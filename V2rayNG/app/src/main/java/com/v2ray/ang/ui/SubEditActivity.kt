@@ -20,6 +20,7 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
+import com.v2ray.ang.util.SubscriptionGuard
 import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -151,6 +152,11 @@ class SubEditActivity : BaseActivity() {
             return false
         }
         if (subItem.url.isNotEmpty()) {
+            // departament: пропускаем только свои ссылки (схема 1b)
+            if (!SubscriptionGuard.isAllowed(subItem.url)) {
+                toast("Эта ссылка не от departament. Используйте подписку из нашего бота.")
+                return false
+            }
             if (!Utils.isValidUrl(subItem.url)) {
                 toast(R.string.toast_invalid_url)
                 return false
