@@ -123,6 +123,20 @@
         <activity
             android:name=".ui.LoginActivity"
             android:exported="false" />
+
+        <!-- =====================Android TV: QR Wi-Fi subscription transfer===================== -->
+        <!-- TV-side receiver: shows the pairing QR and runs the one-shot LAN listener. -->
+        <activity
+            android:name=".tv.TvReceiveActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            tools:ignore="DiscouragedApi,LockedOrientationActivity" />
+        <!-- Phone-side sender: scans the TV QR and POSTs the selected subscription. -->
+        <activity
+            android:name=".tv.TvSendActivity"
+            android:exported="false" />
+        <!-- =====================Android TV===================== -->
+
         <activity
             android:name=".ui.ScScannerActivity"
             android:exported="false" />
