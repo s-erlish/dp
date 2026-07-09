@@ -199,6 +199,7 @@ class GroupServerFragment : BaseFragment<FragmentGroupServerBinding>(),
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
             val result = mainViewModel.updateConfigViaSubAll()
             launch(Dispatchers.Main) {
+                if (!isBindingInitialized) return@launch
                 if (result.configCount > 0) mainViewModel.reloadServerList()
                 bindMetaBar()
                 meta.progressAction.visibility = View.GONE

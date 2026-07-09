@@ -279,13 +279,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         SpeedtestManager.closeAllTcpSockets()
         MmkvManager.clearAllTestDelayResults(serversCache.map { it.guid }.toList())
 
-        val url = SettingsManager.getDelayTestUrl()
         val serversCopy = serversCache.toList()
         val semaphore = Semaphore(24)
         for (item in serversCopy) {
+            val host = item.profile.server ?: continue
+            val port = item.profile.serverPort?.toIntOrNull()
+            val hostPart = if (host.contains(':') && !host.startsWith('[')) "[$host]" else host
+            val url = if (port == null || port == 443) "https://$hostPart/" else "https://$hostPart:$port/"
             tcpingTestScope.launch {
                 semaphore.withPermit {
-                    val testResult = SpeedtestManager.httpPing(url)
+                    // Per-node direct reachability: any HTTP response counts as reachable.
+                    val testResult = SpeedtestManager.httpPing(url, expectAny = true)
                     launch(Dispatchers.Main) {
                         MmkvManager.encodeServerTestDelayMillis(item.guid, testResult)
                         updateListAction.value = getPosition(item.guid)

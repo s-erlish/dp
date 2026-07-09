@@ -32,13 +32,25 @@ object SpeedtestManager {
      * @param timeoutMs per-probe timeout.
      * @return latency in ms, or -1 on failure / unexpected status / redirect.
      */
-    fun httpPing(url: String, timeoutMs: Int = 5000): Long {
-        val client = okhttp3.OkHttpClient.Builder()
-            .connectTimeout(timeoutMs.toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
-            .readTimeout(timeoutMs.toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
-            .callTimeout(timeoutMs.toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+    // One OkHttpClient shared across direct HTTP probes for connection/thread pool reuse.
+    private val httpPingClient: okhttp3.OkHttpClient by lazy {
+        okhttp3.OkHttpClient.Builder()
+            .connectTimeout(5000, java.util.concurrent.TimeUnit.MILLISECONDS)
+            .readTimeout(5000, java.util.concurrent.TimeUnit.MILLISECONDS)
+            .callTimeout(5000, java.util.concurrent.TimeUnit.MILLISECONDS)
             .followRedirects(false)
             .build()
+    }
+
+    /**
+     * Direct HTTP latency probe (no proxy). Measures time-to-first-byte of the response headers.
+     *
+     * @param url the target URL.
+     * @param expectAny when true, any HTTP response counts as reachable (per-node reachability);
+     *        when false, only 204/200 counts (captive-portal generate_204 connectivity check).
+     * @return latency in ms, or -1 on failure / unexpected status / redirect.
+     */
+    fun httpPing(url: String, expectAny: Boolean = false): Long {
         val req = okhttp3.Request.Builder()
             .url(url)
             .head()
@@ -46,9 +58,13 @@ object SpeedtestManager {
             .build()
         val start = System.nanoTime()
         return try {
-            client.newCall(req).execute().use { r ->
+            httpPingClient.newCall(req).execute().use { r ->
                 val ms = (System.nanoTime() - start) / 1_000_000
-                if (r.code == 204 || r.code == 200) ms else -1L
+                if (expectAny) {
+                    if (r.code in 100..599) ms else -1L
+                } else {
+                    if (r.code == 204 || r.code == 200) ms else -1L
+                }
             }
         } catch (e: Exception) {
             LogUtil.w(AppConfig.TAG, "httpPing failed: ${e.message}")
