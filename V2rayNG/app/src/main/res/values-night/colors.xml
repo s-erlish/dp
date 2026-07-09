@@ -79,4 +79,18 @@
     <color name="mono_outlineVariant">#28282C</color>
     <color name="mono_fab_active">#FFFFFF</color>
     <color name="mono_connected">#FFFFFF</color>
+
+    <!-- Surface container ramp (blue theme, dark) -->
+    <color name="md_theme_surfaceContainerLowest">#0A1019</color>
+    <color name="md_theme_surfaceContainerLow">#131C2C</color>
+    <color name="md_theme_surfaceContainer">#172033</color>
+    <color name="md_theme_surfaceContainerHigh">#1E293D</color>
+    <color name="md_theme_surfaceContainerHighest">#243149</color>
+
+    <!-- Surface container ramp (mono theme, dark) -->
+    <color name="mono_surfaceContainerLowest">#000000</color>
+    <color name="mono_surfaceContainerLow">#0E0E10</color>
+    <color name="mono_surfaceContainer">#141416</color>
+    <color name="mono_surfaceContainerHigh">#1B1B1E</color>
+    <color name="mono_surfaceContainerHighest">#232326</color>
 </resources>

@@ -33,11 +33,11 @@
         <item name="colorOnSurfaceVariant">@color/md_theme_onSurfaceVariant</item>
         <item name="colorSurfaceInverse">@color/md_theme_inverseSurface</item>
         <item name="colorOnSurfaceInverse">@color/md_theme_inverseOnSurface</item>
-        <item name="colorSurfaceContainer">@color/md_theme_surface</item>
-        <item name="colorSurfaceContainerHigh">@color/md_theme_surface</item>
-        <item name="colorSurfaceContainerHighest">@color/md_theme_surface</item>
-        <item name="colorSurfaceContainerLow">@color/md_theme_surface</item>
-        <item name="colorSurfaceContainerLowest">@color/md_theme_surface</item>
+        <item name="colorSurfaceContainer">@color/md_theme_surfaceContainer</item>
+        <item name="colorSurfaceContainerHigh">@color/md_theme_surfaceContainerHigh</item>
+        <item name="colorSurfaceContainerHighest">@color/md_theme_surfaceContainerHighest</item>
+        <item name="colorSurfaceContainerLow">@color/md_theme_surfaceContainerLow</item>
+        <item name="colorSurfaceContainerLowest">@color/md_theme_surfaceContainerLowest</item>
 
         <!-- Background colors -->
         <item name="android:colorBackground">@color/md_theme_background</item>
@@ -98,11 +98,11 @@
         <item name="colorOnSurface">@color/mono_onSurface</item>
         <item name="colorSurfaceVariant">@color/mono_surfaceVariant</item>
         <item name="colorOnSurfaceVariant">@color/mono_onSurfaceVariant</item>
-        <item name="colorSurfaceContainer">@color/mono_surface</item>
-        <item name="colorSurfaceContainerHigh">@color/mono_surface</item>
-        <item name="colorSurfaceContainerHighest">@color/mono_surface</item>
-        <item name="colorSurfaceContainerLow">@color/mono_surface</item>
-        <item name="colorSurfaceContainerLowest">@color/mono_surface</item>
+        <item name="colorSurfaceContainer">@color/mono_surfaceContainer</item>
+        <item name="colorSurfaceContainerHigh">@color/mono_surfaceContainerHigh</item>
+        <item name="colorSurfaceContainerHighest">@color/mono_surfaceContainerHighest</item>
+        <item name="colorSurfaceContainerLow">@color/mono_surfaceContainerLow</item>
+        <item name="colorSurfaceContainerLowest">@color/mono_surfaceContainerLowest</item>
         <item name="android:colorBackground">@color/mono_background</item>
         <item name="colorOnBackground">@color/mono_onBackground</item>
         <item name="colorOutline">@color/mono_outline</item>
