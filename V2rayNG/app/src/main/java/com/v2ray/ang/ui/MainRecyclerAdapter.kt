@@ -16,6 +16,7 @@ import com.v2ray.ang.util.FlagUtil
 import com.v2ray.ang.databinding.ItemRecyclerFooterBinding
 import com.v2ray.ang.databinding.ItemRecyclerMainBinding
 import com.v2ray.ang.databinding.ItemSectionHeaderBinding
+import com.v2ray.ang.dto.V2rayConfig
 import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.dto.entities.ServersCache
 import com.v2ray.ang.enums.EConfigType
@@ -23,6 +24,8 @@ import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.helper.ItemTouchHelperAdapter
 import com.v2ray.ang.helper.ItemTouchHelperViewHolder
+import com.v2ray.ang.template.TemplateManager
+import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.viewmodel.MainViewModel
 
 class MainRecyclerAdapter(
@@ -183,10 +186,10 @@ class MainRecyclerAdapter(
         binding.tvName.text = FlagUtil.stripLeadingFlag(profile.remarks)
 
         // Protocol chips: blue primary, gold JSON, grey transport·security.
-        binding.tvType.text = primaryProtocol(profile)
+        binding.tvType.text = primaryProtocol(guid, profile)
         val complex = profile.configType.isComplexType()
         binding.tvJson.visibility = if (complex) View.VISIBLE else View.GONE
-        binding.tvStatistics.text = transportSecurity(profile)
+        binding.tvStatistics.text = transportSecurity(guid, profile)
 
         // Subscription remarks badge (only meaningful in all-servers mode).
         val subRemarks = getSubscriptionRemarks(profile)
@@ -228,18 +231,27 @@ class MainRecyclerAdapter(
         }
     }
 
-    private fun primaryProtocol(profile: ProfileItem): String {
+    private fun primaryProtocol(guid: String, profile: ProfileItem): String {
         return when (profile.configType) {
             EConfigType.POLICYGROUP -> "Auto"
             EConfigType.PROXYCHAIN -> "Chain"
-            EConfigType.CUSTOM -> "Custom"
+            // A CUSTOM profile that wraps a single proxy outbound (e.g. a Remnawave XRAY_JSON
+            // server) should show its real protocol; fall back to "Custom" only when the config
+            // has no single identifiable proxy outbound.
+            EConfigType.CUSTOM -> customProtoInfo(guid)?.protocol?.uppercase() ?: "Custom"
             else -> profile.configType.name
         }
     }
 
-    private fun transportSecurity(profile: ProfileItem): String {
-        if (profile.configType.isComplexType()) return ""
+    private fun transportSecurity(guid: String, profile: ProfileItem): String {
         val parts = mutableListOf<String>()
+        if (profile.configType == EConfigType.CUSTOM) {
+            val info = customProtoInfo(guid) ?: return ""
+            info.network?.let { if (it.isNotBlank()) parts.add(it.uppercase()) }
+            info.security?.let { if (it.isNotBlank()) parts.add(it.uppercase()) }
+            return parts.joinToString(" · ")
+        }
+        if (profile.configType.isComplexType()) return ""
         profile.network?.let { net ->
             if (net.isNotBlank()) parts.add(net.uppercase())
         }
@@ -247,6 +259,38 @@ class MainRecyclerAdapter(
             if (sec.isNotBlank()) parts.add(sec.uppercase())
         }
         return parts.joinToString(" · ")
+    }
+
+    /** Protocol/transport/security parsed from a CUSTOM profile's wrapped xray-json outbound. */
+    private data class CustomProtoInfo(
+        val protocol: String,
+        val network: String?,
+        val security: String?,
+    )
+
+    // Parsing the stored raw config on every row bind would be wasteful, so cache per guid.
+    // A `null` value is cached too (config has no single identifiable outbound → show "Custom").
+    private val customProtoCache = HashMap<String, CustomProtoInfo?>()
+
+    private fun customProtoInfo(guid: String): CustomProtoInfo? {
+        if (customProtoCache.containsKey(guid)) return customProtoCache[guid]
+        val info = try {
+            val raw = TemplateManager.decodeRuntimeRaw(guid) ?: MmkvManager.decodeServerRaw(guid)
+            val outbound = raw
+                ?.let { JsonUtil.fromJsonSafe(it, V2rayConfig::class.java) }
+                ?.getProxyOutbound()
+            outbound?.let {
+                CustomProtoInfo(
+                    protocol = it.protocol,
+                    network = it.streamSettings?.network,
+                    security = it.streamSettings?.security,
+                )
+            }
+        } catch (e: Exception) {
+            null
+        }
+        customProtoCache[guid] = info
+        return info
     }
 
     private fun getSubscriptionRemarks(profile: ProfileItem): String {

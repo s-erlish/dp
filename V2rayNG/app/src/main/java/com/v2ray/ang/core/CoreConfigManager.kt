@@ -3,6 +3,7 @@ package com.v2ray.ang.core
 import android.content.Context
 import android.text.TextUtils
 import com.google.gson.JsonArray
+import com.google.gson.JsonObject
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.dto.ConfigResult
 import com.v2ray.ang.dto.CoreConfigContext
@@ -92,12 +93,36 @@ object CoreConfigManager {
             LogUtil.e(AppConfig.TAG, "buildV2rayCustomConfig: template decode failed, using plain raw", e)
             MmkvManager.decodeServerRaw(configContext.guid)
         } ?: return ConfigResult(status = false, guid = configContext.guid, errorMessage = "Custom config is empty")
-        val result = ConfigResult(true, configContext.guid, raw)
+        // Parse once up-front so we can sanitize/validate even when tun is not needed.
+        // A malformed or non-Xray payload must never reach the native core (an unrecoverable
+        // native panic there kills the whole app process — the "снова произошёл сбой" dialog).
+        val json = JsonUtil.parseString(raw)?.takeIf { it.isJsonObject }?.asJsonObject
+            ?: return ConfigResult(
+                status = false,
+                guid = configContext.guid,
+                errorMessage = "Custom config is not a JSON object"
+            )
+
+        // Remnawave XRAY_JSON templates carry a root-level "remnawave" metadata object (and
+        // may carry other non-Xray keys). libv2ray/Xray can choke on unexpected top-level
+        // keys, so keep only valid Xray root keys before handing the config to the core.
+        sanitizeXrayRootKeys(json, configContext.guid)
+
+        // A config with no outbounds can crash the core on start; fail cleanly instead.
+        val outboundsJson = json.get("outbounds")?.takeIf { it.isJsonArray }?.asJsonArray
+        if (outboundsJson == null || outboundsJson.size() == 0) {
+            return ConfigResult(
+                status = false,
+                guid = configContext.guid,
+                errorMessage = "Custom config has no outbounds"
+            )
+        }
+
+        val result = JsonUtil.toJsonPretty(json)?.let { ConfigResult(true, configContext.guid, it) }
+            ?: ConfigResult(true, configContext.guid, raw)
         if (!needTun()) {
             return result
         }
-
-        val json = JsonUtil.parseString(raw)?.takeIf { it.isJsonObject }?.asJsonObject ?: return result
 
         // Check whether package names need to be replaced with UIDs
         if (SettingsManager.canUseProcessRouting()) {
@@ -131,11 +156,42 @@ object CoreConfigManager {
             val templateConfig = initV2rayConfig(configContext)
             templateConfig.inbounds.firstOrNull { it.tag == "tun" }?.let { inboundTun ->
                 inboundTun.settings?.mtu = SettingsManager.getVpnMtu()
-                inboundsJson.add(JsonUtil.parseString(JsonUtil.toJson(inboundTun)))
+                // Only append a well-formed inbound object; a null element here would be handed
+                // to the native core as `null` inside the inbounds array and can crash it.
+                JsonUtil.parseString(JsonUtil.toJson(inboundTun))
+                    ?.takeIf { it.isJsonObject }
+                    ?.let { inboundsJson.add(it) }
             }
         }
 
         return JsonUtil.toJsonPretty(json)?.let { ConfigResult(true, configContext.guid, it) } ?: result
+    }
+
+    /**
+     * Valid Xray top-level configuration keys. Anything else (e.g. Remnawave's root-level
+     * "remnawave" metadata object) is stripped before the config reaches the native core.
+     */
+    private val XRAY_ROOT_KEYS = setOf(
+        "log", "dns", "inbounds", "outbounds", "routing", "policy",
+        "api", "stats", "reverse", "observatory", "burstObservatory",
+        "fakedns", "metrics"
+    )
+
+    /**
+     * Remove non-Xray root keys from a parsed custom config in place.
+     *
+     * Remnawave XRAY_JSON subscriptions embed a root-level "remnawave" object (and possibly
+     * other panel metadata). libv2ray/Xray may reject or mishandle unknown top-level keys,
+     * which manifests as a process-killing native crash on start. Keeping only the known-good
+     * Xray keys makes these templates safe to load. Ordinary/self-authored custom configs only
+     * contain valid Xray keys, so this is a no-op for them.
+     */
+    private fun sanitizeXrayRootKeys(json: JsonObject, guid: String) {
+        val unknownKeys = json.keySet().filter { it !in XRAY_ROOT_KEYS }
+        if (unknownKeys.isNotEmpty()) {
+            LogUtil.w(AppConfig.TAG, "Stripping non-Xray root keys from custom config $guid: $unknownKeys")
+            unknownKeys.forEach { json.remove(it) }
+        }
     }
 
     /**
