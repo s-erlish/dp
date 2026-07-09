@@ -525,17 +525,24 @@ object CoreConfigManager {
         val socksPort = SettingsManager.getSocksPort()
         val socksUsername = SettingsManager.getSocksUsername()
         val socksPassword = SettingsManager.getSocksPassword()
+        // Proxy sharing binds the socks inbound to 0.0.0.0 (see the listen decision below) so
+        // other devices on the LAN can use it. socks username/password auth is only meaningful
+        // in that shared case. The normal loopback-only tun bridge (hev-socks5-tunnel) connects
+        // to this SAME inbound on 127.0.0.1, so it must always stay "noauth" — otherwise turning
+        // on "SOCKS5 authorization" makes the inbound reject the local tunnel and no traffic
+        // flows. Gate password auth on proxy sharing so the setting only affects shared access.
+        val proxySharing = MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING) == true
         val inbound1 = v2rayConfig.inbounds[0]
         if (inbound1.settings == null) {
             inbound1.settings = V2rayConfig.InboundBean.InSettingsBean()
         }
 
-        if (MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING) != true) {
+        if (!proxySharing) {
             inbound1.listen = AppConfig.LOOPBACK
         }
         inbound1.port = socksPort
         inbound1.settings?.udp = MmkvManager.decodeSettingsBool(AppConfig.PREF_SOCKS_ENABLE_UDP, true)
-        if (socksUsername != null && socksPassword != null) {
+        if (proxySharing && socksUsername != null && socksPassword != null) {
             inbound1.settings?.auth = "password"
             inbound1.settings?.accounts = listOf(
                 V2rayConfig.InboundBean.InSettingsBean.SocksAccountBean(
