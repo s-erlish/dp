@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Departament Telegram auth module. New strings only; do not merge into strings.xml. -->
+    <string name="auth_login_title">Sign in</string>
+    <string name="auth_sign_in_telegram">Sign in with Telegram</string>
+    <string name="auth_intro_headline">Sign in with Telegram</string>
+    <string name="auth_intro_desc">Connect your Telegram account to import your subscription automatically.</string>
+    <string name="auth_continue_telegram">Continue with Telegram</string>
+    <string name="auth_awaiting_title">Waiting for confirmation</string>
+    <string name="auth_awaiting_desc">Open Telegram and press Start, then come back here. Waiting for confirmation…</string>
+    <string name="auth_open_telegram_again">Open Telegram again</string>
+    <string name="auth_enter_code_manually">Or enter the code from the bot</string>
+    <string name="auth_code_hint">Paste code</string>
+    <string name="auth_submit_code">Submit code</string>
+    <string name="auth_success">Signed in successfully</string>
+    <string name="auth_error_generic">Something went wrong. Please try again.</string>
+    <string name="auth_error_network">Network error. Check your connection and try again.</string>
+    <string name="auth_error_unauthorized">Invalid or expired code. Please try again.</string>
+    <string name="auth_error_rate_limited">Too many attempts. Please wait a moment and retry.</string>
+    <string name="auth_error_timeout">Login timed out. Please try again.</string>
+    <string name="auth_error_telegram_not_installed">Telegram is not installed. Use the manual code instead.</string>
+    <string name="auth_not_configured">Sign-in is not available in this build.</string>
+</resources>

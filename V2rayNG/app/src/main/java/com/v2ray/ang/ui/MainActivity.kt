@@ -24,6 +24,7 @@ import com.v2ray.ang.core.CoreServiceManager
 import com.v2ray.ang.databinding.ActivityMainBinding
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.enums.PermissionType
+import com.v2ray.ang.auth.BackendConfig
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toSpeedString
@@ -838,6 +839,14 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
         // Handle navigation view item clicks here.
         when (item.itemId) {
+            R.id.telegram_login -> {
+                // Login is OPTIONAL: only offer it when a backend is configured.
+                if (BackendConfig.isConfigured()) {
+                    requestActivityLauncher.launch(Intent(this, LoginActivity::class.java))
+                } else {
+                    toast(R.string.auth_not_configured)
+                }
+            }
             R.id.sub_setting -> requestActivityLauncher.launch(Intent(this, SubSettingActivity::class.java))
             R.id.per_app_proxy_settings -> requestActivityLauncher.launch(Intent(this, PerAppProxyActivity::class.java))
             R.id.routing_setting -> requestActivityLauncher.launch(Intent(this, RoutingSettingActivity::class.java))

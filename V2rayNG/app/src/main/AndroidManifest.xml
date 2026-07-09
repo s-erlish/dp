@@ -119,6 +119,10 @@
         <activity
             android:name=".ui.SubEditActivity"
             android:exported="false" />
+
+        <activity
+            android:name=".ui.LoginActivity"
+            android:exported="false" />
         <activity
             android:name=".ui.ScScannerActivity"
             android:exported="false" />
