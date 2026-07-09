@@ -59,16 +59,10 @@ class TProxyService(
 
     private fun buildConfig(): String {
         val socksPort = SettingsManager.getSocksPort()
-        val socksUsername = SettingsManager.getSocksUsername()
-        val socksPassword = SettingsManager.getSocksPassword()
         val vpnConfig = SettingsManager.getCurrentVpnInterfaceAddressConfig()
-        val escapedSocksUsername = socksUsername?.replace("'", "''")
-        val escapedSocksPassword = socksPassword?.replace("'", "''")
-        // Keep the bridge in lock-step with the socks inbound (CoreConfigManager.configureInbounds):
-        // the inbound only requires password auth when the proxy is SHARED to the LAN. This tunnel
-        // always connects over loopback, where the inbound stays "noauth", so we must NOT send
-        // credentials there — doing so would desync the two sides and stall all traffic.
-        val proxySharing = MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING) == true
+        // The socks inbound (CoreConfigManager.configureInbounds) is always "noauth", so this
+        // loopback bridge never sends credentials — enabling SOCKS5 auth or hotspot sharing can
+        // therefore never desync the two sides and stall the phone's VPN.
         return buildString {
             appendLine("tunnel:")
             appendLine("  mtu: ${SettingsManager.getVpnMtu()}")
@@ -82,10 +76,6 @@ class TProxyService(
             appendLine("  port: ${socksPort}")
             appendLine("  address: ${AppConfig.LOOPBACK}")
             appendLine("  udp: 'udp'")
-            if (proxySharing && escapedSocksUsername != null && escapedSocksPassword != null) {
-                appendLine("  username: '${escapedSocksUsername}'")
-                appendLine("  password: '${escapedSocksPassword}'")
-            }
 
             // Read-write timeout settings
             val timeoutSetting = MmkvManager.decodeSettingsString(AppConfig.PREF_HEV_TUNNEL_RW_TIMEOUT) ?: AppConfig.HEVTUN_RW_TIMEOUT

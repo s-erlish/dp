@@ -523,14 +523,12 @@ object CoreConfigManager {
         val enableLocalProxy = forcedByHev || MmkvManager.decodeSettingsBool(AppConfig.PREF_ENABLE_LOCAL_PROXY, true)
 
         val socksPort = SettingsManager.getSocksPort()
-        val socksUsername = SettingsManager.getSocksUsername()
-        val socksPassword = SettingsManager.getSocksPassword()
         // Proxy sharing binds the socks inbound to 0.0.0.0 (see the listen decision below) so
-        // other devices on the LAN can use it. socks username/password auth is only meaningful
-        // in that shared case. The normal loopback-only tun bridge (hev-socks5-tunnel) connects
-        // to this SAME inbound on 127.0.0.1, so it must always stay "noauth" — otherwise turning
-        // on "SOCKS5 authorization" makes the inbound reject the local tunnel and no traffic
-        // flows. Gate password auth on proxy sharing so the setting only affects shared access.
+        // other devices on the LAN/hotspot can use the phone as a proxy and ride its VPN.
+        // The local tun bridge (hev-socks5-tunnel) connects to this SAME inbound on 127.0.0.1,
+        // so the inbound is ALWAYS kept "noauth": requiring SOCKS5 auth here rejected the local
+        // tunnel and killed the phone's VPN (and the hotspot too). Auth is deliberately not
+        // enforced on the inbound; a shared proxy is only reachable while sharing is enabled.
         val proxySharing = MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING) == true
         val inbound1 = v2rayConfig.inbounds[0]
         if (inbound1.settings == null) {
@@ -542,18 +540,10 @@ object CoreConfigManager {
         }
         inbound1.port = socksPort
         inbound1.settings?.udp = MmkvManager.decodeSettingsBool(AppConfig.PREF_SOCKS_ENABLE_UDP, true)
-        if (proxySharing && socksUsername != null && socksPassword != null) {
-            inbound1.settings?.auth = "password"
-            inbound1.settings?.accounts = listOf(
-                V2rayConfig.InboundBean.InSettingsBean.SocksAccountBean(
-                    user = socksUsername,
-                    pass = socksPassword
-                )
-            )
-        } else {
-            inbound1.settings?.auth = "noauth"
-            inbound1.settings?.accounts = null
-        }
+        // Always noauth so the loopback tun bridge is never locked out; enabling SOCKS5 auth or
+        // hotspot sharing therefore can no longer break the phone's VPN or the shared connection.
+        inbound1.settings?.auth = "noauth"
+        inbound1.settings?.accounts = null
         val fakedns = MmkvManager.decodeSettingsBool(AppConfig.PREF_FAKE_DNS_ENABLED) == true
         val sniffAllTlsAndHttp =
             MmkvManager.decodeSettingsBool(AppConfig.PREF_SNIFFING_ENABLED, true) != false
