@@ -65,9 +65,9 @@
                     android:baselineAligned="false"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingStart="24dp"
+                    android:paddingStart="18dp"
                     android:paddingTop="10dp"
-                    android:paddingEnd="24dp"
+                    android:paddingEnd="18dp"
                     android:paddingBottom="6dp">
 
                     <LinearLayout
@@ -89,7 +89,9 @@
                             android:id="@+id/tv_upload_speed"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
+                            android:layout_marginStart="4dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
                             android:text="@string/speed_zero"
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="13sp"
@@ -101,8 +103,10 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
+                        android:ellipsize="end"
                         android:fontFamily="monospace"
                         android:gravity="center"
+                        android:maxLines="1"
                         android:text="00:00:00"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:textSize="14sp"
@@ -127,7 +131,9 @@
                             android:id="@+id/tv_download_speed"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
+                            android:layout_marginStart="4dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
                             android:text="@string/speed_zero"
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="13sp"
@@ -177,7 +183,9 @@
 
                             <!-- Thin rotating arc that sweeps around the ring while
                                  connecting (and while a subscription is loading). No solid
-                                 fill: an indeterminate Material sweep in colorPrimary. -->
+                                 fill: an indeterminate Material sweep. Its colour is pinned at
+                                 runtime to the connecting accent so it matches the shield; the
+                                 grow-in/shrink-out behaviours give a smooth start/stop. -->
                             <com.google.android.material.progressindicator.CircularProgressIndicator
                                 android:id="@+id/progress_connect"
                                 android:layout_width="wrap_content"
@@ -185,9 +193,11 @@
                                 android:layout_gravity="center"
                                 android:indeterminate="true"
                                 android:visibility="gone"
+                                app:hideAnimationBehavior="inward"
                                 app:indeterminateAnimationType="disjoint"
                                 app:indicatorColor="?attr/colorPrimary"
                                 app:indicatorSize="212dp"
+                                app:showAnimationBehavior="inward"
                                 app:trackColor="@android:color/transparent"
                                 app:trackCornerRadius="4dp"
                                 app:trackThickness="3dp" />
@@ -203,7 +213,8 @@
                                 app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
                                 app:cardCornerRadius="88dp"
                                 app:cardElevation="0dp"
-                                app:rippleColor="?attr/colorPrimary"
+                                app:cardForegroundColor="@android:color/transparent"
+                                app:rippleColor="@android:color/transparent"
                                 app:strokeWidth="0dp">
 
                                 <ImageView
@@ -385,11 +396,13 @@
                 android:background="@drawable/bg_bottom_nav_scrim" />
 
             <!-- Overlays the content and hugs the very bottom edge; a bottom inset pad is
-                 applied at runtime so the items clear the gesture bar. -->
+                 applied at runtime so the items clear the gesture bar. A fixed compact height
+                 (instead of wrap_content) removes the tall Material-3 item's built-in whitespace
+                 below the label, so the icons/labels sit at the very bottom edge. -->
             <com.google.android.material.bottomnavigation.BottomNavigationView
                 android:id="@+id/bottom_nav"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="58dp"
                 android:layout_gravity="bottom"
                 android:background="@android:color/transparent"
                 app:elevation="0dp"

@@ -163,7 +163,10 @@ object CoreServiceManager {
         if (MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING)) {
             context.toast(R.string.toast_warning_pref_proxysharing_short)
         } else {
-            context.toast(R.string.toast_services_start)
+            // The old system-style «Запуск служб» toast is suppressed here (mirrors the already
+            // commented stop toast above): the connect screen now shows a single custom neutral
+            // gray «Подключение…» toast from MainActivity instead. Proxy-sharing warning kept.
+            //context.toast(R.string.toast_services_start)
         }
 
         val isVpnMode = SettingsManager.isVpnMode()

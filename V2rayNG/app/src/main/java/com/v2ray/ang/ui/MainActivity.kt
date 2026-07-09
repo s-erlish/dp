@@ -95,6 +95,18 @@ class MainActivity : HelperBaseActivity() {
     private val timerHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var connectionStartTime = 0L
 
+    // Custom gray status toast (VPN state). Kept so a new one can cancel the previous
+    // instead of queueing behind it.
+    private var statusToast: android.widget.Toast? = null
+    // Tracks the last delivered running state so status toasts only fire on a real
+    // transition (not on the LiveData value replay after a rotation/theme recreate).
+    private var lastRunningState: Boolean? = null
+    // True between a connect tap and the definitive running/failed result, so a start that
+    // ends in "not running" is reported as a failure rather than a silent revert.
+    private var connectInProgress = false
+    // Home toolbar auto-hide: whether the app bar is currently slid out of view.
+    private var toolbarHidden = false
+
     // Gentle breathing pulse on the shield while the tunnel is establishing.
     private var connectPulse: Animator? = null
     // The rotating connect arc is shared by the "connecting" state and subscription
@@ -119,8 +131,9 @@ class MainActivity : HelperBaseActivity() {
     private val connectWatchdogRunnable = Runnable {
         if (mainViewModel.isRunning.value != true) {
             // Render idle through the existing state path and tell the user the start failed.
+            connectInProgress = false
             applyRunningState(isLoading = false, isRunning = false)
-            toastError(R.string.toast_services_failure)
+            showStatusToast(getString(R.string.toast_status_failed))
         }
     }
 
@@ -168,6 +181,12 @@ class MainActivity : HelperBaseActivity() {
         applyThemeDecorations()
         setupEdgeToEdge()
 
+        // The redesigned Home always shows the inline up/down speed row, so the traffic-stats
+        // pipeline must be on: without this the core config omits the stats outbound and the
+        // speed-notification loop never runs, so the row is stuck on «0 KB/s». Enabling it here
+        // (before any connect) makes real speed flow through updateSpeedAction while connected.
+        MmkvManager.encodeSettings(AppConfig.PREF_SPEED_ENABLED, true)
+
         // All servers are shown in one flat, provider-grouped list (no subscription tabs).
         mainViewModel.subscriptionId = ""
         setupServerLists()
@@ -205,6 +224,7 @@ class MainActivity : HelperBaseActivity() {
         setupAccountHeader()
         setupSettings()
         setupViewModel()
+        setupToolbarAutoHide()
         SubscriptionUpdater.sync()
         mainViewModel.reloadServerList()
 
@@ -254,6 +274,9 @@ class MainActivity : HelperBaseActivity() {
         binding.groupHome.isVisible = tab == R.id.nav_home
         binding.groupServers.isVisible = tab == R.id.nav_servers
         binding.groupSettings.root.isVisible = tab == R.id.nav_settings
+        // The auto-hide only tracks Home scrolling; make sure leaving/returning to a tab never
+        // strands the app bar (and its shifted content) in the hidden position.
+        showToolbar()
     }
 
     /**
@@ -290,13 +313,16 @@ class MainActivity : HelperBaseActivity() {
             // One-shot event: ignore the retained value replayed on recreate/rotation.
             if (!mainViewModel.consumeFastConnectEvent()) return@observe
             if (guid == null) {
-                toastError(R.string.toast_services_failure)
+                connectInProgress = false
+                showStatusToast(getString(R.string.toast_status_failed))
                 return@observe
             }
             updateSelectedServer()
             if (mainViewModel.isRunning.value == true) {
                 restartV2Ray()
             } else {
+                // Mark the attempt so a failed fast-connect is reported as «Не удалось подключиться».
+                connectInProgress = true
                 applyRunningState(isLoading = true, isRunning = false)
                 scheduleConnectWatchdog()
                 startVpnWithPermission()
@@ -308,6 +334,24 @@ class MainActivity : HelperBaseActivity() {
             cancelConnectWatchdog()
             applyRunningState(false, isRunning)
             if (isRunning) scheduleHealthCheckIfEnabled() else cancelHealthCheck()
+
+            // Subtle gray status toast, fired only on a genuine transition. LiveData replays
+            // its last value on rotation/theme recreate, and the state present at launch must
+            // not toast, so a connected/disconnected toast needs a known prior state (or an
+            // in-progress connect for the "connected"/"failed" cases).
+            val prev = lastRunningState
+            if (isRunning) {
+                if (connectInProgress || prev == false) {
+                    showStatusToast(getString(R.string.toast_status_connected))
+                }
+            } else {
+                when {
+                    connectInProgress -> showStatusToast(getString(R.string.toast_status_failed))
+                    prev == true -> showStatusToast(getString(R.string.toast_status_disconnected))
+                }
+            }
+            connectInProgress = false
+            lastRunningState = isRunning
         }
         mainViewModel.delayResultAction.observe(this) { time ->
             if (!healthCheckPending) return@observe
@@ -813,11 +857,15 @@ class MainActivity : HelperBaseActivity() {
         mainViewModel.autoFallbackUsed = false
 
         if (mainViewModel.isRunning.value == true) {
-            // Stop: no "connecting" visual, the isRunning observer will settle the idle state.
+            // Stop: no "connecting" visual, the isRunning observer will settle the idle state
+            // and show the «Отключено» toast.
+            connectInProgress = false
             cancelConnectWatchdog()
             CoreServiceManager.stopVService(this)
         } else {
             // Start: show the subtle blue "connecting" state (pulsing ring), never a bright fill.
+            connectInProgress = true
+            showStatusToast(getString(R.string.toast_status_connecting))
             applyRunningState(isLoading = true, isRunning = false)
             scheduleConnectWatchdog()
             startVpnWithPermission()
@@ -915,19 +963,88 @@ class MainActivity : HelperBaseActivity() {
     private fun themeColor(attr: Int): Int = MaterialColors.getColor(binding.cardConnect, attr)
 
     /**
-     * Incy-style press feedback on the connect button: a quick scale-down followed by a
-     * gentle overshoot back to full size. Purely cosmetic, no state change.
+     * Shows the subtle, neutral gray status toast (custom pill) that reflects the VPN state —
+     * «Подключение…» / «Прокси подключён» / «Отключено» / «Не удалось подключиться». Neutral
+     * surface colour (no green/system style). Cancels any previous status toast so states never
+     * queue up behind each other.
+     */
+    @Suppress("DEPRECATION") // custom Toast view (Toast(context)/setView) is the intended, subtle status pill
+    private fun showStatusToast(text: CharSequence) {
+        statusToast?.cancel()
+        val view = layoutInflater.inflate(R.layout.toast_status, null)
+        view.findViewById<android.widget.TextView>(R.id.tv_toast_status).text = text
+        statusToast = android.widget.Toast(this).apply {
+            duration = android.widget.Toast.LENGTH_SHORT
+            setView(view)
+            val yOffset = (110 * resources.displayMetrics.density).toInt()
+            setGravity(android.view.Gravity.BOTTOM or android.view.Gravity.CENTER_HORIZONTAL, 0, yOffset)
+            show()
+        }
+    }
+
+    /**
+     * Auto-hides the Home app bar on downward scroll and brings it back on upward scroll (or at
+     * the very top). The AppBarLayout is a plain child here (no CoordinatorLayout scroll flags),
+     * so this is driven manually: the app bar and the tab content slide up together
+     * (translationY) so no empty band is left where the bar was; the bottom nav + scrim overlay
+     * the freed strip. State-based (animate to shown/hidden), so it never fights per-frame with
+     * an active fling.
+     */
+    private fun setupToolbarAutoHide() {
+        // Explicit SAM: NestedScrollView also inherits View.setOnScrollChangeListener, whose
+        // listener is likewise a 5-arg interface, so a bare lambda would be an ambiguous overload.
+        binding.groupHome.setOnScrollChangeListener(
+            androidx.core.widget.NestedScrollView.OnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
+                val dy = scrollY - oldScrollY
+                when {
+                    scrollY <= 0 -> showToolbar()
+                    dy > 6 && scrollY > binding.appbarLayout.height -> hideToolbar()
+                    dy < -6 -> showToolbar()
+                }
+            }
+        )
+    }
+
+    private fun hideToolbar() {
+        if (toolbarHidden) return
+        toolbarHidden = true
+        animateToolbar(-binding.appbarLayout.height.toFloat())
+    }
+
+    private fun showToolbar() {
+        if (!toolbarHidden) return
+        toolbarHidden = false
+        animateToolbar(0f)
+    }
+
+    /** Slides the app bar and the tab content to [translationY] in lock-step. */
+    private fun animateToolbar(translationY: Float) {
+        val interpolator = android.view.animation.DecelerateInterpolator()
+        binding.appbarLayout.animate().cancel()
+        binding.mainContent.animate().cancel()
+        binding.appbarLayout.animate()
+            .translationY(translationY).setInterpolator(interpolator).setDuration(220).start()
+        binding.mainContent.animate()
+            .translationY(translationY).setInterpolator(interpolator).setDuration(220).start()
+    }
+
+    /**
+     * Incy-style press feedback on the connect button: a distinct "depress" (scale-down, as if
+     * pushed in) that springs back with an overshoot. Purely cosmetic — there is NO colour/fill
+     * change on press (the ripple and pressed foreground are cleared in the layout), so this
+     * scale is the only press feedback.
      */
     private fun animateConnectPress() {
         binding.cardConnect.animate().cancel()
         binding.cardConnect.animate()
-            .scaleX(0.92f).scaleY(0.92f)
-            .setDuration(90)
+            .scaleX(0.88f).scaleY(0.88f)
+            .setInterpolator(android.view.animation.AccelerateInterpolator())
+            .setDuration(110)
             .withEndAction {
                 binding.cardConnect.animate()
                     .scaleX(1f).scaleY(1f)
-                    .setInterpolator(OvershootInterpolator())
-                    .setDuration(220)
+                    .setInterpolator(OvershootInterpolator(2.5f))
+                    .setDuration(260)
                     .start()
             }
             .start()
@@ -959,9 +1076,20 @@ class MainActivity : HelperBaseActivity() {
         binding.imgConnect.alpha = 1f
     }
 
-    /** The arc spins whenever we are connecting OR a subscription is loading. */
+    /**
+     * The arc spins whenever we are connecting OR a subscription is loading. Uses the indicator's
+     * own show()/hide() (grow-in / shrink-out per the layout's animationBehavior) for a smooth
+     * start/stop, and pins its colour to the connecting accent so the arc always matches the
+     * shield (correct in both the blue and mono overlays).
+     */
     private fun refreshConnectArc() {
-        binding.progressConnect.isVisible = connectArcConnecting || connectArcSubLoads > 0
+        val show = connectArcConnecting || connectArcSubLoads > 0
+        if (show) {
+            binding.progressConnect.setIndicatorColor(themeColor(R.attr.connectActiveColor))
+            binding.progressConnect.show()
+        } else {
+            binding.progressConnect.hide()
+        }
     }
 
     /**
@@ -1684,6 +1812,7 @@ class MainActivity : HelperBaseActivity() {
         timerHandler.removeCallbacks(memoryRunnable)
         timerHandler.removeCallbacks(connectWatchdogRunnable)
         stopConnectingAnim()
+        statusToast?.cancel()
         super.onDestroy()
     }
 }

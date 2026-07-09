@@ -46,6 +46,12 @@
     <string name="toast_services_success">Службы успешно запущены</string>
     <string name="toast_services_failure">Сбой при запуске служб</string>
 
+    <!-- Custom gray status toasts shown on the connect screen (VPN state). -->
+    <string name="toast_status_connecting">Подключение…</string>
+    <string name="toast_status_connected">Прокси подключён</string>
+    <string name="toast_status_disconnected">Отключено</string>
+    <string name="toast_status_failed">Не удалось подключиться</string>
+
     <!--ServerActivity-->
     <string name="title_server">Профиль</string>
     <string name="menu_item_add_config">Добавить профиль</string>

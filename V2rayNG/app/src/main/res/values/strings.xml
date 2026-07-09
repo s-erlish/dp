@@ -47,6 +47,12 @@
     <string name="toast_services_success">Start Services Success</string>
     <string name="toast_services_failure">Start Services Failure</string>
 
+    <!-- Custom gray status toasts shown on the connect screen (VPN state). -->
+    <string name="toast_status_connecting">Connecting…</string>
+    <string name="toast_status_connected">Proxy connected</string>
+    <string name="toast_status_disconnected">Disconnected</string>
+    <string name="toast_status_failed">Couldn\'t connect</string>
+
     <!--ServerActivity-->
     <string name="title_server">Config</string>
     <string name="menu_item_add_config">Add config</string>

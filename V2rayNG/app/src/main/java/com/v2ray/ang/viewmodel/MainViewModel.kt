@@ -25,8 +25,6 @@ import com.v2ray.ang.extension.isGroupType
 import com.v2ray.ang.template.TemplateManager
 import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.extension.matchesPattern
-import com.v2ray.ang.extension.toastError
-import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
@@ -676,17 +674,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 AppConfig.MSG_STATE_START_SUCCESS -> {
-                    getApplication<AngApplication>().toastSuccess(R.string.toast_services_success)
+                    // No green "Службы успешно запущены" toast: the connect screen now reflects
+                    // the connected state with the neutral gray «Прокси подключён» toast + shield,
+                    // driven by MainActivity's isRunning observer.
                     isRunning.value = true
                 }
 
                 AppConfig.MSG_STATE_START_FAILURE -> {
-                    val errorMessage = intent.getStringExtra("content")
-                    if (!errorMessage.isNullOrBlank()) {
-                        getApplication<AngApplication>().toastError(errorMessage)
-                    } else {
-                        getApplication<AngApplication>().toastError(R.string.toast_services_failure)
-                    }
+                    // No system-style error toast here: MainActivity reports the failure as the
+                    // neutral gray «Не удалось подключиться» toast (via connectInProgress) when
+                    // this flips isRunning to false during an in-progress connect.
                     isRunning.value = false
                 }
 
