@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
@@ -17,9 +18,17 @@ import com.v2ray.ang.R
 import com.v2ray.ang.contracts.MainAdapterListener
 import com.v2ray.ang.databinding.FragmentGroupServerBinding
 import com.v2ray.ang.databinding.ItemQrcodeBinding
+import com.google.android.material.color.MaterialColors
 import com.v2ray.ang.dto.entities.ProfileItem
+import com.v2ray.ang.dto.entities.hasExpiry
+import com.v2ray.ang.dto.entities.hasUserInfo
+import com.v2ray.ang.dto.entities.isExpired
+import com.v2ray.ang.dto.entities.isUnlimited
+import com.v2ray.ang.dto.entities.trafficFraction
+import com.v2ray.ang.dto.entities.usedTraffic
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.isComplexType
+import com.v2ray.ang.extension.toTrafficString
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
@@ -31,6 +40,9 @@ import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class GroupServerFragment : BaseFragment<FragmentGroupServerBinding>(),
     SwipeRefreshLayout.OnRefreshListener {
@@ -91,12 +103,128 @@ class GroupServerFragment : BaseFragment<FragmentGroupServerBinding>(),
             adapter.setData(mainViewModel.serversCache, index)
         }
 
+        setupMetaBar()
         // LogUtil.d(TAG, "GroupServerFragment onViewCreated: subId=$subId")
     }
 
     override fun onResume() {
         super.onResume()
         mainViewModel.subscriptionIdChanged(subId)
+        bindMetaBar()
+    }
+
+    /**
+     * Sets up the subscription meta bar (title + ping/refresh actions + traffic bar).
+     * Hidden entirely on the "all servers" pseudo-tab which has no single subscription.
+     */
+    private fun setupMetaBar() {
+        val meta = binding.layoutMetaBar
+        if (subId.isEmpty()) {
+            meta.root.visibility = View.GONE
+            return
+        }
+        meta.btnRefresh.setOnClickListener { refreshSub() }
+        meta.btnPing.setOnClickListener { pingSub() }
+        bindMetaBar()
+    }
+
+    /**
+     * Repaints the meta bar from the persisted subscription metadata.
+     */
+    private fun bindMetaBar() {
+        if (!isBindingInitialized) return
+        val meta = binding.layoutMetaBar
+        val sub = if (subId.isEmpty()) null else MmkvManager.decodeSubscription(subId)
+        if (sub == null) {
+            meta.root.visibility = View.GONE
+            return
+        }
+        meta.root.visibility = View.VISIBLE
+        meta.tvSubTitle.text = sub.remarks.ifBlank { getString(R.string.title_sub_setting) }
+
+        if (!sub.hasUserInfo) {
+            meta.layoutTraffic.visibility = View.GONE
+            return
+        }
+        meta.layoutTraffic.visibility = View.VISIBLE
+
+        val variantColor = MaterialColors.getColor(meta.tvTraffic, com.google.android.material.R.attr.colorOnSurfaceVariant)
+        val redColor = ContextCompat.getColor(requireContext(), R.color.colorPingRed)
+        val greenColor = ContextCompat.getColor(requireContext(), R.color.colorPing)
+
+        if (sub.isUnlimited) {
+            meta.tvTraffic.text = getString(R.string.sub_traffic_unlimited, sub.usedTraffic.toTrafficString())
+            meta.tvTraffic.setTextColor(variantColor)
+            meta.progressTraffic.visibility = View.GONE
+        } else {
+            val near = sub.trafficFraction >= 0.9f
+            meta.tvTraffic.text = getString(
+                R.string.sub_traffic_used,
+                sub.usedTraffic.toTrafficString(),
+                sub.totalTraffic.toTrafficString()
+            )
+            meta.tvTraffic.setTextColor(if (near) redColor else variantColor)
+            meta.progressTraffic.visibility = View.VISIBLE
+            meta.progressTraffic.setProgressCompat((sub.trafficFraction * 1000).toInt(), false)
+            meta.progressTraffic.setIndicatorColor(if (near) redColor else greenColor)
+        }
+
+        if (sub.hasExpiry) {
+            meta.tvExpiry.visibility = View.VISIBLE
+            if (sub.isExpired) {
+                meta.tvExpiry.text = getString(R.string.sub_expired)
+                meta.tvExpiry.setTextColor(redColor)
+            } else {
+                val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(sub.expire * 1000))
+                val daysLeft = ((sub.expire - System.currentTimeMillis() / 1000) / 86400).toInt()
+                meta.tvExpiry.text = if (daysLeft in 0..999) {
+                    getString(R.string.sub_days_left, getString(R.string.sub_expires, date), daysLeft)
+                } else {
+                    getString(R.string.sub_expires, date)
+                }
+                meta.tvExpiry.setTextColor(variantColor)
+            }
+        } else {
+            meta.tvExpiry.visibility = View.GONE
+        }
+    }
+
+    /**
+     * Re-fetches the current subscription (traffic/expiry header included) and repaints.
+     */
+    private fun refreshSub() {
+        val meta = binding.layoutMetaBar
+        meta.progressAction.visibility = View.VISIBLE
+        meta.btnRefresh.isEnabled = false
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            val result = mainViewModel.updateConfigViaSubAll()
+            launch(Dispatchers.Main) {
+                if (result.configCount > 0) mainViewModel.reloadServerList()
+                bindMetaBar()
+                meta.progressAction.visibility = View.GONE
+                meta.btnRefresh.isEnabled = true
+                if (result.successCount > 0) {
+                    ownerActivity.toastSuccess(R.string.toast_success)
+                } else if (result.failureCount > 0) {
+                    ownerActivity.toastError(R.string.toast_failure)
+                }
+            }
+        }
+    }
+
+    /**
+     * Runs a latency test across the servers of this subscription.
+     */
+    private fun pingSub() {
+        val meta = binding.layoutMetaBar
+        meta.progressAction.visibility = View.VISIBLE
+        meta.btnPing.isEnabled = false
+        mainViewModel.testAllTcping()
+        binding.root.postDelayed({
+            if (!isBindingInitialized) return@postDelayed
+            meta.progressAction.visibility = View.GONE
+            meta.btnPing.isEnabled = true
+        }, 3000L)
     }
 
     /**

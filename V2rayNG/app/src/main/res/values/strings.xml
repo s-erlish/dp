@@ -291,6 +291,11 @@
     <string name="bottom_nav_home">Home</string>
     <string name="bottom_nav_servers">Servers</string>
     <string name="bottom_nav_more">More</string>
+    <string name="sub_traffic_used" translatable="false">%1$s / %2$s</string>
+    <string name="sub_traffic_unlimited" translatable="false">%1$s / ∞</string>
+    <string name="sub_expires">Expires %1$s</string>
+    <string name="sub_expired">Expired</string>
+    <string name="sub_days_left" translatable="false">%1$s · %2$dd</string>
     <string name="color_theme_blue">Blue (departament)</string>
     <string name="color_theme_mono">Black &amp; white</string>
     <string name="title_pref_use_hev_tunnel">Enable Hev TUN Feature</string>

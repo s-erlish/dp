@@ -13,5 +13,25 @@ data class SubscriptionItem(
     var filter: String? = null,
     var allowInsecureUrl: Boolean = false,
     var userAgent: String? = null,
+
+    // --- subscription-userinfo metadata (bytes / epoch-seconds) ---
+    var uploadUsed: Long = 0,       // bytes, from header `upload`
+    var downloadUsed: Long = 0,     // bytes, from header `download`
+    var totalTraffic: Long = 0,     // bytes, from header `total`; 0 == unlimited
+    var expire: Long = 0,           // epoch SECONDS, from header `expire`; 0 == no expiry
+    var userInfoUpdated: Long = 0,  // epoch millis, when metadata was last captured
 )
+
+// --- derived helpers (kept out of the data class so it stays a plain JSON POJO) ---
+val SubscriptionItem.usedTraffic: Long get() = uploadUsed + downloadUsed
+val SubscriptionItem.isUnlimited: Boolean get() = totalTraffic <= 0L
+val SubscriptionItem.hasExpiry: Boolean get() = expire > 0L
+val SubscriptionItem.isExpired: Boolean get() = expire in 1 until (System.currentTimeMillis() / 1000)
+
+/** 0f..1f, only meaningful when !isUnlimited */
+val SubscriptionItem.trafficFraction: Float
+    get() = if (isUnlimited) 0f else (usedTraffic.toFloat() / totalTraffic).coerceIn(0f, 1f)
+
+/** true when the header carried at least one meaningful field */
+val SubscriptionItem.hasUserInfo: Boolean get() = usedTraffic > 0 || totalTraffic > 0 || expire > 0
 

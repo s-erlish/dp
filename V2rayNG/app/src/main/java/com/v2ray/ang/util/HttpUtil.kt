@@ -195,6 +195,68 @@ object HttpUtil {
         throw IOException("Too many redirects")
     }
 
+    /**
+     * Body plus selected response headers of a subscription fetch.
+     */
+    data class UrlContentResult(val body: String, val subscriptionUserInfo: String?)
+
+    /**
+     * Same as [getUrlContentWithUserAgent] but also returns the `subscription-userinfo`
+     * response header (used for traffic/expiry metadata), which the plain variant discards.
+     */
+    fun getUrlContentWithUserAgentEx(request: UrlContentRequest): UrlContentResult {
+        var currentUrl = request.url
+        var redirects = 0
+        val maxRedirects = 3
+
+        while (redirects++ < maxRedirects) {
+            if (currentUrl == null) continue
+            val client = buildOkHttpClient(request.timeout, request.httpPort, request.proxyUsername, request.proxyPassword, followRedirects = false)
+            val finalUserAgent = if (request.userAgent.isNullOrBlank()) {
+                "v2rayNG/${BuildConfig.VERSION_NAME}"
+            } else {
+                request.userAgent
+            }
+            val requestBuilder = Request.Builder()
+                .url(currentUrl)
+                .get()
+                .header("User-agent", finalUserAgent)
+                .header("Connection", "close")
+
+            applyEmbeddedBasicAuthHeader(currentUrl, requestBuilder)
+
+            if (request.httpPort != 0 && !request.proxyUsername.isNullOrBlank() && !request.proxyPassword.isNullOrBlank()) {
+                requestBuilder.header("Proxy-Authorization", Credentials.basic(request.proxyUsername, request.proxyPassword))
+            }
+
+            client.newCall(requestBuilder.build()).execute().use { response ->
+                when {
+                    response.isRedirect -> {
+                        val location = response.header("Location")
+                        if (location.isNullOrEmpty()) {
+                            throw IOException("Redirect location not found")
+                        }
+                        currentUrl = resolveLocation(currentUrl, location)
+                        if (currentUrl.isNullOrEmpty()) {
+                            throw IOException("Failed to resolve redirect location")
+                        }
+                        return@use
+                    }
+
+                    response.isSuccessful -> {
+                        val userInfo = response.header("subscription-userinfo")
+                        return UrlContentResult(response.body?.string() ?: "", userInfo)
+                    }
+
+                    else -> {
+                        throw IOException("Request failed with status code ${response.code}")
+                    }
+                }
+            }
+        }
+        throw IOException("Too many redirects")
+    }
+
     private fun applyEmbeddedBasicAuthHeader(rawUrl: String, requestBuilder: Request.Builder) {
         val parsed = runCatching { URL(rawUrl) }.getOrNull() ?: return
         parsed.userInfo?.let { userInfo ->

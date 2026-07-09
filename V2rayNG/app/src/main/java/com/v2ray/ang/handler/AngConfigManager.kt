@@ -23,6 +23,7 @@ import com.v2ray.ang.fmt.VmessFmt
 import com.v2ray.ang.fmt.WireguardFmt
 import com.v2ray.ang.util.HttpUtil
 import com.v2ray.ang.util.JsonUtil
+import com.v2ray.ang.util.SubscriptionUserInfo
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.QRCodeDecoder
 import com.v2ray.ang.util.Utils
@@ -553,9 +554,9 @@ object AngConfigManager {
             val proxyUsername = SettingsManager.getSocksUsername()
             val proxyPassword = SettingsManager.getSocksPassword()
 
-            var configText = try {
+            var result = try {
                 val httpPort = SettingsManager.getHttpPort()
-                HttpUtil.getUrlContentWithUserAgent(
+                HttpUtil.getUrlContentWithUserAgentEx(
                     UrlContentRequest(
                         url = url,
                         userAgent = userAgent,
@@ -567,11 +568,11 @@ object AngConfigManager {
                 )
             } catch (e: Exception) {
                 LogUtil.e(AppConfig.ANG_PACKAGE, "Update subscription: proxy not ready or other error", e)
-                ""
+                null
             }
-            if (configText.isEmpty()) {
-                configText = try {
-                    HttpUtil.getUrlContentWithUserAgent(
+            if (result == null || result.body.isEmpty()) {
+                result = try {
+                    HttpUtil.getUrlContentWithUserAgentEx(
                         UrlContentRequest(
                             url = url,
                             userAgent = userAgent
@@ -579,15 +580,24 @@ object AngConfigManager {
                     )
                 } catch (e: Exception) {
                     LogUtil.e(AppConfig.TAG, "Update subscription: Failed to get URL content with user agent", e)
-                    ""
+                    null
                 }
             }
+            val configText = result?.body ?: ""
             if (configText.isEmpty()) {
                 return SubscriptionUpdateResult(failureCount = 1)
             }
 
             val count = parseConfigViaSub(configText, it.guid, false)
             if (count > 0) {
+                // Persist traffic/expiry metadata from the subscription-userinfo header, if present.
+                SubscriptionUserInfo.parse(result?.subscriptionUserInfo)?.let { info ->
+                    it.subscription.uploadUsed = info.upload
+                    it.subscription.downloadUsed = info.download
+                    it.subscription.totalTraffic = info.total
+                    it.subscription.expire = info.expire
+                    it.subscription.userInfoUpdated = System.currentTimeMillis()
+                }
                 it.subscription.lastUpdated = System.currentTimeMillis()
                 MmkvManager.encodeSubscription(it.guid, it.subscription)
                 LogUtil.i(AppConfig.TAG, "Subscription updated: ${it.subscription.remarks}, $count configs")

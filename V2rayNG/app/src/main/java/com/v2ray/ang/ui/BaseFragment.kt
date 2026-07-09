@@ -16,6 +16,10 @@ abstract class BaseFragment<VB : ViewBinding> : Fragment() {
     protected val binding: VB
         get() = _binding!!
 
+    /** True while the view (and its binding) is alive; use to guard async UI callbacks. */
+    protected val isBindingInitialized: Boolean
+        get() = _binding != null
+
     protected abstract fun inflateBinding(inflater: LayoutInflater, container: ViewGroup?): VB
 
     override fun onCreateView(
