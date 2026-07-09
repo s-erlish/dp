@@ -8,6 +8,20 @@
     <string name="servers_empty_title">Нет серверов</string>
     <string name="servers_add_clipboard">Добавить из буфера</string>
     <string name="servers_section_local">Локальные</string>
+    <!-- Home empty state (no servers/subscriptions yet) -->
+    <string name="home_empty_title">Пока нет подписок</string>
+    <string name="home_empty_subtitle">Добавьте подписку, чтобы начать пользоваться</string>
+    <string name="home_empty_add_qr">Добавить по QR-коду</string>
+    <string name="home_empty_add_clipboard">Добавить из буфера обмена</string>
+    <!-- Toolbar "+" add menu -->
+    <string name="menu_add_title">Добавить</string>
+    <string name="menu_add_scan_qr">Сканировать QR-код</string>
+    <string name="menu_add_clipboard">Добавить из буфера обмена</string>
+    <string name="menu_add_tv_send">Отправить на TV</string>
+    <string name="menu_add_manual">Ввести вручную</string>
+    <!-- Home meta-bar: delete subscription -->
+    <string name="sub_delete">Удалить подписку</string>
+    <string name="sub_delete_confirm">Удалить подписку и её серверы?</string>
     <string name="app_widget_name">departament</string>
     <string name="app_tile_name">departament</string>
     <string name="app_tile_first_use">Первое использование этой функции, пожалуйста, используйте приложение, чтобы добавить профиль</string>

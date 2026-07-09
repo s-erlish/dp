@@ -1,14 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Strings for Android TV support + QR Wi-Fi subscription transfer (module: tv).
-  Kept in a separate file to avoid merge collisions with concurrent UI work in strings.xml.
--->
+<!-- Russian strings for the TV module (mirror of values/strings_tv.xml). -->
 <resources>
 
-    <!-- Shared -->
     <string name="tv_pairing_qr_desc">QR-код сопряжения</string>
 
-    <!-- TV receive screen -->
     <string name="tv_receive_title">Приём подписки</string>
     <string name="tv_receive_instructions">На телефоне откройте departament, выберите подписку и отсканируйте этот код, чтобы отправить её на этот телевизор. Оба устройства должны быть в одной сети Wi-Fi.</string>
     <string name="tv_receive_seconds_left">Ожидание телефона… %1$d с</string>
@@ -19,7 +14,6 @@
     <string name="tv_receive_failed">Что-то пошло не так. Попробуйте ещё раз.</string>
     <string name="tv_receive_regenerate">Показать новый код</string>
 
-    <!-- Phone send screen -->
     <string name="tv_send_title">Отправить на TV</string>
     <string name="tv_send_instructions">Отсканируйте QR-код, показанный на телевизоре, затем выберите подписку для отправки. Оба устройства должны быть в одной сети Wi-Fi.</string>
     <string name="tv_send_scan">Сканировать код телевизора</string>
