@@ -347,6 +347,13 @@
     <string name="sub_telegram">Telegram</string>
     <string name="sub_pin">Закрепить подписку</string>
     <string name="sub_unpin">Открепить подписку</string>
+    <string name="sub_expires">до %1$s</string>
+    <string name="sub_expired">Истекла</string>
+    <string name="sub_meta_updated_never">Никогда</string>
+    <string name="sub_auto_update_label">Автообновление — %1$s</string>
+    <string name="sub_auto_update_off">Выкл</string>
+    <string name="sub_update_interval_hours">%1$d ч.</string>
+    <string name="sub_update_interval_minutes">%1$d мин.</string>
     <string name="title_ping_all_server">Проверить профили</string>
     <string name="title_real_ping_all_server">Проверить задержку профилей</string>
     <string name="title_user_asset_setting">Файлы ресурсов</string>

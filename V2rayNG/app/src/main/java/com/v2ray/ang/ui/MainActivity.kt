@@ -655,7 +655,35 @@ class MainActivity : HelperBaseActivity() {
     }
 
     /**
+     * Small subtitle shown under the meta-bar title: the last successful update timestamp and the
+     * auto-update interval, e.g. "09.07.2026 07:08 · Автообновление — 1 ч." (Выкл when auto-update
+     * is off). [SubscriptionItem.lastUpdated] is epoch millis (-1 == never); [updateInterval] is
+     * minutes.
+     */
+    private fun metaSubtitle(sub: SubscriptionItem): String {
+        val last = if (sub.lastUpdated > 0L) {
+            SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(sub.lastUpdated))
+        } else {
+            getString(R.string.sub_meta_updated_never)
+        }
+        val interval = if (!sub.autoUpdate) {
+            getString(R.string.sub_auto_update_off)
+        } else {
+            val minutes = sub.updateInterval
+            if (minutes >= 60L && minutes % 60L == 0L) {
+                getString(R.string.sub_update_interval_hours, (minutes / 60L).toInt())
+            } else {
+                getString(R.string.sub_update_interval_minutes, minutes.toInt())
+            }
+        }
+        return "$last · " + getString(R.string.sub_auto_update_label, interval)
+    }
+
+    /**
      * Repaints the meta bar from persisted subscription metadata (moved from GroupServerFragment).
+     * Traffic is drawn Happ-style as a rounded pill (the [progressTraffic] track) with the usage
+     * label centered on it; the expiry marker shows the infinity glyph when there is no (or an
+     * effectively unlimited) expiry, otherwise the real date.
      */
     private fun bindMetaBar(sub: SubscriptionItem?) {
         val meta = binding.layoutHomeMetaBar
@@ -665,6 +693,8 @@ class MainActivity : HelperBaseActivity() {
         }
         meta.root.visibility = android.view.View.VISIBLE
         meta.tvSubTitle.text = metaTitle(sub)
+        meta.tvMetaSubtitle.text = metaSubtitle(sub)
+        meta.tvMetaSubtitle.visibility = android.view.View.VISIBLE
 
         val primaryColor = MaterialColors.getColor(meta.btnPin, androidx.appcompat.R.attr.colorPrimary)
         val onVariant = MaterialColors.getColor(meta.btnPin, com.google.android.material.R.attr.colorOnSurfaceVariant)
@@ -687,45 +717,48 @@ class MainActivity : HelperBaseActivity() {
         }
         meta.layoutTraffic.visibility = android.view.View.VISIBLE
 
-        val variantColor = MaterialColors.getColor(meta.tvTraffic, com.google.android.material.R.attr.colorOnSurfaceVariant)
+        val onSurfaceColor = MaterialColors.getColor(meta.tvTraffic, com.google.android.material.R.attr.colorOnSurface)
+        val variantColor = MaterialColors.getColor(meta.tvExpiry, com.google.android.material.R.attr.colorOnSurfaceVariant)
         val redColor = ContextCompat.getColor(this, R.color.colorPingRed)
         val greenColor = ContextCompat.getColor(this, R.color.colorPing)
 
-        if (sub.isUnlimited) {
-            meta.tvTraffic.text = getString(R.string.sub_traffic_unlimited, sub.usedTraffic.toTrafficString())
-            meta.tvTraffic.setTextColor(variantColor)
-            meta.progressTraffic.visibility = android.view.View.GONE
+        // Traffic pill: "usedTraffic / total-or-∞" centered on the rounded track.
+        val near = !sub.isUnlimited && sub.trafficFraction >= 0.9f
+        meta.tvTraffic.text = if (sub.isUnlimited) {
+            getString(R.string.sub_traffic_unlimited, sub.usedTraffic.toTrafficString())
         } else {
-            val near = sub.trafficFraction >= 0.9f
-            meta.tvTraffic.text = getString(
+            getString(
                 R.string.sub_traffic_used,
                 sub.usedTraffic.toTrafficString(),
                 sub.totalTraffic.toTrafficString()
             )
-            meta.tvTraffic.setTextColor(if (near) redColor else variantColor)
-            meta.progressTraffic.visibility = android.view.View.VISIBLE
-            meta.progressTraffic.setProgressCompat((sub.trafficFraction * 1000).toInt(), false)
-            meta.progressTraffic.setIndicatorColor(if (near) redColor else greenColor)
         }
+        meta.tvTraffic.setTextColor(onSurfaceColor)
+        // Unlimited traffic keeps an empty rounded track behind the label instead of a filled bar.
+        val fillFraction = if (sub.isUnlimited) 0f else sub.trafficFraction
+        meta.progressTraffic.setProgressCompat((fillFraction * 1000).toInt(), false)
+        meta.progressTraffic.setIndicatorColor(if (near) redColor else greenColor)
 
-        if (sub.hasExpiry) {
-            meta.tvExpiry.visibility = android.view.View.VISIBLE
-            if (sub.isExpired) {
-                meta.tvExpiry.text = getString(R.string.sub_expired)
-                meta.tvExpiry.setTextColor(redColor)
-            } else {
-                val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(sub.expire * 1000))
-                val daysLeft = ((sub.expire - System.currentTimeMillis() / 1000) / 86400).toInt()
-                meta.tvExpiry.text = if (daysLeft in 0..999) {
-                    getString(R.string.sub_days_left, getString(R.string.sub_expires, date), daysLeft)
-                } else {
-                    getString(R.string.sub_expires, date)
-                }
+        // Expiry: ∞ when absent or effectively unlimited (panels sometimes send a huge timestamp
+        // ~year 2088+ instead of 0), otherwise the real "до <date>".
+        val unlimitedExpireThreshold = 3_723_840_000L // ~2088-01-01 in epoch seconds
+        val expiryUnlimited = sub.expire <= 0L || sub.expire >= unlimitedExpireThreshold
+        when {
+            expiryUnlimited -> {
+                meta.tvExpiry.text = getString(R.string.sub_infinity)
                 meta.tvExpiry.setTextColor(variantColor)
             }
-        } else {
-            meta.tvExpiry.visibility = android.view.View.GONE
+            sub.isExpired -> {
+                meta.tvExpiry.text = getString(R.string.sub_expired)
+                meta.tvExpiry.setTextColor(redColor)
+            }
+            else -> {
+                val date = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(sub.expire * 1000))
+                meta.tvExpiry.text = getString(R.string.sub_expires, date)
+                meta.tvExpiry.setTextColor(variantColor)
+            }
         }
+        meta.tvExpiry.visibility = android.view.View.VISIBLE
     }
 
     // ---- Per-server actions (moved from GroupServerFragment) ----

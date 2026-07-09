@@ -16,7 +16,7 @@
     android:paddingEnd="6dp"
     android:paddingBottom="12dp">
 
-    <!-- Row 1: chevron + title + actions (Ping -> Refresh -> Pin) -->
+    <!-- Row 1: chevron + (title + subtitle) + actions (Ping -> Refresh -> Pin) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -36,17 +36,38 @@
             app:srcCompat="@drawable/ic_arrow_drop_down"
             app:tint="?attr/colorOnSurfaceVariant" />
 
-        <TextView
-            android:id="@+id/tv_sub_title"
+        <!-- Title + meta subtitle (last update + auto-update) -->
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            tools:text="departament • Premium" />
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_sub_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="?attr/colorOnSurface"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                tools:text="erlish" />
+
+            <TextView
+                android:id="@+id/tv_meta_subtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="11sp"
+                android:visibility="gone"
+                tools:text="09.07.2026 07:08 · Автообновление — 1 ч."
+                tools:visibility="visible" />
+
+        </LinearLayout>
 
         <!-- 1) Ping / latency test -->
         <ImageView
@@ -108,64 +129,73 @@
         android:orientation="vertical"
         android:visibility="visible">
 
-    <!-- Row 2: traffic + expiry -->
+    <!-- Row 2: expiry caption + Happ-style traffic pill -->
     <LinearLayout
         android:id="@+id/layout_traffic"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="10dp"
         android:layout_marginEnd="8dp"
         android:orientation="vertical">
 
-        <LinearLayout
+        <!-- Expiry marker (∞ or "до <date>") shown above the traffic pill -->
+        <TextView
+            android:id="@+id/tv_expiry"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:layout_marginBottom="6dp"
+            android:gravity="end"
+            android:maxLines="1"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="12sp"
+            tools:text="до 12.08.2026" />
+
+        <!-- Traffic pill: progress track with the usage label centered on it -->
+        <FrameLayout
+            android:id="@+id/layout_traffic_pill"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <com.google.android.material.progressindicator.LinearProgressIndicator
+                android:id="@+id/progress_traffic"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:max="1000"
+                app:indicatorColor="@color/colorPing"
+                app:indicatorTrackGapSize="0dp"
+                app:trackColor="?attr/colorSurfaceVariant"
+                app:trackCornerRadius="13dp"
+                app:trackStopIndicatorSize="0dp"
+                app:trackThickness="26dp"
+                tools:progress="430" />
 
             <TextView
                 android:id="@+id/tv_traffic"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_gravity="center"
+                android:gravity="center"
                 android:maxLines="1"
-                android:textColor="?attr/colorOnSurfaceVariant"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:textColor="?attr/colorOnSurface"
                 android:textSize="12sp"
-                tools:text="214.6 GB / 500.0 GB" />
+                android:textStyle="bold"
+                tools:text="1,7 ТБ / ∞" />
 
-            <TextView
-                android:id="@+id/tv_expiry"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:maxLines="1"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="12sp"
-                tools:text="Expires 2026-08-15 · 37d" />
-
-        </LinearLayout>
-
-        <com.google.android.material.progressindicator.LinearProgressIndicator
-            android:id="@+id/progress_traffic"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:max="1000"
-            app:indicatorColor="@color/colorPing"
-            app:trackColor="?attr/colorSurfaceVariant"
-            app:trackCornerRadius="4dp"
-            app:trackThickness="6dp"
-            tools:progress="430" />
+        </FrameLayout>
 
     </LinearLayout>
 
-    <!-- Announce banner from the subscription -->
+    <!-- Announce banner from the subscription (centered) -->
     <TextView
         android:id="@+id/tv_announce"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
-        android:layout_marginEnd="8dp"
         android:autoLink="web"
+        android:gravity="center"
         android:maxLines="5"
         android:textColor="?attr/colorOnSurfaceVariant"
         android:textColorLink="?attr/colorPrimary"
