@@ -206,6 +206,8 @@ object HttpUtil {
         val supportUrl: String? = null,
         val webPageUrl: String? = null,
         val profileTitle: String? = null,
+        // Operator signal that this is a managed/hidden template subscription.
+        val hidden: String? = null,
     )
 
     /**
@@ -259,6 +261,7 @@ object HttpUtil {
                             supportUrl = response.header("support-url"),
                             webPageUrl = response.header("profile-web-page-url"),
                             profileTitle = response.header("profile-title"),
+                            hidden = response.header("profile-hidden") ?: response.header("hidden"),
                         )
                     }
 

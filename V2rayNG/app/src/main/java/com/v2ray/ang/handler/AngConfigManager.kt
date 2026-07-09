@@ -21,6 +21,7 @@ import com.v2ray.ang.fmt.TrojanFmt
 import com.v2ray.ang.fmt.VlessFmt
 import com.v2ray.ang.fmt.VmessFmt
 import com.v2ray.ang.fmt.WireguardFmt
+import com.v2ray.ang.template.TemplateManager
 import com.v2ray.ang.util.HttpUtil
 import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.util.SubscriptionUserInfo
@@ -128,6 +129,8 @@ object AngConfigManager {
     fun shareFullContent2Clipboard(context: Context, guid: String?): Int {
         try {
             if (guid == null) return -1
+            // Block full-config export for managed/hidden profiles.
+            if (TemplateManager.isLocked(guid)) return -1
             val result = CoreConfigManager.getV2rayConfig(context, guid)
             if (result.status) {
                 Utils.setClipboard(context, result.content)
@@ -150,6 +153,8 @@ object AngConfigManager {
     private fun shareConfig(guid: String): String {
         try {
             val config = MmkvManager.decodeServerConfig(guid) ?: return ""
+            // Managed/hidden profiles must never be shareable/exportable.
+            if (TemplateManager.isLocked(config)) return ""
 
             return config.configType.protocolScheme + when (config.configType) {
                 EConfigType.VMESS -> VmessFmt.toUri(config)
@@ -390,6 +395,9 @@ object AngConfigManager {
         if (server == null) {
             return 0
         }
+        // A locked (operator-managed, hidden) subscription stamps every imported profile and
+        // stores its raw template obfuscated/encrypted. Non-locked subs keep the plaintext path.
+        val locked = MmkvManager.decodeSubscription(subid)?.locked == true
         if (server.contains("inbounds")
             && server.contains("outbounds")
             && server.contains("routing")
@@ -408,9 +416,10 @@ object AngConfigManager {
                     for (srv in serverList.reversed()) {
                         val config = CustomFmt.parse(JsonUtil.toJson(srv)) ?: continue
                         config.subscriptionId = subid
+                        config.locked = locked
                         config.description = generateDescription(config)
                         val key = MmkvManager.encodeServerConfig("", config)
-                        MmkvManager.encodeServerRaw(key, JsonUtil.toJsonPretty(srv) ?: "")
+                        MmkvManager.encodeServerRaw(key, TemplateManager.wrapRawForStorage(JsonUtil.toJsonPretty(srv) ?: "", locked))
                         keyToProfile[key] = config
                         count += 1
                     }
@@ -428,12 +437,13 @@ object AngConfigManager {
                 // For compatibility
                 val config = CustomFmt.parse(server) ?: return 0
                 config.subscriptionId = subid
+                config.locked = locked
                 config.description = generateDescription(config)
                 if (!append) {
                     MmkvManager.removeServerViaSubid(subid)
                 }
                 val key = MmkvManager.encodeServerConfig("", config)
-                MmkvManager.encodeServerRaw(key, server)
+                MmkvManager.encodeServerRaw(key, TemplateManager.wrapRawForStorage(server, locked))
                 return 1
             } catch (e: Exception) {
                 LogUtil.e(AppConfig.TAG, "Failed to parse custom config server as single config", e)
@@ -493,6 +503,9 @@ object AngConfigManager {
             }
 
             config.subscriptionId = subid
+            // Inherit the hidden/locked state from the owning subscription so share-link
+            // members of a managed subscription are also gated in the UI.
+            config.locked = subItem?.locked == true
             config.description = generateDescription(config)
 
             return config
@@ -606,6 +619,13 @@ object AngConfigManager {
             val configText = result?.body ?: ""
             if (configText.isEmpty()) {
                 return SubscriptionUpdateResult(failureCount = 1)
+            }
+
+            // Resolve the hidden/locked state (header or in-body directive) and persist it
+            // BEFORE parsing, so imported profiles inherit sub.locked and store their raw
+            // template obfuscated/encrypted. Single entry point into the template module.
+            if (TemplateManager.applyLockState(it.subscription, result?.hidden, configText)) {
+                MmkvManager.encodeSubscription(it.guid, it.subscription)
             }
 
             val count = parseConfigViaSub(configText, it.guid, false)

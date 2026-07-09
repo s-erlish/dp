@@ -54,6 +54,7 @@ import com.v2ray.ang.extension.toSpeedString
 import com.v2ray.ang.extension.toTrafficString
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.template.TemplateManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
@@ -643,6 +644,11 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     }
 
     private fun editServer(guid: String, profile: ProfileItem) {
+        // Managed/hidden profiles cannot be opened in an editor (would reveal the config).
+        if (TemplateManager.isLocked(profile)) {
+            toast(R.string.template_locked_toast)
+            return
+        }
         val activityClass = when (profile.configType) {
             EConfigType.CUSTOM -> ServerCustomConfigActivity::class.java
             EConfigType.POLICYGROUP -> ServerGroupActivity::class.java
@@ -701,6 +707,14 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         override fun onEdit(guid: String, position: Int, profile: ProfileItem) { editServer(guid, profile) }
         override fun onSelectServer(guid: String) { setSelectServer(guid) }
         override fun onShare(guid: String, profile: ProfileItem, position: Int, more: Boolean) {
+            // Managed/hidden profile: expose only removal; block QR/share/full-config/edit.
+            if (TemplateManager.isLocked(profile)) {
+                shareServer(
+                    guid, profile, position,
+                    listOf(getString(R.string.template_locked_action_remove)), skip = 4
+                )
+                return
+            }
             val isCustom = profile.configType.isComplexType()
             val (shareOptions, skip) = if (more) {
                 val options = if (isCustom) shareMethodMore.asList().takeLast(3) else shareMethodMore.asList()
