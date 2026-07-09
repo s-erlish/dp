@@ -164,7 +164,7 @@ class GroupServerFragment : BaseFragment<FragmentGroupServerBinding>(),
         meta.tvSubTitle.text = sub.remarks.ifBlank { getString(R.string.title_sub_setting) }
 
         // Pin state (icon tint + description).
-        val primaryColor = MaterialColors.getColor(meta.btnPin, com.google.android.material.R.attr.colorPrimary)
+        val primaryColor = MaterialColors.getColor(meta.btnPin, androidx.appcompat.R.attr.colorPrimary)
         val onVariant = MaterialColors.getColor(meta.btnPin, com.google.android.material.R.attr.colorOnSurfaceVariant)
         meta.btnPin.setColorFilter(if (sub.pinned) primaryColor else onVariant)
         meta.btnPin.contentDescription = getString(if (sub.pinned) R.string.sub_unpin else R.string.sub_pin)
