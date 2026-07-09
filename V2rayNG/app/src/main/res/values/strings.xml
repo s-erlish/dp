@@ -285,6 +285,10 @@
     <string name="title_language">Language</string>
     <string name="title_ui_settings">UI settings</string>
     <string name="title_pref_ui_mode_night">UI mode settings</string>
+    <string name="title_pref_color_theme">Color theme</string>
+    <string name="speed_zero" translatable="false">0 KB/s</string>
+    <string name="color_theme_blue">Blue (departament)</string>
+    <string name="color_theme_mono">Black &amp; white</string>
     <string name="title_pref_use_hev_tunnel">Enable Hev TUN Feature</string>
     <string name="summary_pref_use_hev_tunnel">When enabled, TUN will use hev-socks5-tunnel; otherwise, it will use xray-core.</string>
     <string name="title_pref_hev_tunnel_loglevel">Hev Tun Log Level</string>

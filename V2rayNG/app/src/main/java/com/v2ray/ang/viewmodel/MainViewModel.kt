@@ -46,6 +46,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val isRunning by lazy { MutableLiveData<Boolean>() }
     val updateListAction by lazy { MutableLiveData<Int>() }
     val updateTestResultAction by lazy { MutableLiveData<String>() }
+    val updateSpeedAction by lazy { MutableLiveData<Pair<Long, Long>>() }
     private val tcpingTestScope by lazy { CoroutineScope(Dispatchers.IO) }
 
     /**
@@ -484,6 +485,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                 AppConfig.MSG_MEASURE_DELAY_SUCCESS -> {
                     updateTestResultAction.value = intent.getStringExtra("content")
+                }
+
+                AppConfig.MSG_STATE_SPEED_UPDATE -> {
+                    (intent.getSerializableExtra("content") as? LongArray)?.let {
+                        if (it.size >= 2) updateSpeedAction.value = it[0] to it[1]
+                    }
                 }
 
                 AppConfig.MSG_MEASURE_CONFIG_SUCCESS -> {

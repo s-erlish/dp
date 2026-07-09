@@ -44,6 +44,14 @@
             android:summary="%s"
             android:title="@string/title_pref_ui_mode_night" />
 
+        <ListPreference
+            android:defaultValue="blue"
+            android:entries="@array/color_theme"
+            android:entryValues="@array/color_theme_value"
+            android:key="pref_color_theme"
+            android:summary="%s"
+            android:title="@string/title_pref_color_theme" />
+
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/title_vpn_settings">

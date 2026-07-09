@@ -10,6 +10,7 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.VPN
 import com.v2ray.ang.R
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.helper.MmkvPreferenceDataStore
 import com.v2ray.ang.util.Utils
 
@@ -54,6 +55,7 @@ class SettingsActivity : BaseActivity() {
         private val socksPassword by lazy { findPreference<EditTextPreference>(AppConfig.PREF_SOCKS_PASSWORD) }
         private val socksEnableUdp by lazy { findPreference<CheckBoxPreference>(AppConfig.PREF_SOCKS_ENABLE_UDP) }
         private val proxySharing by lazy { findPreference<CheckBoxPreference>(AppConfig.PREF_PROXY_SHARING) }
+        private val colorTheme by lazy { findPreference<ListPreference>(AppConfig.PREF_COLOR_THEME) }
 
         override fun onCreatePreferences(bundle: Bundle?, s: String?) {
             // Use MMKV as the storage backend for all Preferences
@@ -110,6 +112,20 @@ class SettingsActivity : BaseActivity() {
 
             dynamicSocksPort?.setOnPreferenceChangeListener { _, newValue ->
                 updateDynamicSocksPort(newValue as Boolean)
+                true
+            }
+
+            colorTheme?.setOnPreferenceChangeListener { pref, newValue ->
+                val valueStr = newValue.toString()
+                (pref as? ListPreference)?.let { lp ->
+                    val idx = lp.findIndexOfValue(valueStr)
+                    lp.summary = if (idx >= 0) lp.entries[idx] else valueStr
+                }
+                // Persist immediately so the recreated activities read the new theme,
+                // then recreate the whole UI (settings now, main on return).
+                MmkvManager.encodeSettings(AppConfig.PREF_COLOR_THEME, valueStr)
+                SettingsChangeManager.makeRecreateUi()
+                requireActivity().recreate()
                 true
             }
         }

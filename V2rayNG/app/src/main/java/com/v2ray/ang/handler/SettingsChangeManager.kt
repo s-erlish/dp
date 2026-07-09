@@ -5,6 +5,19 @@ import kotlinx.coroutines.flow.MutableStateFlow
 object SettingsChangeManager {
     private val _restartService = MutableStateFlow(false)
     private val _setupGroupTab = MutableStateFlow(false)
+    private val _recreateUi = MutableStateFlow(false)
+
+    // Mark that the UI must be recreated (e.g. color theme changed)
+    fun makeRecreateUi() {
+        _recreateUi.value = true
+    }
+
+    // Read and clear the recreateUi flag
+    fun consumeRecreateUi(): Boolean {
+        val v = _recreateUi.value
+        _recreateUi.value = false
+        return v
+    }
 
     // Mark restartService as requiring a restart
     fun makeRestartService() {

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Brand wordmark shown as the toolbar title on the main screen -->
+    <style name="ToolbarBrandTitle" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">?attr/colorOnBackground</item>
+        <item name="android:letterSpacing">0.0</item>
+        <item name="android:textSize">20sp</item>
+    </style>
+
+</resources>

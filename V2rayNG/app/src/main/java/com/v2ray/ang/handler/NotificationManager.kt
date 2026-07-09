@@ -18,6 +18,7 @@ import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.extension.toSpeedString
 import com.v2ray.ang.ui.MainActivity
 import com.v2ray.ang.util.LogUtil
+import com.v2ray.ang.util.MessageUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -252,6 +253,14 @@ object NotificationManager {
         val proxyTotal = proxyUplink + proxyDownlink
         val directTotal = directUplink + directDownlink
         val zeroSpeed = proxyTotal + directTotal == 0L
+
+        // Push the live proxy speed to the main screen hero panel (bytes/second).
+        getService()?.let { svc ->
+            val downPerSec = (proxyDownlink / sinceLastQueryInSeconds).toLong()
+            val upPerSec = (proxyUplink / sinceLastQueryInSeconds).toLong()
+            MessageUtil.sendMsg2UI(svc, AppConfig.MSG_STATE_SPEED_UPDATE, longArrayOf(downPerSec, upPerSec))
+        }
+
         if (!zeroSpeed || !lastZeroSpeed) {
             val text = StringBuilder()
             appendSpeedString(

@@ -78,4 +78,38 @@
         <item name="colorPrimary">@color/color_fab_active</item>
     </style>
 
+    <!-- Mono (black & white) color overlay, applied at runtime in BaseActivity
+         when the user selects the monochrome theme. Only overrides color tokens,
+         so it composes with any base theme variant (NoActionBar / Translucent). -->
+    <style name="ThemeOverlay.Mono" parent="">
+        <item name="colorPrimary">@color/mono_primary</item>
+        <item name="colorOnPrimary">@color/mono_onPrimary</item>
+        <item name="colorPrimaryContainer">@color/mono_primaryContainer</item>
+        <item name="colorOnPrimaryContainer">@color/mono_onPrimaryContainer</item>
+        <item name="colorSecondary">@color/mono_secondary</item>
+        <item name="colorOnSecondary">@color/mono_onSecondary</item>
+        <item name="colorSecondaryContainer">@color/mono_secondaryContainer</item>
+        <item name="colorOnSecondaryContainer">@color/mono_onSecondaryContainer</item>
+        <item name="colorTertiary">@color/mono_tertiary</item>
+        <item name="colorOnTertiary">@color/mono_onTertiary</item>
+        <item name="colorTertiaryContainer">@color/mono_primaryContainer</item>
+        <item name="colorOnTertiaryContainer">@color/mono_onPrimaryContainer</item>
+        <item name="colorSurface">@color/mono_surface</item>
+        <item name="colorOnSurface">@color/mono_onSurface</item>
+        <item name="colorSurfaceVariant">@color/mono_surfaceVariant</item>
+        <item name="colorOnSurfaceVariant">@color/mono_onSurfaceVariant</item>
+        <item name="colorSurfaceContainer">@color/mono_surface</item>
+        <item name="colorSurfaceContainerHigh">@color/mono_surface</item>
+        <item name="colorSurfaceContainerHighest">@color/mono_surface</item>
+        <item name="colorSurfaceContainerLow">@color/mono_surface</item>
+        <item name="colorSurfaceContainerLowest">@color/mono_surface</item>
+        <item name="android:colorBackground">@color/mono_background</item>
+        <item name="colorOnBackground">@color/mono_onBackground</item>
+        <item name="colorOutline">@color/mono_outline</item>
+        <item name="colorOutlineVariant">@color/mono_outlineVariant</item>
+        <item name="colorSurfaceTint">@color/mono_primary</item>
+        <item name="android:statusBarColor">@color/mono_surface</item>
+        <item name="android:navigationBarColor">@color/mono_surface</item>
+    </style>
+
 </resources>

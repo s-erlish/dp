@@ -176,6 +176,16 @@
         <item>2</item>
     </string-array>
 
+    <string-array name="color_theme">
+        <item>@string/color_theme_blue</item>
+        <item>@string/color_theme_mono</item>
+    </string-array>
+
+    <string-array name="color_theme_value" translatable="false">
+        <item>blue</item>
+        <item>mono</item>
+    </string-array>
+
     <string-array name="outbound_tag" translatable="false">
         <item>proxy</item>
         <item>direct</item>
