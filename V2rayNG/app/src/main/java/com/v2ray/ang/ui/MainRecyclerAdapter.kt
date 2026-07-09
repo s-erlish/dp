@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.contracts.MainAdapterListener
+import com.v2ray.ang.util.FlagUtil
 import com.v2ray.ang.databinding.ItemRecyclerFooterBinding
 import com.v2ray.ang.databinding.ItemRecyclerMainBinding
 import com.v2ray.ang.dto.entities.ProfileItem
@@ -57,8 +58,9 @@ class MainRecyclerAdapter(
 
             holder.itemView.setBackgroundColor(Color.TRANSPARENT)
 
-            //Name address
-            holder.itemMainBinding.tvName.text = profile.remarks
+            //Flag + name address
+            holder.itemMainBinding.tvFlag.text = FlagUtil.resolveFlag(profile)
+            holder.itemMainBinding.tvName.text = FlagUtil.stripLeadingFlag(profile.remarks)
             holder.itemMainBinding.tvStatistics.text = getAddress(profile)
             holder.itemMainBinding.tvType.text = getProtocolDescription(profile)
 
