@@ -15,7 +15,6 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.core.CoreServiceManager
 import com.v2ray.ang.dto.entities.ProfileItem
-import com.v2ray.ang.extension.toSpeedString
 import com.v2ray.ang.ui.MainActivity
 import com.v2ray.ang.util.FlagUtil
 import com.v2ray.ang.util.LogUtil
@@ -26,7 +25,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlin.math.min
 
 object NotificationManager {
     private const val NOTIFICATION_ID = 1
@@ -266,23 +264,6 @@ object NotificationManager {
     }
 
     /**
-     * Appends the speed string to the given text.
-     * @param text The text to append to.
-     * @param name The name of the tag.
-     * @param up The uplink speed.
-     * @param down The downlink speed.
-     */
-    private fun appendSpeedString(text: StringBuilder, name: String?, up: Double, down: Double) {
-        var n = name ?: "no tag"
-        n = n.take(min(n.length, 6))
-        text.append(n)
-        for (i in n.length..6 step 2) {
-            text.append("\t")
-        }
-        text.append("•  ${up.toLong().toSpeedString()}↑  ${down.toLong().toSpeedString()}↓\n")
-    }
-
-    /**
      * Updates the speed notification once.
      * Queries traffic stats, separates proxy and direct, and updates the notification.
      * @param lastZeroSpeed The previous zero speed state.
@@ -327,28 +308,16 @@ object NotificationManager {
         val directTotal = directUplink + directDownlink
         val zeroSpeed = proxyTotal + directTotal == 0L
 
-        // Push the live proxy speed to the main screen hero panel (bytes/second).
+        // Push the live proxy speed to the main screen hero panel (bytes/second). This is the
+        // ONLY consumer of the speed job now: the ongoing notification deliberately shows just the
+        // server name + live uptime chronometer (no per-second speed lines), so we never write
+        // speed text back into the notification here.
         getService()?.let { svc ->
             val downPerSec = (proxyDownlink / sinceLastQueryInSeconds).toLong()
             val upPerSec = (proxyUplink / sinceLastQueryInSeconds).toLong()
             MessageUtil.sendMsg2UI(svc, AppConfig.MSG_STATE_SPEED_UPDATE, longArrayOf(downPerSec, upPerSec))
         }
 
-        if (!zeroSpeed || !lastZeroSpeed) {
-            val text = StringBuilder()
-            appendSpeedString(
-                text, AppConfig.TAG_PROXY,
-                proxyUplink / sinceLastQueryInSeconds,
-                proxyDownlink / sinceLastQueryInSeconds
-            )
-
-            appendSpeedString(
-                text, AppConfig.TAG_DIRECT,
-                directUplink / sinceLastQueryInSeconds,
-                directDownlink / sinceLastQueryInSeconds
-            )
-            updateNotification(text.toString(), proxyTotal, directTotal)
-        }
         lastQueryTime = queryTime
         return zeroSpeed
     }
