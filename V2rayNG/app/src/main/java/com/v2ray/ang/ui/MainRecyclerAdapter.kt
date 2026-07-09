@@ -7,8 +7,8 @@ import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.color.MaterialColors
 import com.v2ray.ang.R
 import com.v2ray.ang.contracts.MainAdapterListener
 import com.v2ray.ang.dto.GroupMapItem
@@ -176,7 +176,6 @@ class MainRecyclerAdapter(
 
     private fun bindServer(holder: MainViewHolder, position: Int, cache: ServersCache) {
         val binding = holder.itemMainBinding
-        val context = binding.root.context
         val guid = cache.guid
         val profile = cache.profile
 
@@ -198,20 +197,26 @@ class MainRecyclerAdapter(
         val aff = MmkvManager.decodeServerAffiliationInfo(guid)
         val delay = aff?.testDelayMillis ?: 0L
         binding.tvTestResult.text = aff?.getTestDelayString().orEmpty()
-        val pingColor = if (delay < 0L) R.color.colorPingRed else R.color.colorPing
-        binding.tvTestResult.setTextColor(ContextCompat.getColor(context, pingColor))
-        val dotColor = when {
-            delay > 0L -> R.color.colorPing
-            delay < 0L -> R.color.colorPingRed
-            else -> R.color.colorPingRed // untested / n/a
+        // Ping colours resolved from theme attrs so ThemeOverlay.Mono greys them out.
+        val pingAttr = if (delay < 0L) R.attr.pingBad else R.attr.pingGood
+        binding.tvTestResult.setTextColor(MaterialColors.getColor(binding.tvTestResult, pingAttr))
+        val dotAttr = when {
+            delay > 0L -> R.attr.pingGood
+            delay < 0L -> R.attr.pingBad
+            else -> R.attr.pingBad // untested / n/a
         }
-        binding.dotPing.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(context, dotColor))
+        binding.dotPing.backgroundTintList =
+            ColorStateList.valueOf(MaterialColors.getColor(binding.dotPing, dotAttr))
         binding.dotPing.visibility = if (delay == 0L) View.INVISIBLE else View.VISIBLE
 
         // Selection: blue rounded outline via bg_server_row selected state.
+        // Indicator bar tint via theme attr (mono-safe).
         val selected = guid == MmkvManager.getSelectServer()
         binding.infoContainer.isSelected = selected
-        binding.layoutIndicator.setBackgroundResource(if (selected) R.color.colorIndicator else 0)
+        binding.layoutIndicator.setBackgroundColor(
+            if (selected) MaterialColors.getColor(binding.layoutIndicator, R.attr.indicatorColor)
+            else Color.TRANSPARENT
+        )
 
         binding.infoContainer.setOnClickListener {
             adapterListener?.onSelectServer(guid)

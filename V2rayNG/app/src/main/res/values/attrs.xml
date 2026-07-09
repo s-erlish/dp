@@ -9,4 +9,33 @@
     <attr name="connectIdleColor" format="color" />
     <attr name="connectActiveColor" format="color" />
     <attr name="connectedColor" format="color" />
+
+    <!-- Accent colors themed so ThemeOverlay.Mono can neutralise them to grey.
+         Coloured in the Blue theme (light+dark), monochrome in Mono. -->
+
+    <!-- Protocol / JSON chips on the server row -->
+    <attr name="chipTypeText" format="color" />
+    <attr name="chipJsonText" format="color" />
+    <attr name="chipJsonBg" format="color" />
+
+    <!-- Latency ping (good / bad) and server selection indicator bar -->
+    <attr name="pingGood" format="color" />
+    <attr name="pingBad" format="color" />
+    <attr name="indicatorColor" format="color" />
+
+    <!-- Settings / sheet icon-tile glyph tints -->
+    <attr name="iconTintBlue" format="color" />
+    <attr name="iconTintGreen" format="color" />
+    <attr name="iconTintOrange" format="color" />
+    <attr name="iconTintPurple" format="color" />
+    <attr name="iconTintRed" format="color" />
+    <attr name="iconTintYellow" format="color" />
+
+    <!-- Settings / sheet icon-tile background fills -->
+    <attr name="iconTileBgBlue" format="color" />
+    <attr name="iconTileBgGreen" format="color" />
+    <attr name="iconTileBgOrange" format="color" />
+    <attr name="iconTileBgPurple" format="color" />
+    <attr name="iconTileBgRed" format="color" />
+    <attr name="iconTileBgYellow" format="color" />
 </resources>

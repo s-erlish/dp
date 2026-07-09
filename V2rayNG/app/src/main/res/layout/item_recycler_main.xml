@@ -100,7 +100,7 @@
                     android:paddingTop="2dp"
                     android:paddingEnd="8dp"
                     android:paddingBottom="2dp"
-                    android:textColor="@color/colorConfigType"
+                    android:textColor="?attr/chipTypeText"
                     android:textSize="10sp"
                     android:textStyle="bold"
                     tools:text="VLESS" />
@@ -117,7 +117,7 @@
                     android:paddingEnd="8dp"
                     android:paddingBottom="2dp"
                     android:text="JSON"
-                    android:textColor="@color/icon_yellow"
+                    android:textColor="?attr/chipJsonText"
                     android:textSize="10sp"
                     android:textStyle="bold"
                     android:visibility="gone"
@@ -147,7 +147,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="4dp"
                     android:lines="1"
-                    android:textColor="@color/colorPing"
+                    android:textColor="?attr/pingGood"
                     android:textSize="12sp"
                     android:textStyle="bold"
                     tools:text="214ms" />

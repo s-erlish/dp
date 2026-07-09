@@ -25,6 +25,23 @@
     <color name="divider_color_light">#E4E9F2</color>
     <color name="colorIndicator">@color/md_theme_primary</color>
 
+    <!-- Themed-attr accent values (Blue theme, light). Mono remaps via ThemeOverlay.Mono. -->
+    <!-- Protocol chip text: darkened blue for >=4.5:1 on colorPrimaryContainer (#D8E4FF) -->
+    <color name="chip_type_text">#14468F</color>
+    <!-- JSON chip: dark amber text on dense pale-gold fill (~5:1 on white card) -->
+    <color name="chip_json_text">#7A5C00</color>
+    <color name="chip_json_bg">#F5E6B0</color>
+    <!-- Latency ping: darkened green for >=4.5:1 on white; red darkened for contrast -->
+    <color name="ping_good">#0B7D4A</color>
+    <color name="ping_bad">#C42B32</color>
+    <!-- Icon-tile background fills (translucent hue, shared light/dark) -->
+    <color name="icon_tile_blue">#334C8DFF</color>
+    <color name="icon_tile_green">#3322C55E</color>
+    <color name="icon_tile_orange">#33FB923C</color>
+    <color name="icon_tile_purple">#339B7DFF</color>
+    <color name="icon_tile_red">#33F04452</color>
+    <color name="icon_tile_yellow">#33EAB308</color>
+
     <!-- Primary colors - main tone: departament blue -->
     <color name="md_theme_primary">#1E5FC7</color>
     <color name="md_theme_onPrimary">#FFFFFF</color>

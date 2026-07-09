@@ -58,10 +58,32 @@
         <item name="android:enforceStatusBarContrast" tools:targetApi="29">false</item>
         <item name="android:enforceNavigationBarContrast" tools:targetApi="29">false</item>
 
-        <!-- Connect button state colors (blue theme) -->
+        <!-- Connect button state colors (blue theme).
+             connectedColor = blue accent so the connected shield matches the
+             blue glow/ring (was green -> mismatched with the blue halo). -->
         <item name="connectIdleColor">@color/color_fab_inactive</item>
         <item name="connectActiveColor">@color/color_fab_active</item>
-        <item name="connectedColor">@color/color_connected</item>
+        <item name="connectedColor">@color/color_fab_active</item>
+
+        <!-- Themed accents (coloured; Mono overlay neutralises these to grey) -->
+        <item name="chipTypeText">@color/chip_type_text</item>
+        <item name="chipJsonText">@color/chip_json_text</item>
+        <item name="chipJsonBg">@color/chip_json_bg</item>
+        <item name="pingGood">@color/ping_good</item>
+        <item name="pingBad">@color/ping_bad</item>
+        <item name="indicatorColor">@color/colorIndicator</item>
+        <item name="iconTintBlue">@color/icon_blue</item>
+        <item name="iconTintGreen">@color/icon_green</item>
+        <item name="iconTintOrange">@color/icon_orange</item>
+        <item name="iconTintPurple">@color/icon_purple</item>
+        <item name="iconTintRed">@color/icon_red</item>
+        <item name="iconTintYellow">@color/icon_yellow</item>
+        <item name="iconTileBgBlue">@color/icon_tile_blue</item>
+        <item name="iconTileBgGreen">@color/icon_tile_green</item>
+        <item name="iconTileBgOrange">@color/icon_tile_orange</item>
+        <item name="iconTileBgPurple">@color/icon_tile_purple</item>
+        <item name="iconTileBgRed">@color/icon_tile_red</item>
+        <item name="iconTileBgYellow">@color/icon_tile_yellow</item>
     </style>
 
     <!-- Day/Night theme: inherit common values and set light-mode-specific items -->
@@ -123,6 +145,26 @@
         <item name="connectIdleColor">@color/mono_fab_inactive</item>
         <item name="connectActiveColor">@color/mono_fab_active</item>
         <item name="connectedColor">@color/mono_connected</item>
+
+        <!-- Accents neutralised to greyscale (mono_* colours vary day/night) -->
+        <item name="chipTypeText">@color/mono_onPrimaryContainer</item>
+        <item name="chipJsonText">@color/mono_onSurface</item>
+        <item name="chipJsonBg">@color/mono_surfaceContainerHighest</item>
+        <item name="pingGood">@color/mono_onSurfaceVariant</item>
+        <item name="pingBad">@color/mono_onSurface</item>
+        <item name="indicatorColor">@color/mono_primary</item>
+        <item name="iconTintBlue">@color/mono_onSurfaceVariant</item>
+        <item name="iconTintGreen">@color/mono_onSurfaceVariant</item>
+        <item name="iconTintOrange">@color/mono_onSurfaceVariant</item>
+        <item name="iconTintPurple">@color/mono_onSurfaceVariant</item>
+        <item name="iconTintRed">@color/mono_onSurfaceVariant</item>
+        <item name="iconTintYellow">@color/mono_onSurfaceVariant</item>
+        <item name="iconTileBgBlue">@color/mono_surfaceContainerHighest</item>
+        <item name="iconTileBgGreen">@color/mono_surfaceContainerHighest</item>
+        <item name="iconTileBgOrange">@color/mono_surfaceContainerHighest</item>
+        <item name="iconTileBgPurple">@color/mono_surfaceContainerHighest</item>
+        <item name="iconTileBgRed">@color/mono_surfaceContainerHighest</item>
+        <item name="iconTileBgYellow">@color/mono_surfaceContainerHighest</item>
     </style>
 
 </resources>
