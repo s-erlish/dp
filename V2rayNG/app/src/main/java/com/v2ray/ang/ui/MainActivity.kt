@@ -52,8 +52,20 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     private val timerHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var connectionStartTime = 0L
 
+    // Auto-fallback: one-shot post-connect health check that switches to the fastest
+    // working server if the current tunnel doesn't actually pass traffic.
+    private var autoFallbackDone = false
+    private var healthCheckPending = false
+    private val healthCheckRunnable = Runnable {
+        if (mainViewModel.isRunning.value == true) {
+            healthCheckPending = true
+            mainViewModel.testCurrentServerRealPing()
+        }
+    }
+
     private companion object {
         const val KEY_CONNECTION_START = "cache_connection_start_time"
+        const val HEALTH_CHECK_DELAY_MS = 7000L
     }
 
     private val requestVpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -179,6 +191,17 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         }
         mainViewModel.isRunning.observe(this) { isRunning ->
             applyRunningState(false, isRunning)
+            if (isRunning) scheduleHealthCheckIfEnabled() else resetAutoFallback()
+        }
+        mainViewModel.delayResultAction.observe(this) { time ->
+            if (!healthCheckPending) return@observe
+            healthCheckPending = false
+            val enabled = MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_FALLBACK, true)
+            if (enabled && !autoFallbackDone && time < 0 && mainViewModel.isRunning.value == true) {
+                autoFallbackDone = true
+                toast(getString(R.string.auto_fallback_switching))
+                triggerFastConnect()
+            }
         }
         mainViewModel.startListenBroadcast()
         mainViewModel.initAssets(assets)
@@ -337,6 +360,23 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         binding.tvConnectionTime.visibility = android.view.View.INVISIBLE
     }
 
+    /**
+     * Schedules the one-shot post-connect health check, if auto-fallback is enabled and it
+     * hasn't already run this session.
+     */
+    private fun scheduleHealthCheckIfEnabled() {
+        if (autoFallbackDone) return
+        if (!MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_FALLBACK, true)) return
+        timerHandler.removeCallbacks(healthCheckRunnable)
+        timerHandler.postDelayed(healthCheckRunnable, HEALTH_CHECK_DELAY_MS)
+    }
+
+    private fun resetAutoFallback() {
+        autoFallbackDone = false
+        healthCheckPending = false
+        timerHandler.removeCallbacks(healthCheckRunnable)
+    }
+
     private val timerRunnable = object : Runnable {
         override fun run() {
             if (connectionStartTime == 0L) return
@@ -360,6 +400,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
 
     override fun onDestroy() {
         timerHandler.removeCallbacks(timerRunnable)
+        timerHandler.removeCallbacks(healthCheckRunnable)
         super.onDestroy()
     }
 

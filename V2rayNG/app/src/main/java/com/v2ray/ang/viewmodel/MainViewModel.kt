@@ -50,6 +50,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val updateListAction by lazy { MutableLiveData<Int>() }
     val updateTestResultAction by lazy { MutableLiveData<String>() }
     val updateSpeedAction by lazy { MutableLiveData<Pair<Long, Long>>() }
+    val delayResultAction by lazy { MutableLiveData<Long>() }
 
     // Emitted after a "fast connect" test finishes: carries the chosen server guid
     // (or null when no server produced a valid latency). Guarded as a one-shot event
@@ -602,6 +603,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                 AppConfig.MSG_MEASURE_DELAY_SUCCESS -> {
                     updateTestResultAction.value = intent.getStringExtra("content")
+                }
+
+                AppConfig.MSG_STATE_DELAY_RESULT -> {
+                    (intent.getSerializableExtra("content") as? Long)?.let {
+                        delayResultAction.value = it
+                    }
                 }
 
                 AppConfig.MSG_STATE_SPEED_UPDATE -> {

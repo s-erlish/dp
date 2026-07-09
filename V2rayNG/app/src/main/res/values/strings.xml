@@ -291,6 +291,9 @@
     <string name="ping_method_http">HTTP GET /generate_204 (direct)</string>
     <string name="ping_method_tcp">TCP connect (tcping)</string>
     <string name="ping_method_icmp">ICMP ping (many nodes filter it)</string>
+    <string name="title_pref_auto_fallback">Auto-fallback on failure</string>
+    <string name="summary_pref_auto_fallback">After connecting, verify the tunnel actually passes traffic and automatically switch to the fastest working server if it does not</string>
+    <string name="auto_fallback_switching">Connection not responding — switching to the fastest working server…</string>
     <string name="speed_zero" translatable="false">0 KB/s</string>
     <string name="menu_item_fast_connect">Fast connect (fastest server)</string>
     <string name="bottom_nav_home">Home</string>

@@ -376,6 +376,8 @@ object CoreServiceManager {
                 service.getString(R.string.connection_test_error, errorStr)
             }
             MessageUtil.sendMsg2UI(service, AppConfig.MSG_MEASURE_DELAY_SUCCESS, result)
+            // Numeric result for the auto-fallback health check (ms, or -1 on failure).
+            MessageUtil.sendMsg2UI(service, AppConfig.MSG_STATE_DELAY_RESULT, time)
 
             // Only fetch IP info if the delay test was successful
             if (time >= 0) {

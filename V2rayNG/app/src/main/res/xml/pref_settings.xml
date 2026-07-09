@@ -60,6 +60,12 @@
             android:summary="%s"
             android:title="@string/title_pref_ping_method" />
 
+        <CheckBoxPreference
+            android:defaultValue="true"
+            android:key="pref_auto_fallback"
+            android:summary="@string/summary_pref_auto_fallback"
+            android:title="@string/title_pref_auto_fallback" />
+
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/title_vpn_settings">
