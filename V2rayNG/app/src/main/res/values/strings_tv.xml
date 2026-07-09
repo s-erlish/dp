@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Strings for Android TV support + QR Wi-Fi subscription transfer (module: tv).
+  Kept in a separate file to avoid merge collisions with concurrent UI work in strings.xml.
+-->
+<resources>
+
+    <!-- Shared -->
+    <string name="tv_pairing_qr_desc">Pairing QR code</string>
+
+    <!-- TV receive screen -->
+    <string name="tv_receive_title">Receive subscription</string>
+    <string name="tv_receive_instructions">On your phone, open departament, pick a subscription and scan this code to send it to this TV. Both devices must be on the same Wi-Fi.</string>
+    <string name="tv_receive_seconds_left">Waiting for phone… %1$d s</string>
+    <string name="tv_receive_success">Subscription imported (%1$d).</string>
+    <string name="tv_receive_duplicate">This subscription is already added on this TV.</string>
+    <string name="tv_receive_expired">The code expired. Show a new code and scan again.</string>
+    <string name="tv_receive_no_network">No Wi-Fi/LAN connection detected. Connect this TV to the same Wi-Fi as your phone.</string>
+    <string name="tv_receive_failed">Something went wrong. Please try again.</string>
+    <string name="tv_receive_regenerate">Show a new code</string>
+
+    <!-- Phone send screen -->
+    <string name="tv_send_title">Send to TV</string>
+    <string name="tv_send_instructions">Choose a subscription, then scan the code shown on your TV to send it over the local Wi-Fi.</string>
+    <string name="tv_send_pick">Choose subscription</string>
+    <string name="tv_send_scan">Scan TV code and send</string>
+    <string name="tv_send_no_subs">No subscriptions to send. Add one first.</string>
+    <string name="tv_send_selected">Selected: %1$s</string>
+    <string name="tv_send_none_selected">No subscription selected</string>
+    <string name="tv_send_scanning_invalid">That QR code is not a departament TV code.</string>
+    <string name="tv_send_sending">Sending to TV…</string>
+    <string name="tv_send_success">Sent. The TV imported the subscription.</string>
+    <string name="tv_send_duplicate">The TV already has this subscription.</string>
+    <string name="tv_send_unauthorized">The code expired. Show a fresh code on the TV and try again.</string>
+    <string name="tv_send_unreachable">Couldn\'t reach the TV. Make sure both devices are on the same Wi-Fi without client isolation (guest networks often block this).</string>
+    <string name="tv_send_failed">Transfer failed. Please try again.</string>
+
+</resources>
