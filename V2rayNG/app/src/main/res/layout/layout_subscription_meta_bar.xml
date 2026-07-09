@@ -5,9 +5,9 @@
     android:id="@+id/meta_bar_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginStart="16dp"
+    android:layout_marginStart="22dp"
     android:layout_marginTop="8dp"
-    android:layout_marginEnd="16dp"
+    android:layout_marginEnd="22dp"
     android:layout_marginBottom="2dp"
     android:background="@drawable/bg_server_card"
     android:orientation="vertical"
@@ -129,24 +129,22 @@
         android:orientation="vertical"
         android:visibility="visible">
 
-    <!-- Row 2: compact Happ-style traffic pill (left, ~half width) + expiry marker (right,
-         same line). Horizontal so the ∞ / "до <date>" sits in the top-right corner. -->
-    <LinearLayout
+    <!-- Row 2: compact Happ-style traffic pill CENTERED horizontally, with the expiry marker
+         (∞ / "до <date>") pinned to the top-right corner on the same line. A FrameLayout lets
+         the short/thin pill sit dead-center while the expiry hugs the end. -->
+    <FrameLayout
         android:id="@+id/layout_traffic"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:layout_marginEnd="8dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:layout_marginTop="6dp">
 
-        <!-- Traffic pill: thin rounded track with the usage label centered on it. Takes ~half
-             the row (weight) so it is about 2x shorter than the old full-width bar. -->
+        <!-- Traffic pill: thin rounded track with the usage label centered on it. Short fixed
+             width (~half the card) centered in the row rather than left-aligned. -->
         <FrameLayout
             android:id="@+id/layout_traffic_pill"
-            android:layout_width="0dp"
+            android:layout_width="160dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1">
+            android:layout_gravity="center_horizontal|center_vertical">
 
             <com.google.android.material.progressindicator.LinearProgressIndicator
                 android:id="@+id/progress_traffic"
@@ -178,20 +176,18 @@
 
         </FrameLayout>
 
-        <!-- Expiry marker (∞ or "до <date>") in the top-right corner, same line as the pill -->
+        <!-- Expiry marker (∞ or "до <date>") pinned to the top-right corner. -->
         <TextView
             android:id="@+id/tv_expiry"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="12dp"
-            android:gravity="end"
+            android:layout_gravity="end|center_vertical"
             android:maxLines="1"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="12sp"
             tools:text="до 12.08.2026" />
 
-    </LinearLayout>
+    </FrameLayout>
 
     <!-- Announce banner from the subscription (centered) -->
     <TextView

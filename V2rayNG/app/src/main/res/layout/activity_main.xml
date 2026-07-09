@@ -51,24 +51,47 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
-                <!-- Brand wordmark: sits on the page background (no fill), left-aligned, and
-                     scrolls away with the content (Incy-style). Space Grotesk @ wght 600. -->
-                <TextView
-                    android:id="@+id/tv_brand"
-                    android:layout_width="wrap_content"
+                <!-- Home scrolling header (Incy-style): brand wordmark top-LEFT + "+" add top-RIGHT
+                     on the same row, both scroll away with the content. The fixed toolbar is hidden
+                     on Home; the top status-bar inset is applied to this scroll content at runtime. -->
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:fontFamily="@font/spacegrotesk"
-                    android:fontVariationSettings="'wght' 600"
-                    android:includeFontPadding="false"
-                    android:letterSpacing="-0.02"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
                     android:paddingStart="20dp"
                     android:paddingTop="6dp"
-                    android:paddingEnd="20dp"
-                    android:paddingBottom="2dp"
-                    android:text="@string/app_name"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="30sp"
-                    tools:ignore="UnusedAttribute" />
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="2dp">
+
+                    <!-- Brand wordmark: sits on the page background (no fill). Space Grotesk @ wght 600. -->
+                    <TextView
+                        android:id="@+id/tv_brand"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="@font/spacegrotesk"
+                        android:fontVariationSettings="'wght' 600"
+                        android:includeFontPadding="false"
+                        android:letterSpacing="-0.02"
+                        android:text="@string/app_name"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="30sp"
+                        tools:ignore="UnusedAttribute" />
+
+                    <!-- Scrolling "+" add action: opens the SAME add menu the toolbar used. -->
+                    <ImageButton
+                        android:id="@+id/btn_home_add"
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/menu_item_add_config"
+                        android:padding="8dp"
+                        android:scaleType="fitCenter"
+                        app:srcCompat="@drawable/ic_add_24dp"
+                        app:tint="?attr/colorOnSurface" />
+
+                </LinearLayout>
 
                 <!-- Home account header: sign-in button (signed out) / account chip (signed in) -->
                 <include
@@ -414,26 +437,113 @@
                 android:layout_gravity="bottom"
                 android:background="@drawable/bg_bottom_nav_scrim" />
 
-            <!-- Overlays the content and hugs the very bottom edge. wrap_content gives each item
-                 room for BOTH the icon AND its label (a fixed short height clipped the labels);
-                 a SMALL fixed bottom pad is applied at runtime (not the full gesture-bar inset)
-                 so the bar sits low, just a few dp above the very bottom edge. -->
-            <com.google.android.material.bottomnavigation.BottomNavigationView
+            <!-- Custom bottom bar (replaces Material BottomNavigationView, which reserved tall
+                 internal whitespace below the label and floated the items well above the edge).
+                 A plain 3-item weighted row of icon+label hugs the very bottom; a SMALL fixed
+                 bottom pad (~gesture bar only) is applied at runtime so it sits a few dp low.
+                 The item container ids (nav_home/nav_servers/nav_settings) match the existing
+                 R.id constants so showTab/tab selection is unchanged. -->
+            <LinearLayout
                 android:id="@+id/bottom_nav"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="56dp"
                 android:layout_gravity="bottom"
                 android:background="@android:color/transparent"
-                app:elevation="0dp"
-                app:itemActiveIndicatorStyle="@null"
-                app:itemIconSize="24dp"
-                app:itemIconTint="@color/bottom_nav_item_color"
-                app:itemRippleColor="@android:color/transparent"
-                app:itemTextAppearanceActive="@style/BottomNavLabel"
-                app:itemTextAppearanceInactive="@style/BottomNavLabel"
-                app:itemTextColor="@color/bottom_nav_item_color"
-                app:labelVisibilityMode="labeled"
-                app:menu="@menu/menu_bottom_nav" />
+                android:baselineAligned="false"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:id="@+id/nav_home"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <ImageView
+                        android:id="@+id/nav_home_icon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:importantForAccessibility="no"
+                        app:srcCompat="@drawable/ic_nav_home"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+
+                    <TextView
+                        android:id="@+id/nav_home_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="@string/bottom_nav_home"
+                        android:textAppearance="@style/BottomNavLabel"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/nav_servers"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <ImageView
+                        android:id="@+id/nav_servers_icon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:importantForAccessibility="no"
+                        app:srcCompat="@drawable/ic_nav_servers"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+
+                    <TextView
+                        android:id="@+id/nav_servers_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="@string/bottom_nav_servers"
+                        android:textAppearance="@style/BottomNavLabel"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/nav_settings"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <ImageView
+                        android:id="@+id/nav_settings_icon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:importantForAccessibility="no"
+                        app:srcCompat="@drawable/ic_nav_settings"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+
+                    <TextView
+                        android:id="@+id/nav_settings_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="@string/bottom_nav_settings"
+                        android:textAppearance="@style/BottomNavLabel"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                </LinearLayout>
+
+            </LinearLayout>
 
         </FrameLayout>
 

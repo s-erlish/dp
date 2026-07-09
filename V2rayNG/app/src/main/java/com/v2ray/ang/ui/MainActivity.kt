@@ -18,7 +18,6 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.widget.SearchView
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -193,14 +192,14 @@ class MainActivity : HelperBaseActivity() {
         // Keep the user on the tab they were on when the activity is recreated
         // (e.g. after a theme or language change) instead of jumping back to Home.
         val restoredNav = savedInstanceState?.getInt(KEY_SELECTED_NAV, R.id.nav_home) ?: R.id.nav_home
-        if (restoredNav != R.id.nav_home && binding.bottomNav.selectedItemId != restoredNav) {
-            binding.bottomNav.selectedItemId = restoredNav
+        if (restoredNav != R.id.nav_home && selectedNavId != restoredNav) {
+            selectNav(restoredNav)
         }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 when {
-                    binding.bottomNav.selectedItemId != R.id.nav_home ->
-                        binding.bottomNav.selectedItemId = R.id.nav_home
+                    selectedNavId != R.id.nav_home ->
+                        selectNav(R.id.nav_home)
 
                     else -> {
                         isEnabled = false
@@ -215,6 +214,9 @@ class MainActivity : HelperBaseActivity() {
             animateConnectPress()
             handleFabAction()
         }
+
+        // Scrolling Home "+" opens the same add menu the toolbar "+" used (menu_main via PopupMenu).
+        binding.btnHomeAdd.setOnClickListener { showImportMenu(it) }
 
         setupServersHeader()
         setupHomeMetaBar()
@@ -232,7 +234,7 @@ class MainActivity : HelperBaseActivity() {
     /** Persist the selected tab so a theme/language recreate does not reset it to Home. */
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        outState.putInt(KEY_SELECTED_NAV, binding.bottomNav.selectedItemId)
+        outState.putInt(KEY_SELECTED_NAV, selectedNavId)
     }
 
     /**
@@ -240,30 +242,38 @@ class MainActivity : HelperBaseActivity() {
      * subscription/server list, and Settings shows the custom Incy settings screen.
      */
     private fun setupBottomNav() {
-        // Disable Material's built-in bottom-inset auto-padding: setupEdgeToEdge already
-        // applies the single gesture-bar inset. Without this the two stack and the items
-        // float well above the bottom edge (the "raised nav" bug).
+        // The custom bar is a plain LinearLayout; consume the window insets so nothing auto-pads
+        // it (setupEdgeToEdge applies the single small gesture-bar bottom pad as the one source).
         ViewCompat.setOnApplyWindowInsetsListener(binding.bottomNav) { _, insets -> insets }
-        showTab(R.id.nav_home)
-        binding.bottomNav.setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_home -> {
-                    showTab(R.id.nav_home)
-                    true
-                }
+        binding.navHome.setOnClickListener { selectNav(R.id.nav_home) }
+        binding.navServers.setOnClickListener { selectNav(R.id.nav_servers) }
+        binding.navSettings.setOnClickListener { selectNav(R.id.nav_settings) }
+        selectNav(R.id.nav_home)
+    }
 
-                R.id.nav_servers -> {
-                    showTab(R.id.nav_servers)
-                    true
-                }
+    /** Currently selected bottom-nav tab (replaces BottomNavigationView.selectedItemId). */
+    private var selectedNavId = R.id.nav_home
 
-                R.id.nav_settings -> {
-                    showTab(R.id.nav_settings)
-                    true
-                }
+    /** Selects a bottom-nav tab: repaints the custom bar and swaps the visible tab content. */
+    private fun selectNav(navId: Int) {
+        selectedNavId = navId
+        updateNavSelection()
+        showTab(navId)
+    }
 
-                else -> false
-            }
+    /** Tints the custom bar items: blue (colorPrimary) for the selected one, grey otherwise. */
+    private fun updateNavSelection() {
+        val active = themeColor(androidx.appcompat.R.attr.colorPrimary)
+        val inactive = themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
+        val items = listOf(
+            Triple(R.id.nav_home, binding.navHomeIcon, binding.navHomeLabel),
+            Triple(R.id.nav_servers, binding.navServersIcon, binding.navServersLabel),
+            Triple(R.id.nav_settings, binding.navSettingsIcon, binding.navSettingsLabel),
+        )
+        items.forEach { (id, icon, label) ->
+            val color = if (id == selectedNavId) active else inactive
+            icon.setColorFilter(color)
+            label.setTextColor(color)
         }
     }
 
@@ -271,9 +281,11 @@ class MainActivity : HelperBaseActivity() {
         binding.groupHome.isVisible = tab == R.id.nav_home
         binding.groupServers.isVisible = tab == R.id.nav_servers
         binding.groupSettings.root.isVisible = tab == R.id.nav_settings
-        // Home shows the brand as a scroll-away wordmark inside the content, so the toolbar
-        // title stays empty there; the other tabs keep the fixed toolbar title.
-        supportActionBar?.title = if (tab == R.id.nav_home) "" else getString(R.string.app_name)
+        // Home is a full-bleed scroll with its own scrolling wordmark + "+" header, so the fixed
+        // toolbar is hidden there; the other tabs keep an empty toolbar for status-bar spacing.
+        binding.appbarLayout.isVisible = tab != R.id.nav_home
+        // No tab shows the "departament" wordmark in the top bar (Home shows it inline).
+        supportActionBar?.title = ""
     }
 
     /**
@@ -287,6 +299,9 @@ class MainActivity : HelperBaseActivity() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.homeRoot) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             binding.appbarLayout.updatePadding(top = bars.top)
+            // Home hides the fixed toolbar, so its scroll content must clear the status bar itself
+            // (the scrolling wordmark + "+" header then starts just below the clock).
+            binding.groupHome.updatePadding(top = bars.top)
             // Small fixed bottom pad (NOT the full gesture-bar inset): on gesture nav the thin
             // pill was lifting the whole bar well above the edge. Cap at ~8dp so the items sit
             // low, just a few dp clear of the bottom. Material's auto bottom-inset padding is
@@ -1220,26 +1235,11 @@ class MainActivity : HelperBaseActivity() {
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.menu_main, menu)
-
-        val searchItem = menu.findItem(R.id.search_view)
-        if (searchItem != null) {
-            val searchView = searchItem.actionView as SearchView
-            searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-                override fun onQueryTextSubmit(query: String?): Boolean = false
-
-                override fun onQueryTextChange(newText: String?): Boolean {
-                    mainViewModel.filterConfig(newText.orEmpty())
-                    return false
-                }
-            })
-
-            searchView.setOnCloseListener {
-                mainViewModel.filterConfig("")
-                false
-            }
-        }
-        return super.onCreateOptionsMenu(menu)
+        // No toolbar action menu: the "+" add action lives in the Home scrolling header and the
+        // Servers-tab header (both open the same menu_main PopupMenu via showImportMenu), and the
+        // Settings tab intentionally has no "+". onOptionsItemSelected is still reused by those
+        // PopupMenus, so it stays as-is.
+        return false
     }
 
     override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
@@ -1514,8 +1514,8 @@ class MainActivity : HelperBaseActivity() {
             return
         }
         // Ensure we are on the Servers tab so the list is visible.
-        if (binding.bottomNav.selectedItemId != R.id.nav_servers) {
-            binding.bottomNav.selectedItemId = R.id.nav_servers
+        if (selectedNavId != R.id.nav_servers) {
+            selectNav(R.id.nav_servers)
         }
         val position = serversAdapter.positionOfGuid(selectedGuid)
         if (position < 0) {
@@ -1597,7 +1597,14 @@ class MainActivity : HelperBaseActivity() {
         val s = binding.groupSettings
 
         val mode = MmkvManager.decodeSettingsString(AppConfig.PREF_MODE, AppConfig.VPN)
-        s.valueMode.text = getString(if (mode == AppConfig.VPN) R.string.settings_mode_vpn else R.string.settings_mode_proxy)
+        val proxySharing = MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING, false)
+        s.valueMode.text = getString(
+            when {
+                mode != AppConfig.VPN -> R.string.settings_mode_proxy_opt // Proxy-only
+                proxySharing -> R.string.settings_mode_vpn_proxy          // VPN(tun) + local proxy sharing
+                else -> R.string.settings_mode_tun                        // VPN(tun) only
+            }
+        )
 
         val perApp = MmkvManager.decodeSettingsBool(AppConfig.PREF_PER_APP_PROXY, false)
         s.valuePerApp.text = getString(if (perApp) R.string.settings_value_on else R.string.settings_value_off)
@@ -1641,15 +1648,41 @@ class MainActivity : HelperBaseActivity() {
         if (mainViewModel.isRunning.value == true) restartV2Ray()
     }
 
+    /**
+     * Three connection modes, all expressed with existing prefs (core config untouched):
+     *   0 TUN         = VPN(tun) mode, local-proxy sharing OFF
+     *   1 Proxy       = proxy-only mode (isVpnMode() == false)
+     *   2 VPN + Proxy = VPN(tun) mode, local-proxy sharing ON (PREF_PROXY_SHARING)
+     */
     private fun pickMode() {
-        val entries = arrayOf(getString(R.string.settings_mode_vpn), getString(R.string.settings_mode_proxy))
-        val values = arrayOf(AppConfig.VPN, "Proxy only")
-        val current = MmkvManager.decodeSettingsString(AppConfig.PREF_MODE, AppConfig.VPN).orEmpty()
-        val idx = values.indexOf(current).coerceAtLeast(0)
+        val entries = arrayOf(
+            getString(R.string.settings_mode_tun),
+            getString(R.string.settings_mode_proxy_opt),
+            getString(R.string.settings_mode_vpn_proxy),
+        )
+        val mode = MmkvManager.decodeSettingsString(AppConfig.PREF_MODE, AppConfig.VPN)
+        val proxySharing = MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING, false)
+        val idx = when {
+            mode != AppConfig.VPN -> 1
+            proxySharing -> 2
+            else -> 0
+        }
         AlertDialog.Builder(this)
             .setTitle(R.string.settings_mode)
             .setSingleChoiceItems(entries, idx) { dialog, which ->
-                MmkvManager.encodeSettings(AppConfig.PREF_MODE, values[which])
+                when (which) {
+                    0 -> { // TUN
+                        MmkvManager.encodeSettings(AppConfig.PREF_MODE, AppConfig.VPN)
+                        MmkvManager.encodeSettings(AppConfig.PREF_PROXY_SHARING, false)
+                    }
+                    1 -> { // Proxy only
+                        MmkvManager.encodeSettings(AppConfig.PREF_MODE, "Proxy only")
+                    }
+                    else -> { // VPN + Proxy
+                        MmkvManager.encodeSettings(AppConfig.PREF_MODE, AppConfig.VPN)
+                        MmkvManager.encodeSettings(AppConfig.PREF_PROXY_SHARING, true)
+                    }
+                }
                 bindSettingsState()
                 restartIfRunning()
                 dialog.dismiss()

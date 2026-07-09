@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home-shell "Режим" option labels (latin, locale-independent). Kept out of the shared
+         strings.xml so translations are untouched. TUN = VPN(tun) mode; Proxy = proxy-only;
+         VPN + Proxy = VPN(tun) mode with local-proxy sharing enabled. -->
+    <string name="settings_mode_tun" translatable="false">TUN</string>
+    <string name="settings_mode_proxy_opt" translatable="false">Proxy</string>
+    <string name="settings_mode_vpn_proxy" translatable="false">VPN + Proxy</string>
+</resources>
