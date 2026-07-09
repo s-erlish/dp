@@ -51,33 +51,101 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
-                <!-- Home scrolling header (Incy-style): brand wordmark top-LEFT + "+" add top-RIGHT
-                     on the same row, both scroll away with the content. The fixed toolbar is hidden
-                     on Home; the top status-bar inset is applied to this scroll content at runtime. -->
+                <!-- Home scrolling header (Incy-style): inline stats on the SAME top line as the
+                     top-RIGHT "+" add action; both scroll away with the content. No brand wordmark.
+                     The fixed toolbar is hidden on all tabs; the top status-bar inset is applied to
+                     this scroll content at runtime so the row starts just below the clock. -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:baselineAligned="false"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingStart="20dp"
+                    android:paddingStart="18dp"
                     android:paddingTop="6dp"
                     android:paddingEnd="12dp"
                     android:paddingBottom="2dp">
 
-                    <!-- Brand wordmark: sits on the page background (no fill). Space Grotesk @ wght 600. -->
-                    <TextView
-                        android:id="@+id/tv_brand"
+                    <!-- Inline stats block: upload · uptime · download (takes all remaining width) -->
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:fontFamily="@font/spacegrotesk"
-                        android:fontVariationSettings="'wght' 600"
-                        android:includeFontPadding="false"
-                        android:letterSpacing="-0.02"
-                        android:text="@string/app_name"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="30sp"
-                        tools:ignore="UnusedAttribute" />
+                        android:baselineAligned="false"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="↑"
+                                android:textColor="@color/color_upload"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tv_upload_speed"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="4dp"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:text="@string/speed_zero"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tv_connection_time"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:ellipsize="end"
+                            android:fontFamily="monospace"
+                            android:gravity="center"
+                            android:maxLines="1"
+                            android:text="00:00:00"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="↓"
+                                android:textColor="@color/color_download"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tv_download_speed"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="4dp"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:text="@string/speed_zero"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                    </LinearLayout>
 
                     <!-- Scrolling "+" add action: opens the SAME add menu the toolbar used. -->
                     <ImageButton
@@ -99,90 +167,6 @@
                     layout="@layout/layout_home_account"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
-
-                <!-- Inline stats: upload · uptime · download -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:baselineAligned="false"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="18dp"
-                    android:paddingTop="10dp"
-                    android:paddingEnd="18dp"
-                    android:paddingBottom="6dp">
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="↑"
-                            android:textColor="@color/color_upload"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tv_upload_speed"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:text="@string/speed_zero"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="13sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/tv_connection_time"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:ellipsize="end"
-                        android:fontFamily="monospace"
-                        android:gravity="center"
-                        android:maxLines="1"
-                        android:text="00:00:00"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:gravity="center"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="↓"
-                            android:textColor="@color/color_download"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tv_download_speed"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:text="@string/speed_zero"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="13sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-
-                </LinearLayout>
 
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/card_hero"

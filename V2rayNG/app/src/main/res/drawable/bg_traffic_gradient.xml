@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- progressDrawable for the traffic pill (a horizontal ProgressBar):
+     - background: rounded track (colorSurfaceVariant), ~16dp thick pill => 8dp radius
+     - progress: clipped rounded shape filled with a LEFT->RIGHT white->blue gradient,
+       so the filled end of the pill is the logo blue (#1E5FC7). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item android:id="@android:id/background">
+        <shape android:shape="rectangle">
+            <corners android:radius="8dp" />
+            <solid android:color="?attr/colorSurfaceVariant" />
+        </shape>
+    </item>
+
+    <item android:id="@android:id/progress">
+        <clip>
+            <shape android:shape="rectangle">
+                <corners android:radius="8dp" />
+                <gradient
+                    android:angle="0"
+                    android:endColor="#1E5FC7"
+                    android:startColor="#FFFFFF" />
+            </shape>
+        </clip>
+    </item>
+
+</layer-list>

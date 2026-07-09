@@ -281,10 +281,10 @@ class MainActivity : HelperBaseActivity() {
         binding.groupHome.isVisible = tab == R.id.nav_home
         binding.groupServers.isVisible = tab == R.id.nav_servers
         binding.groupSettings.root.isVisible = tab == R.id.nav_settings
-        // Home is a full-bleed scroll with its own scrolling wordmark + "+" header, so the fixed
-        // toolbar is hidden there; the other tabs keep an empty toolbar for status-bar spacing.
-        binding.appbarLayout.isVisible = tab != R.id.nav_home
-        // No tab shows the "departament" wordmark in the top bar (Home shows it inline).
+        // No tab shows a title or "+" in the top bar, so the fixed AppBarLayout is hidden on ALL
+        // tabs (each tab's content gets the status-bar top inset directly in setupEdgeToEdge). This
+        // removes the empty top band the toolbar left on the Servers/Settings tabs.
+        binding.appbarLayout.isVisible = false
         supportActionBar?.title = ""
     }
 
@@ -299,9 +299,12 @@ class MainActivity : HelperBaseActivity() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.homeRoot) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             binding.appbarLayout.updatePadding(top = bars.top)
-            // Home hides the fixed toolbar, so its scroll content must clear the status bar itself
-            // (the scrolling wordmark + "+" header then starts just below the clock).
+            // The fixed toolbar is hidden on every tab, so each tab's content must clear the status
+            // bar itself: the Home scroll header, the Servers header, and the Settings first section
+            // all start just below the clock with no empty band above them.
             binding.groupHome.updatePadding(top = bars.top)
+            binding.groupServers.updatePadding(top = bars.top)
+            binding.groupSettings.root.updatePadding(top = bars.top)
             // Small fixed bottom pad (NOT the full gesture-bar inset): on gesture nav the thin
             // pill was lifting the whole bar well above the edge. Cap at ~8dp so the items sit
             // low, just a few dp clear of the bottom. Material's auto bottom-inset padding is
@@ -734,10 +737,8 @@ class MainActivity : HelperBaseActivity() {
         val onSurfaceColor = MaterialColors.getColor(meta.tvTraffic, com.google.android.material.R.attr.colorOnSurface)
         val variantColor = MaterialColors.getColor(meta.tvExpiry, com.google.android.material.R.attr.colorOnSurfaceVariant)
         val redColor = ContextCompat.getColor(this, R.color.colorPingRed)
-        val greenColor = ContextCompat.getColor(this, R.color.colorPing)
 
         // Traffic pill: "usedTraffic / total-or-∞" centered on the rounded track.
-        val near = !sub.isUnlimited && sub.trafficFraction >= 0.9f
         meta.tvTraffic.text = if (sub.isUnlimited) {
             getString(R.string.sub_traffic_unlimited, sub.usedTraffic.toTrafficString())
         } else {
@@ -749,9 +750,10 @@ class MainActivity : HelperBaseActivity() {
         }
         meta.tvTraffic.setTextColor(onSurfaceColor)
         // Unlimited traffic keeps an empty rounded track behind the label instead of a filled bar.
+        // The pill fill is a white->blue gradient (bg_traffic_gradient). A horizontal ProgressBar
+        // takes an Int progress against max=1000, so the fill fraction is unchanged.
         val fillFraction = if (sub.isUnlimited) 0f else sub.trafficFraction
-        meta.progressTraffic.setProgressCompat((fillFraction * 1000).toInt(), false)
-        meta.progressTraffic.setIndicatorColor(if (near) redColor else greenColor)
+        meta.progressTraffic.progress = (fillFraction * 1000).toInt()
 
         // Expiry: ∞ when absent or effectively unlimited (panels sometimes send a huge timestamp
         // ~year 2088+ instead of 0), otherwise the real "до <date>".
@@ -1259,8 +1261,10 @@ class MainActivity : HelperBaseActivity() {
         }
 
         R.id.import_manually_vless -> {
-            // "Ввести вручную" — the single manual-entry option in the simplified "+" menu.
-            importManually(EConfigType.VLESS.value)
+            // "Ввести вручную" — a simple text-input dialog where the user pastes/types a config
+            // or subscription link by hand; the entered text is imported via the same path as
+            // pasted clipboard text (importBatchConfig).
+            showManualEntryDialog()
             true
         }
 
@@ -1293,6 +1297,25 @@ class MainActivity : HelperBaseActivity() {
                     .setClass(this, ServerActivity::class.java)
             )
         }
+    }
+
+    /**
+     * "Ввести вручную": a plain text-input dialog for pasting/typing a config or subscription
+     * link by hand. The entered string is fed into the same import path as pasted clipboard text.
+     */
+    private fun showManualEntryDialog() {
+        val input = EditText(this).apply {
+            hint = getString(R.string.manual_entry_hint)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.menu_add_manual)
+            .setView(input)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val text = input.text.toString().trim()
+                if (text.isNotEmpty()) importBatchConfig(text)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     /**

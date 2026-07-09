@@ -16,7 +16,7 @@
     android:paddingEnd="12dp"
     android:paddingBottom="14dp">
 
-    <!-- Row 1: chevron + (title + subtitle) + actions (Ping -> Refresh -> Pin) -->
+    <!-- Row 1: chevron + (title + subtitle) + actions (Ping -> Refresh -> Pin -> Telegram) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -105,12 +105,11 @@
             android:visibility="gone"
             tools:visibility="visible" />
 
-        <!-- 3) Pin (last) -->
+        <!-- 3) Pin -->
         <ImageView
             android:id="@+id/btn_pin"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:layout_marginEnd="2dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
             android:contentDescription="@string/sub_pin"
@@ -118,6 +117,22 @@
             android:padding="8dp"
             app:srcCompat="@drawable/ic_pin_24dp"
             app:tint="?attr/colorOnSurfaceVariant" />
+
+        <!-- 4) Telegram (top-right corner): compact icon button, wired in bindMetaBar. -->
+        <ImageView
+            android:id="@+id/btn_telegram"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="2dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:contentDescription="@string/sub_telegram"
+            android:focusable="true"
+            android:padding="8dp"
+            android:visibility="gone"
+            app:srcCompat="@drawable/ic_telegram_24dp"
+            app:tint="?attr/colorPrimary"
+            tools:visibility="visible" />
 
     </LinearLayout>
 
@@ -146,18 +161,16 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal|center_vertical">
 
-            <com.google.android.material.progressindicator.LinearProgressIndicator
+            <!-- Traffic pill fill: a horizontal ProgressBar whose progressDrawable is a rounded
+                 track + a clipped rounded LEFT->RIGHT white->blue gradient (bg_traffic_gradient). -->
+            <ProgressBar
                 android:id="@+id/progress_traffic"
+                style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="16dp"
                 android:layout_gravity="center_vertical"
                 android:max="1000"
-                app:indicatorColor="@color/colorPing"
-                app:indicatorTrackGapSize="0dp"
-                app:trackColor="?attr/colorSurfaceVariant"
-                app:trackCornerRadius="8dp"
-                app:trackStopIndicatorSize="0dp"
-                app:trackThickness="16dp"
+                android:progressDrawable="@drawable/bg_traffic_gradient"
                 tools:progress="430" />
 
             <TextView
@@ -205,7 +218,7 @@
         tools:text="No ads on YouTube: Hybrid, Russia\nIf it stops working, refresh the subscription @departamentvpn"
         tools:visibility="visible" />
 
-    <!-- Support / Telegram buttons -->
+    <!-- Support button (Telegram moved up to Row 1's top-right corner) -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -217,7 +230,6 @@
             style="@style/Widget.Material3.Button.TonalButton.Icon"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
             android:minWidth="0dp"
             android:minHeight="0dp"
             android:paddingStart="14dp"
@@ -226,20 +238,6 @@
             android:textSize="12sp"
             android:visibility="gone"
             app:icon="@drawable/ic_support_24dp"
-            app:iconSize="16dp"
-            tools:visibility="visible" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_telegram"
-            style="@style/Widget.Material3.Button.TextButton.Icon"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:minHeight="0dp"
-            android:text="@string/sub_telegram"
-            android:textSize="12sp"
-            android:visibility="gone"
-            app:icon="@drawable/ic_telegram_24dp"
             app:iconSize="16dp"
             tools:visibility="visible" />
 

@@ -1,28 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-    <!-- Toolbar keeps ONLY the "+" add action. Tapping it pops a 4-item menu. -->
+    <!-- Flat "+" add menu: tapping the add button lists these four actions directly (no wrapper
+         submenu). Item ids are unchanged so onOptionsItemSelected still routes them. -->
     <item
-        android:icon="@drawable/ic_add_24dp"
-        android:title="@string/menu_add_title"
-        app:showAsAction="ifRoom">
-        <menu>
-            <item
-                android:id="@+id/import_qrcode"
-                android:title="@string/menu_add_scan_qr"
-                app:showAsAction="never" />
-            <item
-                android:id="@+id/import_clipboard"
-                android:title="@string/menu_add_clipboard"
-                app:showAsAction="never" />
-            <item
-                android:id="@+id/tv_send"
-                android:title="@string/menu_add_tv_send"
-                app:showAsAction="never" />
-            <item
-                android:id="@+id/import_manually_vless"
-                android:title="@string/menu_add_manual"
-                app:showAsAction="never" />
-        </menu>
-    </item>
+        android:id="@+id/import_qrcode"
+        android:title="@string/menu_add_scan_qr"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/import_clipboard"
+        android:title="@string/menu_add_clipboard"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/tv_send"
+        android:title="@string/menu_add_tv_send"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/import_manually_vless"
+        android:title="@string/menu_add_manual"
+        app:showAsAction="never" />
 </menu>
