@@ -83,6 +83,7 @@
     <color name="mono_outline">#D2D2D6</color>
     <color name="mono_outlineVariant">#E6E6E8</color>
     <color name="mono_fab_active">#111214</color>
+    <color name="mono_fab_inactive">#C7C7CC</color>
     <color name="mono_connected">#111214</color>
 
     <!-- Surface container ramp (blue theme, light) - enables layering & glass depth -->

@@ -4,4 +4,9 @@
     <style name="TabLayoutTextStyle" parent="TextAppearance.Design.Tab">
         <item name="textAllCaps">false</item>
     </style>
+
+    <!-- Connect button state colors, themed so the mono overlay can remap them -->
+    <attr name="connectIdleColor" format="color" />
+    <attr name="connectActiveColor" format="color" />
+    <attr name="connectedColor" format="color" />
 </resources>

@@ -78,6 +78,7 @@
     <color name="mono_outline">#38383C</color>
     <color name="mono_outlineVariant">#28282C</color>
     <color name="mono_fab_active">#FFFFFF</color>
+    <color name="mono_fab_inactive">#48484A</color>
     <color name="mono_connected">#FFFFFF</color>
 
     <!-- Surface container ramp (blue theme, dark) -->

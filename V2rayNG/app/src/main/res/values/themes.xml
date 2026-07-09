@@ -53,6 +53,11 @@
         <!-- Status bar and navigation bar - system bars -->
         <item name="android:statusBarColor">@color/md_theme_surface</item>
         <item name="android:navigationBarColor">@color/md_theme_surface</item>
+
+        <!-- Connect button state colors (blue theme) -->
+        <item name="connectIdleColor">@color/color_fab_inactive</item>
+        <item name="connectActiveColor">@color/color_fab_active</item>
+        <item name="connectedColor">@color/color_connected</item>
     </style>
 
     <!-- Day/Night theme: inherit common values and set light-mode-specific items -->
@@ -110,6 +115,9 @@
         <item name="colorSurfaceTint">@color/mono_primary</item>
         <item name="android:statusBarColor">@color/mono_surface</item>
         <item name="android:navigationBarColor">@color/mono_surface</item>
+        <item name="connectIdleColor">@color/mono_fab_inactive</item>
+        <item name="connectActiveColor">@color/mono_fab_active</item>
+        <item name="connectedColor">@color/mono_connected</item>
     </style>
 
 </resources>

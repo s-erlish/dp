@@ -12,10 +12,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
-import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.navigation.NavigationView
 import com.google.android.material.tabs.TabLayoutMediator
 import com.v2ray.ang.AppConfig
@@ -51,6 +51,10 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
 
     private val timerHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var connectionStartTime = 0L
+
+    private companion object {
+        const val KEY_CONNECTION_START = "cache_connection_start_time"
+    }
 
     private val requestVpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (it.resultCode == RESULT_OK) {
@@ -158,6 +162,8 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
             binding.tvUploadSpeed.text = up.toSpeedString()
         }
         mainViewModel.fastConnectAction.observe(this) { guid ->
+            // One-shot event: ignore the retained value replayed on recreate/rotation.
+            if (!mainViewModel.consumeFastConnectEvent()) return@observe
             if (guid == null) {
                 setTestState(getString(R.string.connection_test_fail))
                 toastError(R.string.toast_services_failure)
@@ -269,19 +275,19 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
 
     private fun applyRunningState(isLoading: Boolean, isRunning: Boolean) {
         if (isLoading) {
-            binding.cardConnect.setCardBackgroundColor(ContextCompat.getColor(this, R.color.color_fab_active))
+            binding.cardConnect.setCardBackgroundColor(themeColor(R.attr.connectActiveColor))
             binding.tvConnectionStatus.text = getString(R.string.toast_services_start)
             return
         }
 
         if (isRunning) {
-            binding.cardConnect.setCardBackgroundColor(ContextCompat.getColor(this, R.color.color_connected))
+            binding.cardConnect.setCardBackgroundColor(themeColor(R.attr.connectedColor))
             binding.cardConnect.contentDescription = getString(R.string.action_stop_service)
             binding.tvConnectionStatus.text = getString(R.string.connection_connected)
             binding.layoutServerInfo.isFocusable = true
             startConnectionTimer()
         } else {
-            binding.cardConnect.setCardBackgroundColor(ContextCompat.getColor(this, R.color.color_fab_inactive))
+            binding.cardConnect.setCardBackgroundColor(themeColor(R.attr.connectIdleColor))
             binding.cardConnect.contentDescription = getString(R.string.tasker_start_service)
             binding.tvConnectionStatus.text = getString(R.string.connection_not_connected)
             binding.layoutServerInfo.isFocusable = false
@@ -292,6 +298,11 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         }
         updateSelectedServer()
     }
+
+    /**
+     * Resolves a themed color attribute (respects the active blue/mono overlay).
+     */
+    private fun themeColor(attr: Int): Int = MaterialColors.getColor(binding.cardConnect, attr)
 
     /**
      * Updates the selected server name shown in the hero panel.
@@ -307,7 +318,13 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
      * Uses a single reused Runnable to keep memory/CPU footprint minimal.
      */
     private fun startConnectionTimer() {
-        if (connectionStartTime == 0L) connectionStartTime = System.currentTimeMillis()
+        // Persist the start time so the uptime survives rotation / theme recreate.
+        val stored = MmkvManager.decodeSettingsLong(KEY_CONNECTION_START, 0L)
+        connectionStartTime = if (stored > 0L) {
+            stored
+        } else {
+            System.currentTimeMillis().also { MmkvManager.encodeSettings(KEY_CONNECTION_START, it) }
+        }
         binding.tvConnectionTime.visibility = android.view.View.VISIBLE
         timerHandler.removeCallbacks(timerRunnable)
         timerHandler.post(timerRunnable)
@@ -316,6 +333,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     private fun stopConnectionTimer() {
         timerHandler.removeCallbacks(timerRunnable)
         connectionStartTime = 0L
+        MmkvManager.encodeSettings(KEY_CONNECTION_START, 0L)
         binding.tvConnectionTime.visibility = android.view.View.INVISIBLE
     }
 

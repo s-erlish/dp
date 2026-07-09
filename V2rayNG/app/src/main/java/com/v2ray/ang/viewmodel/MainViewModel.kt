@@ -49,9 +49,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val updateSpeedAction by lazy { MutableLiveData<Pair<Long, Long>>() }
 
     // Emitted after a "fast connect" test finishes: carries the chosen server guid
-    // (or null when no server produced a valid latency).
+    // (or null when no server produced a valid latency). Guarded as a one-shot event
+    // so the retained value is not replayed (and re-acted on) after recreate/rotation.
     val fastConnectAction by lazy { MutableLiveData<String?>() }
     private var pendingFastConnect = false
+    private var fastConnectEventPending = false
+
+    /**
+     * Returns true exactly once per emitted fast-connect result, so observers ignore
+     * the LiveData value replayed when the Activity is recreated.
+     */
+    fun consumeFastConnectEvent(): Boolean {
+        val v = fastConnectEventPending
+        fastConnectEventPending = false
+        return v
+    }
     private val tcpingTestScope by lazy { CoroutineScope(Dispatchers.IO) }
 
     /**
@@ -488,6 +500,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 reloadServerList()
                 if (pendingFastConnect) {
                     pendingFastConnect = false
+                    fastConnectEventPending = true
                     fastConnectAction.value = fastestGuid
                 }
             }

@@ -33,7 +33,7 @@
             android:layout_height="wrap_content"
             android:indeterminate="true"
             android:visibility="invisible"
-            app:indicatorColor="@color/color_fab_active"
+            app:indicatorColor="?attr/colorPrimary"
             app:trackCornerRadius="4dp" />
 
         <FrameLayout
@@ -92,7 +92,7 @@
                                 android:clickable="true"
                                 android:contentDescription="@string/tasker_start_service"
                                 android:focusable="true"
-                                app:cardBackgroundColor="@color/color_fab_inactive"
+                                app:cardBackgroundColor="?attr/connectIdleColor"
                                 app:cardCornerRadius="70dp"
                                 app:cardElevation="6dp"
                                 app:rippleColor="@color/colorWhite">
