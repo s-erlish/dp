@@ -200,7 +200,7 @@ abstract class BaseActivity : AppCompatActivity() {
      * be posted to the UI thread via [runOnUiThread]. If the base layout was not set yet
      * (progressBar == null) the call is a no-op.
      */
-    protected fun showLoading() {
+    protected open fun showLoading() {
         runOnUiThread {
             progressBar?.visibility = View.VISIBLE
         }
@@ -211,7 +211,7 @@ abstract class BaseActivity : AppCompatActivity() {
      *
      * Safe to call from background threads. No-op if the progress bar hasn't been cached.
      */
-    protected fun hideLoading() {
+    protected open fun hideLoading() {
         runOnUiThread {
             progressBar?.visibility = View.GONE
         }
