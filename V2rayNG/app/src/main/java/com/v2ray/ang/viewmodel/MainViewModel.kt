@@ -47,6 +47,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val updateListAction by lazy { MutableLiveData<Int>() }
     val updateTestResultAction by lazy { MutableLiveData<String>() }
     val updateSpeedAction by lazy { MutableLiveData<Pair<Long, Long>>() }
+
+    // Emitted after a "fast connect" test finishes: carries the chosen server guid
+    // (or null when no server produced a valid latency).
+    val fastConnectAction by lazy { MutableLiveData<String?>() }
+    private var pendingFastConnect = false
     private val tcpingTestScope by lazy { CoroutineScope(Dispatchers.IO) }
 
     /**
@@ -236,6 +241,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun testCurrentServerRealPing() {
         MessageUtil.sendMsg2Service(getApplication(), AppConfig.MSG_MEASURE_DELAY, "")
+    }
+
+    /**
+     * Runs a real-ping test across the current server list and, once finished,
+     * automatically selects the lowest-latency server and signals the UI to connect.
+     * Used by the "fast connect" action.
+     */
+    fun fastConnect() {
+        pendingFastConnect = true
+        testAllRealPing()
+    }
+
+    /**
+     * Picks the server with the smallest positive latency from the current cache
+     * and marks it as the selected server.
+     *
+     * @return the selected server guid, or null if no server has a valid latency.
+     */
+    private fun selectFastestServer(): String? {
+        var bestGuid: String? = null
+        var bestDelay = Long.MAX_VALUE
+        serversCache.forEach { sc ->
+            val delay = MmkvManager.decodeServerAffiliationInfo(sc.guid)?.testDelayMillis ?: -1L
+            if (delay in 1 until bestDelay) {
+                bestDelay = delay
+                bestGuid = sc.guid
+            }
+        }
+        bestGuid?.let { MmkvManager.setSelectServer(it) }
+        return bestGuid
     }
 
     /**
@@ -447,8 +482,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 sortByTestResults()
             }
 
+            val fastestGuid = if (pendingFastConnect) selectFastestServer() else null
+
             withContext(Dispatchers.Main) {
                 reloadServerList()
+                if (pendingFastConnect) {
+                    pendingFastConnect = false
+                    fastConnectAction.value = fastestGuid
+                }
             }
         }
     }

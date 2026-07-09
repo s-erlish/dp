@@ -8,6 +8,10 @@
         app:actionViewClass="androidx.appcompat.widget.SearchView"
         app:showAsAction="always|collapseActionView" />
     <item
+        android:id="@+id/fast_connect"
+        android:title="@string/menu_item_fast_connect"
+        app:showAsAction="never" />
+    <item
         android:icon="@drawable/ic_add_24dp"
         android:title="@string/menu_item_add_config"
         app:showAsAction="ifRoom">

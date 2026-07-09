@@ -102,6 +102,10 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         })
 
         binding.cardConnect.setOnClickListener { handleFabAction() }
+        binding.cardConnect.setOnLongClickListener {
+            triggerFastConnect()
+            true
+        }
         binding.layoutServerInfo.setOnClickListener { handleLayoutTestClick() }
 
         setupGroupTab()
@@ -118,6 +122,20 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         mainViewModel.updateSpeedAction.observe(this) { (down, up) ->
             binding.tvDownloadSpeed.text = down.toSpeedString()
             binding.tvUploadSpeed.text = up.toSpeedString()
+        }
+        mainViewModel.fastConnectAction.observe(this) { guid ->
+            if (guid == null) {
+                setTestState(getString(R.string.connection_test_fail))
+                toastError(R.string.toast_services_failure)
+                return@observe
+            }
+            updateSelectedServer()
+            if (mainViewModel.isRunning.value == true) {
+                restartV2Ray()
+            } else {
+                applyRunningState(isLoading = true, isRunning = false)
+                startVpnWithPermission()
+            }
         }
         mainViewModel.isRunning.observe(this) { isRunning ->
             applyRunningState(false, isRunning)
@@ -149,7 +167,16 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
 
         if (mainViewModel.isRunning.value == true) {
             CoreServiceManager.stopVService(this)
-        } else if (SettingsManager.isVpnMode()) {
+        } else {
+            startVpnWithPermission()
+        }
+    }
+
+    /**
+     * Starts the VPN, requesting the system VPN permission first when needed.
+     */
+    private fun startVpnWithPermission() {
+        if (SettingsManager.isVpnMode()) {
             val intent = VpnService.prepare(this)
             if (intent == null) {
                 startV2Ray()
@@ -159,6 +186,20 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         } else {
             startV2Ray()
         }
+    }
+
+    /**
+     * Long-press action on the connect button: measures latency across the current
+     * server list and connects to the fastest one automatically.
+     */
+    private fun triggerFastConnect() {
+        if (mainViewModel.serversCache.isEmpty()) {
+            toast(R.string.title_file_chooser)
+            return
+        }
+        toast(getString(R.string.connection_test_testing_count, mainViewModel.serversCache.count()))
+        setTestState(getString(R.string.connection_test_testing))
+        mainViewModel.fastConnect()
     }
 
     private fun handleLayoutTestClick() {
@@ -294,6 +335,11 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     }
 
     override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
+        R.id.fast_connect -> {
+            triggerFastConnect()
+            true
+        }
+
         R.id.import_qrcode -> {
             importQRcode()
             true

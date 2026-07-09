@@ -287,6 +287,7 @@
     <string name="title_pref_ui_mode_night">UI mode settings</string>
     <string name="title_pref_color_theme">Color theme</string>
     <string name="speed_zero" translatable="false">0 KB/s</string>
+    <string name="menu_item_fast_connect">Fast connect (fastest server)</string>
     <string name="color_theme_blue">Blue (departament)</string>
     <string name="color_theme_mono">Black &amp; white</string>
     <string name="title_pref_use_hev_tunnel">Enable Hev TUN Feature</string>
