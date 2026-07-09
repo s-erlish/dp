@@ -2,7 +2,6 @@
 package com.v2ray.ang.ui
 
 import android.annotation.SuppressLint
-import android.content.res.ColorStateList
 import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
@@ -185,27 +184,17 @@ class MainRecyclerAdapter(
         binding.tvFlag.text = FlagUtil.resolveFlag(profile)
         binding.tvName.text = FlagUtil.stripLeadingFlag(profile.remarks)
 
-        // Protocol chips: blue primary, gold JSON, grey transport·security.
+        // Protocol chips: blue primary, grey transport·security.
         binding.tvType.text = primaryProtocol(guid, profile)
-        val complex = profile.configType.isComplexType()
-        binding.tvJson.visibility = if (complex) View.VISIBLE else View.GONE
         binding.tvStatistics.text = transportSecurity(guid, profile)
 
-        // Ping dot + latency text.
+        // Latency text only (colored by result).
         val aff = MmkvManager.decodeServerAffiliationInfo(guid)
         val delay = aff?.testDelayMillis ?: 0L
         binding.tvTestResult.text = aff?.getTestDelayString().orEmpty()
         // Ping colours resolved from theme attrs so ThemeOverlay.Mono greys them out.
         val pingAttr = if (delay < 0L) R.attr.pingBad else R.attr.pingGood
         binding.tvTestResult.setTextColor(MaterialColors.getColor(binding.tvTestResult, pingAttr))
-        val dotAttr = when {
-            delay > 0L -> R.attr.pingGood
-            delay < 0L -> R.attr.pingBad
-            else -> R.attr.pingBad // untested / n/a
-        }
-        binding.dotPing.backgroundTintList =
-            ColorStateList.valueOf(MaterialColors.getColor(binding.dotPing, dotAttr))
-        binding.dotPing.visibility = if (delay == 0L) View.INVISIBLE else View.VISIBLE
 
         // Selection: blue rounded outline via bg_server_row selected state.
         // Indicator bar tint via theme attr (mono-safe).
