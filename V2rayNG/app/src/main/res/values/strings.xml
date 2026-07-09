@@ -304,6 +304,10 @@
     <string name="sub_expires">Expires %1$s</string>
     <string name="sub_expired">Expired</string>
     <string name="sub_days_left" translatable="false">%1$s · %2$dd</string>
+    <string name="sub_pin">Pin subscription</string>
+    <string name="sub_unpin">Unpin subscription</string>
+    <string name="sub_support">Support</string>
+    <string name="sub_website">Website</string>
     <string name="color_theme_blue">Blue (departament)</string>
     <string name="color_theme_mono">Black &amp; white</string>
     <string name="title_pref_use_hev_tunnel">Enable Hev TUN Feature</string>

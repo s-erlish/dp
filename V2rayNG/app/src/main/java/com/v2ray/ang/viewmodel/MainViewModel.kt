@@ -395,7 +395,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             )
         }
-        subscriptions.forEach { sub ->
+        // Pinned subscriptions come first (stable sort preserves original order otherwise).
+        subscriptions.sortedByDescending { it.subscription.pinned }.forEach { sub ->
             groups.add(
                 GroupMapItem(
                     id = sub.guid,

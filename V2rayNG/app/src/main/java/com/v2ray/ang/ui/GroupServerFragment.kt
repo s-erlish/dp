@@ -125,7 +125,28 @@ class GroupServerFragment : BaseFragment<FragmentGroupServerBinding>(),
         }
         meta.btnRefresh.setOnClickListener { refreshSub() }
         meta.btnPing.setOnClickListener { pingSub() }
+        meta.btnPin.setOnClickListener { togglePin() }
+        meta.btnSupport.setOnClickListener { openSubUrl(MmkvManager.decodeSubscription(subId)?.supportUrl) }
+        meta.btnWebsite.setOnClickListener { openSubUrl(MmkvManager.decodeSubscription(subId)?.webPageUrl) }
         bindMetaBar()
+    }
+
+    /** Toggles the pinned state of this subscription and rebuilds the tab order. */
+    private fun togglePin() {
+        val sub = MmkvManager.decodeSubscription(subId) ?: return
+        sub.pinned = !sub.pinned
+        MmkvManager.encodeSubscription(subId, sub)
+        bindMetaBar()
+        ownerActivity.reloadSubscriptionTabs()
+    }
+
+    private fun openSubUrl(url: String?) {
+        if (url.isNullOrBlank()) return
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+        } catch (e: Exception) {
+            ownerActivity.toastError(R.string.toast_failure)
+        }
     }
 
     /**
@@ -141,6 +162,22 @@ class GroupServerFragment : BaseFragment<FragmentGroupServerBinding>(),
         }
         meta.root.visibility = View.VISIBLE
         meta.tvSubTitle.text = sub.remarks.ifBlank { getString(R.string.title_sub_setting) }
+
+        // Pin state (icon tint + description).
+        val primaryColor = MaterialColors.getColor(meta.btnPin, com.google.android.material.R.attr.colorPrimary)
+        val onVariant = MaterialColors.getColor(meta.btnPin, com.google.android.material.R.attr.colorOnSurfaceVariant)
+        meta.btnPin.setColorFilter(if (sub.pinned) primaryColor else onVariant)
+        meta.btnPin.contentDescription = getString(if (sub.pinned) R.string.sub_unpin else R.string.sub_pin)
+
+        // Announce banner + support/website buttons.
+        if (sub.announce.isNotBlank()) {
+            meta.tvAnnounce.visibility = View.VISIBLE
+            meta.tvAnnounce.text = sub.announce
+        } else {
+            meta.tvAnnounce.visibility = View.GONE
+        }
+        meta.btnSupport.visibility = if (sub.supportUrl.isNotBlank()) View.VISIBLE else View.GONE
+        meta.btnWebsite.visibility = if (sub.webPageUrl.isNotBlank()) View.VISIBLE else View.GONE
 
         if (!sub.hasUserInfo) {
             meta.layoutTraffic.visibility = View.GONE

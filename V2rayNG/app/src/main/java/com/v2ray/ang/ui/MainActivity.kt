@@ -210,6 +210,9 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         mainViewModel.initAssets(assets)
     }
 
+    /** Rebuilds the subscription tabs (e.g. after a pin/unpin changes their order). */
+    fun reloadSubscriptionTabs() = setupGroupTab()
+
     private fun setupGroupTab() {
         val groups = mainViewModel.getSubscriptions(this)
         groupPagerAdapter.update(groups)

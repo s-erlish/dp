@@ -35,6 +35,20 @@
             android:textStyle="bold"
             tools:text="departament • Premium" />
 
+        <ImageView
+            android:id="@+id/btn_pin"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="2dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:contentDescription="@string/sub_pin"
+            android:focusable="true"
+            android:padding="6dp"
+            app:srcCompat="@drawable/ic_pin_24dp"
+            app:tint="?attr/colorOnSurfaceVariant" />
+
         <ProgressBar
             android:id="@+id/progress_action"
             android:layout_width="20dp"
@@ -117,6 +131,61 @@
             app:trackCornerRadius="4dp"
             app:trackThickness="6dp"
             tools:progress="430" />
+
+    </LinearLayout>
+
+    <!-- Announce banner from the subscription -->
+    <TextView
+        android:id="@+id/tv_announce"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="8dp"
+        android:autoLink="web"
+        android:maxLines="5"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textColorLink="?attr/colorPrimary"
+        android:textSize="12sp"
+        android:visibility="gone"
+        tools:text="No ads on YouTube: Hybrid, Russia\nIf it stops working, refresh the subscription @departamentvpn"
+        tools:visibility="visible" />
+
+    <!-- Support / website buttons -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_support"
+            style="@style/Widget.Material3.Button.TonalButton.Icon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="16dp"
+            android:text="@string/sub_support"
+            android:textSize="12sp"
+            android:visibility="gone"
+            app:icon="@drawable/ic_support_24dp"
+            app:iconSize="16dp"
+            tools:visibility="visible" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_website"
+            style="@style/Widget.Material3.Button.TextButton.Icon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:text="@string/sub_website"
+            android:textSize="12sp"
+            android:visibility="gone"
+            app:icon="@drawable/ic_globe_24dp"
+            app:iconSize="16dp" />
 
     </LinearLayout>
 

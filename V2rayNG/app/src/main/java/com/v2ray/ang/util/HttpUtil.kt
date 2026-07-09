@@ -197,8 +197,15 @@ object HttpUtil {
 
     /**
      * Body plus selected response headers of a subscription fetch.
+     * announce/supportUrl/webPageUrl are raw header values (may be `base64:`-prefixed).
      */
-    data class UrlContentResult(val body: String, val subscriptionUserInfo: String?)
+    data class UrlContentResult(
+        val body: String,
+        val subscriptionUserInfo: String?,
+        val announce: String? = null,
+        val supportUrl: String? = null,
+        val webPageUrl: String? = null,
+    )
 
     /**
      * Same as [getUrlContentWithUserAgent] but also returns the `subscription-userinfo`
@@ -244,8 +251,13 @@ object HttpUtil {
                     }
 
                     response.isSuccessful -> {
-                        val userInfo = response.header("subscription-userinfo")
-                        return UrlContentResult(response.body?.string() ?: "", userInfo)
+                        return UrlContentResult(
+                            body = response.body?.string() ?: "",
+                            subscriptionUserInfo = response.header("subscription-userinfo"),
+                            announce = response.header("announce"),
+                            supportUrl = response.header("support-url"),
+                            webPageUrl = response.header("profile-web-page-url"),
+                        )
                     }
 
                     else -> {

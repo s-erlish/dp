@@ -520,6 +520,26 @@ object AngConfigManager {
     }
 
     /**
+     * Decodes a Happ/Incy subscription directive header value.
+     * @return null when the header is absent (leave the stored value unchanged);
+     *         "" when the value is "0" (clear); otherwise the plaintext ("base64:" decoded).
+     */
+    private fun decodeSubDirective(raw: String?): String? {
+        if (raw == null) return null
+        val v = raw.trim()
+        if (v == "0") return ""
+        return if (v.startsWith("base64:")) {
+            try {
+                String(android.util.Base64.decode(v.removePrefix("base64:"), android.util.Base64.DEFAULT)).trim()
+            } catch (e: Exception) {
+                v
+            }
+        } else {
+            v
+        }
+    }
+
+    /**
      * Updates the configuration via a subscription.
      *
      * @param it The subscription item.
@@ -598,6 +618,11 @@ object AngConfigManager {
                     it.subscription.expire = info.expire
                     it.subscription.userInfoUpdated = System.currentTimeMillis()
                 }
+                // Persist Happ/Incy-style directives (announce banner, support/website buttons).
+                // null header = leave unchanged; "0" = clear; "base64:.." = decoded.
+                decodeSubDirective(result?.announce)?.let { v -> it.subscription.announce = v }
+                decodeSubDirective(result?.supportUrl)?.let { v -> it.subscription.supportUrl = v }
+                decodeSubDirective(result?.webPageUrl)?.let { v -> it.subscription.webPageUrl = v }
                 it.subscription.lastUpdated = System.currentTimeMillis()
                 MmkvManager.encodeSubscription(it.guid, it.subscription)
                 LogUtil.i(AppConfig.TAG, "Subscription updated: ${it.subscription.remarks}, $count configs")

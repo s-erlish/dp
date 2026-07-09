@@ -20,6 +20,12 @@ data class SubscriptionItem(
     var totalTraffic: Long = 0,     // bytes, from header `total`; 0 == unlimited
     var expire: Long = 0,           // epoch SECONDS, from header `expire`; 0 == no expiry
     var userInfoUpdated: Long = 0,  // epoch millis, when metadata was last captured
+
+    // --- Happ-style subscription directives ---
+    var pinned: Boolean = false,    // pinned subscriptions sort first and become the default tab
+    var announce: String = "",      // banner text from the `announce` header/#directive
+    var supportUrl: String = "",    // from `support-url` (e.g. a Telegram link)
+    var webPageUrl: String = "",    // from `profile-web-page-url`
 )
 
 // --- derived helpers (kept out of the data class so it stays a plain JSON POJO) ---
