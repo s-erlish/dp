@@ -523,6 +523,7 @@
     <string name="settings_theme_dark">Тёмная тема</string>
     <string name="settings_theme_mono">Чёрно-белый режим</string>
     <string name="settings_language">Язык</string>
+    <string name="settings_language_system">Системный</string>
     <string name="settings_boot">Запуск при загрузке</string>
     <string name="settings_boot_sub">Подключаться после перезагрузки устройства</string>
     <string name="settings_subscriptions">Подписки</string>

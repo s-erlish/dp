@@ -132,6 +132,9 @@ class MainActivity : HelperBaseActivity() {
         const val HEALTH_CHECK_DELAY_MS = 7000L
         // Upper bound for a connect attempt before the UI gives up and returns to idle.
         const val CONNECT_TIMEOUT_MS = 20000L
+        // Remembers which bottom-nav tab was selected so it survives an activity
+        // recreate (theme/language change) instead of snapping back to Home.
+        const val KEY_SELECTED_NAV = "selected_bottom_nav"
     }
 
     private val requestVpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -165,6 +168,12 @@ class MainActivity : HelperBaseActivity() {
         setupServerLists()
 
         setupBottomNav()
+        // Keep the user on the tab they were on when the activity is recreated
+        // (e.g. after a theme or language change) instead of jumping back to Home.
+        val restoredNav = savedInstanceState?.getInt(KEY_SELECTED_NAV, R.id.nav_home) ?: R.id.nav_home
+        if (restoredNav != R.id.nav_home && binding.bottomNav.selectedItemId != restoredNav) {
+            binding.bottomNav.selectedItemId = restoredNav
+        }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 when {
@@ -196,6 +205,12 @@ class MainActivity : HelperBaseActivity() {
 
         checkAndRequestPermission(PermissionType.POST_NOTIFICATIONS) {
         }
+    }
+
+    /** Persist the selected tab so a theme/language recreate does not reset it to Home. */
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(KEY_SELECTED_NAV, binding.bottomNav.selectedItemId)
     }
 
     /**
