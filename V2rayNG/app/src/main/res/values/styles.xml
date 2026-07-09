@@ -34,4 +34,48 @@
         <item name="android:textSize">20sp</item>
     </style>
 
+    <!--
+        App-wide AlertDialog theming (departament design language).
+
+        Wired to every app theme via `alertDialogTheme` / `android:alertDialogTheme`
+        / `materialAlertDialogTheme`, so EVERY androidx.appcompat AlertDialog
+        (DNS input dialog, "Пинг" single-choice list, etc.) is restyled without
+        touching any Kotlin. All colours are pulled from the current theme via
+        `?attr/...`, so the dialog adapts automatically to the dark, light and
+        (runtime-applied) mono themes.
+    -->
+    <style name="ThemeOverlay.Departament.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <!-- Rounded dark app-surface window (replaces the flat grey box) -->
+        <item name="android:windowBackground">@drawable/bg_dialog</item>
+        <item name="android:dialogCornerRadius">20dp</item>
+        <item name="dialogCornerRadius">20dp</item>
+
+        <!-- Bright-blue accent for action buttons, cursor, radio/checkbox controls -->
+        <item name="colorControlNormal">?attr/colorOnSurfaceVariant</item>
+        <item name="colorControlActivated">?attr/colorPrimary</item>
+        <item name="colorControlHighlight">?attr/colorPrimary</item>
+
+        <!-- On-surface text colours -->
+        <item name="android:textColorPrimary">?attr/colorOnSurface</item>
+        <item name="android:textColorSecondary">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textColorAlertDialogListItem">?attr/colorOnSurface</item>
+
+        <!-- Title / button appearances -->
+        <item name="materialAlertDialogTitleTextStyle">@style/Departament.Dialog.Title</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Departament.Dialog.Button</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Departament.Dialog.Button</item>
+        <item name="buttonBarNeutralButtonStyle">@style/Departament.Dialog.Button</item>
+    </style>
+
+    <!-- Dialog title: on-surface colour so it reads on the dark surface -->
+    <style name="Departament.Dialog.Title" parent="MaterialAlertDialog.Material3.Title.Text">
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+
+    <!-- Dialog action buttons (OK / Отмена): flat text buttons in the blue accent -->
+    <style name="Departament.Dialog.Button" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">?attr/colorPrimary</item>
+        <item name="rippleColor">?attr/colorPrimary</item>
+    </style>
+
 </resources>

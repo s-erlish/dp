@@ -84,6 +84,13 @@
         <item name="iconTileBgPurple">@color/icon_tile_purple</item>
         <item name="iconTileBgRed">@color/icon_tile_red</item>
         <item name="iconTileBgYellow">@color/icon_tile_yellow</item>
+
+        <!-- App-wide AlertDialog styling (departament design). Applies to every
+             androidx.appcompat AlertDialog.Builder dialog; adapts per theme via
+             ?attr colours. Inherited by both the light and night AppThemeDayNight. -->
+        <item name="alertDialogTheme">@style/ThemeOverlay.Departament.Dialog</item>
+        <item name="android:alertDialogTheme">@style/ThemeOverlay.Departament.Dialog</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.Departament.Dialog</item>
     </style>
 
     <!-- Day/Night theme: inherit common values and set light-mode-specific items -->
@@ -165,6 +172,12 @@
         <item name="iconTileBgPurple">@color/mono_surfaceContainerHighest</item>
         <item name="iconTileBgRed">@color/mono_surfaceContainerHighest</item>
         <item name="iconTileBgYellow">@color/mono_surfaceContainerHighest</item>
+
+        <!-- Keep app-wide dialog styling under the mono overlay too. The overlay's
+             greyscale ?attr colours flow into the same dialog theme automatically. -->
+        <item name="alertDialogTheme">@style/ThemeOverlay.Departament.Dialog</item>
+        <item name="android:alertDialogTheme">@style/ThemeOverlay.Departament.Dialog</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.Departament.Dialog</item>
     </style>
 
 </resources>
