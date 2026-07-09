@@ -55,7 +55,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
 
     // Auto-fallback: one-shot post-connect health check that switches to the fastest
     // working server if the current tunnel doesn't actually pass traffic.
-    private var autoFallbackDone = false
+    // The "already fired this session" flag lives in the ViewModel (autoFallbackUsed).
     private var healthCheckPending = false
     private val healthCheckRunnable = Runnable {
         if (mainViewModel.isRunning.value == true) {
@@ -192,16 +192,18 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         }
         mainViewModel.isRunning.observe(this) { isRunning ->
             applyRunningState(false, isRunning)
-            if (isRunning) scheduleHealthCheckIfEnabled() else resetAutoFallback()
+            if (isRunning) scheduleHealthCheckIfEnabled() else cancelHealthCheck()
         }
         mainViewModel.delayResultAction.observe(this) { time ->
             if (!healthCheckPending) return@observe
             healthCheckPending = false
             val enabled = MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_FALLBACK, true)
-            if (enabled && !autoFallbackDone && time < 0 && mainViewModel.isRunning.value == true) {
-                autoFallbackDone = true
+            if (enabled && !mainViewModel.autoFallbackUsed && time < 0 && mainViewModel.isRunning.value == true) {
+                // Mark used BEFORE restarting so the restart's own START_SUCCESS doesn't re-arm.
+                mainViewModel.autoFallbackUsed = true
                 toast(getString(R.string.auto_fallback_switching))
-                triggerFastConnect()
+                // Exclude the server that just failed so we don't switch back to it.
+                mainViewModel.fastConnect(excludeGuid = MmkvManager.getSelectServer())
             }
         }
         mainViewModel.startListenBroadcast()
@@ -228,6 +230,9 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
 
     private fun handleFabAction() {
         applyRunningState(isLoading = true, isRunning = false)
+
+        // A manual connect/disconnect starts a fresh session: allow auto-fallback again.
+        mainViewModel.autoFallbackUsed = false
 
         if (mainViewModel.isRunning.value == true) {
             CoreServiceManager.stopVService(this)
@@ -263,6 +268,8 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         }
         toast(getString(R.string.connection_test_testing_count, mainViewModel.serversCache.count()))
         setTestState(getString(R.string.connection_test_testing))
+        // User-initiated fresh connect: allow the post-connect health check again.
+        mainViewModel.autoFallbackUsed = false
         mainViewModel.fastConnect()
     }
 
@@ -366,14 +373,14 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
      * hasn't already run this session.
      */
     private fun scheduleHealthCheckIfEnabled() {
-        if (autoFallbackDone) return
+        if (mainViewModel.autoFallbackUsed) return
         if (!MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_FALLBACK, true)) return
         timerHandler.removeCallbacks(healthCheckRunnable)
         timerHandler.postDelayed(healthCheckRunnable, HEALTH_CHECK_DELAY_MS)
     }
 
-    private fun resetAutoFallback() {
-        autoFallbackDone = false
+    /** Cancels a pending health check (on disconnect) without clearing the session flag. */
+    private fun cancelHealthCheck() {
         healthCheckPending = false
         timerHandler.removeCallbacks(healthCheckRunnable)
     }

@@ -58,6 +58,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val fastConnectAction by lazy { MutableLiveData<String?>() }
     private var pendingFastConnect = false
     private var fastConnectEventPending = false
+    private var fastConnectExcludeGuid: String? = null
+
+    // Whether the one-shot auto-fallback has already fired for the current user-initiated
+    // session. Lives in the ViewModel so it survives Activity recreate (rotation/theme change)
+    // and is NOT reset by the fallback's own service restart — prevents reconnect loops.
+    var autoFallbackUsed = false
 
     /**
      * Returns true exactly once per emitted fast-connect result, so observers ignore
@@ -328,8 +334,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * automatically selects the lowest-latency server and signals the UI to connect.
      * Used by the "fast connect" action.
      */
-    fun fastConnect() {
+    fun fastConnect(excludeGuid: String? = null) {
         pendingFastConnect = true
+        fastConnectExcludeGuid = excludeGuid
         testAllRealPing()
     }
 
@@ -339,10 +346,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      *
      * @return the selected server guid, or null if no server has a valid latency.
      */
-    private fun selectFastestServer(): String? {
+    private fun selectFastestServer(excludeGuid: String? = null): String? {
         var bestGuid: String? = null
         var bestDelay = Long.MAX_VALUE
         serversCache.forEach { sc ->
+            if (sc.guid == excludeGuid) return@forEach
             val delay = MmkvManager.decodeServerAffiliationInfo(sc.guid)?.testDelayMillis ?: -1L
             if (delay in 1 until bestDelay) {
                 bestDelay = delay
@@ -562,12 +570,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 sortByTestResults()
             }
 
-            val fastestGuid = if (pendingFastConnect) selectFastestServer() else null
+            val fastestGuid = if (pendingFastConnect) selectFastestServer(fastConnectExcludeGuid) else null
 
             withContext(Dispatchers.Main) {
                 reloadServerList()
                 if (pendingFastConnect) {
                     pendingFastConnect = false
+                    fastConnectExcludeGuid = null
                     fastConnectEventPending = true
                     fastConnectAction.value = fastestGuid
                 }
