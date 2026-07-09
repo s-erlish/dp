@@ -2,7 +2,7 @@ package com.v2ray.ang.tv
 
 import android.os.Bundle
 import android.view.View
-import androidx.appcompat.app.AlertDialog
+import android.widget.RadioButton
 import androidx.lifecycle.lifecycleScope
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
@@ -24,12 +24,12 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
 /**
- * Phone-side "Send to TV" screen.
+ * Phone-side "Отправить на TV" screen.
  *
- * The phone is the trusted, signed-in sender: the user picks one of their existing
- * subscriptions, scans the TV's pairing QR, and this screen POSTs the selected
- * subscription URL to the TV's one-shot LAN listener, authorized by the one-time
- * token embedded in the QR. The secret sub URL is never shown on screen.
+ * New flow (scan-first): the user scans the TV's pairing QR FIRST, then picks which of
+ * their subscriptions to send. Once a subscription is ticked and «Отправить» pressed,
+ * its URL is POSTed to the TV's one-shot LAN listener, authorized by the one-time token
+ * embedded in the QR. The secret sub URL is never shown on screen.
  */
 class TvSendActivity : BaseActivity() {
 
@@ -40,7 +40,13 @@ class TvSendActivity : BaseActivity() {
     private lateinit var scannerHelper: QRCodeScannerHelper
 
     private var subscriptions: List<SubscriptionCache> = emptyList()
-    private var selected: SubscriptionCache? = null
+
+    // Rendezvous info from the scanned TV QR; kept so the follow-up "pick + send" step
+    // knows where to POST.
+    private var pairInfo: TvPairingProtocol.PairInfo? = null
+
+    // Auto-launch the scanner only once (avoids re-scanning on rotation/resume).
+    private var scanLaunched = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,59 +56,85 @@ class TvSendActivity : BaseActivity() {
         subscriptions = MmkvManager.decodeSubscriptions()
             .filter { it.subscription.url.isNotEmpty() }
 
-        binding.tvInstructions.text = getString(R.string.tv_send_instructions)
-        binding.tvSelected.text = getString(R.string.tv_send_none_selected)
-
-        binding.btnPickSub.setOnClickListener { pickSubscription() }
-        binding.btnScan.setOnClickListener { scanAndSend() }
+        binding.btnScan.setOnClickListener { startScan() }
+        binding.btnSend.setOnClickListener { sendSelected() }
 
         if (subscriptions.isEmpty()) {
-            binding.tvStatus.text = getString(R.string.tv_send_no_subs)
-            binding.btnPickSub.isEnabled = false
             binding.btnScan.isEnabled = false
+            setStatus(getString(R.string.tv_send_no_subs))
         }
     }
 
-    private fun pickSubscription() {
+    override fun onResume() {
+        super.onResume()
+        // "Tapping «Отправить на TV» launches the scan directly": auto-open the scanner once.
+        if (!scanLaunched && subscriptions.isNotEmpty()) {
+            scanLaunched = true
+            binding.root.post { startScan() }
+        }
+    }
+
+    private fun startScan() {
         if (subscriptions.isEmpty()) {
             toast(R.string.tv_send_no_subs)
-            return
-        }
-        val labels = subscriptions.map { cache ->
-            cache.subscription.remarks.ifEmpty { cache.subscription.url }
-        }.toTypedArray()
-
-        AlertDialog.Builder(this)
-            .setTitle(R.string.tv_send_pick)
-            .setItems(labels) { _, which ->
-                selected = subscriptions[which]
-                binding.tvSelected.text = getString(
-                    R.string.tv_send_selected,
-                    labels[which]
-                )
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun scanAndSend() {
-        val sub = selected
-        if (sub == null) {
-            toast(R.string.tv_send_none_selected)
             return
         }
         scannerHelper.launch { scanResult ->
             val info = TvPairingProtocol.parsePairUri(scanResult)
             if (info == null) {
+                setStatus(getString(R.string.tv_send_scanning_invalid))
                 toastError(R.string.tv_send_scanning_invalid)
                 return@launch
             }
-            sendToTv(info, sub)
+            pairInfo = info
+            showPicker()
         }
     }
 
+    /** Reveals the subscription picker after a successful TV scan. */
+    private fun showPicker() {
+        binding.tvStatus.visibility = View.GONE
+        binding.radioSubs.removeAllViews()
+        subscriptions.forEachIndexed { index, cache ->
+            val rb = RadioButton(this).apply {
+                id = View.generateViewId()
+                text = cache.subscription.remarks.ifEmpty { getString(R.string.app_name) }
+                tag = index
+                minHeight = resources.getDimensionPixelSize(android.R.dimen.app_icon_size)
+                setPadding(paddingLeft + 12, paddingTop, paddingRight, paddingBottom)
+            }
+            binding.radioSubs.addView(rb)
+        }
+        binding.radioSubs.setOnCheckedChangeListener { _, checkedId ->
+            binding.btnSend.isEnabled = checkedId != -1
+        }
+        binding.layoutPick.visibility = View.VISIBLE
+        binding.btnSend.isEnabled = false
+    }
+
+    private fun selectedSubscription(): SubscriptionCache? {
+        val checkedId = binding.radioSubs.checkedRadioButtonId
+        if (checkedId == -1) return null
+        val index = binding.radioSubs.findViewById<RadioButton>(checkedId)?.tag as? Int ?: return null
+        return subscriptions.getOrNull(index)
+    }
+
+    private fun sendSelected() {
+        val info = pairInfo
+        if (info == null) {
+            toastError(R.string.tv_send_scanning_invalid)
+            return
+        }
+        val sub = selectedSubscription()
+        if (sub == null) {
+            toast(R.string.tv_send_pick_title)
+            return
+        }
+        sendToTv(info, sub)
+    }
+
     private fun sendToTv(info: TvPairingProtocol.PairInfo, sub: SubscriptionCache) {
-        binding.tvStatus.text = getString(R.string.tv_send_sending)
+        setStatus(getString(R.string.tv_send_sending))
         showLoading()
 
         lifecycleScope.launch {

@@ -6,10 +6,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bg_home_gradient"
-    android:fitsSystemWindows="true"
     android:orientation="vertical">
 
+        <!-- Edge-to-edge: the gradient (home_root) draws behind the status bar; the
+             app bar receives a top inset pad at runtime so the toolbar clears the clock. -->
         <com.google.android.material.appbar.AppBarLayout
+            android:id="@+id/appbar_layout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@android:color/transparent"
@@ -202,60 +204,23 @@
 
                         </FrameLayout>
 
+                        <!-- Label under the shield shows the selected/connected server name.
+                             Connection STATE is conveyed by the shield/ring colour, not by text. -->
                         <TextView
                             android:id="@+id/tv_connection_status"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="18dp"
+                            android:layout_marginStart="24dp"
+                            android:layout_marginEnd="24dp"
+                            android:ellipsize="end"
+                            android:gravity="center"
                             android:letterSpacing="0.01"
-                            android:text="@string/connection_not_connected"
+                            android:maxLines="1"
+                            android:text="@string/title_file_chooser"
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="19sp"
                             android:textStyle="bold" />
-
-                        <LinearLayout
-                            android:id="@+id/layout_server_info"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="18dp"
-                            android:background="?attr/selectableItemBackground"
-                            android:clickable="true"
-                            android:focusable="true"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingVertical="6dp">
-
-                            <ImageView
-                                android:layout_width="20dp"
-                                android:layout_height="20dp"
-                                android:importantForAccessibility="no"
-                                app:srcCompat="@drawable/ic_cloud_download_24dp"
-                                app:tint="?attr/colorPrimary" />
-
-                            <TextView
-                                android:id="@+id/tv_selected_server"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:layout_weight="1"
-                                android:ellipsize="end"
-                                android:maxLines="1"
-                                android:text="@string/title_file_chooser"
-                                android:textColor="?attr/colorOnSurface"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/tv_test_state"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:maxLines="1"
-                                android:text="@string/connection_test_pending"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="12sp" />
-
-                        </LinearLayout>
 
                     </LinearLayout>
 
@@ -320,6 +285,13 @@
                     </LinearLayout>
 
                 </com.google.android.material.card.MaterialCardView>
+
+                <!-- Empty state (no servers/subscriptions yet): two Incy add buttons. -->
+                <include
+                    android:id="@+id/layout_home_empty"
+                    layout="@layout/layout_home_empty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
 
                 <!-- Current provider meta bar (collapsible), reused from the subscription header -->
                 <include
@@ -386,16 +358,17 @@
 
         </FrameLayout>
 
+        <!-- Transparent so the home gradient shows through; a bottom inset pad is applied
+             at runtime so the items clear the gesture bar and stay evenly aligned. -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottom_nav"
             android:layout_width="match_parent"
-            android:layout_height="64dp"
+            android:layout_height="72dp"
             android:background="@android:color/transparent"
             app:elevation="0dp"
             app:itemActiveIndicatorStyle="@null"
             app:itemIconSize="24dp"
             app:itemIconTint="@color/bottom_nav_item_color"
-            app:itemPaddingTop="8dp"
             app:itemRippleColor="@android:color/transparent"
             app:itemTextAppearanceActive="@style/BottomNavLabel"
             app:itemTextAppearanceInactive="@style/BottomNavLabel"

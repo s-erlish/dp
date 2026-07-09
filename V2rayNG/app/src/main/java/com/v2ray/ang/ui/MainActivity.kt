@@ -20,7 +20,11 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -154,6 +158,7 @@ class MainActivity : HelperBaseActivity() {
         setContentView(binding.root)
         setupToolbar(binding.toolbar, false, getString(R.string.app_name))
         applyThemeDecorations()
+        setupEdgeToEdge()
 
         // All servers are shown in one flat, provider-grouped list (no subscription tabs).
         mainViewModel.subscriptionId = ""
@@ -179,7 +184,6 @@ class MainActivity : HelperBaseActivity() {
             animateConnectPress()
             handleFabAction()
         }
-        binding.layoutServerInfo.setOnClickListener { handleLayoutTestClick() }
 
         setupServersHeader()
         setupHomeMetaBar()
@@ -228,9 +232,24 @@ class MainActivity : HelperBaseActivity() {
         binding.groupSettings.root.isVisible = tab == R.id.nav_settings
     }
 
+    /**
+     * True edge-to-edge: the home gradient (home_root) draws behind the status and nav
+     * bars; the app bar receives a top inset pad (so the toolbar clears the clock) and the
+     * bottom nav a bottom inset pad (so items clear the gesture bar). The bars themselves
+     * stay transparent (handled by the theme, not touched here).
+     */
+    private fun setupEdgeToEdge() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        ViewCompat.setOnApplyWindowInsetsListener(binding.homeRoot) { _, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            binding.appbarLayout.updatePadding(top = bars.top)
+            binding.bottomNav.updatePadding(bottom = bars.bottom)
+            insets
+        }
+    }
+
     private fun setupViewModel() {
         mainViewModel.updateListAction.observe(this) { index -> refreshServerLists(index ?: -1) }
-        mainViewModel.updateTestResultAction.observe(this) { setTestState(it) }
         mainViewModel.updateSpeedAction.observe(this) { (down, up) ->
             binding.tvDownloadSpeed.text = down.toSpeedString()
             binding.tvUploadSpeed.text = up.toSpeedString()
@@ -239,7 +258,6 @@ class MainActivity : HelperBaseActivity() {
             // One-shot event: ignore the retained value replayed on recreate/rotation.
             if (!mainViewModel.consumeFastConnectEvent()) return@observe
             if (guid == null) {
-                setTestState(getString(R.string.connection_test_fail))
                 toastError(R.string.toast_services_failure)
                 return@observe
             }

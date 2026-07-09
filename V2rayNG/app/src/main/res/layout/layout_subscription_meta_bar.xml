@@ -16,7 +16,7 @@
     android:paddingEnd="6dp"
     android:paddingBottom="12dp">
 
-    <!-- Row 1: title + actions -->
+    <!-- Row 1: chevron + title + actions (Ping -> Refresh -> Pin) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -48,44 +48,7 @@
             android:textStyle="bold"
             tools:text="departament • Premium" />
 
-        <ImageView
-            android:id="@+id/btn_telegram"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
-            android:layout_marginStart="4dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:clickable="true"
-            android:contentDescription="@string/sub_telegram"
-            android:focusable="true"
-            android:padding="5dp"
-            android:visibility="gone"
-            app:srcCompat="@drawable/ic_telegram_24dp"
-            app:tint="?attr/colorPrimary"
-            tools:visibility="visible" />
-
-        <ImageView
-            android:id="@+id/btn_pin"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="2dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:clickable="true"
-            android:contentDescription="@string/sub_pin"
-            android:focusable="true"
-            android:padding="6dp"
-            app:srcCompat="@drawable/ic_pin_24dp"
-            app:tint="?attr/colorOnSurfaceVariant" />
-
-        <ProgressBar
-            android:id="@+id/progress_action"
-            android:layout_width="20dp"
-            android:layout_height="20dp"
-            android:layout_marginEnd="6dp"
-            android:indeterminateTint="?attr/colorPrimary"
-            android:visibility="gone"
-            tools:visibility="visible" />
-
+        <!-- 1) Ping / latency test -->
         <ImageView
             android:id="@+id/btn_ping"
             android:layout_width="36dp"
@@ -95,9 +58,10 @@
             android:contentDescription="@string/connection_test_pending"
             android:focusable="true"
             android:padding="8dp"
-            app:srcCompat="@drawable/ic_speed_24dp"
+            app:srcCompat="@drawable/ic_ping_24dp"
             app:tint="?attr/colorPrimary" />
 
+        <!-- 2) Refresh subscription -->
         <ImageView
             android:id="@+id/btn_refresh"
             android:layout_width="36dp"
@@ -110,14 +74,39 @@
             app:srcCompat="@drawable/ic_refresh_24dp"
             app:tint="?attr/colorPrimary" />
 
+        <ProgressBar
+            android:id="@+id/progress_action"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:indeterminateTint="?attr/colorPrimary"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <!-- 3) Pin (last) -->
+        <ImageView
+            android:id="@+id/btn_pin"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="2dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:contentDescription="@string/sub_pin"
+            android:focusable="true"
+            android:padding="8dp"
+            app:srcCompat="@drawable/ic_pin_24dp"
+            app:tint="?attr/colorOnSurfaceVariant" />
+
     </LinearLayout>
 
-    <!-- Collapsible body: traffic + announce + support/website -->
+    <!-- Collapsible body: traffic + announce + support/telegram. Starts EXPANDED. -->
     <LinearLayout
         android:id="@+id/layout_meta_body"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:visibility="visible">
 
     <!-- Row 2: traffic + expiry -->
     <LinearLayout
@@ -185,7 +174,7 @@
         tools:text="No ads on YouTube: Hybrid, Russia\nIf it stops working, refresh the subscription @departamentvpn"
         tools:visibility="visible" />
 
-    <!-- Support / website buttons -->
+    <!-- Support / Telegram buttons -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -210,17 +199,18 @@
             tools:visibility="visible" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_website"
+            android:id="@+id/btn_telegram"
             style="@style/Widget.Material3.Button.TextButton.Icon"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:minWidth="0dp"
             android:minHeight="0dp"
-            android:text="@string/sub_website"
+            android:text="@string/sub_telegram"
             android:textSize="12sp"
             android:visibility="gone"
-            app:icon="@drawable/ic_globe_24dp"
-            app:iconSize="16dp" />
+            app:icon="@drawable/ic_telegram_24dp"
+            app:iconSize="16dp"
+            tools:visibility="visible" />
 
     </LinearLayout>
 
