@@ -2,13 +2,13 @@
 <resources>
     <string name="app_name" translatable="false">departament</string>
     <!-- Servers redesign (S3) -->
-    <string name="title_servers">Servers</string>
-    <string name="servers_count">%d servers</string>
-    <string name="providers_count">%d providers</string>
-    <string name="search_hint">Search servers…</string>
-    <string name="servers_empty_title">No servers</string>
-    <string name="servers_add_clipboard">Add from clipboard</string>
-    <string name="servers_section_local">Local</string>
+    <string name="title_servers">Сервера</string>
+    <string name="servers_count">%d серверов</string>
+    <string name="providers_count">%d провайдеров</string>
+    <string name="search_hint">Поиск серверов…</string>
+    <string name="servers_empty_title">Нет серверов</string>
+    <string name="servers_add_clipboard">Добавить из буфера</string>
+    <string name="servers_section_local">Локальные</string>
     <string name="app_widget_name">Switch</string>
     <string name="app_tile_name">Switch</string>
     <string name="app_tile_first_use">First use of this feature, please use the app to add server</string>

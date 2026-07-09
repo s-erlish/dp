@@ -615,7 +615,7 @@ class MainActivity : HelperBaseActivity() {
                     2 -> shareFullContent(guid)
                     3 -> editServer(guid, profile)
                     4 -> removeServer(guid, position)
-                    else -> toast("else")
+                    else -> {}
                 }
             } catch (e: Exception) {
                 LogUtil.e(AppConfig.TAG, "Error when sharing server", e)
