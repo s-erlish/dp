@@ -53,6 +53,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Sign release builds with the debug key so the produced APK is directly installable
+            // for full-app testing (no separate keystore/secrets required in CI).
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 

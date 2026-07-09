@@ -359,7 +359,9 @@
                     android:id="@+id/layout_home_meta_bar"
                     layout="@layout/layout_subscription_meta_bar"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="20dp"
+                    android:layout_marginEnd="20dp" />
 
                 <!-- Server list right here, below the provider -->
                 <androidx.recyclerview.widget.RecyclerView
