@@ -226,13 +226,21 @@ object HttpUtil {
         while (redirects++ < maxRedirects) {
             if (currentUrl == null) continue
             val client = buildOkHttpClient(request.timeout, request.httpPort, request.proxyUsername, request.proxyPassword, followRedirects = false)
-            // Subscription fetch: default to the v2rayNG User-Agent so panels (Remnawave/3x-ui)
-            // that key the response format (XRAY_JSON template vs base64 link list) off a
-            // recognised client return the correct managed format. Overridable per-subscription.
-            val finalUserAgent = if (request.userAgent.isNullOrBlank()) {
-                "v2rayNG/${BuildConfig.VERSION_NAME}"
+            // Subscription fetch: panels (Remnawave/3x-ui) key the response format
+            // (XRAY_JSON template vs base64 link list) off a recognised client User-Agent.
+            // The caller-supplied value can be a branding string (BackendConfig fallback
+            // "DepartamentVPN/1.0") or the provider-screen display field, neither of which
+            // the panel recognises -> it returns the wrong format. Force a v2rayNG-family
+            // UA whenever the supplied value is missing or not v2rayNG-family, so the panel
+            // always returns the managed JSON servers, independent of the display field.
+            val defaultSubUserAgent = "v2rayNG/${BuildConfig.VERSION_NAME}"
+            val requestedUserAgent = request.userAgent?.trim()
+            val finalUserAgent = if (!requestedUserAgent.isNullOrBlank()
+                && requestedUserAgent.contains("v2rayng", ignoreCase = true)
+            ) {
+                requestedUserAgent
             } else {
-                request.userAgent
+                defaultSubUserAgent
             }
             val requestBuilder = Request.Builder()
                 .url(currentUrl)

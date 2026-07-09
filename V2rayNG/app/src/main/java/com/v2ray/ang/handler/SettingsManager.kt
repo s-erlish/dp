@@ -421,7 +421,17 @@ object SettingsManager {
      */
     fun getVpnDnsServers(): List<String> {
         val vpnDns = MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_DNS) ?: AppConfig.DNS_VPN
-        return vpnDns.split(",").filter { Utils.isPureIpAddress(it) }
+        val ret = vpnDns.split(",").filter { Utils.isPureIpAddress(it) }
+        if (ret.isEmpty()) {
+            // Safeguard: never hand the VPN interface an empty DNS list. These values feed
+            // CoreVpnService.addDnsServer(); an empty result (e.g. the blank "custom" DNS
+            // preset, or a DoH URL / bare hostname that isn't a pure IP) would leave the
+            // tunnel with NO resolver, so every domain fails ("no internet") even though
+            // IP-level ping still succeeds. Fall back to the default, mirroring
+            // getRemoteDnsServers()/getDomesticDnsServers().
+            return listOf(AppConfig.DNS_VPN)
+        }
+        return ret
     }
 
     /**
