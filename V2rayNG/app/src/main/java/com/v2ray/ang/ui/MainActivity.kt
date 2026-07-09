@@ -318,19 +318,19 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
 
     private fun applyRunningState(isLoading: Boolean, isRunning: Boolean) {
         if (isLoading) {
-            binding.cardConnect.setCardBackgroundColor(themeColor(R.attr.connectActiveColor))
+            binding.imgConnect.setColorFilter(themeColor(androidx.appcompat.R.attr.colorPrimary))
             binding.tvConnectionStatus.text = getString(R.string.toast_services_start)
             return
         }
 
         if (isRunning) {
-            binding.cardConnect.setCardBackgroundColor(themeColor(R.attr.connectedColor))
+            binding.imgConnect.setColorFilter(themeColor(androidx.appcompat.R.attr.colorPrimary))
             binding.cardConnect.contentDescription = getString(R.string.action_stop_service)
             binding.tvConnectionStatus.text = getString(R.string.connection_connected)
             binding.layoutServerInfo.isFocusable = true
             startConnectionTimer()
         } else {
-            binding.cardConnect.setCardBackgroundColor(themeColor(R.attr.connectIdleColor))
+            binding.imgConnect.setColorFilter(themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
             binding.cardConnect.contentDescription = getString(R.string.tasker_start_service)
             binding.tvConnectionStatus.text = getString(R.string.connection_not_connected)
             binding.layoutServerInfo.isFocusable = false
@@ -394,7 +394,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         timerHandler.removeCallbacks(timerRunnable)
         connectionStartTime = 0L
         MmkvManager.encodeSettings(KEY_CONNECTION_START, 0L)
-        binding.tvConnectionTime.visibility = android.view.View.INVISIBLE
+        binding.tvConnectionTime.text = "00:00:00"
     }
 
     /**

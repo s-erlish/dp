@@ -54,6 +54,84 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
+                <!-- Inline stats: upload · uptime · download -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:baselineAligned="false"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="24dp"
+                    android:paddingTop="10dp"
+                    android:paddingEnd="24dp"
+                    android:paddingBottom="6dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="↑"
+                            android:textColor="@color/color_upload"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tv_upload_speed"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:text="@string/speed_zero"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tv_connection_time"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:fontFamily="monospace"
+                        android:gravity="center"
+                        android:text="00:00:00"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="↓"
+                            android:textColor="@color/color_download"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tv_download_speed"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:text="@string/speed_zero"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                </LinearLayout>
+
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/card_hero"
                     android:layout_width="match_parent"
@@ -80,8 +158,8 @@
                         android:paddingBottom="24dp">
 
                         <FrameLayout
-                            android:layout_width="184dp"
-                            android:layout_height="184dp"
+                            android:layout_width="230dp"
+                            android:layout_height="230dp"
                             android:layout_gravity="center">
 
                             <View
@@ -91,25 +169,27 @@
 
                             <com.google.android.material.card.MaterialCardView
                                 android:id="@+id/card_connect"
-                                android:layout_width="140dp"
-                                android:layout_height="140dp"
+                                android:layout_width="176dp"
+                                android:layout_height="176dp"
                                 android:layout_gravity="center"
                                 android:clickable="true"
                                 android:contentDescription="@string/tasker_start_service"
                                 android:focusable="true"
-                                app:cardBackgroundColor="?attr/connectIdleColor"
-                                app:cardCornerRadius="70dp"
-                                app:cardElevation="6dp"
-                                app:rippleColor="@color/colorWhite">
+                                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
+                                app:cardCornerRadius="88dp"
+                                app:cardElevation="0dp"
+                                app:rippleColor="?attr/colorPrimary"
+                                app:strokeColor="?attr/colorOutlineVariant"
+                                app:strokeWidth="1dp">
 
                                 <ImageView
                                     android:id="@+id/img_connect"
-                                    android:layout_width="60dp"
-                                    android:layout_height="60dp"
+                                    android:layout_width="80dp"
+                                    android:layout_height="80dp"
                                     android:layout_gravity="center"
                                     android:importantForAccessibility="no"
-                                    app:srcCompat="@drawable/ic_power_settings"
-                                    app:tint="@color/colorWhite" />
+                                    app:srcCompat="@drawable/ic_shield_outline"
+                                    app:tint="?attr/colorOnSurfaceVariant" />
 
                             </com.google.android.material.card.MaterialCardView>
 
@@ -125,18 +205,6 @@
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="19sp"
                             android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tv_connection_time"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:fontFamily="monospace"
-                            android:text="00:00:00"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="13sp"
-                            android:visibility="invisible"
-                            tools:visibility="visible" />
 
                         <LinearLayout
                             android:id="@+id/layout_server_info"
@@ -179,75 +247,6 @@
                                 android:text="@string/connection_test_pending"
                                 android:textColor="?attr/colorOnSurfaceVariant"
                                 android:textSize="12sp" />
-
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="12dp"
-                            android:baselineAligned="false"
-                            android:orientation="horizontal">
-
-                            <LinearLayout
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:background="@drawable/bg_speed_chip"
-                                android:gravity="center"
-                                android:orientation="horizontal"
-                                android:paddingVertical="10dp">
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="↓"
-                                    android:textColor="?attr/colorPrimary"
-                                    android:textSize="15sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:id="@+id/tv_download_speed"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="6dp"
-                                    android:text="@string/speed_zero"
-                                    android:textColor="?attr/colorOnSurface"
-                                    android:textSize="13sp"
-                                    android:textStyle="bold" />
-                            </LinearLayout>
-
-                            <Space
-                                android:layout_width="10dp"
-                                android:layout_height="1dp" />
-
-                            <LinearLayout
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:background="@drawable/bg_speed_chip"
-                                android:gravity="center"
-                                android:orientation="horizontal"
-                                android:paddingVertical="10dp">
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="↑"
-                                    android:textColor="?attr/colorTertiary"
-                                    android:textSize="15sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:id="@+id/tv_upload_speed"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="6dp"
-                                    android:text="@string/speed_zero"
-                                    android:textColor="?attr/colorOnSurface"
-                                    android:textSize="13sp"
-                                    android:textStyle="bold" />
-                            </LinearLayout>
 
                         </LinearLayout>
 
