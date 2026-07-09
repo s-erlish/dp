@@ -532,8 +532,7 @@
     <string name="settings_bypass_lan_sub">Прямой доступ к устройствам в локальной сети</string>
     <string name="settings_dns">DNS</string>
     <string name="settings_dns_hint">Адрес DNS-сервера</string>
-    <string name="settings_ping_method">Метод проверки задержки</string>
-    <string name="settings_ping_method_sub">Способ измерения пинга серверов</string>
+    <string name="settings_ping_method">Пинг</string>
     <string name="settings_ping_method_real">Реальная задержка (через ядро)</string>
     <string name="settings_ping_method_tcp">TCP-соединение</string>
     <string name="settings_ping_method_http">HTTP-запрос</string>
@@ -550,6 +549,12 @@
     <string name="settings_boot">Запуск при загрузке</string>
     <string name="settings_boot_sub">Подключаться после перезагрузки устройства</string>
     <string name="settings_subscriptions">Подписки</string>
+    <string name="settings_sub_auto_update">Автообновление подписки</string>
+    <string name="settings_sub_auto_update_1h">1 час</string>
+    <string name="settings_sub_auto_update_6h">6 часов</string>
+    <string name="settings_sub_auto_update_12h">12 часов</string>
+    <string name="settings_sub_auto_update_24h">24 часа</string>
+    <string name="settings_sub_auto_update_minutes">%1$d мин</string>
     <string name="settings_routing">Маршрутизация</string>
     <string name="settings_assets">Файлы ресурсов</string>
     <string name="settings_tv_send">Перенести подписку на ТВ</string>

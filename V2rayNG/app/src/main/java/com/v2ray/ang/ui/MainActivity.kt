@@ -1616,7 +1616,7 @@ class MainActivity : HelperBaseActivity() {
         s.rowBoot.setOnClickListener { toggleStartOnBoot() }
 
         // ПОДПИСКА
-        s.rowSubscriptions.setOnClickListener { requestActivityLauncher.launch(Intent(this, SubSettingActivity::class.java)) }
+        s.rowSubAutoUpdate.setOnClickListener { pickSubAutoUpdate() }
         s.rowRouting.setOnClickListener { requestActivityLauncher.launch(Intent(this, RoutingSettingActivity::class.java)) }
         s.rowAssets.setOnClickListener { requestActivityLauncher.launch(Intent(this, UserAssetActivity::class.java)) }
 
@@ -1655,6 +1655,8 @@ class MainActivity : HelperBaseActivity() {
         val curLang = MmkvManager.decodeSettingsString(AppConfig.PREF_LANGUAGE, langValues.firstOrNull() ?: "auto").orEmpty()
         val li = langValues.indexOf(curLang).coerceAtLeast(0)
         s.valueLanguage.text = langEntries.getOrElse(li) { langEntries.firstOrNull().orEmpty() }
+
+        s.valueSubAutoUpdate.text = currentSubAutoUpdateLabel()
 
         s.switchBypassLan.isChecked = isBypassLanOn()
 
@@ -1837,6 +1839,61 @@ class MainActivity : HelperBaseActivity() {
         val enabled = !MmkvManager.decodeStartOnBoot()
         MmkvManager.encodeStartOnBoot(enabled)
         binding.groupSettings.switchBoot.isChecked = enabled
+    }
+
+    /** Interval options (minutes) offered by the subscription auto-update picker; 0 == off. */
+    private val subAutoUpdateValues = longArrayOf(0L, 60L, 360L, 720L, 1440L)
+
+    /** Short Russian label for a subscription auto-update interval in minutes (0 == off). */
+    private fun subAutoUpdateLabel(minutes: Long): String = when (minutes) {
+        0L -> getString(R.string.settings_value_off)
+        60L -> getString(R.string.settings_sub_auto_update_1h)
+        360L -> getString(R.string.settings_sub_auto_update_6h)
+        720L -> getString(R.string.settings_sub_auto_update_12h)
+        1440L -> getString(R.string.settings_sub_auto_update_24h)
+        else -> getString(R.string.settings_sub_auto_update_minutes, minutes)
+    }
+
+    /** Row value: interval of any auto-updating subscription, or "Выкл" when none is enabled. */
+    private fun currentSubAutoUpdateLabel(): String {
+        val active = MmkvManager.decodeSubscriptions().firstOrNull { it.subscription.autoUpdate }
+            ?: return getString(R.string.settings_value_off)
+        return subAutoUpdateLabel(active.subscription.updateInterval)
+    }
+
+    /**
+     * Global subscription auto-update picker. There is no dedicated global pref key, so the
+     * choice is applied across every stored subscription: [SubscriptionItem.autoUpdate] and
+     * [SubscriptionItem.updateInterval] (in minutes) are written for each one, then the
+     * WorkManager scheduler is re-synced via [SubscriptionUpdater.sync] so the new interval
+     * takes effect immediately. Minutes are stored so the home meta-bar can read the value.
+     */
+    private fun pickSubAutoUpdate() {
+        val entries = subAutoUpdateValues.map { subAutoUpdateLabel(it) }.toTypedArray()
+        val active = MmkvManager.decodeSubscriptions().firstOrNull { it.subscription.autoUpdate }
+        val currentMinutes = if (active == null) 0L else active.subscription.updateInterval
+        val idx = subAutoUpdateValues.indexOf(currentMinutes).coerceAtLeast(0)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_sub_auto_update)
+            .setSingleChoiceItems(entries, idx) { dialog, which ->
+                val minutes = subAutoUpdateValues[which]
+                MmkvManager.decodeSubscriptions().forEach { cache ->
+                    val item = cache.subscription
+                    if (minutes <= 0L) {
+                        item.autoUpdate = false
+                    } else {
+                        item.autoUpdate = true
+                        item.updateInterval = minutes
+                    }
+                    MmkvManager.encodeSubscription(cache.guid, item)
+                }
+                // Recalculate the next run time from the freshly persisted state.
+                SubscriptionUpdater.sync(forceReschedule = true)
+                bindSettingsState()
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     override fun onDestroy() {

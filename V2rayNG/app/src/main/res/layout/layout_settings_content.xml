@@ -294,7 +294,7 @@
                     android:layout_marginStart="68dp"
                     android:background="?attr/colorOutlineVariant" />
 
-                <!-- Метод проверки задержки (ping) -->
+                <!-- Пинг (ping method) -->
                 <LinearLayout
                     android:id="@+id/row_ping_method"
                     android:layout_width="match_parent"
@@ -323,29 +323,14 @@
                             app:tint="?attr/iconTintYellow" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_ping_method"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="@string/settings_ping_method_sub"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp" />
-                    </LinearLayout>
+                        android:text="@string/settings_ping_method"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="16sp" />
 
                     <TextView
                         android:id="@+id/value_ping_method"
@@ -864,9 +849,9 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- Подписки -->
+                <!-- Автообновление подписки -->
                 <LinearLayout
-                    android:id="@+id/row_subscriptions"
+                    android:id="@+id/row_sub_auto_update"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:background="?attr/selectableItemBackground"
@@ -889,7 +874,7 @@
                             android:layout_height="22dp"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_subscriptions_24dp"
+                            app:srcCompat="@drawable/ic_refresh_24dp"
                             app:tint="?attr/iconTintBlue" />
                     </FrameLayout>
 
@@ -898,9 +883,19 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="14dp"
                         android:layout_weight="1"
-                        android:text="@string/settings_subscriptions"
+                        android:text="@string/settings_sub_auto_update"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/value_sub_auto_update"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:maxLines="1"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="13sp"
+                        tools:text="24 часа" />
 
                     <ImageView
                         android:layout_width="18dp"
