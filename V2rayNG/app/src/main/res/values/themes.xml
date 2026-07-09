@@ -112,7 +112,6 @@
         <item name="colorOnBackground">@color/mono_onBackground</item>
         <item name="colorOutline">@color/mono_outline</item>
         <item name="colorOutlineVariant">@color/mono_outlineVariant</item>
-        <item name="colorSurfaceTint">@color/mono_primary</item>
         <item name="android:statusBarColor">@color/mono_surface</item>
         <item name="android:navigationBarColor">@color/mono_surface</item>
         <item name="connectIdleColor">@color/mono_fab_inactive</item>
