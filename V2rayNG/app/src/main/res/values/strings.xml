@@ -558,6 +558,12 @@
     <string name="settings_bypass_lan_sub">Прямой доступ к устройствам в локальной сети</string>
     <string name="settings_dns">DNS</string>
     <string name="settings_dns_hint">Адрес DNS-сервера</string>
+    <string name="settings_ping_method">Метод проверки задержки</string>
+    <string name="settings_ping_method_sub">Способ измерения пинга серверов</string>
+    <string name="settings_ping_method_real">Реальная задержка (через ядро)</string>
+    <string name="settings_ping_method_tcp">TCP-соединение</string>
+    <string name="settings_ping_method_http">HTTP-запрос</string>
+    <string name="settings_ping_method_icmp">ICMP (системный ping)</string>
     <string name="settings_mux">Мультиплексирование (Mux)</string>
     <string name="settings_mux_sub">Объединяет запросы в один канал соединения</string>
     <string name="settings_mux_concurrency">Число соединений Mux</string>
