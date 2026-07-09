@@ -16,9 +16,14 @@ import com.v2ray.ang.R
 import com.v2ray.ang.dto.GroupMapItem
 import com.v2ray.ang.dto.SubscriptionUpdateResult
 import com.v2ray.ang.dto.TestServiceMessage
+import com.v2ray.ang.dto.V2rayConfig
 import com.v2ray.ang.dto.entities.ServersCache
 import com.v2ray.ang.dto.entities.SubscriptionCache
+import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.isComplexType
+import com.v2ray.ang.extension.isGroupType
+import com.v2ray.ang.template.TemplateManager
+import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.extension.matchesPattern
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
@@ -213,6 +218,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Resolves the host:port to ping for a server row.
+     *
+     * Ordinary profiles (vmess/vless/trojan/…) expose [ProfileItem.server] / [ProfileItem.serverPort]
+     * directly. For [EConfigType.CUSTOM] xray-json profiles those fields are empty, so we parse the
+     * stored raw config and read address/port from its first proxy outbound (vnext/servers →
+     * address/port) — otherwise these rows would never get a direct ping. Group entries
+     * (PolicyGroup "Auto"/balancer, ProxyChain) have no single address and return null so they stay
+     * untested (blank) rather than showing a red "-1ms".
+     *
+     * @return host to (port) pair, or null when the row is not directly pingable.
+     */
+    private fun resolvePingHostPort(item: ServersCache): Pair<String, Int>? {
+        val profile = item.profile
+        // Balancer / "Auto" / proxy-chain rows have no single address to ping.
+        if (profile.configType.isGroupType()) return null
+
+        val directHost = profile.server
+        val directPort = profile.serverPort?.toIntOrNull()
+        if (!directHost.isNullOrEmpty() && directPort != null) {
+            return directHost to directPort
+        }
+
+        // CUSTOM xray-json: pull host:port out of the stored outbound.
+        if (profile.configType == EConfigType.CUSTOM) {
+            val raw = try {
+                TemplateManager.decodeRuntimeRaw(item.guid)
+            } catch (e: Exception) {
+                MmkvManager.decodeServerRaw(item.guid)
+            } ?: return null
+            val v2rayConfig = JsonUtil.fromJsonSafe(raw, V2rayConfig::class.java) ?: return null
+            val outbound = v2rayConfig.getProxyOutbound() ?: return null
+            val host = outbound.getServerAddress()
+            val port = outbound.getServerPort()
+            if (!host.isNullOrEmpty() && port != null) {
+                return host to port
+            }
+        }
+        return null
+    }
+
+    /**
      * Tests the TCP ping for all servers.
      */
     fun testAllTcping() {
@@ -222,17 +268,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         val serversCopy = serversCache.toList()
         for (item in serversCopy) {
-            item.profile.let { outbound ->
-                val serverAddress = outbound.server
-                val serverPort = outbound.serverPort
-                if (serverAddress != null && serverPort != null) {
-                    tcpingTestScope.launch {
-                        val testResult = SpeedtestManager.tcping(serverAddress, serverPort.toInt())
-                        launch(Dispatchers.Main) {
-                            MmkvManager.encodeServerTestDelayMillis(item.guid, testResult)
-                            updateListAction.value = getPosition(item.guid)
-                        }
-                    }
+            val (serverAddress, serverPort) = resolvePingHostPort(item) ?: continue
+            tcpingTestScope.launch {
+                val testResult = SpeedtestManager.tcping(serverAddress, serverPort)
+                launch(Dispatchers.Main) {
+                    MmkvManager.encodeServerTestDelayMillis(item.guid, testResult)
+                    updateListAction.value = getPosition(item.guid)
                 }
             }
         }
@@ -294,10 +335,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val serversCopy = serversCache.toList()
         val semaphore = Semaphore(24)
         for (item in serversCopy) {
-            val host = item.profile.server ?: continue
-            val port = item.profile.serverPort?.toIntOrNull()
+            val (host, port) = resolvePingHostPort(item) ?: continue
             val hostPart = if (host.contains(':') && !host.startsWith('[')) "[$host]" else host
-            val url = if (port == null || port == 443) "https://$hostPart/" else "https://$hostPart:$port/"
+            val url = if (port == 443) "https://$hostPart/" else "https://$hostPart:$port/"
             tcpingTestScope.launch {
                 semaphore.withPermit {
                     // Per-node direct reachability: any HTTP response counts as reachable.
@@ -322,7 +362,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val serversCopy = serversCache.toList()
         val semaphore = Semaphore(12)
         for (item in serversCopy) {
-            val host = item.profile.server ?: continue
+            val (host, _) = resolvePingHostPort(item) ?: continue
             tcpingTestScope.launch {
                 semaphore.withPermit {
                     val testResult = SpeedtestManager.icmpPing(host)

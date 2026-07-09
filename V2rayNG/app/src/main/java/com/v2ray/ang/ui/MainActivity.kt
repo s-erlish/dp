@@ -46,6 +46,7 @@ import com.v2ray.ang.dto.entities.trafficFraction
 import com.v2ray.ang.dto.entities.usedTraffic
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.enums.PermissionType
+import com.v2ray.ang.enums.PingMethod
 import android.text.format.DateFormat
 import android.view.View
 import android.view.animation.OvershootInterpolator
@@ -1397,6 +1398,7 @@ class MainActivity : HelperBaseActivity() {
         s.rowPerApp.setOnClickListener { requestActivityLauncher.launch(Intent(this, PerAppProxyActivity::class.java)) }
         s.rowBypassLan.setOnClickListener { toggleBypassLan() }
         s.rowDns.setOnClickListener { editDns() }
+        s.rowPingMethod.setOnClickListener { pickPingMethod() }
 
         // ОБХОД БЛОКИРОВОК
         s.rowMux.setOnClickListener { toggleMux() }
@@ -1441,6 +1443,7 @@ class MainActivity : HelperBaseActivity() {
         s.valuePerApp.text = getString(if (perApp) R.string.settings_value_on else R.string.settings_value_off)
 
         s.valueDns.text = MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_DNS, AppConfig.DNS_VPN)
+        s.valuePingMethod.text = getString(pingMethodLabelRes(SettingsManager.getPingMethod()))
         s.valueMuxConcurrency.text = MmkvManager.decodeSettingsString(AppConfig.PREF_MUX_CONCURRENCY, "8")
 
         val langEntries = resources.getStringArray(R.array.language_select)
@@ -1487,6 +1490,41 @@ class MainActivity : HelperBaseActivity() {
                 MmkvManager.encodeSettings(AppConfig.PREF_MODE, values[which])
                 bindSettingsState()
                 restartIfRunning()
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** Maps a ping method to its short Russian label shown on the settings row. */
+    private fun pingMethodLabelRes(method: PingMethod): Int = when (method) {
+        PingMethod.PROXIED_REAL_DELAY -> R.string.settings_ping_method_real
+        PingMethod.TCP_CONNECT -> R.string.settings_ping_method_tcp
+        PingMethod.HTTP_URL -> R.string.settings_ping_method_http
+        PingMethod.ICMP -> R.string.settings_ping_method_icmp
+    }
+
+    /**
+     * Single-choice picker for the connection-test (ping) method. Writes the same
+     * [AppConfig.PREF_PING_METHOD] key the "test all" logic reads via
+     * [SettingsManager.getPingMethod], so the choice changes ping behavior immediately.
+     */
+    private fun pickPingMethod() {
+        // Order shown to the user; index maps 1:1 to `values`.
+        val values = arrayOf(
+            PingMethod.PROXIED_REAL_DELAY,
+            PingMethod.TCP_CONNECT,
+            PingMethod.HTTP_URL,
+            PingMethod.ICMP,
+        )
+        val entries = values.map { getString(pingMethodLabelRes(it)) }.toTypedArray()
+        val current = SettingsManager.getPingMethod()
+        val idx = values.indexOf(current).coerceAtLeast(0)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_ping_method)
+            .setSingleChoiceItems(entries, idx) { dialog, which ->
+                MmkvManager.encodeSettings(AppConfig.PREF_PING_METHOD, values[which].prefValue)
+                bindSettingsState()
                 dialog.dismiss()
             }
             .setNegativeButton(android.R.string.cancel, null)
