@@ -1683,7 +1683,7 @@ class MainActivity : HelperBaseActivity() {
         timerHandler.removeCallbacks(healthCheckRunnable)
         timerHandler.removeCallbacks(memoryRunnable)
         timerHandler.removeCallbacks(connectWatchdogRunnable)
-        stopGlowPulse()
+        stopConnectingAnim()
         super.onDestroy()
     }
 }
