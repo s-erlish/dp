@@ -7,6 +7,7 @@ plugins {
 android {
     namespace = "com.v2ray.ang"
     compileSdk = 37
+    ndkVersion = "28.2.13676358"
 
     defaultConfig {
         applicationId = "com.departamentvpn.app"

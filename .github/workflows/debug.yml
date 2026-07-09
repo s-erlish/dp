@@ -28,6 +28,17 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install NDK
+        run: |
+          echo "y" | sdkmanager --install "ndk;28.2.13676358" >/dev/null
+          echo "NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> $GITHUB_ENV
+
+      - name: Build libhev-socks5-tunnel (tun2socks native lib)
+        run: bash compile-hevtun.sh
+
+      - name: Copy libhev-socks5-tunnel into app
+        run: cp -r "${{ github.workspace }}/libs" "${{ github.workspace }}/V2rayNG/app"
+
       - name: Fetch AndroidLibXrayLite tag
         run: |
           pushd AndroidLibXrayLite
