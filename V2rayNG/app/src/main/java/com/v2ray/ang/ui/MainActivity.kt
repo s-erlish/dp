@@ -104,8 +104,6 @@ class MainActivity : HelperBaseActivity() {
     // True between a connect tap and the definitive running/failed result, so a start that
     // ends in "not running" is reported as a failure rather than a silent revert.
     private var connectInProgress = false
-    // Home toolbar auto-hide: whether the app bar is currently slid out of view.
-    private var toolbarHidden = false
 
     // Gentle breathing pulse on the shield while the tunnel is establishing.
     private var connectPulse: Animator? = null
@@ -224,7 +222,6 @@ class MainActivity : HelperBaseActivity() {
         setupAccountHeader()
         setupSettings()
         setupViewModel()
-        setupToolbarAutoHide()
         SubscriptionUpdater.sync()
         mainViewModel.reloadServerList()
 
@@ -274,9 +271,6 @@ class MainActivity : HelperBaseActivity() {
         binding.groupHome.isVisible = tab == R.id.nav_home
         binding.groupServers.isVisible = tab == R.id.nav_servers
         binding.groupSettings.root.isVisible = tab == R.id.nav_settings
-        // The auto-hide only tracks Home scrolling; make sure leaving/returning to a tab never
-        // strands the app bar (and its shifted content) in the hidden position.
-        showToolbar()
     }
 
     /**
@@ -290,13 +284,15 @@ class MainActivity : HelperBaseActivity() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.homeRoot) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             binding.appbarLayout.updatePadding(top = bars.top)
-            // Single gesture-bar inset so the nav hugs the very bottom edge. Material's
-            // BottomNavigationView also auto-pads by this inset; that auto-pad is disabled
-            // in setupBottomNav so this stays the one source of truth (no doubled gap).
-            binding.bottomNav.updatePadding(bottom = bars.bottom)
-            // The nav now overlays the content, so pad the scrollable lists to keep the
-            // last row clear of the nav (nav height + the gesture-bar inset).
-            val navPad = bars.bottom + (72 * resources.displayMetrics.density).toInt()
+            // Small fixed bottom pad (NOT the full gesture-bar inset): on gesture nav the thin
+            // pill was lifting the whole bar well above the edge. Cap at ~8dp so the items sit
+            // low, just a few dp clear of the bottom. Material's auto bottom-inset padding is
+            // disabled in setupBottomNav so this stays the one source of truth (no doubled gap).
+            val density = resources.displayMetrics.density
+            binding.bottomNav.updatePadding(bottom = minOf(bars.bottom, (8 * density).toInt()))
+            // The nav overlays the content, so pad the scrollable lists to keep the last row
+            // clear of the nav using the REAL inset (nav height + the full gesture-bar inset).
+            val navPad = bars.bottom + (72 * density).toInt()
             binding.rvHomeServers.updatePadding(bottom = navPad)
             binding.rvServers.updatePadding(bottom = navPad)
             insets
@@ -1013,52 +1009,6 @@ class MainActivity : HelperBaseActivity() {
             setGravity(android.view.Gravity.BOTTOM or android.view.Gravity.CENTER_HORIZONTAL, 0, yOffset)
             show()
         }
-    }
-
-    /**
-     * Auto-hides the Home app bar on downward scroll and brings it back on upward scroll (or at
-     * the very top). The AppBarLayout is a plain child here (no CoordinatorLayout scroll flags),
-     * so this is driven manually: the app bar and the tab content slide up together
-     * (translationY) so no empty band is left where the bar was; the bottom nav + scrim overlay
-     * the freed strip. State-based (animate to shown/hidden), so it never fights per-frame with
-     * an active fling.
-     */
-    private fun setupToolbarAutoHide() {
-        // Explicit SAM: NestedScrollView also inherits View.setOnScrollChangeListener, whose
-        // listener is likewise a 5-arg interface, so a bare lambda would be an ambiguous overload.
-        binding.groupHome.setOnScrollChangeListener(
-            androidx.core.widget.NestedScrollView.OnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
-                val dy = scrollY - oldScrollY
-                when {
-                    scrollY <= 0 -> showToolbar()
-                    dy > 6 && scrollY > binding.appbarLayout.height -> hideToolbar()
-                    dy < -6 -> showToolbar()
-                }
-            }
-        )
-    }
-
-    private fun hideToolbar() {
-        if (toolbarHidden) return
-        toolbarHidden = true
-        animateToolbar(-binding.appbarLayout.height.toFloat())
-    }
-
-    private fun showToolbar() {
-        if (!toolbarHidden) return
-        toolbarHidden = false
-        animateToolbar(0f)
-    }
-
-    /** Slides the app bar and the tab content to [translationY] in lock-step. */
-    private fun animateToolbar(translationY: Float) {
-        val interpolator = android.view.animation.DecelerateInterpolator()
-        binding.appbarLayout.animate().cancel()
-        binding.mainContent.animate().cancel()
-        binding.appbarLayout.animate()
-            .translationY(translationY).setInterpolator(interpolator).setDuration(220).start()
-        binding.mainContent.animate()
-            .translationY(translationY).setInterpolator(interpolator).setDuration(220).start()
     }
 
     /**

@@ -395,14 +395,14 @@
                 android:layout_gravity="bottom"
                 android:background="@drawable/bg_bottom_nav_scrim" />
 
-            <!-- Overlays the content and hugs the very bottom edge; a bottom inset pad is
-                 applied at runtime so the items clear the gesture bar. A fixed compact height
-                 (instead of wrap_content) removes the tall Material-3 item's built-in whitespace
-                 below the label, so the icons/labels sit at the very bottom edge. -->
+            <!-- Overlays the content and hugs the very bottom edge. wrap_content gives each item
+                 room for BOTH the icon AND its label (a fixed short height clipped the labels);
+                 a SMALL fixed bottom pad is applied at runtime (not the full gesture-bar inset)
+                 so the bar sits low, just a few dp above the very bottom edge. -->
             <com.google.android.material.bottomnavigation.BottomNavigationView
                 android:id="@+id/bottom_nav"
                 android:layout_width="match_parent"
-                android:layout_height="58dp"
+                android:layout_height="wrap_content"
                 android:layout_gravity="bottom"
                 android:background="@android:color/transparent"
                 app:elevation="0dp"

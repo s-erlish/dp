@@ -129,32 +129,24 @@
         android:orientation="vertical"
         android:visibility="visible">
 
-    <!-- Row 2: expiry caption + Happ-style traffic pill -->
+    <!-- Row 2: compact Happ-style traffic pill (left, ~half width) + expiry marker (right,
+         same line). Horizontal so the ∞ / "до <date>" sits in the top-right corner. -->
     <LinearLayout
         android:id="@+id/layout_traffic"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="6dp"
         android:layout_marginEnd="8dp"
-        android:orientation="vertical">
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-        <!-- Expiry marker (∞ or "до <date>") shown above the traffic pill -->
-        <TextView
-            android:id="@+id/tv_expiry"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="6dp"
-            android:gravity="end"
-            android:maxLines="1"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="12sp"
-            tools:text="до 12.08.2026" />
-
-        <!-- Traffic pill: progress track with the usage label centered on it -->
+        <!-- Traffic pill: thin rounded track with the usage label centered on it. Takes ~half
+             the row (weight) so it is about 2x shorter than the old full-width bar. -->
         <FrameLayout
             android:id="@+id/layout_traffic_pill"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1">
 
             <com.google.android.material.progressindicator.LinearProgressIndicator
                 android:id="@+id/progress_traffic"
@@ -165,9 +157,9 @@
                 app:indicatorColor="@color/colorPing"
                 app:indicatorTrackGapSize="0dp"
                 app:trackColor="?attr/colorSurfaceVariant"
-                app:trackCornerRadius="13dp"
+                app:trackCornerRadius="8dp"
                 app:trackStopIndicatorSize="0dp"
-                app:trackThickness="26dp"
+                app:trackThickness="16dp"
                 tools:progress="430" />
 
             <TextView
@@ -177,14 +169,27 @@
                 android:layout_gravity="center"
                 android:gravity="center"
                 android:maxLines="1"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
                 android:textColor="?attr/colorOnSurface"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:textStyle="bold"
                 tools:text="1,7 ТБ / ∞" />
 
         </FrameLayout>
+
+        <!-- Expiry marker (∞ or "до <date>") in the top-right corner, same line as the pill -->
+        <TextView
+            android:id="@+id/tv_expiry"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:gravity="end"
+            android:maxLines="1"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textSize="12sp"
+            tools:text="до 12.08.2026" />
 
     </LinearLayout>
 
