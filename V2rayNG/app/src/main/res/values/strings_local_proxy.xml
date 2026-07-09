@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Экран «Локальный прокси» (LocalProxyActivity) -->
+    <string name="title_local_proxy">Локальный прокси</string>
+
+    <!-- Разделы -->
+    <string name="lp_section_memory">Память</string>
+    <string name="lp_section_socks">SOCKS5-авторизация</string>
+    <string name="lp_section_local">Локальный прокси</string>
+
+    <!-- Память -->
+    <string name="lp_memory_title">Лимит оперативной памяти</string>
+    <string name="lp_memory_sub">Меньше — экономнее, но возможны замедления</string>
+    <string name="lp_memory_unlimited">Снять ограничение</string>
+    <string name="lp_memory_unlimited_sub">Работать без ограничения памяти ядра</string>
+    <string name="lp_memory_unit">МБ</string>
+
+    <!-- SOCKS5-авторизация -->
+    <string name="lp_socks_auth">SOCKS5 авторизация</string>
+    <string name="lp_socks_auth_sub">Требовать логин и пароль для доступа</string>
+    <string name="lp_socks_login">Логин</string>
+    <string name="lp_socks_password">Пароль</string>
+    <string name="lp_socks_address">Адрес</string>
+    <string name="lp_socks_port">Порт</string>
+    <string name="lp_socks_reset">Сбросить логин/пароль</string>
+    <string name="lp_copy">Копировать</string>
+    <string name="lp_show_password">Показать пароль</string>
+    <string name="lp_hide_password">Скрыть пароль</string>
+    <string name="lp_copied">Скопировано</string>
+    <string name="lp_creds_reset">Логин и пароль обновлены</string>
+
+    <!-- Локальный прокси -->
+    <string name="lp_block_udp">Блокировать UDP</string>
+    <string name="lp_block_udp_sub">Запретить UDP-трафик через прокси</string>
+    <string name="lp_http_auth">HTTP-прокси авторизация</string>
+    <string name="lp_http_auth_sub">Добавлять HTTP-прокси с авторизацией</string>
+    <string name="lp_hide_icon">Скрыть значок (только прокси)</string>
+    <string name="lp_hide_icon_sub">Работать без VPN, только локальный прокси</string>
+    <string name="lp_hotspot">Доступ через хотспот</string>
+    <string name="lp_hotspot_sub">Разрешить подключения из локальной сети</string>
+    <string name="lp_route_domain">Маршрутизация по домену</string>
+    <string name="lp_route_domain_sub">Определять правила по имени домена</string>
+</resources>
