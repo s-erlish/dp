@@ -569,14 +569,14 @@ class MainActivity : HelperBaseActivity() {
     private fun refreshHomeSub() {
         val meta = binding.layoutHomeMetaBar
         // Progress shows on the connect circle (shared rotating arc), not a top bar.
-        showConnectLoading()
+        showLoading()
         meta.btnRefresh.isEnabled = false
         lifecycleScope.launch(Dispatchers.IO) {
             val result = mainViewModel.updateConfigViaSubAll()
             launch(Dispatchers.Main) {
                 if (result.configCount > 0) mainViewModel.reloadServerList()
                 bindHomeMetaBar()
-                hideConnectLoading()
+                hideLoading()
                 meta.btnRefresh.isEnabled = true
                 if (result.successCount > 0) {
                     toastSuccess(R.string.toast_success)
