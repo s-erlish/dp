@@ -48,6 +48,12 @@ class MainRecyclerAdapter(
     private var rows: List<Row> = emptyList()
 
     /**
+     * Long-press callback for a server row (guid). Set by the host activity to open the
+     * Incy server-actions bottom sheet (share / edit / duplicate / set default / delete).
+     */
+    var onItemLongClick: ((String) -> Unit)? = null
+
+    /**
      * Feeds the adapter with the flat server list plus the provider groups used to build
      * section headers. Headers are suppressed when [showHeaders] is false or there is a
      * single (or no) provider — Home already shows the meta bar as the provider header.
@@ -210,10 +216,9 @@ class MainRecyclerAdapter(
         binding.infoContainer.setOnClickListener {
             adapterListener?.onSelectServer(guid)
         }
-        // Long-press opens the full share/edit/remove bottom sheet (inline actions removed).
+        // Long-press opens the Incy server-actions bottom sheet (inline actions removed in S3).
         binding.infoContainer.setOnLongClickListener {
-            val pos = holder.bindingAdapterPosition
-            adapterListener?.onShare(guid, profile, pos, true)
+            onItemLongClick?.invoke(guid)
             true
         }
     }

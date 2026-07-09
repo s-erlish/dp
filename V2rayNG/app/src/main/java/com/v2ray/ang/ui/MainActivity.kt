@@ -267,6 +267,36 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         binding.rvHomeServers.isNestedScrollingEnabled = false
         addCustomDividerToRecyclerView(binding.rvHomeServers, this, R.drawable.custom_divider)
         binding.rvHomeServers.adapter = homeAdapter
+
+        // Long-press a server row -> Incy server-actions bottom sheet (S3 moved inline actions here).
+        serversAdapter.onItemLongClick = { guid -> showServerActions(guid) }
+        homeAdapter.onItemLongClick = { guid -> showServerActions(guid) }
+    }
+
+    /**
+     * Opens the Incy server-actions bottom sheet for [guid] (long-press entry point).
+     * Each action delegates to an existing per-server flow; duplicate reuses
+     * [MmkvManager.encodeServerConfig] with a blank guid to mint a fresh copy.
+     */
+    private fun showServerActions(guid: String) {
+        val profile = MmkvManager.decodeServerConfig(guid) ?: return
+        ServerActionsSheet(
+            context = this,
+            profile = profile,
+            onShareQr = { showQRCode(guid) },
+            onShareClipboard = { share2Clipboard(guid) },
+            onEdit = { editServer(guid, profile) },
+            onDuplicate = {
+                val copy = profile.copy(
+                    remarks = profile.remarks + getString(R.string.server_action_duplicate_suffix),
+                    addedTime = System.currentTimeMillis()
+                )
+                MmkvManager.encodeServerConfig("", copy)
+                mainViewModel.reloadServerList()
+            },
+            onSetDefault = { setSelectServer(guid) },
+            onDelete = { removeServer(guid, serversAdapter.positionOfGuid(guid)) },
+        ).show()
     }
 
     /** Wires the Servers tab header: title actions, search, protocol chips. */
