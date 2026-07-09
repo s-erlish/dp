@@ -1553,6 +1553,7 @@ class MainActivity : HelperBaseActivity() {
         s.rowBypassLan.setOnClickListener { toggleBypassLan() }
         s.rowDns.setOnClickListener { editDns() }
         s.rowPingMethod.setOnClickListener { pickPingMethod() }
+        s.rowLocalProxy.setOnClickListener { startActivity(Intent(this, LocalProxyActivity::class.java)) }
 
         // ОБХОД БЛОКИРОВОК
         s.rowMux.setOnClickListener { toggleMux() }
@@ -1569,6 +1570,7 @@ class MainActivity : HelperBaseActivity() {
         s.rowSubAutoUpdate.setOnClickListener { pickSubAutoUpdate() }
         s.rowRouting.setOnClickListener { requestActivityLauncher.launch(Intent(this, RoutingSettingActivity::class.java)) }
         s.rowAssets.setOnClickListener { requestActivityLauncher.launch(Intent(this, UserAssetActivity::class.java)) }
+        s.rowProvider.setOnClickListener { startActivity(Intent(this, ProviderSettingsActivity::class.java)) }
 
         // УСТРОЙСТВА
         s.rowTvSend.setOnClickListener { startActivity(Intent(this, TvSendActivity::class.java)) }
@@ -1580,6 +1582,7 @@ class MainActivity : HelperBaseActivity() {
 
         // О ПРИЛОЖЕНИИ
         s.rowAbout.setOnClickListener { startActivity(Intent(this, AboutActivity::class.java)) }
+        s.rowUrlScheme.setOnClickListener { startActivity(Intent(this, UrlSchemeListActivity::class.java)) }
         s.rowBackup.setOnClickListener { requestActivityLauncher.launch(Intent(this, BackupActivity::class.java)) }
         s.valueAbout.text = BuildConfig.VERSION_NAME
 
@@ -1596,7 +1599,7 @@ class MainActivity : HelperBaseActivity() {
         val perApp = MmkvManager.decodeSettingsBool(AppConfig.PREF_PER_APP_PROXY, false)
         s.valuePerApp.text = getString(if (perApp) R.string.settings_value_on else R.string.settings_value_off)
 
-        s.valueDns.text = MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_DNS, AppConfig.DNS_VPN)
+        s.valueDns.text = dnsLabel(MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_DNS, AppConfig.DNS_VPN).orEmpty())
         s.valuePingMethod.text = getString(pingMethodLabelRes(SettingsManager.getPingMethod()))
         s.valueMuxConcurrency.text = MmkvManager.decodeSettingsString(AppConfig.PREF_MUX_CONCURRENCY, "8")
 
@@ -1694,8 +1697,44 @@ class MainActivity : HelperBaseActivity() {
         restartIfRunning()
     }
 
+    /** Maps a stored DNS value to its friendly preset name, or returns the raw value. */
+    private fun dnsLabel(value: String): String {
+        val names = resources.getStringArray(R.array.dns_preset_names)
+        val values = resources.getStringArray(R.array.dns_preset_values)
+        val i = values.indexOfFirst { it.isNotEmpty() && it == value }
+        return if (i >= 0) names.getOrElse(i) { value } else value
+    }
+
+    /**
+     * Single-choice DNS picker offering ready-made presets plus a "Свой…" option that
+     * opens the free-text editor. Writes the selected server(s) into
+     * [AppConfig.PREF_VPN_DNS] as a comma-separated list (same key/format as before).
+     */
     private fun editDns() {
-        val current = MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_DNS, AppConfig.DNS_VPN)
+        val names = resources.getStringArray(R.array.dns_preset_names)
+        val values = resources.getStringArray(R.array.dns_preset_values)
+        val current = MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_DNS, AppConfig.DNS_VPN).orEmpty()
+        // The last entry is the custom option (empty value); it's the fallback selection.
+        val customIdx = values.size - 1
+        val idx = values.indexOfFirst { it.isNotEmpty() && it == current }.let { if (it >= 0) it else customIdx }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_dns)
+            .setSingleChoiceItems(names, idx) { dialog, which ->
+                dialog.dismiss()
+                if (which == customIdx) {
+                    editDnsCustom(current)
+                } else {
+                    MmkvManager.encodeSettings(AppConfig.PREF_VPN_DNS, values[which])
+                    bindSettingsState()
+                    restartIfRunning()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** Free-text DNS editor, reached via the "Свой…" preset option. */
+    private fun editDnsCustom(current: String) {
         val input = EditText(this).apply {
             setText(current)
             setSingleLine()
