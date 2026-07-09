@@ -34,6 +34,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import com.v2ray.ang.enums.PingMethod
 import kotlinx.coroutines.withContext
 import java.util.Collections
 import java.util.regex.PatternSyntaxException
@@ -253,6 +256,66 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun testCurrentServerRealPing() {
         MessageUtil.sendMsg2Service(getApplication(), AppConfig.MSG_MEASURE_DELAY, "")
+    }
+
+    /**
+     * Runs the "test all" using the user's selected ping method (Settings → ping method).
+     */
+    fun testAllServers() {
+        when (SettingsManager.getPingMethod()) {
+            PingMethod.TCP_CONNECT -> testAllTcping()
+            PingMethod.HTTP_URL -> testAllDirectHttp()
+            PingMethod.ICMP -> testAllIcmp()
+            PingMethod.PROXIED_REAL_DELAY -> testAllRealPing()
+        }
+    }
+
+    /**
+     * Direct HTTP/204 latency test across the current server list (bounded concurrency).
+     */
+    fun testAllDirectHttp() {
+        tcpingTestScope.coroutineContext[Job]?.cancelChildren()
+        SpeedtestManager.closeAllTcpSockets()
+        MmkvManager.clearAllTestDelayResults(serversCache.map { it.guid }.toList())
+
+        val url = SettingsManager.getDelayTestUrl()
+        val serversCopy = serversCache.toList()
+        val semaphore = Semaphore(24)
+        for (item in serversCopy) {
+            tcpingTestScope.launch {
+                semaphore.withPermit {
+                    val testResult = SpeedtestManager.httpPing(url)
+                    launch(Dispatchers.Main) {
+                        MmkvManager.encodeServerTestDelayMillis(item.guid, testResult)
+                        updateListAction.value = getPosition(item.guid)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * ICMP latency test across the current server list (bounded concurrency).
+     */
+    fun testAllIcmp() {
+        tcpingTestScope.coroutineContext[Job]?.cancelChildren()
+        SpeedtestManager.closeAllTcpSockets()
+        MmkvManager.clearAllTestDelayResults(serversCache.map { it.guid }.toList())
+
+        val serversCopy = serversCache.toList()
+        val semaphore = Semaphore(12)
+        for (item in serversCopy) {
+            val host = item.profile.server ?: continue
+            tcpingTestScope.launch {
+                semaphore.withPermit {
+                    val testResult = SpeedtestManager.icmpPing(host)
+                    launch(Dispatchers.Main) {
+                        MmkvManager.encodeServerTestDelayMillis(item.guid, testResult)
+                        updateListAction.value = getPosition(item.guid)
+                    }
+                }
+            }
+        }
     }
 
     /**

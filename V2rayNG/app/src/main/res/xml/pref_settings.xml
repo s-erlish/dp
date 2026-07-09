@@ -52,6 +52,14 @@
             android:summary="%s"
             android:title="@string/title_pref_color_theme" />
 
+        <ListPreference
+            android:defaultValue="real"
+            android:entries="@array/ping_method_entries"
+            android:entryValues="@array/ping_method_values"
+            android:key="pref_ping_method"
+            android:summary="%s"
+            android:title="@string/title_pref_ping_method" />
+
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/title_vpn_settings">

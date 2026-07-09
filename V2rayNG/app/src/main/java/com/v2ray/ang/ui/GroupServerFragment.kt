@@ -219,7 +219,7 @@ class GroupServerFragment : BaseFragment<FragmentGroupServerBinding>(),
         val meta = binding.layoutMetaBar
         meta.progressAction.visibility = View.VISIBLE
         meta.btnPing.isEnabled = false
-        mainViewModel.testAllTcping()
+        mainViewModel.testAllServers()
         binding.root.postDelayed({
             if (!isBindingInitialized) return@postDelayed
             meta.progressAction.visibility = View.GONE

@@ -18,6 +18,7 @@ import com.v2ray.ang.dto.entities.RulesetItem
 import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.enums.Language
+import com.v2ray.ang.enums.PingMethod
 import com.v2ray.ang.enums.RoutingType
 import com.v2ray.ang.enums.VpnInterfaceAddressConfig
 import com.v2ray.ang.handler.MmkvManager.decodeAllServerList
@@ -408,6 +409,12 @@ object SettingsManager {
     }
 
     /**
+     * Returns the user-selected connection-test (ping) method.
+     */
+    fun getPingMethod(): PingMethod =
+        PingMethod.fromPref(MmkvManager.decodeSettingsString(AppConfig.PREF_PING_METHOD))
+
+    /**
      * Get real ping concurrency.
      * @return The number of concurrent real-ping tests (clamped to 1..64).
      */
@@ -521,6 +528,7 @@ object SettingsManager {
         ensureDefaultValue(AppConfig.PREF_REMOTE_DNS, AppConfig.DNS_PROXY)
         ensureDefaultValue(AppConfig.PREF_DOMESTIC_DNS, AppConfig.DNS_DIRECT)
         ensureDefaultValue(AppConfig.PREF_DELAY_TEST_URL, AppConfig.DELAY_TEST_URL)
+        ensureDefaultValue(AppConfig.PREF_PING_METHOD, PingMethod.PROXIED_REAL_DELAY.prefValue)
         ensureDefaultValue(AppConfig.PREF_IP_API_URL, AppConfig.IP_API_URL)
         ensureDefaultValue(AppConfig.PREF_HEV_TUNNEL_RW_TIMEOUT, AppConfig.HEVTUN_RW_TIMEOUT)
         ensureDefaultValue(AppConfig.PREF_MUX_CONCURRENCY, "8")

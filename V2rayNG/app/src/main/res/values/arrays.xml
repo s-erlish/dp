@@ -186,6 +186,20 @@
         <item>mono</item>
     </string-array>
 
+    <string-array name="ping_method_entries">
+        <item>@string/ping_method_real</item>
+        <item>@string/ping_method_http</item>
+        <item>@string/ping_method_tcp</item>
+        <item>@string/ping_method_icmp</item>
+    </string-array>
+
+    <string-array name="ping_method_values" translatable="false">
+        <item>real</item>
+        <item>http</item>
+        <item>tcp</item>
+        <item>icmp</item>
+    </string-array>
+
     <string-array name="outbound_tag" translatable="false">
         <item>proxy</item>
         <item>direct</item>

@@ -286,6 +286,11 @@
     <string name="title_ui_settings">UI settings</string>
     <string name="title_pref_ui_mode_night">UI mode settings</string>
     <string name="title_pref_color_theme">Color theme</string>
+    <string name="title_pref_ping_method">Ping method</string>
+    <string name="ping_method_real">Proxied real delay (through tunnel)</string>
+    <string name="ping_method_http">HTTP GET /generate_204 (direct)</string>
+    <string name="ping_method_tcp">TCP connect (tcping)</string>
+    <string name="ping_method_icmp">ICMP ping (many nodes filter it)</string>
     <string name="speed_zero" translatable="false">0 KB/s</string>
     <string name="menu_item_fast_connect">Fast connect (fastest server)</string>
     <string name="bottom_nav_home">Home</string>

@@ -24,6 +24,67 @@ object SpeedtestManager {
      * @param port The port to connect to.
      * @return The connection time in milliseconds, or -1 if the connection failed.
      */
+    /**
+     * Direct HTTP latency probe (no proxy) to a captive-portal-style generate_204 endpoint.
+     * Measures time-to-first-byte of the response headers.
+     *
+     * @param url the test URL (expects HTTP 204/200).
+     * @param timeoutMs per-probe timeout.
+     * @return latency in ms, or -1 on failure / unexpected status / redirect.
+     */
+    fun httpPing(url: String, timeoutMs: Int = 5000): Long {
+        val client = okhttp3.OkHttpClient.Builder()
+            .connectTimeout(timeoutMs.toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+            .readTimeout(timeoutMs.toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+            .callTimeout(timeoutMs.toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+            .followRedirects(false)
+            .build()
+        val req = okhttp3.Request.Builder()
+            .url(url)
+            .head()
+            .header("Connection", "close")
+            .build()
+        val start = System.nanoTime()
+        return try {
+            client.newCall(req).execute().use { r ->
+                val ms = (System.nanoTime() - start) / 1_000_000
+                if (r.code == 204 || r.code == 200) ms else -1L
+            }
+        } catch (e: Exception) {
+            LogUtil.w(AppConfig.TAG, "httpPing failed: ${e.message}")
+            -1L
+        }
+    }
+
+    /**
+     * ICMP echo probe via the system `ping` binary (works without root on modern Android).
+     * Note: many nodes/CDNs drop ICMP, so -1 here often means "filtered", not "node down".
+     *
+     * @param host node host or IP.
+     * @param timeoutSec per-probe timeout in seconds.
+     * @return round-trip time in ms, or -1 on failure / no reply.
+     */
+    fun icmpPing(host: String, timeoutSec: Int = 2): Long {
+        val ip = HttpUtil.resolveHostToIP(host)?.firstOrNull() ?: host
+        var process: Process? = null
+        return try {
+            process = ProcessBuilder("/system/bin/ping", "-c", "1", "-W", "$timeoutSec", ip)
+                .redirectErrorStream(true)
+                .start()
+            val out = process.inputStream.bufferedReader().readText()
+            if (process.waitFor() == 0) {
+                Regex("time=([0-9.]+)").find(out)?.groupValues?.get(1)?.toFloat()?.toLong() ?: -1L
+            } else {
+                -1L
+            }
+        } catch (e: Exception) {
+            LogUtil.w(AppConfig.TAG, "icmpPing failed: ${e.message}")
+            -1L
+        } finally {
+            process?.destroy()
+        }
+    }
+
     suspend fun tcping(url: String, port: Int): Long {
         var time = -1L
         for (k in 0 until 2) {
