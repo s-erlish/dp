@@ -357,7 +357,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         val show = MmkvManager.decodeSettingsBool(AppConfig.PREF_SHOW_MEMORY, true)
         binding.cardMemory.isVisible = show
         if (!show) return
-        val mb = MemoryStatsManager.currentPssMb()
+        val mb = MemoryStatsManager.currentUsedMb()
         val (labelRes, colorRes) = when (MemoryStatsManager.levelFor(mb)) {
             MemoryStatsManager.Level.NORMAL -> R.string.memory_normal to R.color.color_connected
             MemoryStatsManager.Level.ELEVATED -> R.string.memory_elevated to R.color.colorConfigType

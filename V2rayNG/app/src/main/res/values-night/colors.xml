@@ -1,62 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="brand_blue">#6FA0FF</color>
-    <color name="brand_blue_dark">#3B6FD0</color>
-    <color name="brand_cream">#1A1D24</color>
+    <!-- Incy-style dark palette: near-black background, bright blue accent -->
+    <color name="brand_blue">#4C8DFF</color>
+    <color name="brand_blue_dark">#3B82F6</color>
+    <color name="brand_cream">#141619</color>
 
-    <color name="colorPing">#3DDC97</color>
-    <color name="colorPingRed">#FF6369</color>
-    <color name="colorConfigType">#6FA0FF</color>
-    <color name="color_fab_active">#6FA0FF</color>
-    <color name="color_fab_inactive">#5A6577</color>
-    <color name="color_connected">#3DDC97</color>
-    <color name="divider_color_light">#25303F</color>
+    <color name="colorPing">#22C55E</color>
+    <color name="colorPingRed">#F04452</color>
+    <color name="colorConfigType">#4C8DFF</color>
+    <color name="color_fab_active">#4C8DFF</color>
+    <color name="color_fab_inactive">#3A3F49</color>
+    <color name="color_connected">#22C55E</color>
+    <color name="color_upload">#4C8DFF</color>
+    <color name="color_download">#9B7DFF</color>
+    <color name="divider_color_light">#20242B</color>
 
-    <!-- Primary colors - departament blue (dark) -->
-    <color name="md_theme_primary">#6FA0FF</color>
-    <color name="md_theme_onPrimary">#00246B</color>
-    <color name="md_theme_primaryContainer">#123A82</color>
-    <color name="md_theme_onPrimaryContainer">#D8E4FF</color>
+    <!-- Primary - bright blue -->
+    <color name="md_theme_primary">#4C8DFF</color>
+    <color name="md_theme_onPrimary">#00183A</color>
+    <color name="md_theme_primaryContainer">#17325C</color>
+    <color name="md_theme_onPrimaryContainer">#CFE0FF</color>
 
-    <!-- Secondary colors -->
-    <color name="md_theme_secondary">#A9C3FF</color>
-    <color name="md_theme_onSecondary">#0A2148</color>
-    <color name="md_theme_secondaryContainer">#243B66</color>
-    <color name="md_theme_onSecondaryContainer">#DCE6FF</color>
+    <!-- Secondary - purple accent -->
+    <color name="md_theme_secondary">#9B7DFF</color>
+    <color name="md_theme_onSecondary">#1B0E45</color>
+    <color name="md_theme_secondaryContainer">#2A2350</color>
+    <color name="md_theme_onSecondaryContainer">#E4DBFF</color>
 
-    <!-- Tertiary colors - green -->
-    <color name="md_theme_tertiary">#3DDC97</color>
-    <color name="md_theme_onTertiary">#00382A</color>
-    <color name="md_theme_tertiaryContainer">#00513E</color>
-    <color name="md_theme_onTertiaryContainer">#A8F0CE</color>
+    <!-- Tertiary - green -->
+    <color name="md_theme_tertiary">#22C55E</color>
+    <color name="md_theme_onTertiary">#00210F</color>
+    <color name="md_theme_tertiaryContainer">#0C3F22</color>
+    <color name="md_theme_onTertiaryContainer">#A6F2C4</color>
 
-    <!-- Error colors -->
-    <color name="md_theme_error">#FFB4AB</color>
-    <color name="md_theme_errorContainer">#93000A</color>
-    <color name="md_theme_onError">#690005</color>
-    <color name="md_theme_onErrorContainer">#FFDAD6</color>
+    <!-- Error -->
+    <color name="md_theme_error">#F04452</color>
+    <color name="md_theme_errorContainer">#5C1420</color>
+    <color name="md_theme_onError">#FFFFFF</color>
+    <color name="md_theme_onErrorContainer">#FFD9DD</color>
 
-    <!-- Background colors - deep navy -->
-    <color name="md_theme_background">#0B1220</color>
-    <color name="md_theme_onBackground">#E6ECF5</color>
+    <!-- Background - near black -->
+    <color name="md_theme_background">#0A0B0D</color>
+    <color name="md_theme_onBackground">#F2F4F8</color>
 
-    <!-- Surface colors -->
-    <color name="md_theme_surface">#131C2C</color>
-    <color name="md_theme_onSurface">#E6ECF5</color>
-    <color name="md_theme_surfaceVariant">#23304A</color>
-    <color name="md_theme_onSurfaceVariant">#A9B4C6</color>
-    <color name="md_theme_inverseSurface">#E6ECF5</color>
-    <color name="md_theme_inverseOnSurface">#131C2C</color>
+    <!-- Surface - dark cards -->
+    <color name="md_theme_surface">#141619</color>
+    <color name="md_theme_onSurface">#F2F4F8</color>
+    <color name="md_theme_surfaceVariant">#1E2126</color>
+    <color name="md_theme_onSurfaceVariant">#8A909C</color>
+    <color name="md_theme_inverseSurface">#F2F4F8</color>
+    <color name="md_theme_inverseOnSurface">#141619</color>
 
-    <!-- Outline colors -->
-    <color name="md_theme_outline">#3A4761</color>
-    <color name="md_theme_outlineVariant">#25303F</color>
+    <!-- Outline -->
+    <color name="md_theme_outline">#2A2E36</color>
+    <color name="md_theme_outlineVariant">#20242B</color>
 
-    <!-- Other colors -->
+    <!-- Other -->
     <color name="md_theme_inversePrimary">#1E5FC7</color>
     <color name="md_theme_shadow">#000000</color>
-    <color name="md_theme_surfaceTint">#6FA0FF</color>
+    <color name="md_theme_surfaceTint">#4C8DFF</color>
     <color name="md_theme_scrim">#000000</color>
+
+    <!-- Surface container ramp (near-black → dark grey) -->
+    <color name="md_theme_surfaceContainerLowest">#08090B</color>
+    <color name="md_theme_surfaceContainerLow">#111316</color>
+    <color name="md_theme_surfaceContainer">#141619</color>
+    <color name="md_theme_surfaceContainerHigh">#1A1D21</color>
+    <color name="md_theme_surfaceContainerHighest">#20242B</color>
 
     <!-- MONO theme (white on black) -->
     <color name="mono_primary">#FFFFFF</color>
@@ -78,17 +88,7 @@
     <color name="mono_outline">#38383C</color>
     <color name="mono_outlineVariant">#28282C</color>
     <color name="mono_fab_active">#FFFFFF</color>
-    <color name="mono_fab_inactive">#48484A</color>
     <color name="mono_connected">#FFFFFF</color>
-
-    <!-- Surface container ramp (blue theme, dark) -->
-    <color name="md_theme_surfaceContainerLowest">#0A1019</color>
-    <color name="md_theme_surfaceContainerLow">#131C2C</color>
-    <color name="md_theme_surfaceContainer">#172033</color>
-    <color name="md_theme_surfaceContainerHigh">#1E293D</color>
-    <color name="md_theme_surfaceContainerHighest">#243149</color>
-
-    <!-- Surface container ramp (mono theme, dark) -->
     <color name="mono_surfaceContainerLowest">#000000</color>
     <color name="mono_surfaceContainerLow">#0E0E10</color>
     <color name="mono_surfaceContainer">#141416</color>

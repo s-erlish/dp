@@ -465,4 +465,7 @@
         <item>WebDAV</item>
     </string-array>
 
+    <string name="bottom_nav_home">Главная</string>
+    <string name="bottom_nav_servers">Сервера</string>
+    <string name="bottom_nav_more">Настройки</string>
 </resources>

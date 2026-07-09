@@ -12,6 +12,8 @@
     <color name="color_fab_active">#1E5FC7</color>
     <color name="color_fab_inactive">#9AA6B8</color>
     <color name="color_connected">#12B76A</color>
+    <color name="color_upload">#1E5FC7</color>
+    <color name="color_download">#7C5CFF</color>
     <color name="divider_color_light">#E4E9F2</color>
     <color name="colorIndicator">@color/md_theme_primary</color>
 

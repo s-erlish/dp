@@ -1,6 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+    <!-- Compact Incy-style bottom navigation -->
+    <style name="BottomNavLabel" parent="TextAppearance.Material3.LabelSmall">
+        <item name="android:textSize">11sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="BottomNavIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:width">64dp</item>
+        <item name="android:height">34dp</item>
+        <item name="android:color">@color/md_theme_primaryContainer</item>
+        <item name="marginHorizontal">6dp</item>
+    </style>
+
     <!-- Brand wordmark shown as the toolbar title on the main screen -->
     <style name="ToolbarBrandTitle" parent="TextAppearance.Material3.TitleLarge">
         <item name="android:textStyle">bold</item>
