@@ -205,6 +205,7 @@ object HttpUtil {
         val announce: String? = null,
         val supportUrl: String? = null,
         val webPageUrl: String? = null,
+        val profileTitle: String? = null,
     )
 
     /**
@@ -257,6 +258,7 @@ object HttpUtil {
                             announce = response.header("announce"),
                             supportUrl = response.header("support-url"),
                             webPageUrl = response.header("profile-web-page-url"),
+                            profileTitle = response.header("profile-title"),
                         )
                     }
 

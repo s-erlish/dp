@@ -316,6 +316,7 @@
     <string name="sub_unpin">Unpin subscription</string>
     <string name="sub_support">Support</string>
     <string name="sub_website">Website</string>
+    <string name="sub_telegram">Telegram</string>
     <string name="memory_app_usage">App memory</string>
     <string name="memory_value" translatable="false">%1$d MB · %2$s</string>
     <string name="memory_normal">Normal</string>
@@ -406,6 +407,7 @@
     <string name="connection_test_error_status_code">Error code: #%d</string>
     <string name="connection_connected">Connected, tap to check connection</string>
     <string name="connection_not_connected">Not connected</string>
+    <string name="connection_connecting">Connecting…</string>
     <string name="connection_runing_task_left">Number of running test tasks: %s</string>
 
     <string name="import_subscription_success">Subscription imported Successfully</string>

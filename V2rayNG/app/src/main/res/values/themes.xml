@@ -50,9 +50,13 @@
         <!-- Other colors -->
         <item name="colorPrimaryInverse">@color/md_theme_inversePrimary</item>
 
-        <!-- Status bar and navigation bar - system bars -->
-        <item name="android:statusBarColor">@color/md_theme_surface</item>
-        <item name="android:navigationBarColor">@color/md_theme_surface</item>
+        <!-- Edge-to-edge: fully transparent system bars so the home gradient
+             draws underneath them. Disable the auto contrast scrim (API 29+). -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:enforceStatusBarContrast" tools:targetApi="29">false</item>
+        <item name="android:enforceNavigationBarContrast" tools:targetApi="29">false</item>
 
         <!-- Connect button state colors (blue theme) -->
         <item name="connectIdleColor">@color/color_fab_inactive</item>
@@ -112,8 +116,10 @@
         <item name="colorOnBackground">@color/mono_onBackground</item>
         <item name="colorOutline">@color/mono_outline</item>
         <item name="colorOutlineVariant">@color/mono_outlineVariant</item>
-        <item name="android:statusBarColor">@color/mono_surface</item>
-        <item name="android:navigationBarColor">@color/mono_surface</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:enforceStatusBarContrast" tools:targetApi="29">false</item>
+        <item name="android:enforceNavigationBarContrast" tools:targetApi="29">false</item>
         <item name="connectIdleColor">@color/mono_fab_inactive</item>
         <item name="connectActiveColor">@color/mono_fab_active</item>
         <item name="connectedColor">@color/mono_connected</item>

@@ -26,6 +26,7 @@ data class SubscriptionItem(
     var announce: String = "",      // banner text from the `announce` header/#directive
     var supportUrl: String = "",    // from `support-url` (e.g. a Telegram link)
     var webPageUrl: String = "",    // from `profile-web-page-url`
+    var profileTitle: String = "",  // display title from the `profile-title` header
 )
 
 // --- derived helpers (kept out of the data class so it stays a plain JSON POJO) ---
