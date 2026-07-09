@@ -482,4 +482,40 @@
     <string name="bottom_nav_home">Главная</string>
     <string name="bottom_nav_servers">Сервера</string>
     <string name="bottom_nav_more">Настройки</string>
+
+    <!-- Incy settings tab -->
+    <string name="bottom_nav_settings">Настройки</string>
+    <string name="settings_section_connection">ПОДКЛЮЧЕНИЕ</string>
+    <string name="settings_section_bypass">ОБХОД БЛОКИРОВОК</string>
+    <string name="settings_section_interface">ИНТЕРФЕЙС</string>
+    <string name="settings_section_subscription">ПОДПИСКА</string>
+    <string name="settings_section_devices">УСТРОЙСТВА</string>
+    <string name="settings_section_about">О ПРИЛОЖЕНИИ</string>
+    <string name="settings_mode">Режим</string>
+    <string name="settings_mode_vpn">VPN</string>
+    <string name="settings_mode_proxy">Только прокси</string>
+    <string name="settings_per_app">Прокси по приложениям</string>
+    <string name="settings_bypass_lan">Обход локальной сети</string>
+    <string name="settings_bypass_lan_sub">Прямой доступ к устройствам в локальной сети</string>
+    <string name="settings_dns">DNS</string>
+    <string name="settings_dns_hint">Адрес DNS-сервера</string>
+    <string name="settings_mux">Мультиплексирование (Mux)</string>
+    <string name="settings_mux_sub">Объединяет запросы в один канал соединения</string>
+    <string name="settings_mux_concurrency">Число соединений Mux</string>
+    <string name="settings_fragment">Фрагментация пакетов</string>
+    <string name="settings_fragment_sub">Разбивает TLS-рукопожатие против DPI</string>
+    <string name="settings_theme_dark">Тёмная тема</string>
+    <string name="settings_theme_mono">Чёрно-белый режим</string>
+    <string name="settings_language">Язык</string>
+    <string name="settings_boot">Запуск при загрузке</string>
+    <string name="settings_boot_sub">Подключаться после перезагрузки устройства</string>
+    <string name="settings_subscriptions">Подписки</string>
+    <string name="settings_routing">Маршрутизация</string>
+    <string name="settings_assets">Файлы ресурсов</string>
+    <string name="settings_tv_send">Перенести подписку на ТВ</string>
+    <string name="settings_tv_receive">Принять подписку</string>
+    <string name="settings_about">О приложении</string>
+    <string name="settings_backup">Резервное копирование</string>
+    <string name="settings_value_on">Вкл</string>
+    <string name="settings_value_off">Выкл</string>
 </resources>

@@ -9,7 +9,7 @@
         android:icon="@drawable/ic_nav_servers"
         android:title="@string/bottom_nav_servers" />
     <item
-        android:id="@+id/nav_more"
-        android:icon="@drawable/ic_nav_more"
-        android:title="@string/bottom_nav_more" />
+        android:id="@+id/nav_settings"
+        android:icon="@drawable/ic_nav_settings"
+        android:title="@string/bottom_nav_settings" />
 </menu>
