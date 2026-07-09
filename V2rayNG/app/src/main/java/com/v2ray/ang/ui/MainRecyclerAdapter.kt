@@ -188,10 +188,15 @@ class MainRecyclerAdapter(
         binding.tvType.text = primaryProtocol(guid, profile)
         binding.tvStatistics.text = transportSecurity(guid, profile)
 
-        // Latency text only (colored by result).
+        // Latency text only (colored by result). testDelayMillis == -2L is the "testing" sentinel
+        // set by MainActivity at ping start: show a spinner in place of the ms value until the real
+        // per-server result overwrites it.
         val aff = MmkvManager.decodeServerAffiliationInfo(guid)
         val delay = aff?.testDelayMillis ?: 0L
-        binding.tvTestResult.text = aff?.getTestDelayString().orEmpty()
+        val testing = delay == -2L
+        binding.progressPing.visibility = if (testing) View.VISIBLE else View.GONE
+        binding.tvTestResult.visibility = if (testing) View.GONE else View.VISIBLE
+        binding.tvTestResult.text = if (testing) "" else aff?.getTestDelayString().orEmpty()
         // Ping colours resolved from theme attrs so ThemeOverlay.Mono greys them out.
         val pingAttr = if (delay < 0L) R.attr.pingBad else R.attr.pingGood
         binding.tvTestResult.setTextColor(MaterialColors.getColor(binding.tvTestResult, pingAttr))

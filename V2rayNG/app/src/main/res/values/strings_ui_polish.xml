@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Custom gray status toast shown when a subscription refresh/update completes. -->
+    <string name="toast_updated">Обновлено</string>
+</resources>

@@ -16,7 +16,8 @@
     android:paddingEnd="12dp"
     android:paddingBottom="14dp">
 
-    <!-- Row 1: chevron + (title + subtitle) + actions (Ping -> Refresh -> Pin -> Telegram) -->
+    <!-- Row 1: chevron + (title + subtitle) + actions (Ping -> Refresh -> Pin). Telegram moved
+         to the bottom support row's right corner, opposite Поддержка. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -118,22 +119,6 @@
             app:srcCompat="@drawable/ic_pin_24dp"
             app:tint="?attr/colorOnSurfaceVariant" />
 
-        <!-- 4) Telegram (top-right corner): compact icon button, wired in bindMetaBar. -->
-        <ImageView
-            android:id="@+id/btn_telegram"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_marginEnd="2dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:clickable="true"
-            android:contentDescription="@string/sub_telegram"
-            android:focusable="true"
-            android:padding="8dp"
-            android:visibility="gone"
-            app:srcCompat="@drawable/ic_telegram_24dp"
-            app:tint="?attr/colorPrimary"
-            tools:visibility="visible" />
-
     </LinearLayout>
 
     <!-- Collapsible body: traffic + announce + support/telegram. Starts EXPANDED. -->
@@ -218,11 +203,13 @@
         tools:text="No ads on YouTube: Hybrid, Russia\nIf it stops working, refresh the subscription @departamentvpn"
         tools:visibility="visible" />
 
-    <!-- Support button (Telegram moved up to Row 1's top-right corner) -->
+    <!-- Bottom support row: full-width with «Поддержка» pinned bottom-left and Telegram pinned
+         bottom-right (opposite corners), a weighted spacer between them. -->
     <LinearLayout
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
+        android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <com.google.android.material.button.MaterialButton
@@ -239,6 +226,27 @@
             android:visibility="gone"
             app:icon="@drawable/ic_support_24dp"
             app:iconSize="16dp"
+            tools:visibility="visible" />
+
+        <!-- Spacer pushes Telegram to the bottom-right corner. -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <!-- Telegram (bottom-right corner): compact icon button, wired in bindMetaBar. -->
+        <ImageView
+            android:id="@+id/btn_telegram"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:contentDescription="@string/sub_telegram"
+            android:focusable="true"
+            android:padding="8dp"
+            android:visibility="gone"
+            app:srcCompat="@drawable/ic_telegram_24dp"
+            app:tint="?attr/colorPrimary"
             tools:visibility="visible" />
 
     </LinearLayout>

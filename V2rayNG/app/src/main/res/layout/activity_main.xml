@@ -66,6 +66,15 @@
                     android:paddingEnd="12dp"
                     android:paddingBottom="2dp">
 
+                    <!-- Invisible left spacer matching the top-right "+" button width (42dp) so the
+                         3-weight stats block is centered between two equal edges -> the middle
+                         column (tv_connection_time) lands at the real screen center. -->
+                    <View
+                        android:layout_width="42dp"
+                        android:layout_height="1dp"
+                        android:importantForAccessibility="no"
+                        android:visibility="invisible" />
+
                     <!-- Inline stats block: upload · uptime · download (takes all remaining width) -->
                     <LinearLayout
                         android:layout_width="0dp"

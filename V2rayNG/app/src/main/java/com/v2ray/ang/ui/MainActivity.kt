@@ -443,8 +443,8 @@ class MainActivity : HelperBaseActivity() {
         header.btnCollapseAll.setOnClickListener { serversAdapter.toggleCollapseAll() }
         header.btnRefreshAll.setOnClickListener { importConfigViaSub() }
         header.btnSpeedtestAll.setOnClickListener {
-            toast(getString(R.string.connection_test_testing_count, mainViewModel.serversCache.count()))
             mainViewModel.testAllServers()
+            markAllServersTesting()
         }
         header.btnAdd.setOnClickListener { showImportMenu(it) }
         header.etSearch.doAfterTextChanged { mainViewModel.filterConfig(it?.toString().orEmpty()) }
@@ -494,6 +494,17 @@ class MainActivity : HelperBaseActivity() {
     }
 
     /**
+     * Marks every server as "ping in flight" so each row shows a spinner. Must be called AFTER
+     * [MainViewModel.testAllServers], which synchronously clears all delays to 0 before launching
+     * its async pings; writing the -2L sentinel afterwards makes the rows spin until each real
+     * per-server result overwrites it (via updateListAction -> refreshServerLists).
+     */
+    private fun markAllServersTesting() {
+        mainViewModel.serversCache.forEach { MmkvManager.encodeServerTestDelayMillis(it.guid, -2L) }
+        refreshServerLists(-1)
+    }
+
+    /**
      * Rebuilds both lists from the current cache and refreshes the Servers-tab chrome
      * (subtitle counts, protocol chips, empty-state visibility) plus the Home meta bar.
      */
@@ -528,8 +539,8 @@ class MainActivity : HelperBaseActivity() {
         meta.btnCollapse.setOnClickListener { toggleHomeServerList() }
         meta.btnRefresh.setOnClickListener { refreshHomeSub() }
         meta.btnPing.setOnClickListener {
-            toast(getString(R.string.connection_test_testing_count, mainViewModel.serversCache.count()))
             mainViewModel.testAllServers()
+            markAllServersTesting()
         }
         meta.btnPin.setOnClickListener { toggleHomePin() }
         meta.btnSupport.setOnClickListener { openSubUrl(MmkvManager.decodeSubscription(currentMetaSubId())?.supportUrl) }
@@ -640,7 +651,9 @@ class MainActivity : HelperBaseActivity() {
                 hideLoading()
                 meta.btnRefresh.isEnabled = true
                 if (result.successCount > 0) {
-                    toastSuccess(R.string.toast_success)
+                    // Route subscription-update completion through the app's custom gray status
+                    // toast («Обновлено») instead of the default green success toast.
+                    showStatusToast(getString(R.string.toast_updated))
                 } else if (result.failureCount > 0) {
                     toastError(R.string.toast_failure)
                 }

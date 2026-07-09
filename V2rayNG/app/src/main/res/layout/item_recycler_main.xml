@@ -97,6 +97,17 @@
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="11sp" />
 
+                <!-- Per-row ping spinner: shown while a latency test is in flight
+                     (testDelayMillis == -2L sentinel), replaced by tv_test_result on completion. -->
+                <ProgressBar
+                    android:id="@+id/progress_ping"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginStart="4dp"
+                    android:indeterminateTint="?attr/colorPrimary"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+
                 <TextView
                     android:id="@+id/tv_test_result"
                     android:layout_width="wrap_content"
