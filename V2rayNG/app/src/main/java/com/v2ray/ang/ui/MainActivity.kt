@@ -12,22 +12,38 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
+import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.isVisible
+import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.chip.Chip
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.navigation.NavigationView
-import com.google.android.material.tabs.TabLayoutMediator
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
+import com.v2ray.ang.contracts.MainAdapterListener
 import com.v2ray.ang.core.CoreServiceManager
 import com.v2ray.ang.databinding.ActivityMainBinding
+import com.v2ray.ang.databinding.ItemQrcodeBinding
+import com.v2ray.ang.dto.entities.ProfileItem
+import com.v2ray.ang.dto.entities.SubscriptionItem
+import com.v2ray.ang.dto.entities.hasExpiry
+import com.v2ray.ang.dto.entities.hasUserInfo
+import com.v2ray.ang.dto.entities.isExpired
+import com.v2ray.ang.dto.entities.isUnlimited
+import com.v2ray.ang.dto.entities.trafficFraction
+import com.v2ray.ang.dto.entities.usedTraffic
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.enums.PermissionType
 import com.v2ray.ang.auth.BackendConfig
+import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
+import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.extension.toSpeedString
+import com.v2ray.ang.extension.toTrafficString
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
@@ -41,6 +57,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelectedListener {
     private val binding by lazy {
@@ -48,8 +67,12 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     }
 
     val mainViewModel: MainViewModel by viewModels()
-    private lateinit var groupPagerAdapter: GroupPagerAdapter
-    private var tabMediator: TabLayoutMediator? = null
+    private lateinit var serversAdapter: MainRecyclerAdapter
+    private lateinit var homeAdapter: MainRecyclerAdapter
+    private var lastProtocolChipSet: List<EConfigType> = emptyList()
+
+    private val shareMethod: Array<out String> by lazy { resources.getStringArray(R.array.share_method) }
+    private val shareMethodMore: Array<out String> by lazy { resources.getStringArray(R.array.share_method_more) }
 
     private val timerHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var connectionStartTime = 0L
@@ -92,7 +115,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
             restartV2Ray()
         }
         if (SettingsChangeManager.consumeSetupGroupTab()) {
-            setupGroupTab()
+            mainViewModel.reloadServerList()
         }
     }
 
@@ -102,10 +125,9 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         setContentView(binding.root)
         setupToolbar(binding.toolbar, false, getString(R.string.app_name))
 
-        // setup viewpager and tablayout
-        groupPagerAdapter = GroupPagerAdapter(this, emptyList())
-        binding.viewPager.adapter = groupPagerAdapter
-        binding.viewPager.isUserInputEnabled = true
+        // All servers are shown in one flat, provider-grouped list (no subscription tabs).
+        mainViewModel.subscriptionId = ""
+        setupServerLists()
 
         // "More" bottom tab and edge-swipe open the drawer; secondary navigation lives there
         binding.navView.setNavigationItemSelectedListener(this)
@@ -135,7 +157,9 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         }
         binding.layoutServerInfo.setOnClickListener { handleLayoutTestClick() }
 
-        setupGroupTab()
+        setupServersHeader()
+        setupHomeMetaBar()
+        setupEmptyState()
         setupViewModel()
         SubscriptionUpdater.sync()
         mainViewModel.reloadServerList()
@@ -178,6 +202,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     }
 
     private fun setupViewModel() {
+        mainViewModel.updateListAction.observe(this) { index -> refreshServerLists(index ?: -1) }
         mainViewModel.updateTestResultAction.observe(this) { setTestState(it) }
         mainViewModel.updateSpeedAction.observe(this) { (down, up) ->
             binding.tvDownloadSpeed.text = down.toSpeedString()
@@ -219,25 +244,370 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         mainViewModel.initAssets(assets)
     }
 
-    /** Rebuilds the subscription tabs (e.g. after a pin/unpin changes their order). */
-    fun reloadSubscriptionTabs() = setupGroupTab()
+    /**
+     * Creates the two RecyclerViews (Servers tab = grouped, Home = flat) sharing one
+     * adapter each, both driven by the same all-servers cache.
+     */
+    private fun setupServerLists() {
+        val listener = ActivityAdapterListener()
 
-    private fun setupGroupTab() {
-        val groups = mainViewModel.getSubscriptions(this)
-        groupPagerAdapter.update(groups)
+        serversAdapter = MainRecyclerAdapter(mainViewModel, listener)
+        binding.rvServers.setHasFixedSize(true)
+        binding.rvServers.layoutManager = LinearLayoutManager(this)
+        addCustomDividerToRecyclerView(binding.rvServers, this, R.drawable.custom_divider)
+        binding.rvServers.adapter = serversAdapter
 
-        tabMediator?.detach()
-        tabMediator = TabLayoutMediator(binding.tabGroup, binding.viewPager) { tab, position ->
-            groupPagerAdapter.groups.getOrNull(position)?.let {
-                tab.text = it.remarks
-                tab.tag = it.id
+        homeAdapter = MainRecyclerAdapter(mainViewModel, listener)
+        binding.rvHomeServers.setHasFixedSize(false)
+        binding.rvHomeServers.layoutManager = LinearLayoutManager(this)
+        binding.rvHomeServers.isNestedScrollingEnabled = false
+        addCustomDividerToRecyclerView(binding.rvHomeServers, this, R.drawable.custom_divider)
+        binding.rvHomeServers.adapter = homeAdapter
+    }
+
+    /** Wires the Servers tab header: title actions, search, protocol chips. */
+    private fun setupServersHeader() {
+        val header = binding.layoutServersHeader
+        header.btnCollapseAll.setOnClickListener { serversAdapter.toggleCollapseAll() }
+        header.btnRefreshAll.setOnClickListener { importConfigViaSub() }
+        header.btnSpeedtestAll.setOnClickListener {
+            toast(getString(R.string.connection_test_testing_count, mainViewModel.serversCache.count()))
+            mainViewModel.testAllServers()
+        }
+        header.btnAdd.setOnClickListener { showImportMenu(it) }
+        header.etSearch.doAfterTextChanged { mainViewModel.filterConfig(it?.toString().orEmpty()) }
+        header.chipGroupProtocol.setOnCheckedStateChangeListener { group, checkedIds ->
+            val id = checkedIds.firstOrNull() ?: return@setOnCheckedStateChangeListener
+            val chip = group.findViewById<Chip>(id) ?: return@setOnCheckedStateChangeListener
+            val type = chip.tag as? EConfigType
+            mainViewModel.setProtocolFilter(type)
+        }
+    }
+
+    /** Popup with the full import/actions menu, anchored to the header "+" button. */
+    private fun showImportMenu(anchor: android.view.View) {
+        val popup = androidx.appcompat.widget.PopupMenu(this, anchor)
+        popup.menuInflater.inflate(R.menu.menu_main, popup.menu)
+        popup.setOnMenuItemClickListener { onOptionsItemSelected(it) }
+        popup.show()
+    }
+
+    private fun setupEmptyState() {
+        binding.layoutEmpty.btnImportClipboard.setOnClickListener { importClipboard() }
+        binding.layoutEmpty.btnScanQr.setOnClickListener { importQRcode() }
+    }
+
+    /**
+     * Rebuilds both lists from the current cache and refreshes the Servers-tab chrome
+     * (subtitle counts, protocol chips, empty-state visibility) plus the Home meta bar.
+     */
+    private fun refreshServerLists(index: Int) {
+        val subs = mainViewModel.getProviderGroups()
+        serversAdapter.setSections(mainViewModel.serversCache, subs, showHeaders = true, index = index)
+        homeAdapter.setSections(mainViewModel.serversCache, subs, showHeaders = false, index = index)
+        updateServersChrome(subs.size)
+        bindHomeMetaBar()
+    }
+
+    private fun updateServersChrome(providerCount: Int) {
+        val serverCount = mainViewModel.serversCache.size
+        val distinctProviders = mainViewModel.serversCache.map { it.profile.subscriptionId }.distinct().size
+        binding.layoutServersHeader.tvServersSubtitle.text =
+            getString(R.string.servers_count, serverCount) + " · " +
+                getString(R.string.providers_count, maxOf(distinctProviders, 0))
+
+        buildProtocolChips()
+
+        val filtersActive = mainViewModel.keywordFilter.isNotEmpty() || mainViewModel.protocolFilter != null
+        val showEmpty = serverCount == 0 && !filtersActive
+        binding.layoutEmpty.root.isVisible = showEmpty
+        binding.rvServers.isVisible = !showEmpty
+    }
+
+    /** Rebuilds protocol chips only when the available protocol set changes. */
+    private fun buildProtocolChips() {
+        val protocols = mainViewModel.availableProtocols()
+        if (protocols == lastProtocolChipSet) return
+        lastProtocolChipSet = protocols
+
+        val group = binding.layoutServersHeader.chipGroupProtocol
+        // Keep the permanent "Все" chip (index 0), drop the rest.
+        while (group.childCount > 1) group.removeViewAt(group.childCount - 1)
+        binding.layoutServersHeader.chipAll.tag = null
+
+        val current = mainViewModel.protocolFilter
+        val chipContext = android.view.ContextThemeWrapper(
+            this, com.google.android.material.R.style.Widget_Material3_Chip_Filter
+        )
+        protocols.forEach { type ->
+            val chip = Chip(chipContext).apply {
+                text = type.name
+                tag = type
+                isCheckable = true
+                isChecked = (type == current)
             }
-        }.also { it.attach() }
+            group.addView(chip)
+        }
+        if (current == null) binding.layoutServersHeader.chipAll.isChecked = true
+    }
 
-        val targetIndex = groups.indexOfFirst { it.id == mainViewModel.subscriptionId }.takeIf { it >= 0 } ?: (groups.size - 1)
-        binding.viewPager.setCurrentItem(targetIndex, false)
+    /**
+     * Binds the Home provider meta bar to the selected server's subscription (or the first
+     * provider). Reuses the collapsible meta-bar layout shared with the old fragment.
+     */
+    private fun setupHomeMetaBar() {
+        val meta = binding.layoutHomeMetaBar
+        meta.btnCollapse.setOnClickListener { toggleMetaBody() }
+        meta.btnRefresh.setOnClickListener { refreshHomeSub() }
+        meta.btnPing.setOnClickListener {
+            toast(getString(R.string.connection_test_testing_count, mainViewModel.serversCache.count()))
+            mainViewModel.testAllServers()
+        }
+        meta.btnPin.setOnClickListener { toggleHomePin() }
+        meta.btnSupport.setOnClickListener { openSubUrl(MmkvManager.decodeSubscription(currentMetaSubId())?.supportUrl) }
+        meta.btnWebsite.setOnClickListener { openSubUrl(MmkvManager.decodeSubscription(currentMetaSubId())?.webPageUrl) }
+        bindHomeMetaBar()
+    }
 
-        binding.tabGroup.isVisible = groups.size > 1
+    private fun toggleMetaBody() {
+        val body = binding.layoutHomeMetaBar.layoutMetaBody
+        val collapse = body.isVisible
+        body.isVisible = !collapse
+        binding.layoutHomeMetaBar.btnCollapse.rotation = if (collapse) -90f else 0f
+    }
+
+    /** Subscription shown in the Home meta bar: the selected server's, else the first provider. */
+    private fun currentMetaSubId(): String {
+        mainViewModel.findSubscriptionIdBySelect()?.takeIf { it.isNotEmpty() }?.let { return it }
+        return mainViewModel.getProviderGroups().firstOrNull()?.id.orEmpty()
+    }
+
+    private fun bindHomeMetaBar() {
+        val subId = currentMetaSubId()
+        val sub = if (subId.isEmpty()) null else MmkvManager.decodeSubscription(subId)
+        bindMetaBar(sub)
+    }
+
+    private fun toggleHomePin() {
+        val subId = currentMetaSubId()
+        val sub = MmkvManager.decodeSubscription(subId) ?: return
+        sub.pinned = !sub.pinned
+        MmkvManager.encodeSubscription(subId, sub)
+        bindHomeMetaBar()
+        mainViewModel.reloadServerList()
+    }
+
+    private fun refreshHomeSub() {
+        val meta = binding.layoutHomeMetaBar
+        meta.progressAction.visibility = android.view.View.VISIBLE
+        meta.btnRefresh.isEnabled = false
+        lifecycleScope.launch(Dispatchers.IO) {
+            val result = mainViewModel.updateConfigViaSubAll()
+            launch(Dispatchers.Main) {
+                if (result.configCount > 0) mainViewModel.reloadServerList()
+                bindHomeMetaBar()
+                meta.progressAction.visibility = android.view.View.GONE
+                meta.btnRefresh.isEnabled = true
+                if (result.successCount > 0) {
+                    toastSuccess(R.string.toast_success)
+                } else if (result.failureCount > 0) {
+                    toastError(R.string.toast_failure)
+                }
+            }
+        }
+    }
+
+    private fun openSubUrl(url: String?) {
+        if (url.isNullOrBlank()) return
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (e: Exception) {
+            toastError(R.string.toast_failure)
+        }
+    }
+
+    /**
+     * Repaints the meta bar from persisted subscription metadata (moved from GroupServerFragment).
+     */
+    private fun bindMetaBar(sub: SubscriptionItem?) {
+        val meta = binding.layoutHomeMetaBar
+        if (sub == null) {
+            meta.root.visibility = android.view.View.GONE
+            return
+        }
+        meta.root.visibility = android.view.View.VISIBLE
+        meta.tvSubTitle.text = sub.remarks.ifBlank { getString(R.string.title_sub_setting) }
+
+        val primaryColor = MaterialColors.getColor(meta.btnPin, androidx.appcompat.R.attr.colorPrimary)
+        val onVariant = MaterialColors.getColor(meta.btnPin, com.google.android.material.R.attr.colorOnSurfaceVariant)
+        meta.btnPin.setColorFilter(if (sub.pinned) primaryColor else onVariant)
+        meta.btnPin.contentDescription = getString(if (sub.pinned) R.string.sub_unpin else R.string.sub_pin)
+
+        if (sub.announce.isNotBlank()) {
+            meta.tvAnnounce.visibility = android.view.View.VISIBLE
+            meta.tvAnnounce.text = sub.announce
+        } else {
+            meta.tvAnnounce.visibility = android.view.View.GONE
+        }
+        meta.btnSupport.visibility = if (sub.supportUrl.isNotBlank()) android.view.View.VISIBLE else android.view.View.GONE
+        meta.btnWebsite.visibility = if (sub.webPageUrl.isNotBlank()) android.view.View.VISIBLE else android.view.View.GONE
+
+        if (!sub.hasUserInfo) {
+            meta.layoutTraffic.visibility = android.view.View.GONE
+            return
+        }
+        meta.layoutTraffic.visibility = android.view.View.VISIBLE
+
+        val variantColor = MaterialColors.getColor(meta.tvTraffic, com.google.android.material.R.attr.colorOnSurfaceVariant)
+        val redColor = ContextCompat.getColor(this, R.color.colorPingRed)
+        val greenColor = ContextCompat.getColor(this, R.color.colorPing)
+
+        if (sub.isUnlimited) {
+            meta.tvTraffic.text = getString(R.string.sub_traffic_unlimited, sub.usedTraffic.toTrafficString())
+            meta.tvTraffic.setTextColor(variantColor)
+            meta.progressTraffic.visibility = android.view.View.GONE
+        } else {
+            val near = sub.trafficFraction >= 0.9f
+            meta.tvTraffic.text = getString(
+                R.string.sub_traffic_used,
+                sub.usedTraffic.toTrafficString(),
+                sub.totalTraffic.toTrafficString()
+            )
+            meta.tvTraffic.setTextColor(if (near) redColor else variantColor)
+            meta.progressTraffic.visibility = android.view.View.VISIBLE
+            meta.progressTraffic.setProgressCompat((sub.trafficFraction * 1000).toInt(), false)
+            meta.progressTraffic.setIndicatorColor(if (near) redColor else greenColor)
+        }
+
+        if (sub.hasExpiry) {
+            meta.tvExpiry.visibility = android.view.View.VISIBLE
+            if (sub.isExpired) {
+                meta.tvExpiry.text = getString(R.string.sub_expired)
+                meta.tvExpiry.setTextColor(redColor)
+            } else {
+                val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(sub.expire * 1000))
+                val daysLeft = ((sub.expire - System.currentTimeMillis() / 1000) / 86400).toInt()
+                meta.tvExpiry.text = if (daysLeft in 0..999) {
+                    getString(R.string.sub_days_left, getString(R.string.sub_expires, date), daysLeft)
+                } else {
+                    getString(R.string.sub_expires, date)
+                }
+                meta.tvExpiry.setTextColor(variantColor)
+            }
+        } else {
+            meta.tvExpiry.visibility = android.view.View.GONE
+        }
+    }
+
+    // ---- Per-server actions (moved from GroupServerFragment) ----
+
+    private fun shareServer(guid: String, profile: ProfileItem, position: Int, shareOptions: List<String>, skip: Int) {
+        AlertDialog.Builder(this).setItems(shareOptions.toTypedArray()) { _, i ->
+            try {
+                when (i + skip) {
+                    0 -> showQRCode(guid)
+                    1 -> share2Clipboard(guid)
+                    2 -> shareFullContent(guid)
+                    3 -> editServer(guid, profile)
+                    4 -> removeServer(guid, position)
+                    else -> toast("else")
+                }
+            } catch (e: Exception) {
+                LogUtil.e(AppConfig.TAG, "Error when sharing server", e)
+            }
+        }.show()
+    }
+
+    private fun showQRCode(guid: String) {
+        val ivBinding = ItemQrcodeBinding.inflate(layoutInflater)
+        ivBinding.ivQcode.setImageBitmap(AngConfigManager.share2QRCode(guid))
+        ivBinding.ivQcode.contentDescription = shareMethod.firstOrNull() ?: "QR Code"
+        AlertDialog.Builder(this).setView(ivBinding.root).show()
+    }
+
+    private fun share2Clipboard(guid: String) {
+        if (AngConfigManager.share2Clipboard(this, guid) == 0) toastSuccess(R.string.toast_success)
+        else toastError(R.string.toast_failure)
+    }
+
+    private fun shareFullContent(guid: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val result = AngConfigManager.shareFullContent2Clipboard(this@MainActivity, guid)
+            launch(Dispatchers.Main) {
+                if (result == 0) toastSuccess(R.string.toast_success) else toastError(R.string.toast_failure)
+            }
+        }
+    }
+
+    private fun editServer(guid: String, profile: ProfileItem) {
+        val activityClass = when (profile.configType) {
+            EConfigType.CUSTOM -> ServerCustomConfigActivity::class.java
+            EConfigType.POLICYGROUP -> ServerGroupActivity::class.java
+            EConfigType.PROXYCHAIN -> ServerProxyChainActivity::class.java
+            else -> ServerActivity::class.java
+        }
+        val intent = Intent(this, activityClass)
+            .putExtra("guid", guid)
+            .putExtra("isRunning", mainViewModel.isRunning.value)
+            .putExtra("createConfigType", profile.configType.value)
+            .putExtra("subscriptionId", profile.subscriptionId)
+        requestActivityLauncher.launch(intent)
+    }
+
+    private fun removeServer(guid: String, position: Int) {
+        if (guid == MmkvManager.getSelectServer()) {
+            toast(R.string.toast_action_not_allowed)
+            return
+        }
+        if (MmkvManager.decodeSettingsBool(AppConfig.PREF_CONFIRM_REMOVE)) {
+            AlertDialog.Builder(this).setMessage(R.string.del_config_comfirm)
+                .setPositiveButton(android.R.string.ok) { _, _ -> removeServerSub(guid, position) }
+                .setNegativeButton(android.R.string.cancel) { _, _ -> }
+                .show()
+        } else {
+            removeServerSub(guid, position)
+        }
+    }
+
+    private fun removeServerSub(guid: String, position: Int) {
+        mainViewModel.removeServer(guid)
+        serversAdapter.removeServerSub(guid, position)
+        homeAdapter.removeServerSub(guid, position)
+        updateServersChrome(mainViewModel.getProviderGroups().size)
+    }
+
+    private fun setSelectServer(guid: String) {
+        val selected = MmkvManager.getSelectServer()
+        if (guid != selected) {
+            MmkvManager.setSelectServer(guid)
+            serversAdapter.setSelectServer(selected, guid)
+            homeAdapter.setSelectServer(selected, guid)
+            updateSelectedServer()
+            bindHomeMetaBar()
+            if (mainViewModel.isRunning.value == true) {
+                restartV2Ray()
+            }
+        }
+    }
+
+    private inner class ActivityAdapterListener : MainAdapterListener {
+        override fun onEdit(guid: String, position: Int) {}
+        override fun onShare(url: String) {}
+        override fun onRefreshData() {}
+        override fun onRemove(guid: String, position: Int) { removeServer(guid, position) }
+        override fun onEdit(guid: String, position: Int, profile: ProfileItem) { editServer(guid, profile) }
+        override fun onSelectServer(guid: String) { setSelectServer(guid) }
+        override fun onShare(guid: String, profile: ProfileItem, position: Int, more: Boolean) {
+            val isCustom = profile.configType.isComplexType()
+            val (shareOptions, skip) = if (more) {
+                val options = if (isCustom) shareMethodMore.asList().takeLast(3) else shareMethodMore.asList()
+                options to if (isCustom) 2 else 0
+            } else {
+                val options = if (isCustom) shareMethod.asList().takeLast(1) else shareMethod.asList()
+                options to if (isCustom) 2 else 0
+            }
+            shareServer(guid, profile, position, shareOptions, skip)
+        }
     }
 
     private fun handleFabAction() {
@@ -651,7 +1021,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
                             mainViewModel.reloadServerList()
                         }
 
-                        countSub > 0 -> setupGroupTab()
+                        countSub > 0 -> mainViewModel.reloadServerList()
                         else -> toastError(R.string.toast_failure)
                     }
                     hideLoading()
@@ -820,43 +1190,27 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     }
 
     /**
-     * Locates and scrolls to the currently selected server.
-     * If the selected server is in a different group, automatically switches to that group first.
+     * Locates and scrolls to the currently selected server in the flat Servers list.
      */
     private fun locateSelectedServer() {
-        val targetSubscriptionId = mainViewModel.findSubscriptionIdBySelect()
-        if (targetSubscriptionId.isNullOrEmpty()) {
+        val selectedGuid = MmkvManager.getSelectServer()
+        if (selectedGuid.isNullOrEmpty()) {
             toast(R.string.title_file_chooser)
             return
         }
-
-        val targetGroupIndex = groupPagerAdapter.groups.indexOfFirst { it.id == targetSubscriptionId }
-        if (targetGroupIndex < 0) {
+        // Ensure we are on the Servers tab so the list is visible.
+        if (binding.bottomNav.selectedItemId != R.id.nav_servers) {
+            binding.bottomNav.selectedItemId = R.id.nav_servers
+        }
+        val position = serversAdapter.positionOfGuid(selectedGuid)
+        if (position < 0) {
             toast(R.string.toast_server_not_found_in_group)
             return
         }
-
-        // Switch to target group if needed, then scroll to the server
-        if (binding.viewPager.currentItem != targetGroupIndex) {
-            binding.viewPager.setCurrentItem(targetGroupIndex, true)
-            binding.viewPager.postDelayed({ scrollToSelectedServer(targetGroupIndex) }, 1000)
-        } else {
-            scrollToSelectedServer(targetGroupIndex)
-        }
-    }
-
-    /**
-     * Scrolls to the selected server in the specified fragment.
-     * @param groupIndex The index of the group/fragment to scroll in
-     */
-    private fun scrollToSelectedServer(groupIndex: Int) {
-        val itemId = groupPagerAdapter.getItemId(groupIndex)
-        val fragment = supportFragmentManager.findFragmentByTag("f$itemId") as? GroupServerFragment
-
-        if (fragment?.isAdded == true && fragment.view != null) {
-            fragment.scrollToSelectedServer()
-        } else {
-            toast(R.string.toast_fragment_not_available)
+        binding.rvServers.post {
+            (binding.rvServers.layoutManager as? LinearLayoutManager)
+                ?.scrollToPositionWithOffset(position, binding.rvServers.height / 3)
+                ?: binding.rvServers.smoothScrollToPosition(position)
         }
     }
 
@@ -897,7 +1251,6 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     }
 
     override fun onDestroy() {
-        tabMediator?.detach()
         timerHandler.removeCallbacks(timerRunnable)
         timerHandler.removeCallbacks(healthCheckRunnable)
         timerHandler.removeCallbacks(memoryRunnable)

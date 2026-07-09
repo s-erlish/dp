@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Servers redesign (S3) -->
+    <string name="title_servers">Сервера</string>
+    <string name="servers_count">%d серверов</string>
+    <string name="providers_count">%d провайдеров</string>
+    <string name="search_hint">Поиск серверов…</string>
+    <string name="servers_empty_title">Нет серверов</string>
+    <string name="servers_add_clipboard">Добавить из буфера</string>
+    <string name="servers_section_local">Локальные</string>
     <string name="app_widget_name">v2rayNG</string>
     <string name="app_tile_name">v2rayNG</string>
     <string name="app_tile_first_use">Первое использование этой функции, пожалуйста, используйте приложение, чтобы добавить профиль</string>

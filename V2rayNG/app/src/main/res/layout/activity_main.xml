@@ -314,6 +314,22 @@
 
                 </com.google.android.material.card.MaterialCardView>
 
+                <!-- Current provider meta bar (collapsible), reused from the subscription header -->
+                <include
+                    android:id="@+id/layout_home_meta_bar"
+                    layout="@layout/layout_subscription_meta_bar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <!-- Server list right here, below the provider -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rv_home_servers"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:nestedScrollingEnabled="false"
+                    android:paddingBottom="12dp" />
+
                 </LinearLayout>
 
             </androidx.core.widget.NestedScrollView>
@@ -326,24 +342,31 @@
                 android:orientation="vertical"
                 android:visibility="gone">
 
-                <com.google.android.material.tabs.TabLayout
-                    android:id="@+id/tab_group"
+                <include
+                    android:id="@+id/layout_servers_header"
+                    layout="@layout/layout_servers_header"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?android:attr/colorBackground"
-                    app:tabGravity="start"
-                    app:tabIndicatorColor="?attr/colorPrimary"
-                    app:tabIndicatorFullWidth="false"
-                    app:tabMode="scrollable"
-                    app:tabSelectedTextColor="?attr/colorPrimary"
-                    app:tabTextAppearance="@style/TabLayoutTextStyle" />
+                    android:layout_height="wrap_content" />
 
-                <androidx.viewpager2.widget.ViewPager2
-                    android:id="@+id/view_pager"
+                <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:scrollbars="none" />
+                    android:layout_weight="1">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rv_servers"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scrollbars="vertical" />
+
+                    <include
+                        android:id="@+id/layout_empty"
+                        layout="@layout/layout_servers_empty"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:visibility="gone" />
+
+                </FrameLayout>
 
             </LinearLayout>
 

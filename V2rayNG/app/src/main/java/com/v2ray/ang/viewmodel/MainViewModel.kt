@@ -45,6 +45,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var serverList = mutableListOf<String>() // MmkvManager.decodeServerList()
     var subscriptionId: String = MmkvManager.decodeSettingsString(AppConfig.CACHE_SUBSCRIPTION_ID, "").orEmpty()
     var keywordFilter = ""
+
+    // Protocol filter for the Servers tab chips ("Все" = null). Applied in updateCache().
+    var protocolFilter: com.v2ray.ang.enums.EConfigType? = null
     val serversCache = mutableListOf<ServersCache>()
     val isRunning by lazy { MutableLiveData<Boolean>() }
     val updateListAction by lazy { MutableLiveData<Int>() }
@@ -155,6 +158,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         for (guid in serverList) {
             val profile = MmkvManager.decodeServerConfig(guid) ?: continue
+            // Protocol filter (Servers tab chips). Null = "Все" (show every protocol).
+            val pf = protocolFilter
+            if (pf != null && profile.configType != pf) continue
             if (kw.isEmpty()) {
                 serversCache.add(ServersCache(guid, profile))
                 continue
@@ -548,6 +554,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         keywordFilter = keyword
         reloadServerList()
+    }
+
+    /**
+     * Sets the protocol filter (Servers tab chips) and reloads the list.
+     * @param type The protocol to keep, or null for "Все" (all protocols).
+     */
+    fun setProtocolFilter(type: com.v2ray.ang.enums.EConfigType?) {
+        if (protocolFilter == type) return
+        protocolFilter = type
+        reloadServerList()
+    }
+
+    /**
+     * Distinct protocol types present in the full (unfiltered) server list,
+     * used to build the Servers tab filter chips. Order follows first appearance.
+     */
+    fun availableProtocols(): List<com.v2ray.ang.enums.EConfigType> {
+        val result = mutableListOf<com.v2ray.ang.enums.EConfigType>()
+        for (guid in serverList) {
+            val type = MmkvManager.decodeServerConfig(guid)?.configType ?: continue
+            if (!result.contains(type)) result.add(type)
+        }
+        return result
+    }
+
+    /**
+     * Real subscription groups (providers), pinned-first, used as section headers
+     * on the Servers tab. Excludes the synthetic "All" pseudo-group.
+     */
+    fun getProviderGroups(): List<GroupMapItem> {
+        return MmkvManager.decodeSubscriptions()
+            .sortedByDescending { it.subscription.pinned }
+            .map { GroupMapItem(id = it.guid, remarks = it.subscription.remarks) }
     }
 
     fun findSubscriptionIdBySelect(): String? {
