@@ -177,6 +177,16 @@
                 <data android:host="install-config" />
                 <data android:host="install-sub" />
             </intent-filter>
+            <!-- departament deeplinks: connect/open, disconnect/close, toggle,
+                 import/{base64}, add/{url}, routing/add|onadd/{base64} -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.BROWSABLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:scheme="depv" />
+            </intent-filter>
         </activity>
         <activity
             android:name=".ui.CheckUpdateActivity"
@@ -187,6 +197,20 @@
         <activity
             android:name=".ui.AboutActivity"
             android:exported="false" />
+
+        <!-- departament wave activities (registered here per manifest ownership) -->
+        <activity
+            android:name=".ui.LocalProxyActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+        <activity
+            android:name=".ui.ProviderSettingsActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+        <activity
+            android:name=".ui.UrlSchemeListActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
 
         <service
             android:name=".service.CoreVpnService"
