@@ -61,7 +61,7 @@
             android:contentDescription="@string/connection_test_pending"
             android:focusable="true"
             android:padding="8dp"
-            app:srcCompat="@drawable/ic_speed_24dp"
+            app:srcCompat="@drawable/ic_ping_24dp"
             app:tint="?attr/colorOnSurfaceVariant" />
 
         <ImageView
@@ -107,32 +107,5 @@
         android:textSize="14sp"
         app:drawableStartCompat="@drawable/ic_outline_filter_alt_24"
         app:drawableTint="?attr/colorOnSurfaceVariant" />
-
-    <!-- Protocol filter chips -->
-    <HorizontalScrollView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:scrollbars="none">
-
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/chip_group_protocol"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:selectionRequired="true"
-            app:singleLine="true"
-            app:singleSelection="true">
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chip_all"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checked="true"
-                android:text="@string/filter_config_all" />
-
-        </com.google.android.material.chip.ChipGroup>
-
-    </HorizontalScrollView>
 
 </LinearLayout>

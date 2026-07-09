@@ -34,10 +34,17 @@
             app:indicatorColor="?attr/colorPrimary"
             app:trackCornerRadius="4dp" />
 
+        <!-- Content + overlaid bottom nav: the nav floats over the content so the
+             server list scrolls UNDER a faint scrim rather than sitting on a solid bar. -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1">
+
+            <FrameLayout
+                android:id="@+id/main_content"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
 
             <!-- ==================== HOME TAB ==================== -->
             <androidx.core.widget.NestedScrollView
@@ -306,6 +313,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
+                    android:clipToPadding="false"
                     android:nestedScrollingEnabled="false"
                     android:paddingBottom="12dp" />
 
@@ -336,6 +344,7 @@
                         android:id="@+id/rv_servers"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
+                        android:clipToPadding="false"
                         android:scrollbars="vertical" />
 
                     <include
@@ -356,24 +365,36 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />
 
-        </FrameLayout>
+            </FrameLayout>
 
-        <!-- Transparent so the home gradient shows through; a bottom inset pad is applied
-             at runtime so the items clear the gesture bar and stay evenly aligned. -->
-        <com.google.android.material.bottomnavigation.BottomNavigationView
-            android:id="@+id/bottom_nav"
-            android:layout_width="match_parent"
-            android:layout_height="72dp"
-            android:background="@android:color/transparent"
-            app:elevation="0dp"
-            app:itemActiveIndicatorStyle="@null"
-            app:itemIconSize="24dp"
-            app:itemIconTint="@color/bottom_nav_item_color"
-            app:itemRippleColor="@android:color/transparent"
-            app:itemTextAppearanceActive="@style/BottomNavLabel"
-            app:itemTextAppearanceInactive="@style/BottomNavLabel"
-            app:itemTextColor="@color/bottom_nav_item_color"
-            app:labelVisibilityMode="labeled"
-            app:menu="@menu/menu_bottom_nav" />
+            <!-- Faint gradient scrim (transparent -> surface): the content fades out
+                 under the nav buttons so the bar reads as frameless, no solid fill. -->
+            <View
+                android:id="@+id/bottom_nav_scrim"
+                android:layout_width="match_parent"
+                android:layout_height="128dp"
+                android:layout_gravity="bottom"
+                android:background="@drawable/bg_bottom_nav_scrim" />
+
+            <!-- Overlays the content and hugs the very bottom edge; a bottom inset pad is
+                 applied at runtime so the items clear the gesture bar. -->
+            <com.google.android.material.bottomnavigation.BottomNavigationView
+                android:id="@+id/bottom_nav"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:background="@android:color/transparent"
+                app:elevation="0dp"
+                app:itemActiveIndicatorStyle="@null"
+                app:itemIconSize="24dp"
+                app:itemIconTint="@color/bottom_nav_item_color"
+                app:itemRippleColor="@android:color/transparent"
+                app:itemTextAppearanceActive="@style/BottomNavLabel"
+                app:itemTextAppearanceInactive="@style/BottomNavLabel"
+                app:itemTextColor="@color/bottom_nav_item_color"
+                app:labelVisibilityMode="labeled"
+                app:menu="@menu/menu_bottom_nav" />
+
+        </FrameLayout>
 
 </LinearLayout>
