@@ -5,7 +5,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:attr/colorBackground"
-    android:fitsSystemWindows="true"
     android:orientation="vertical"
     tools:context=".ui.PerAppProxyActivity">
 
@@ -45,7 +44,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/per_app_proxy_settings_enable"
+                        android:text="@string/pa_enable"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="16sp" />
 
@@ -76,7 +75,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/switch_bypass_apps_mode"
+                        android:text="@string/pa_bypass_mode"
                         android:textColor="?attr/colorOnSurface"
                         android:textSize="16sp" />
 
@@ -86,7 +85,7 @@
                         android:layout_height="wrap_content"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:clickable="true"
-                        android:contentDescription="@string/switch_bypass_apps_mode"
+                        android:contentDescription="@string/pa_bypass_tips"
                         android:focusable="true"
                         android:gravity="center"
                         android:padding="@dimen/padding_spacing_dp8">

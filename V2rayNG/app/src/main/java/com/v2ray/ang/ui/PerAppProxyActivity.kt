@@ -42,7 +42,7 @@ class PerAppProxyActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         //setContentView(binding.root)
-        setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = getString(R.string.per_app_proxy_settings))
+        setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = getString(R.string.pa_title))
 
         addCustomDividerToRecyclerView(binding.recyclerView, this, R.drawable.custom_divider)
 
@@ -59,7 +59,7 @@ class PerAppProxyActivity : BaseActivity() {
         binding.switchBypassApps.isChecked = MmkvManager.decodeSettingsBool(AppConfig.PREF_BYPASS_APPS, false)
 
         binding.layoutSwitchBypassAppsTips.setOnClickListener {
-            Toasty.info(this, R.string.summary_pref_per_app_proxy, Toast.LENGTH_LONG, true).show()
+            Toasty.info(this, R.string.pa_summary, Toast.LENGTH_LONG, true).show()
         }
     }
 
