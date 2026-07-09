@@ -28,7 +28,6 @@ import androidx.core.view.updatePadding
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.google.android.material.chip.Chip
 import com.google.android.material.color.MaterialColors
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.BuildConfig
@@ -86,7 +85,8 @@ class MainActivity : HelperBaseActivity() {
     val mainViewModel: MainViewModel by viewModels()
     private lateinit var serversAdapter: MainRecyclerAdapter
     private lateinit var homeAdapter: MainRecyclerAdapter
-    private var lastProtocolChipSet: List<EConfigType> = emptyList()
+    // Home server list collapse state, toggled by the meta-bar chevron.
+    private var homeListCollapsed = false
 
     private val shareMethod: Array<out String> by lazy { resources.getStringArray(R.array.share_method) }
     private val shareMethodMore: Array<out String> by lazy { resources.getStringArray(R.array.share_method_more) }
@@ -244,6 +244,11 @@ class MainActivity : HelperBaseActivity() {
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             binding.appbarLayout.updatePadding(top = bars.top)
             binding.bottomNav.updatePadding(bottom = bars.bottom)
+            // The nav now overlays the content, so pad the scrollable lists to keep the
+            // last row clear of the nav (nav height + the gesture-bar inset).
+            val navPad = bars.bottom + (72 * resources.displayMetrics.density).toInt()
+            binding.rvHomeServers.updatePadding(bottom = navPad)
+            binding.rvServers.updatePadding(bottom = navPad)
             insets
         }
     }
@@ -344,7 +349,7 @@ class MainActivity : HelperBaseActivity() {
         ).show()
     }
 
-    /** Wires the Servers tab header: title actions, search, protocol chips. */
+    /** Wires the Servers tab header: title actions and search. */
     private fun setupServersHeader() {
         val header = binding.layoutServersHeader
         header.btnCollapseAll.setOnClickListener { serversAdapter.toggleCollapseAll() }
@@ -355,12 +360,6 @@ class MainActivity : HelperBaseActivity() {
         }
         header.btnAdd.setOnClickListener { showImportMenu(it) }
         header.etSearch.doAfterTextChanged { mainViewModel.filterConfig(it?.toString().orEmpty()) }
-        header.chipGroupProtocol.setOnCheckedStateChangeListener { group, checkedIds ->
-            val id = checkedIds.firstOrNull() ?: return@setOnCheckedStateChangeListener
-            val chip = group.findViewById<Chip>(id) ?: return@setOnCheckedStateChangeListener
-            val type = chip.tag as? EConfigType
-            mainViewModel.applyProtocolFilter(type)
-        }
     }
 
     /** Popup with the full import/actions menu, anchored to the header "+" button. */
@@ -379,9 +378,31 @@ class MainActivity : HelperBaseActivity() {
         binding.layoutHomeEmpty.btnHomeAddClipboard.setOnClickListener { importClipboard() }
     }
 
-    /** On Home, show the two add-buttons when there are no servers; otherwise show the meta bar. */
+    /**
+     * On Home, when there are no servers show ONLY the empty-state card (two add buttons)
+     * and hide both the provider meta bar and the server list; otherwise show the list
+     * (respecting the chevron collapse state) and let [bindMetaBar] own the meta bar.
+     */
     private fun updateHomeEmptyState() {
-        binding.layoutHomeEmpty.homeEmptyRoot.isVisible = mainViewModel.serversCache.isEmpty()
+        val empty = mainViewModel.serversCache.isEmpty()
+        binding.layoutHomeEmpty.homeEmptyRoot.isVisible = empty
+        if (empty) {
+            binding.layoutHomeMetaBar.root.isVisible = false
+            binding.rvHomeServers.isVisible = false
+            // Nothing selectable: neutral under-shield label, not a stale server name.
+            if (mainViewModel.isRunning.value != true) {
+                binding.tvConnectionStatus.text = getString(R.string.home_select_server)
+            }
+        } else {
+            applyHomeListVisibility()
+        }
+    }
+
+    /** Applies the Home server-list visibility and chevron rotation from the collapse flag. */
+    private fun applyHomeListVisibility() {
+        val show = mainViewModel.serversCache.isNotEmpty() && !homeListCollapsed
+        binding.rvHomeServers.isVisible = show
+        binding.layoutHomeMetaBar.btnCollapse.rotation = if (homeListCollapsed) -90f else 0f
     }
 
     /**
@@ -404,39 +425,10 @@ class MainActivity : HelperBaseActivity() {
             getString(R.string.servers_count, serverCount) + " · " +
                 getString(R.string.providers_count, maxOf(distinctProviders, 0))
 
-        buildProtocolChips()
-
-        val filtersActive = mainViewModel.keywordFilter.isNotEmpty() || mainViewModel.protocolFilter != null
+        val filtersActive = mainViewModel.keywordFilter.isNotEmpty()
         val showEmpty = serverCount == 0 && !filtersActive
         binding.layoutEmpty.root.isVisible = showEmpty
         binding.rvServers.isVisible = !showEmpty
-    }
-
-    /** Rebuilds protocol chips only when the available protocol set changes. */
-    private fun buildProtocolChips() {
-        val protocols = mainViewModel.availableProtocols()
-        if (protocols == lastProtocolChipSet) return
-        lastProtocolChipSet = protocols
-
-        val group = binding.layoutServersHeader.chipGroupProtocol
-        // Keep the permanent "Все" chip (index 0), drop the rest.
-        while (group.childCount > 1) group.removeViewAt(group.childCount - 1)
-        binding.layoutServersHeader.chipAll.tag = null
-
-        val current = mainViewModel.protocolFilter
-        val chipContext = android.view.ContextThemeWrapper(
-            this, com.google.android.material.R.style.Widget_Material3_Chip_Filter
-        )
-        protocols.forEach { type ->
-            val chip = Chip(chipContext).apply {
-                text = type.name
-                tag = type
-                isCheckable = true
-                isChecked = (type == current)
-            }
-            group.addView(chip)
-        }
-        if (current == null) binding.layoutServersHeader.chipAll.isChecked = true
     }
 
     /**
@@ -445,7 +437,7 @@ class MainActivity : HelperBaseActivity() {
      */
     private fun setupHomeMetaBar() {
         val meta = binding.layoutHomeMetaBar
-        meta.btnCollapse.setOnClickListener { toggleMetaBody() }
+        meta.btnCollapse.setOnClickListener { toggleHomeServerList() }
         meta.btnRefresh.setOnClickListener { refreshHomeSub() }
         meta.btnPing.setOnClickListener {
             toast(getString(R.string.connection_test_testing_count, mainViewModel.serversCache.count()))
@@ -473,11 +465,13 @@ class MainActivity : HelperBaseActivity() {
             .show()
     }
 
-    private fun toggleMetaBody() {
-        val body = binding.layoutHomeMetaBar.layoutMetaBody
-        val collapse = body.isVisible
-        body.isVisible = !collapse
-        binding.layoutHomeMetaBar.btnCollapse.rotation = if (collapse) -90f else 0f
+    /**
+     * The meta-bar chevron now shows/hides the Home SERVER LIST (not the meta-bar body,
+     * which stays permanently visible). Rotates the chevron to reflect the list state.
+     */
+    private fun toggleHomeServerList() {
+        homeListCollapsed = !homeListCollapsed
+        applyHomeListVisibility()
     }
 
     /**
@@ -965,7 +959,7 @@ class MainActivity : HelperBaseActivity() {
     private fun selectedServerName(): String {
         val guid = MmkvManager.getSelectServer()
         val remarks = guid?.let { MmkvManager.decodeServerConfig(it)?.remarks }
-        return remarks?.takeIf { it.isNotBlank() } ?: getString(R.string.title_file_chooser)
+        return remarks?.takeIf { it.isNotBlank() } ?: getString(R.string.home_select_server)
     }
 
     private fun updateSelectedServer() {
