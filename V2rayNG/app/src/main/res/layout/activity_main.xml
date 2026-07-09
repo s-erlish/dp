@@ -7,6 +7,7 @@
     android:layout_height="match_parent">
 
     <LinearLayout
+        android:id="@+id/home_root"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@drawable/bg_home_gradient"
@@ -170,9 +171,11 @@
                                 android:id="@+id/view_connect_glow"
                                 android:layout_width="match_parent"
                                 android:layout_height="match_parent"
-                                android:background="@drawable/bg_connect_glow" />
+                                android:background="@drawable/bg_connect_glow"
+                                android:visibility="invisible" />
 
                             <View
+                                android:id="@+id/view_connect_ring"
                                 android:layout_width="match_parent"
                                 android:layout_height="match_parent"
                                 android:background="@drawable/bg_connect_ring" />

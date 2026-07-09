@@ -623,6 +623,8 @@ object AngConfigManager {
                 decodeSubDirective(result?.announce)?.let { v -> it.subscription.announce = v }
                 decodeSubDirective(result?.supportUrl)?.let { v -> it.subscription.supportUrl = v }
                 decodeSubDirective(result?.webPageUrl)?.let { v -> it.subscription.webPageUrl = v }
+                // Real subscription title sent by the provider (used as the meta-bar heading).
+                decodeSubDirective(result?.profileTitle)?.let { v -> it.subscription.profileTitle = v }
                 it.subscription.lastUpdated = System.currentTimeMillis()
                 MmkvManager.encodeSubscription(it.guid, it.subscription)
                 LogUtil.i(AppConfig.TAG, "Subscription updated: ${it.subscription.remarks}, $count configs")

@@ -1,5 +1,9 @@
 package com.v2ray.ang.ui
 
+import android.animation.Animator
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.content.Intent
 import android.net.Uri
 import android.net.VpnService
@@ -39,6 +43,7 @@ import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.enums.PermissionType
 import android.text.format.DateFormat
 import android.view.View
+import android.view.animation.OvershootInterpolator
 import com.v2ray.ang.auth.AuthTokenStore
 import com.v2ray.ang.auth.BackendConfig
 import com.v2ray.ang.extension.isComplexType
@@ -79,6 +84,9 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
 
     private val timerHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var connectionStartTime = 0L
+
+    // Infinite pulse animation on the connect glow while the tunnel is establishing.
+    private var glowPulse: Animator? = null
 
     // Auto-fallback: one-shot post-connect health check that switches to the fastest
     // working server if the current tunnel doesn't actually pass traffic.
@@ -127,6 +135,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
         setupToolbar(binding.toolbar, false, getString(R.string.app_name))
+        applyThemeDecorations()
 
         // All servers are shown in one flat, provider-grouped list (no subscription tabs).
         mainViewModel.subscriptionId = ""
@@ -153,10 +162,9 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
             }
         })
 
-        binding.cardConnect.setOnClickListener { handleFabAction() }
-        binding.cardConnect.setOnLongClickListener {
-            triggerFastConnect()
-            true
+        binding.cardConnect.setOnClickListener {
+            animateConnectPress()
+            handleFabAction()
         }
         binding.layoutServerInfo.setOnClickListener { handleLayoutTestClick() }
 
@@ -369,6 +377,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         }
         meta.btnPin.setOnClickListener { toggleHomePin() }
         meta.btnSupport.setOnClickListener { openSubUrl(MmkvManager.decodeSubscription(currentMetaSubId())?.supportUrl) }
+        meta.btnTelegram.setOnClickListener { openSubUrl(MmkvManager.decodeSubscription(currentMetaSubId())?.supportUrl) }
         meta.btnWebsite.setOnClickListener { openSubUrl(MmkvManager.decodeSubscription(currentMetaSubId())?.webPageUrl) }
         bindHomeMetaBar()
     }
@@ -475,6 +484,20 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     }
 
     /**
+     * Display heading for the meta bar: the provider-sent `profile-title` first, then the
+     * subscription remarks, and finally the app name - never the raw "Default" placeholder.
+     */
+    private fun metaTitle(sub: SubscriptionItem): String {
+        sub.profileTitle.takeIf { it.isNotBlank() }?.let { return it }
+        val remarks = sub.remarks.trim()
+        return if (remarks.isNotEmpty() && !remarks.equals("Default", ignoreCase = true)) {
+            remarks
+        } else {
+            getString(R.string.app_name)
+        }
+    }
+
+    /**
      * Repaints the meta bar from persisted subscription metadata (moved from GroupServerFragment).
      */
     private fun bindMetaBar(sub: SubscriptionItem?) {
@@ -484,7 +507,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
             return
         }
         meta.root.visibility = android.view.View.VISIBLE
-        meta.tvSubTitle.text = sub.remarks.ifBlank { getString(R.string.title_sub_setting) }
+        meta.tvSubTitle.text = metaTitle(sub)
 
         val primaryColor = MaterialColors.getColor(meta.btnPin, androidx.appcompat.R.attr.colorPrimary)
         val onVariant = MaterialColors.getColor(meta.btnPin, com.google.android.material.R.attr.colorOnSurfaceVariant)
@@ -499,6 +522,8 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         }
         meta.btnSupport.visibility = if (sub.supportUrl.isNotBlank()) android.view.View.VISIBLE else android.view.View.GONE
         meta.btnWebsite.visibility = if (sub.webPageUrl.isNotBlank()) android.view.View.VISIBLE else android.view.View.GONE
+        // Compact Telegram shortcut in the collapsed header, shown only when a support URL exists.
+        meta.btnTelegram.visibility = if (sub.supportUrl.isNotBlank()) android.view.View.VISIBLE else android.view.View.GONE
 
         if (!sub.hasUserInfo) {
             meta.layoutTraffic.visibility = android.view.View.GONE
@@ -659,14 +684,15 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     }
 
     private fun handleFabAction() {
-        applyRunningState(isLoading = true, isRunning = false)
-
         // A manual connect/disconnect starts a fresh session: allow auto-fallback again.
         mainViewModel.autoFallbackUsed = false
 
         if (mainViewModel.isRunning.value == true) {
+            // Stop: no "connecting" visual, the isRunning observer will settle the idle state.
             CoreServiceManager.stopVService(this)
         } else {
+            // Start: show the subtle blue "connecting" state (pulsing ring), never a bright fill.
+            applyRunningState(isLoading = true, isRunning = false)
             startVpnWithPermission()
         }
     }
@@ -685,22 +711,6 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         } else {
             startV2Ray()
         }
-    }
-
-    /**
-     * Long-press action on the connect button: measures latency across the current
-     * server list and connects to the fastest one automatically.
-     */
-    private fun triggerFastConnect() {
-        if (mainViewModel.serversCache.isEmpty()) {
-            toast(R.string.title_file_chooser)
-            return
-        }
-        toast(getString(R.string.connection_test_testing_count, mainViewModel.serversCache.count()))
-        setTestState(getString(R.string.connection_test_testing))
-        // User-initiated fresh connect: allow the post-connect health check again.
-        mainViewModel.autoFallbackUsed = false
-        mainViewModel.fastConnect()
     }
 
     private fun handleLayoutTestClick() {
@@ -734,21 +744,47 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         binding.tvTestState.text = content
     }
 
+    /**
+     * The blue/light and blue/dark backgrounds are theme-qualified drawables, but the mono
+     * overlay is a runtime style overlay (not a resource qualifier), so the decorative home
+     * gradient, glow and ring must be swapped to neutral grey variants here when mono is active.
+     */
+    private fun applyThemeDecorations() {
+        val mono = MmkvManager.decodeSettingsString(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_BLUE) == BaseActivity.THEME_MONO
+        if (!mono) return
+        binding.homeRoot.setBackgroundResource(R.drawable.bg_home_gradient_mono)
+        binding.viewConnectGlow.setBackgroundResource(R.drawable.bg_connect_glow_mono)
+        binding.viewConnectRing.setBackgroundResource(R.drawable.bg_connect_ring_mono)
+    }
+
     private fun applyRunningState(isLoading: Boolean, isRunning: Boolean) {
+        // Connecting: blue pulsing ring/glow + blue shield, "Подключение…" (no bright fill).
         if (isLoading) {
-            binding.imgConnect.setColorFilter(themeColor(androidx.appcompat.R.attr.colorPrimary))
-            binding.tvConnectionStatus.text = getString(R.string.toast_services_start)
+            val active = themeColor(R.attr.connectActiveColor)
+            startGlowPulse()
+            binding.imgConnect.setColorFilter(active)
+            binding.tvConnectionStatus.setTextColor(active)
+            binding.tvConnectionStatus.text = getString(R.string.connection_connecting)
             return
         }
 
         if (isRunning) {
-            binding.imgConnect.setColorFilter(themeColor(androidx.appcompat.R.attr.colorPrimary))
+            // Connected: green shield/glow/label, steady (no pulse).
+            val connected = themeColor(R.attr.connectedColor)
+            stopGlowPulse()
+            binding.viewConnectGlow.visibility = android.view.View.VISIBLE
+            binding.imgConnect.setColorFilter(connected)
+            binding.tvConnectionStatus.setTextColor(connected)
             binding.cardConnect.contentDescription = getString(R.string.action_stop_service)
             binding.tvConnectionStatus.text = getString(R.string.connection_connected)
             binding.layoutServerInfo.isFocusable = true
             startConnectionTimer()
         } else {
+            // Idle: neutral shield, no glow.
+            stopGlowPulse()
+            binding.viewConnectGlow.visibility = android.view.View.INVISIBLE
             binding.imgConnect.setColorFilter(themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
+            binding.tvConnectionStatus.setTextColor(themeColor(com.google.android.material.R.attr.colorOnSurface))
             binding.cardConnect.contentDescription = getString(R.string.tasker_start_service)
             binding.tvConnectionStatus.text = getString(R.string.connection_not_connected)
             binding.layoutServerInfo.isFocusable = false
@@ -764,6 +800,58 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
      * Resolves a themed color attribute (respects the active blue/mono overlay).
      */
     private fun themeColor(attr: Int): Int = MaterialColors.getColor(binding.cardConnect, attr)
+
+    /**
+     * Incy-style press feedback on the connect button: a quick scale-down followed by a
+     * gentle overshoot back to full size. Purely cosmetic, no state change.
+     */
+    private fun animateConnectPress() {
+        binding.cardConnect.animate().cancel()
+        binding.cardConnect.animate()
+            .scaleX(0.92f).scaleY(0.92f)
+            .setDuration(90)
+            .withEndAction {
+                binding.cardConnect.animate()
+                    .scaleX(1f).scaleY(1f)
+                    .setInterpolator(OvershootInterpolator())
+                    .setDuration(220)
+                    .start()
+            }
+            .start()
+    }
+
+    /**
+     * Starts an infinite breathing pulse on the glow ring, used for the "connecting" state.
+     */
+    private fun startGlowPulse() {
+        stopGlowPulse()
+        val glow = binding.viewConnectGlow
+        glow.visibility = View.VISIBLE
+        val animators = listOf(
+            ObjectAnimator.ofFloat(glow, View.SCALE_X, 0.88f, 1.10f),
+            ObjectAnimator.ofFloat(glow, View.SCALE_Y, 0.88f, 1.10f),
+            ObjectAnimator.ofFloat(glow, View.ALPHA, 0.4f, 1f),
+        ).onEach {
+            it.duration = 750
+            it.repeatCount = ValueAnimator.INFINITE
+            it.repeatMode = ValueAnimator.REVERSE
+        }
+        glowPulse = AnimatorSet().apply {
+            playTogether(animators)
+            start()
+        }
+    }
+
+    /** Cancels the connecting pulse and resets the glow transform. */
+    private fun stopGlowPulse() {
+        glowPulse?.cancel()
+        glowPulse = null
+        binding.viewConnectGlow.apply {
+            scaleX = 1f
+            scaleY = 1f
+            alpha = 1f
+        }
+    }
 
     /**
      * Updates the selected server name shown in the hero panel.
@@ -881,11 +969,6 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     }
 
     override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
-        R.id.fast_connect -> {
-            triggerFastConnect()
-            true
-        }
-
         R.id.import_qrcode -> {
             importQRcode()
             true
@@ -1303,6 +1386,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         timerHandler.removeCallbacks(timerRunnable)
         timerHandler.removeCallbacks(healthCheckRunnable)
         timerHandler.removeCallbacks(memoryRunnable)
+        stopGlowPulse()
         super.onDestroy()
     }
 }

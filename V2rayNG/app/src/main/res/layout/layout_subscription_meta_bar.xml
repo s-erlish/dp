@@ -49,6 +49,21 @@
             tools:text="departament • Premium" />
 
         <ImageView
+            android:id="@+id/btn_telegram"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginStart="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:contentDescription="@string/sub_telegram"
+            android:focusable="true"
+            android:padding="5dp"
+            android:visibility="gone"
+            app:srcCompat="@drawable/ic_telegram_24dp"
+            app:tint="?attr/colorPrimary"
+            tools:visibility="visible" />
+
+        <ImageView
             android:id="@+id/btn_pin"
             android:layout_width="30dp"
             android:layout_height="30dp"

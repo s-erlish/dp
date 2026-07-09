@@ -1,14 +1,13 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Outer soft ring - darker blue so it reads on a light background -->
+    <!-- Neutral grey rings for the mono theme. -->
     <item>
         <shape android:shape="oval">
             <solid android:color="@android:color/transparent" />
             <stroke
                 android:width="1.5dp"
-                android:color="#2E1E5FC7" />
+                android:color="#33808080" />
         </shape>
     </item>
-    <!-- Inner brighter ring -->
     <item
         android:bottom="14dp"
         android:left="14dp"
@@ -18,7 +17,7 @@
             <solid android:color="@android:color/transparent" />
             <stroke
                 android:width="2dp"
-                android:color="#701E5FC7" />
+                android:color="#66808080" />
         </shape>
     </item>
 </layer-list>

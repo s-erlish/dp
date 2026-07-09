@@ -1,11 +1,11 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Outer soft ring - darker blue so it reads on a light background -->
+    <!-- Outer soft glow ring -->
     <item>
         <shape android:shape="oval">
             <solid android:color="@android:color/transparent" />
             <stroke
                 android:width="1.5dp"
-                android:color="#2E1E5FC7" />
+                android:color="#334C8DFF" />
         </shape>
     </item>
     <!-- Inner brighter ring -->
@@ -18,7 +18,7 @@
             <solid android:color="@android:color/transparent" />
             <stroke
                 android:width="2dp"
-                android:color="#701E5FC7" />
+                android:color="#804C8DFF" />
         </shape>
     </item>
 </layer-list>
