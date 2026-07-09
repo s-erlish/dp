@@ -2,7 +2,7 @@
 <resources>
     <!-- Departament Telegram auth module. New strings only; do not merge into strings.xml. -->
     <string name="auth_login_title">Sign in</string>
-    <string name="auth_sign_in_telegram">Sign in with Telegram</string>
+    <!-- auth_sign_in_telegram is defined (in Russian) in strings.xml to avoid a duplicate. -->
     <string name="auth_intro_headline">Sign in with Telegram</string>
     <string name="auth_intro_desc">Connect your Telegram account to import your subscription automatically.</string>
     <string name="auth_continue_telegram">Continue with Telegram</string>
