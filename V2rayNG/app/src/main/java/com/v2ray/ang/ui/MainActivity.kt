@@ -94,8 +94,12 @@ class MainActivity : HelperBaseActivity() {
     private val timerHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var connectionStartTime = 0L
 
-    // Infinite pulse animation on the connect glow while the tunnel is establishing.
-    private var glowPulse: Animator? = null
+    // Gentle breathing pulse on the shield while the tunnel is establishing.
+    private var connectPulse: Animator? = null
+    // The rotating connect arc is shared by the "connecting" state and subscription
+    // loading; these track who currently wants it visible so neither hides the other's.
+    private var connectArcConnecting = false
+    private var connectArcSubLoads = 0
 
     // Auto-fallback: one-shot post-connect health check that switches to the fastest
     // working server if the current tunnel doesn't actually pass traffic.
@@ -218,6 +222,10 @@ class MainActivity : HelperBaseActivity() {
      * subscription/server list, and Settings shows the custom Incy settings screen.
      */
     private fun setupBottomNav() {
+        // Disable Material's built-in bottom-inset auto-padding: setupEdgeToEdge already
+        // applies the single gesture-bar inset. Without this the two stack and the items
+        // float well above the bottom edge (the "raised nav" bug).
+        ViewCompat.setOnApplyWindowInsetsListener(binding.bottomNav) { _, insets -> insets }
         showTab(R.id.nav_home)
         binding.bottomNav.setOnItemSelectedListener { item ->
             when (item.itemId) {
@@ -258,6 +266,9 @@ class MainActivity : HelperBaseActivity() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.homeRoot) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             binding.appbarLayout.updatePadding(top = bars.top)
+            // Single gesture-bar inset so the nav hugs the very bottom edge. Material's
+            // BottomNavigationView also auto-pads by this inset; that auto-pad is disabled
+            // in setupBottomNav so this stays the one source of truth (no doubled gap).
             binding.bottomNav.updatePadding(bottom = bars.bottom)
             // The nav now overlays the content, so pad the scrollable lists to keep the
             // last row clear of the nav (nav height + the gesture-bar inset).
@@ -556,14 +567,15 @@ class MainActivity : HelperBaseActivity() {
 
     private fun refreshHomeSub() {
         val meta = binding.layoutHomeMetaBar
-        meta.progressAction.visibility = android.view.View.VISIBLE
+        // Progress shows on the connect circle (shared rotating arc), not a top bar.
+        showConnectLoading()
         meta.btnRefresh.isEnabled = false
         lifecycleScope.launch(Dispatchers.IO) {
             val result = mainViewModel.updateConfigViaSubAll()
             launch(Dispatchers.Main) {
                 if (result.configCount > 0) mainViewModel.reloadServerList()
                 bindHomeMetaBar()
-                meta.progressAction.visibility = android.view.View.GONE
+                hideConnectLoading()
                 meta.btnRefresh.isEnabled = true
                 if (result.successCount > 0) {
                     toastSuccess(R.string.toast_success)
@@ -859,10 +871,12 @@ class MainActivity : HelperBaseActivity() {
     }
 
     private fun applyRunningState(isLoading: Boolean, isRunning: Boolean) {
-        // Connecting: blue pulsing ring/glow + blue shield, "Подключение…" (no bright fill).
+        // Connecting: a thin rotating arc sweeps the ring + a gentle shield pulse, blue
+        // outline shield. No solid blue fill (the glow stays off while establishing).
         if (isLoading) {
             val active = themeColor(R.attr.connectActiveColor)
-            startGlowPulse()
+            binding.viewConnectGlow.visibility = android.view.View.INVISIBLE
+            startConnectingAnim()
             binding.imgConnect.setColorFilter(active)
             binding.tvConnectionStatus.setTextColor(active)
             binding.tvConnectionStatus.text = getString(R.string.connection_connecting)
@@ -870,9 +884,10 @@ class MainActivity : HelperBaseActivity() {
         }
 
         if (isRunning) {
-            // Connected: blue shield/glow, label shows the connected server name.
+            // Connected: subtle blue glow (soft halo, not a solid fill) + blue shield,
+            // label shows the connected server name.
             val connected = themeColor(R.attr.connectedColor)
-            stopGlowPulse()
+            stopConnectingAnim()
             binding.viewConnectGlow.visibility = android.view.View.VISIBLE
             binding.imgConnect.setColorFilter(connected)
             binding.tvConnectionStatus.setTextColor(connected)
@@ -880,13 +895,13 @@ class MainActivity : HelperBaseActivity() {
             binding.tvConnectionStatus.text = selectedServerName()
             startConnectionTimer()
         } else {
-            // Idle: neutral shield, no glow; label shows the selected server name.
-            stopGlowPulse()
+            // Idle: neutral shield, no glow; label is a neutral status (never a server name).
+            stopConnectingAnim()
             binding.viewConnectGlow.visibility = android.view.View.INVISIBLE
             binding.imgConnect.setColorFilter(themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
             binding.tvConnectionStatus.setTextColor(themeColor(com.google.android.material.R.attr.colorOnSurface))
             binding.cardConnect.contentDescription = getString(R.string.tasker_start_service)
-            binding.tvConnectionStatus.text = selectedServerName()
+            binding.tvConnectionStatus.text = idleStatusText()
             stopConnectionTimer()
             binding.tvDownloadSpeed.text = getString(R.string.speed_zero)
             binding.tvUploadSpeed.text = getString(R.string.speed_zero)
@@ -918,35 +933,52 @@ class MainActivity : HelperBaseActivity() {
     }
 
     /**
-     * Starts an infinite breathing pulse on the glow ring, used for the "connecting" state.
+     * "Connecting" visual: shows the thin rotating arc around the ring and a gentle
+     * breathing pulse on the shield. No solid blue fill (the glow drawable stays off).
      */
-    private fun startGlowPulse() {
-        stopGlowPulse()
-        val glow = binding.viewConnectGlow
-        glow.visibility = View.VISIBLE
-        val animators = listOf(
-            ObjectAnimator.ofFloat(glow, View.SCALE_X, 0.88f, 1.10f),
-            ObjectAnimator.ofFloat(glow, View.SCALE_Y, 0.88f, 1.10f),
-            ObjectAnimator.ofFloat(glow, View.ALPHA, 0.4f, 1f),
-        ).onEach {
-            it.duration = 750
-            it.repeatCount = ValueAnimator.INFINITE
-            it.repeatMode = ValueAnimator.REVERSE
-        }
-        glowPulse = AnimatorSet().apply {
-            playTogether(animators)
+    private fun startConnectingAnim() {
+        connectArcConnecting = true
+        refreshConnectArc()
+        connectPulse?.cancel()
+        connectPulse = ObjectAnimator.ofFloat(binding.imgConnect, View.ALPHA, 1f, 0.45f).apply {
+            duration = 850
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.REVERSE
+            interpolator = android.view.animation.AccelerateDecelerateInterpolator()
             start()
         }
     }
 
-    /** Cancels the connecting pulse and resets the glow transform. */
-    private fun stopGlowPulse() {
-        glowPulse?.cancel()
-        glowPulse = null
-        binding.viewConnectGlow.apply {
-            scaleX = 1f
-            scaleY = 1f
-            alpha = 1f
+    /** Stops the connecting pulse and hides the arc (unless a subscription is still loading). */
+    private fun stopConnectingAnim() {
+        connectArcConnecting = false
+        refreshConnectArc()
+        connectPulse?.cancel()
+        connectPulse = null
+        binding.imgConnect.alpha = 1f
+    }
+
+    /** The arc spins whenever we are connecting OR a subscription is loading. */
+    private fun refreshConnectArc() {
+        binding.progressConnect.isVisible = connectArcConnecting || connectArcSubLoads > 0
+    }
+
+    /**
+     * Routes subscription add/refresh progress onto the connect circle (the shared rotating
+     * arc) instead of a top progress bar. Ref-counted so overlapping loads don't clash with
+     * the connecting state. Overrides the BaseActivity top-bar spinner.
+     */
+    override fun showLoading() {
+        runOnUiThread {
+            connectArcSubLoads++
+            refreshConnectArc()
+        }
+    }
+
+    override fun hideLoading() {
+        runOnUiThread {
+            if (connectArcSubLoads > 0) connectArcSubLoads--
+            refreshConnectArc()
         }
     }
 
@@ -970,17 +1002,28 @@ class MainActivity : HelperBaseActivity() {
         binding.dotMemory.backgroundTintList = android.content.res.ColorStateList.valueOf(getColor(colorRes))
     }
 
-    /** The name shown under the shield when idle/connected (selected server remarks). */
+    /** The name shown under the shield ONLY when connected (selected server remarks). */
     private fun selectedServerName(): String {
         val guid = MmkvManager.getSelectServer()
         val remarks = guid?.let { MmkvManager.decodeServerConfig(it)?.remarks }
         return remarks?.takeIf { it.isNotBlank() } ?: getString(R.string.home_select_server)
     }
 
+    /**
+     * Neutral under-shield status when NOT connected: never the server name. Shows
+     * «Не подключено» when a server is selected, «Выберите сервер» when none is.
+     */
+    private fun idleStatusText(): String {
+        val guid = MmkvManager.getSelectServer()
+        val hasServer = guid?.let { MmkvManager.decodeServerConfig(it) } != null
+        return getString(if (hasServer) R.string.home_not_connected else R.string.home_select_server)
+    }
+
     private fun updateSelectedServer() {
-        // Connecting/connected labels are owned by applyRunningState; only refresh the idle label.
+        // Connecting/connected labels are owned by applyRunningState; when idle keep a
+        // neutral status (the server name only appears once actually connected).
         if (mainViewModel.isRunning.value == true) return
-        binding.tvConnectionStatus.text = selectedServerName()
+        binding.tvConnectionStatus.text = idleStatusText()
     }
 
     /**

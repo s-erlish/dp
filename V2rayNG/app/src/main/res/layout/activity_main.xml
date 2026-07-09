@@ -25,15 +25,6 @@
 
         </com.google.android.material.appbar.AppBarLayout>
 
-        <com.google.android.material.progressindicator.LinearProgressIndicator
-            android:id="@+id/progress_bar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:indeterminate="true"
-            android:visibility="invisible"
-            app:indicatorColor="?attr/colorPrimary"
-            app:trackCornerRadius="4dp" />
-
         <!-- Content + overlaid bottom nav: the nav floats over the content so the
              server list scrolls UNDER a faint scrim rather than sitting on a solid bar. -->
         <FrameLayout
@@ -183,6 +174,23 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="match_parent"
                                 android:background="@drawable/bg_connect_ring" />
+
+                            <!-- Thin rotating arc that sweeps around the ring while
+                                 connecting (and while a subscription is loading). No solid
+                                 fill: an indeterminate Material sweep in colorPrimary. -->
+                            <com.google.android.material.progressindicator.CircularProgressIndicator
+                                android:id="@+id/progress_connect"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_gravity="center"
+                                android:indeterminate="true"
+                                android:visibility="gone"
+                                app:indeterminateAnimationType="disjoint"
+                                app:indicatorColor="?attr/colorPrimary"
+                                app:indicatorSize="212dp"
+                                app:trackColor="@android:color/transparent"
+                                app:trackCornerRadius="4dp"
+                                app:trackThickness="3dp" />
 
                             <com.google.android.material.card.MaterialCardView
                                 android:id="@+id/card_connect"
