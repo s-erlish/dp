@@ -5,27 +5,29 @@ import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.net.VpnService
 import android.os.Bundle
+import android.text.InputType
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
+import android.widget.EditText
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
 import androidx.core.content.ContextCompat
-import androidx.core.view.GravityCompat
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.chip.Chip
 import com.google.android.material.color.MaterialColors
-import com.google.android.material.navigation.NavigationView
 import com.v2ray.ang.AppConfig
+import com.v2ray.ang.BuildConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.contracts.MainAdapterListener
 import com.v2ray.ang.core.CoreServiceManager
@@ -57,6 +59,8 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
+import com.v2ray.ang.tv.TvReceiveActivity
+import com.v2ray.ang.tv.TvSendActivity
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.MemoryStatsManager
 import com.v2ray.ang.util.Utils
@@ -69,7 +73,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelectedListener {
+class MainActivity : HelperBaseActivity() {
     private val binding by lazy {
         ActivityMainBinding.inflate(layoutInflater)
     }
@@ -141,15 +145,10 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         mainViewModel.subscriptionId = ""
         setupServerLists()
 
-        // "More" bottom tab and edge-swipe open the drawer; secondary navigation lives there
-        binding.navView.setNavigationItemSelectedListener(this)
         setupBottomNav()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 when {
-                    binding.drawerLayout.isDrawerOpen(GravityCompat.START) ->
-                        binding.drawerLayout.closeDrawer(GravityCompat.START)
-
                     binding.bottomNav.selectedItemId != R.id.nav_home ->
                         binding.bottomNav.selectedItemId = R.id.nav_home
 
@@ -172,6 +171,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         setupHomeMetaBar()
         setupEmptyState()
         setupAccountHeader()
+        setupSettings()
         setupViewModel()
         SubscriptionUpdater.sync()
         mainViewModel.reloadServerList()
@@ -182,25 +182,25 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
 
     /**
      * Wires the bottom navigation: Home shows the connect hero, Servers shows the
-     * subscription/server list, and More opens the side drawer with secondary screens.
+     * subscription/server list, and Settings shows the custom Incy settings screen.
      */
     private fun setupBottomNav() {
-        showHomeTab(true)
+        showTab(R.id.nav_home)
         binding.bottomNav.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.nav_home -> {
-                    showHomeTab(true)
+                    showTab(R.id.nav_home)
                     true
                 }
 
                 R.id.nav_servers -> {
-                    showHomeTab(false)
+                    showTab(R.id.nav_servers)
                     true
                 }
 
-                R.id.nav_more -> {
-                    binding.drawerLayout.openDrawer(GravityCompat.START)
-                    false
+                R.id.nav_settings -> {
+                    showTab(R.id.nav_settings)
+                    true
                 }
 
                 else -> false
@@ -208,9 +208,10 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         }
     }
 
-    private fun showHomeTab(home: Boolean) {
-        binding.groupHome.isVisible = home
-        binding.groupServers.isVisible = !home
+    private fun showTab(tab: Int) {
+        binding.groupHome.isVisible = tab == R.id.nav_home
+        binding.groupServers.isVisible = tab == R.id.nav_servers
+        binding.groupSettings.root.isVisible = tab == R.id.nav_settings
     }
 
     private fun setupViewModel() {
@@ -966,6 +967,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         super.onResume()
         updateSelectedServer()
         updateAccountHeader()
+        bindSettingsState()
         timerHandler.removeCallbacks(memoryRunnable)
         timerHandler.post(memoryRunnable)
     }
@@ -1385,31 +1387,221 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     }
 
 
-    override fun onNavigationItemSelected(item: MenuItem): Boolean {
-        // Handle navigation view item clicks here.
-        when (item.itemId) {
-            R.id.telegram_login -> {
-                // Login is OPTIONAL: only offer it when a backend is configured.
-                if (BackendConfig.isConfigured()) {
-                    requestActivityLauncher.launch(Intent(this, LoginActivity::class.java))
-                } else {
-                    toast(R.string.auth_not_configured)
-                }
-            }
-            R.id.sub_setting -> requestActivityLauncher.launch(Intent(this, SubSettingActivity::class.java))
-            R.id.per_app_proxy_settings -> requestActivityLauncher.launch(Intent(this, PerAppProxyActivity::class.java))
-            R.id.routing_setting -> requestActivityLauncher.launch(Intent(this, RoutingSettingActivity::class.java))
-            R.id.user_asset_setting -> requestActivityLauncher.launch(Intent(this, UserAssetActivity::class.java))
-            R.id.settings -> requestActivityLauncher.launch(Intent(this, SettingsActivity::class.java))
-            R.id.promotion -> Utils.openUri(this, "${Utils.decode(AppConfig.APP_PROMOTION_URL)}?t=${System.currentTimeMillis()}")
-            R.id.logcat -> startActivity(Intent(this, LogcatActivity::class.java))
-            R.id.check_for_update -> startActivity(Intent(this, CheckUpdateActivity::class.java))
-            R.id.backup_restore -> requestActivityLauncher.launch(Intent(this, BackupActivity::class.java))
-            R.id.about -> startActivity(Intent(this, AboutActivity::class.java))
-        }
+    // ==================== Settings tab (Incy) ====================
 
-        binding.drawerLayout.closeDrawer(GravityCompat.START)
-        return true
+    /**
+     * Wires the custom "Настройки" tab (replaces the old navigation drawer). All row
+     * click handlers live here; toggles/pickers read & write the same MMKV keys the
+     * legacy SettingsActivity used, so values stay consistent. Switches are non-focusable
+     * in XML, so the whole row drives them — no CheckedChange listeners (avoids feedback
+     * loops when reflecting state in [bindSettingsState]).
+     */
+    private fun setupSettings() {
+        val s = binding.groupSettings
+
+        // ПОДКЛЮЧЕНИЕ
+        s.rowMode.setOnClickListener { pickMode() }
+        s.rowPerApp.setOnClickListener { requestActivityLauncher.launch(Intent(this, PerAppProxyActivity::class.java)) }
+        s.rowBypassLan.setOnClickListener { toggleBypassLan() }
+        s.rowDns.setOnClickListener { editDns() }
+
+        // ОБХОД БЛОКИРОВОК
+        s.rowMux.setOnClickListener { toggleMux() }
+        s.rowMuxConcurrency.setOnClickListener { editMuxConcurrency() }
+        s.rowFragment.setOnClickListener { toggleFragment() }
+
+        // ИНТЕРФЕЙС
+        s.rowThemeDark.setOnClickListener { toggleDarkTheme() }
+        s.rowThemeMono.setOnClickListener { toggleMono() }
+        s.rowLanguage.setOnClickListener { pickLanguage() }
+        s.rowBoot.setOnClickListener { toggleStartOnBoot() }
+
+        // ПОДПИСКА
+        s.rowSubscriptions.setOnClickListener { requestActivityLauncher.launch(Intent(this, SubSettingActivity::class.java)) }
+        s.rowRouting.setOnClickListener { requestActivityLauncher.launch(Intent(this, RoutingSettingActivity::class.java)) }
+        s.rowAssets.setOnClickListener { requestActivityLauncher.launch(Intent(this, UserAssetActivity::class.java)) }
+
+        // УСТРОЙСТВА
+        s.rowTvSend.setOnClickListener { startActivity(Intent(this, TvSendActivity::class.java)) }
+        // "Принять подписку" only makes sense on an Android TV device.
+        val isTv = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+        s.rowTvReceive.isVisible = isTv
+        s.dividerTvReceive.isVisible = isTv
+        s.rowTvReceive.setOnClickListener { startActivity(Intent(this, TvReceiveActivity::class.java)) }
+
+        // О ПРИЛОЖЕНИИ
+        s.rowAbout.setOnClickListener { startActivity(Intent(this, AboutActivity::class.java)) }
+        s.rowBackup.setOnClickListener { requestActivityLauncher.launch(Intent(this, BackupActivity::class.java)) }
+        s.valueAbout.text = BuildConfig.VERSION_NAME
+
+        bindSettingsState()
+    }
+
+    /** Reflects all persisted settings values/toggle states into the settings tab. */
+    private fun bindSettingsState() {
+        val s = binding.groupSettings
+
+        val mode = MmkvManager.decodeSettingsString(AppConfig.PREF_MODE, AppConfig.VPN)
+        s.valueMode.text = getString(if (mode == AppConfig.VPN) R.string.settings_mode_vpn else R.string.settings_mode_proxy)
+
+        val perApp = MmkvManager.decodeSettingsBool(AppConfig.PREF_PER_APP_PROXY, false)
+        s.valuePerApp.text = getString(if (perApp) R.string.settings_value_on else R.string.settings_value_off)
+
+        s.valueDns.text = MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_DNS, AppConfig.DNS_VPN)
+        s.valueMuxConcurrency.text = MmkvManager.decodeSettingsString(AppConfig.PREF_MUX_CONCURRENCY, "8")
+
+        val langEntries = resources.getStringArray(R.array.language_select)
+        val langValues = resources.getStringArray(R.array.language_select_value)
+        val curLang = MmkvManager.decodeSettingsString(AppConfig.PREF_LANGUAGE, langValues.firstOrNull() ?: "auto").orEmpty()
+        val li = langValues.indexOf(curLang).coerceAtLeast(0)
+        s.valueLanguage.text = langEntries.getOrElse(li) { langEntries.firstOrNull().orEmpty() }
+
+        s.switchBypassLan.isChecked = isBypassLanOn()
+
+        val muxOn = MmkvManager.decodeSettingsBool(AppConfig.PREF_MUX_ENABLED, false)
+        s.switchMux.isChecked = muxOn
+        s.rowMuxConcurrency.isVisible = muxOn
+        s.dividerConcurrency.isVisible = muxOn
+
+        s.switchFragment.isChecked = MmkvManager.decodeSettingsBool(AppConfig.PREF_FRAGMENT_ENABLED, false)
+        s.switchThemeDark.isChecked = isDarkThemeOn()
+        s.switchThemeMono.isChecked = isMonoOn()
+        s.switchBoot.isChecked = MmkvManager.decodeStartOnBoot()
+    }
+
+    private fun isBypassLanOn(): Boolean =
+        MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_BYPASS_LAN, "1") != "2"
+
+    private fun isDarkThemeOn(): Boolean =
+        MmkvManager.decodeSettingsString(AppConfig.PREF_UI_MODE_NIGHT, "2") != "1"
+
+    private fun isMonoOn(): Boolean =
+        MmkvManager.decodeSettingsString(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_BLUE) == BaseActivity.THEME_MONO
+
+    /** Restart the tunnel so a changed core-config setting takes effect immediately. */
+    private fun restartIfRunning() {
+        if (mainViewModel.isRunning.value == true) restartV2Ray()
+    }
+
+    private fun pickMode() {
+        val entries = arrayOf(getString(R.string.settings_mode_vpn), getString(R.string.settings_mode_proxy))
+        val values = arrayOf(AppConfig.VPN, "Proxy only")
+        val current = MmkvManager.decodeSettingsString(AppConfig.PREF_MODE, AppConfig.VPN).orEmpty()
+        val idx = values.indexOf(current).coerceAtLeast(0)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_mode)
+            .setSingleChoiceItems(entries, idx) { dialog, which ->
+                MmkvManager.encodeSettings(AppConfig.PREF_MODE, values[which])
+                bindSettingsState()
+                restartIfRunning()
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun toggleBypassLan() {
+        val on = !isBypassLanOn()
+        MmkvManager.encodeSettings(AppConfig.PREF_VPN_BYPASS_LAN, if (on) "1" else "2")
+        binding.groupSettings.switchBypassLan.isChecked = on
+        restartIfRunning()
+    }
+
+    private fun editDns() {
+        val current = MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_DNS, AppConfig.DNS_VPN)
+        val input = EditText(this).apply {
+            setText(current)
+            setSingleLine()
+            hint = getString(R.string.settings_dns_hint)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_dns)
+            .setView(input)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val value = input.text.toString().trim().ifEmpty { AppConfig.DNS_VPN }
+                MmkvManager.encodeSettings(AppConfig.PREF_VPN_DNS, value)
+                bindSettingsState()
+                restartIfRunning()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun toggleMux() {
+        val enabled = !MmkvManager.decodeSettingsBool(AppConfig.PREF_MUX_ENABLED, false)
+        MmkvManager.encodeSettings(AppConfig.PREF_MUX_ENABLED, enabled)
+        val s = binding.groupSettings
+        s.switchMux.isChecked = enabled
+        s.rowMuxConcurrency.isVisible = enabled
+        s.dividerConcurrency.isVisible = enabled
+        restartIfRunning()
+    }
+
+    private fun editMuxConcurrency() {
+        val current = MmkvManager.decodeSettingsString(AppConfig.PREF_MUX_CONCURRENCY, "8")
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setText(current)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_mux_concurrency)
+            .setView(input)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val value = (input.text.toString().toIntOrNull() ?: 8).coerceIn(1, 1024)
+                MmkvManager.encodeSettings(AppConfig.PREF_MUX_CONCURRENCY, value.toString())
+                bindSettingsState()
+                restartIfRunning()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun toggleFragment() {
+        val enabled = !MmkvManager.decodeSettingsBool(AppConfig.PREF_FRAGMENT_ENABLED, false)
+        MmkvManager.encodeSettings(AppConfig.PREF_FRAGMENT_ENABLED, enabled)
+        binding.groupSettings.switchFragment.isChecked = enabled
+        restartIfRunning()
+    }
+
+    private fun toggleDarkTheme() {
+        val dark = !isDarkThemeOn()
+        MmkvManager.encodeSettings(AppConfig.PREF_UI_MODE_NIGHT, if (dark) "2" else "1")
+        // AppCompat applies the night mode and recreates the activity to reflect it
+        // (same path the legacy settings screen relies on).
+        SettingsManager.setNightMode()
+    }
+
+    private fun toggleMono() {
+        val mono = !isMonoOn()
+        MmkvManager.encodeSettings(
+            AppConfig.PREF_COLOR_THEME,
+            if (mono) BaseActivity.THEME_MONO else BaseActivity.THEME_BLUE
+        )
+        // The mono overlay is applied in BaseActivity.onCreate, so recreate to pick it up.
+        recreate()
+    }
+
+    private fun pickLanguage() {
+        val entries = resources.getStringArray(R.array.language_select)
+        val values = resources.getStringArray(R.array.language_select_value)
+        val current = MmkvManager.decodeSettingsString(AppConfig.PREF_LANGUAGE, values.firstOrNull() ?: "auto").orEmpty()
+        val idx = values.indexOf(current).coerceAtLeast(0)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_language)
+            .setSingleChoiceItems(entries, idx) { dialog, which ->
+                MmkvManager.encodeSettings(AppConfig.PREF_LANGUAGE, values[which])
+                dialog.dismiss()
+                // Locale is applied via BaseActivity.attachBaseContext on recreate.
+                recreate()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun toggleStartOnBoot() {
+        val enabled = !MmkvManager.decodeStartOnBoot()
+        MmkvManager.encodeStartOnBoot(enabled)
+        binding.groupSettings.switchBoot.isChecked = enabled
     }
 
     override fun onDestroy() {
