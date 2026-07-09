@@ -15,6 +15,7 @@ import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.isNotNullEmpty
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
+import com.v2ray.ang.template.TemplateManager
 import com.v2ray.ang.util.HttpUtil
 import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.util.LogUtil
@@ -79,7 +80,10 @@ object CoreConfigManager {
      */
     private fun buildV2rayCustomConfig(configContext: CoreConfigContext): ConfigResult {
         val context = configContext.context
-        val raw = MmkvManager.decodeServerRaw(configContext.guid)
+        // Hidden/locked templates are stored encrypted; decodeRuntimeRaw transparently
+        // decrypts them and returns non-locked raw configs unchanged. All the template's
+        // routing/DNS/obfuscation rules are applied as-authored from this point on.
+        val raw = TemplateManager.decodeRuntimeRaw(configContext.guid)
             ?: return ConfigResult(status = false, guid = configContext.guid, errorMessage = "Custom config is empty")
         val result = ConfigResult(true, configContext.guid, raw)
         if (!needTun()) {

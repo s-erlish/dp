@@ -191,7 +191,9 @@ object SettingsManager {
         val guid = MmkvManager.getSelectServer() ?: return false
         val config = decodeServerConfig(guid) ?: return false
         if (config.configType == EConfigType.CUSTOM) {
-            val raw = MmkvManager.decodeServerRaw(guid) ?: return false
+            // decodeRuntimeRaw transparently decrypts hidden templates; identical to
+            // decodeServerRaw for ordinary custom configs.
+            val raw = com.v2ray.ang.template.TemplateManager.decodeRuntimeRaw(guid) ?: return false
             val v2rayConfig = JsonUtil.fromJsonSafe(raw, V2rayConfig::class.java)
             val exist = v2rayConfig?.routing?.rules?.filter { it.outboundTag == TAG_DIRECT }?.any {
                 it.domain?.contains(GEOSITE_PRIVATE) == true || it.ip?.contains(GEOIP_PRIVATE) == true

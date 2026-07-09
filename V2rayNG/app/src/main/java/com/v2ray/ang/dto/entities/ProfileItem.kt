@@ -69,6 +69,11 @@ data class ProfileItem(
 
     var browserDialerMode: String? = null,
 
+    // Managed/hidden template flag: stamped from the owning subscription at import time.
+    // When true, the profile's raw config is stored obfuscated/encrypted and the UI must
+    // block share / QR / show-config / edit / export. See com.v2ray.ang.template.TemplateManager.
+    var locked: Boolean = false,
+
     ) {
     companion object {
         fun create(configType: EConfigType): ProfileItem {

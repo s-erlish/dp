@@ -26,6 +26,12 @@ data class SubscriptionItem(
     var announce: String = "",      // banner text from the `announce` header/#directive
     var supportUrl: String = "",    // from `support-url` (e.g. a Telegram link)
     var webPageUrl: String = "",    // from `profile-web-page-url`
+
+    // --- managed/hidden template state ---
+    // Set from the `profile-hidden`/`hidden` response header or an in-body `#profile-hidden:` directive.
+    // Locked subscriptions store their raw config obfuscated/encrypted and stamp locked=true on every
+    // imported profile, which gates share/QR/show-config/edit/export in the UI and redacts the sub URL.
+    var locked: Boolean = false,
 )
 
 // --- derived helpers (kept out of the data class so it stays a plain JSON POJO) ---

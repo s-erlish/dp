@@ -53,7 +53,13 @@ class SubEditActivity : BaseActivity() {
      */
     private fun bindingServer(subItem: SubscriptionItem): Boolean {
         binding.etRemarks.text = Utils.getEditable(subItem.remarks)
-        binding.etUrl.text = Utils.getEditable(subItem.url)
+        if (subItem.locked) {
+            // Managed/hidden subscription: never reveal the operator URL (it carries the token).
+            binding.etUrl.text = Utils.getEditable("••••••••")
+            binding.etUrl.isEnabled = false
+        } else {
+            binding.etUrl.text = Utils.getEditable(subItem.url)
+        }
         binding.etUserAgent.text = Utils.getEditable(subItem.userAgent)
         binding.etFilter.text = Utils.getEditable(subItem.filter)
         binding.chkEnable.isChecked = subItem.enabled
@@ -117,7 +123,10 @@ class SubEditActivity : BaseActivity() {
         val subItem = MmkvManager.decodeSubscription(editSubId) ?: SubscriptionItem()
 
         subItem.remarks = binding.etRemarks.text.toString()
-        subItem.url = binding.etUrl.text.toString()
+        // Keep the hidden operator URL for locked subs; the field only shows a redacted mask.
+        if (!subItem.locked) {
+            subItem.url = binding.etUrl.text.toString()
+        }
         subItem.userAgent = binding.etUserAgent.text.toString()
         subItem.filter = binding.etFilter.text.toString()
         subItem.enabled = binding.chkEnable.isChecked
