@@ -10,7 +10,6 @@ import android.view.MenuItem
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
 import androidx.core.content.ContextCompat
@@ -82,21 +81,23 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         binding.viewPager.adapter = groupPagerAdapter
         binding.viewPager.isUserInputEnabled = true
 
-        // setup navigation drawer
-        val toggle = ActionBarDrawerToggle(
-            this, binding.drawerLayout, binding.toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close
-        )
-        binding.drawerLayout.addDrawerListener(toggle)
-        toggle.syncState()
+        // "More" bottom tab and edge-swipe open the drawer; secondary navigation lives there
         binding.navView.setNavigationItemSelectedListener(this)
+        setupBottomNav()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
-                    binding.drawerLayout.closeDrawer(GravityCompat.START)
-                } else {
-                    isEnabled = false
-                    onBackPressedDispatcher.onBackPressed()
-                    isEnabled = true
+                when {
+                    binding.drawerLayout.isDrawerOpen(GravityCompat.START) ->
+                        binding.drawerLayout.closeDrawer(GravityCompat.START)
+
+                    binding.bottomNav.selectedItemId != R.id.nav_home ->
+                        binding.bottomNav.selectedItemId = R.id.nav_home
+
+                    else -> {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                        isEnabled = true
+                    }
                 }
             }
         })
@@ -115,6 +116,39 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
 
         checkAndRequestPermission(PermissionType.POST_NOTIFICATIONS) {
         }
+    }
+
+    /**
+     * Wires the bottom navigation: Home shows the connect hero, Servers shows the
+     * subscription/server list, and More opens the side drawer with secondary screens.
+     */
+    private fun setupBottomNav() {
+        showHomeTab(true)
+        binding.bottomNav.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> {
+                    showHomeTab(true)
+                    true
+                }
+
+                R.id.nav_servers -> {
+                    showHomeTab(false)
+                    true
+                }
+
+                R.id.nav_more -> {
+                    binding.drawerLayout.openDrawer(GravityCompat.START)
+                    false
+                }
+
+                else -> false
+            }
+        }
+    }
+
+    private fun showHomeTab(home: Boolean) {
+        binding.groupHome.isVisible = home
+        binding.groupServers.isVisible = !home
     }
 
     private fun setupViewModel() {
