@@ -8,6 +8,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.SheetServerActionsBinding
 import com.v2ray.ang.dto.entities.ProfileItem
+import com.v2ray.ang.template.TemplateManager
 
 /**
  * Incy-styled bottom sheet with per-server actions, shown on long-press of a server row
@@ -63,15 +64,9 @@ class ServerActionsSheet(
 
     /**
      * Whether this profile is a locked/hidden JSON template whose config must not be
-     * shared, exported, edited or duplicated.
-     *
-     * TODO(templates): the locked-templates module is being added by another agent and does
-     *  not exist in this worktree yet. Once it lands, replace the `false` below with that
-     *  module's lock check (a one-line change), e.g.:
-     *      return TemplateManager.isLocked(profile)
-     *  Delete must stay allowed regardless, so it is intentionally not guarded by this flag.
+     * shared, exported, edited or duplicated. Delete stays allowed regardless.
      */
     private fun isLocked(profile: ProfileItem): Boolean {
-        return false
+        return TemplateManager.isLocked(profile)
     }
 }
