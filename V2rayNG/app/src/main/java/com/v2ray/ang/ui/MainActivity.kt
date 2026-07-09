@@ -271,6 +271,9 @@ class MainActivity : HelperBaseActivity() {
         binding.groupHome.isVisible = tab == R.id.nav_home
         binding.groupServers.isVisible = tab == R.id.nav_servers
         binding.groupSettings.root.isVisible = tab == R.id.nav_settings
+        // Home shows the brand as a scroll-away wordmark inside the content, so the toolbar
+        // title stays empty there; the other tabs keep the fixed toolbar title.
+        supportActionBar?.title = if (tab == R.id.nav_home) "" else getString(R.string.app_name)
     }
 
     /**

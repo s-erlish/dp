@@ -51,6 +51,25 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
+                <!-- Brand wordmark: sits on the page background (no fill), left-aligned, and
+                     scrolls away with the content (Incy-style). Space Grotesk @ wght 600. -->
+                <TextView
+                    android:id="@+id/tv_brand"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/spacegrotesk"
+                    android:fontVariationSettings="'wght' 600"
+                    android:includeFontPadding="false"
+                    android:letterSpacing="-0.02"
+                    android:paddingStart="20dp"
+                    android:paddingTop="6dp"
+                    android:paddingEnd="20dp"
+                    android:paddingBottom="2dp"
+                    android:text="@string/app_name"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="30sp"
+                    tools:ignore="UnusedAttribute" />
+
                 <!-- Home account header: sign-in button (signed out) / account chip (signed in) -->
                 <include
                     android:id="@+id/layout_home_account"
