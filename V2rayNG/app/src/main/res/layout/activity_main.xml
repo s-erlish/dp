@@ -55,6 +55,13 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
+                <!-- Home account header: sign-in button (signed out) / account chip (signed in) -->
+                <include
+                    android:id="@+id/layout_home_account"
+                    layout="@layout/layout_home_account"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
                 <!-- Inline stats: upload · uptime · download -->
                 <LinearLayout
                     android:layout_width="match_parent"

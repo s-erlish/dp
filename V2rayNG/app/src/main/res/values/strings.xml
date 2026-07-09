@@ -514,4 +514,12 @@
         <item>WebDAV</item>
     </string-array>
 
+    <!-- Telegram authorization / account header -->
+    <string name="auth_sign_in_telegram">Войти через Telegram</string>
+    <string name="auth_account">Аккаунт</string>
+    <string name="auth_subscription_active">Подписка активна</string>
+    <string name="auth_subscription_active_until">Подписка активна · до %1$s</string>
+    <string name="auth_subscription_expired">Подписка не активна</string>
+    <string name="auth_subscription_none">Подписка не подключена</string>
+
 </resources>

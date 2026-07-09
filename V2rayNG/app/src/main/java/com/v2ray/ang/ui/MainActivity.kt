@@ -37,6 +37,9 @@ import com.v2ray.ang.dto.entities.trafficFraction
 import com.v2ray.ang.dto.entities.usedTraffic
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.enums.PermissionType
+import android.text.format.DateFormat
+import android.view.View
+import com.v2ray.ang.auth.AuthTokenStore
 import com.v2ray.ang.auth.BackendConfig
 import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.extension.toast
@@ -160,6 +163,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         setupServersHeader()
         setupHomeMetaBar()
         setupEmptyState()
+        setupAccountHeader()
         setupViewModel()
         SubscriptionUpdater.sync()
         mainViewModel.reloadServerList()
@@ -374,6 +378,50 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         val collapse = body.isVisible
         body.isVisible = !collapse
         binding.layoutHomeMetaBar.btnCollapse.rotation = if (collapse) -90f else 0f
+    }
+
+    /**
+     * Home account header (Telegram login / account chip).
+     * Entirely hidden unless a backend is configured, so the no-backend build looks unchanged.
+     */
+    private fun setupAccountHeader() {
+        val open = View.OnClickListener {
+            requestActivityLauncher.launch(Intent(this, LoginActivity::class.java))
+        }
+        binding.layoutHomeAccount.btnTelegramLogin.setOnClickListener(open)
+        binding.layoutHomeAccount.chipAccount.setOnClickListener(open)
+        updateAccountHeader()
+    }
+
+    private fun updateAccountHeader() {
+        val header = binding.layoutHomeAccount
+        val configured = BackendConfig.isConfigured()
+        val loggedIn = configured && AuthTokenStore.isLoggedIn()
+        header.root.isVisible = configured
+        header.btnTelegramLogin.isVisible = configured && !loggedIn
+        header.chipAccount.isVisible = loggedIn
+        if (loggedIn) {
+            val user = AuthTokenStore.getUser()
+            val name = user?.displayName?.takeIf { it.isNotBlank() }
+                ?: user?.username?.takeIf { it.isNotBlank() }
+                ?: getString(R.string.auth_account)
+            header.tvAccountName.text = name
+            header.tvAvatarInitial.text = name.firstOrNull()?.uppercase() ?: "?"
+            header.tvAccountSub.text = subscriptionStatusLine()
+        }
+    }
+
+    /** Subtitle for the signed-in account chip, read from the login-imported subscription. */
+    private fun subscriptionStatusLine(): String {
+        val sub = AuthTokenStore.managedSubGuid()
+            .takeIf { it.isNotEmpty() }
+            ?.let { MmkvManager.decodeSubscription(it) }
+            ?: return getString(R.string.auth_subscription_none)
+        if (!sub.enabled) return getString(R.string.auth_subscription_expired)
+        val expire = sub.expire
+        if (expire <= 0L) return getString(R.string.auth_subscription_active)
+        val date = DateFormat.getDateFormat(this).format(Date(expire * 1000L))
+        return getString(R.string.auth_subscription_active_until, date)
     }
 
     /** Subscription shown in the Home meta bar: the selected server's, else the first provider. */
@@ -799,6 +847,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     override fun onResume() {
         super.onResume()
         updateSelectedServer()
+        updateAccountHeader()
         timerHandler.removeCallbacks(memoryRunnable)
         timerHandler.post(memoryRunnable)
     }
