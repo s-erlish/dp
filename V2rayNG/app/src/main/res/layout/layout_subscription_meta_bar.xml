@@ -5,16 +5,16 @@
     android:id="@+id/meta_bar_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginStart="12dp"
+    android:layout_marginStart="16dp"
     android:layout_marginTop="8dp"
-    android:layout_marginEnd="12dp"
+    android:layout_marginEnd="16dp"
     android:layout_marginBottom="2dp"
     android:background="@drawable/bg_server_card"
     android:orientation="vertical"
-    android:paddingStart="14dp"
-    android:paddingTop="10dp"
-    android:paddingEnd="6dp"
-    android:paddingBottom="12dp">
+    android:paddingStart="16dp"
+    android:paddingTop="12dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="14dp">
 
     <!-- Row 1: chevron + (title + subtitle) + actions (Ping -> Refresh -> Pin) -->
     <LinearLayout
