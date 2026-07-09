@@ -2,6 +2,12 @@ name: Build Debug APK
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - claude/vpn-client-happ-design-mq51pv
+    paths:
+      - 'V2rayNG/**'
+      - '.github/workflows/debug.yml'
 
 jobs:
   build:
