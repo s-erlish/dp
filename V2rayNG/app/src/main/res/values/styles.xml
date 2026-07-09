@@ -1,6 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+    <!-- Incy settings section header (uppercase grey label) -->
+    <style name="SettingsSectionLabel" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.04</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:paddingTop">18dp</item>
+        <item name="android:paddingBottom">8dp</item>
+    </style>
+
     <!-- Compact Incy-style bottom navigation -->
     <style name="BottomNavLabel" parent="TextAppearance.Material3.LabelSmall">
         <item name="android:textSize">11sp</item>

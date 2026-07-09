@@ -14,6 +14,14 @@
     <color name="color_connected">#12B76A</color>
     <color name="color_upload">#1E5FC7</color>
     <color name="color_download">#7C5CFF</color>
+
+    <!-- Colored setting-row icon tints (same in light/dark) -->
+    <color name="icon_blue">#4C8DFF</color>
+    <color name="icon_green">#22C55E</color>
+    <color name="icon_purple">#9B7DFF</color>
+    <color name="icon_yellow">#EAB308</color>
+    <color name="icon_red">#F04452</color>
+    <color name="icon_orange">#FB923C</color>
     <color name="divider_color_light">#E4E9F2</color>
     <color name="colorIndicator">@color/md_theme_primary</color>
 
