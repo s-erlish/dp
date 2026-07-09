@@ -426,6 +426,8 @@
     <string name="title_configuration_share">Поделиться конфигурацией</string>
     <string name="title_webdav_config_setting">Настройки WebDAV</string>
     <string name="title_webdav_config_setting_unknown">Необходимо настроить WebDAV</string>
+    <string name="backup_section_local">Данные</string>
+    <string name="backup_section_cloud">Облачное хранилище</string>
     <string name="title_webdav_url">URL сервера</string>
     <string name="title_webdav_user">Пользователь</string>
     <string name="title_webdav_pass">Пароль</string>
@@ -462,9 +464,9 @@
     </string-array>
 
     <string-array name="preset_rulesets">
-        <item>Белый список Китая</item>
-        <item>Чёрный список Китая</item>
-        <item>Общие</item>
+        <item>Базовый набор</item>
+        <item>Прокси для заблокированного</item>
+        <item>Весь трафик через прокси</item>
         <item>Белый список Ирана</item>
         <item>Белый список России</item>
     </string-array>

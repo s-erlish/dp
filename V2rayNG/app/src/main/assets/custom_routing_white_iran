@@ -1,26 +1,26 @@
 [
   {
-    "remarks": "Block udp443",
+    "remarks": "Блокировать QUIC (UDP 443)",
     "outboundTag": "block",
     "port": "443",
     "network": "udp"
   },
   {
-    "remarks": "Direct LAN IP",
+    "remarks": "Обход локальной сети (IP)",
     "outboundTag": "direct",
     "ip": [
       "geoip:private"
     ]
   },
   {
-    "remarks": "Direct LAN domains",
+    "remarks": "Обход локальной сети (домены)",
     "outboundTag": "direct",
     "domain": [
       "geosite:private"
     ]
   },
   {
-    "remarks": "Bypass Iran domains",
+    "remarks": "Обход доменов Ирана",
     "outboundTag": "direct",
     "domain": [
       "domain:ir",
@@ -28,7 +28,7 @@
     ]
   },
   {
-    "remarks": "Bypass Iran IP",
+    "remarks": "Обход IP-адресов Ирана",
     "outboundTag": "direct",
     "ip": [
        "geoip:ir"

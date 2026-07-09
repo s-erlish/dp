@@ -44,7 +44,6 @@ class UserAssetActivity : HelperBaseActivity() {
 
         binding.recyclerView.setHasFixedSize(true)
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
-        addCustomDividerToRecyclerView(binding.recyclerView, this, R.drawable.custom_divider)
         adapter = UserAssetAdapter(viewModel, extDir, ActivityAdapterListener())
         binding.recyclerView.adapter = adapter
 

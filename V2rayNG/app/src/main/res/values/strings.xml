@@ -457,6 +457,8 @@
     <string name="title_configuration_share">Share config</string>
     <string name="title_webdav_config_setting">WebDAV Settings</string>
     <string name="title_webdav_config_setting_unknown">Please configure WebDAV first.</string>
+    <string name="backup_section_local">Данные</string>
+    <string name="backup_section_cloud">Облачное хранилище</string>
     <string name="title_webdav_url">WebDAV server URL</string>
     <string name="title_webdav_user">Username</string>
     <string name="title_webdav_pass">Password</string>
@@ -499,11 +501,11 @@
     </string-array>
 
     <string-array name="preset_rulesets">
-        <item>China Whitelist</item>
-        <item>China Blacklist</item>
-        <item>Global</item>
-        <item>Iran Whitelist</item>
-        <item>Russia Whitelist</item>
+        <item>Базовый набор</item>
+        <item>Прокси для заблокированного</item>
+        <item>Весь трафик через прокси</item>
+        <item>Белый список Ирана</item>
+        <item>Белый список России</item>
     </string-array>
 
     <string-array name="vpn_bypass_lan">
