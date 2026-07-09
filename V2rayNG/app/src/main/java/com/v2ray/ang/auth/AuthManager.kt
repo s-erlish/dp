@@ -27,8 +27,9 @@ class AuthManager(
         /** Deep link is ready; the UI should open Telegram with it. */
         data class AwaitingTelegram(val deepLink: String) : LoginState
 
-        /** Polling the backend for confirmation. */
-        object Polling : LoginState
+        /** Polling the backend for confirmation. Carries the deep link so the UI can
+         *  (re)open Telegram even if the momentary AwaitingTelegram state was conflated away. */
+        data class Polling(val deepLink: String) : LoginState
 
         data class Success(val user: UserProfileDto?) : LoginState
 
@@ -59,8 +60,9 @@ class AuthManager(
         }
 
         val deepLink = resolveDeepLink(start.deepLink, start.botUsername, nonce)
-        emit(LoginState.AwaitingTelegram(deepLink))
-        emit(LoginState.Polling)
+        // Carry the deep link on the Polling state; a conflating StateFlow in the ViewModel
+        // may otherwise drop the momentary AwaitingTelegram before the UI observes it.
+        emit(LoginState.Polling(deepLink))
 
         val pollIntervalMs = 2_000L
         val timeoutMs = (start.expiresInSec.coerceAtLeast(30)) * 1000L

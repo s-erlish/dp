@@ -39,7 +39,8 @@ class AuthViewModel : ViewModel() {
     /** Fallback: submit a code copied from the bot. */
     fun submitCode(code: String) {
         loginJob?.cancel()
-        _state.value = LoginState.Polling
+        // Manual code path has no deep link; blank means "don't reopen Telegram".
+        _state.value = LoginState.Polling("")
         loginJob = viewModelScope.launch {
             _state.value = authManager.submitCode(code)
         }

@@ -73,7 +73,16 @@ class LoginActivity : BaseActivity() {
                 showAwaiting()
             }
 
-            is LoginState.Polling -> showAwaiting()
+            is LoginState.Polling -> {
+                // Open Telegram here too: the momentary AwaitingTelegram may have been
+                // conflated away by the StateFlow before the UI observed it. Blank deep link
+                // (manual-code path) means don't open Telegram.
+                if (state.deepLink.isNotBlank() && currentDeepLink != state.deepLink) {
+                    currentDeepLink = state.deepLink
+                    openTelegram(state.deepLink)
+                }
+                showAwaiting()
+            }
 
             is LoginState.Success -> {
                 showLoading()
