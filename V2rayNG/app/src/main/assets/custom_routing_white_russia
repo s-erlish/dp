@@ -1,40 +1,40 @@
 [
   {
-    "remarks": "Bypass bittorrent",
+    "remarks": "Обход BitTorrent",
     "outboundTag": "direct",
     "protocol": [
       "bittorrent"
     ]
   },
   {
-    "remarks": "Block udp443",
+    "remarks": "Блокировать QUIC (UDP 443)",
     "outboundTag": "block",
     "port": "443",
     "network": "udp"
   },
   {
-    "remarks": "Direct LAN IP",
+    "remarks": "Обход локальной сети (IP)",
     "outboundTag": "direct",
     "ip": [
       "geoip:private"
     ]
   },
   {
-    "remarks": "Direct LAN domains",
+    "remarks": "Обход локальной сети (домены)",
     "outboundTag": "direct",
     "domain": [
       "geosite:private"
     ]
   },
   {
-    "remarks": "Bypass Russia domains",
+    "remarks": "Обход доменов РФ",
     "outboundTag": "direct",
     "domain": [
       "geosite:category-ru"
     ]
   },
   {
-    "remarks": "Bypass Russia IP",
+    "remarks": "Обход IP-адресов РФ",
     "outboundTag": "direct",
     "ip": [
        "geoip:ru"
