@@ -560,7 +560,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Sets the protocol filter (Servers tab chips) and reloads the list.
      * @param type The protocol to keep, or null for "Все" (all protocols).
      */
-    fun setProtocolFilter(type: com.v2ray.ang.enums.EConfigType?) {
+    fun applyProtocolFilter(type: com.v2ray.ang.enums.EConfigType?) {
         if (protocolFilter == type) return
         protocolFilter = type
         reloadServerList()

@@ -280,7 +280,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
             val id = checkedIds.firstOrNull() ?: return@setOnCheckedStateChangeListener
             val chip = group.findViewById<Chip>(id) ?: return@setOnCheckedStateChangeListener
             val type = chip.tag as? EConfigType
-            mainViewModel.setProtocolFilter(type)
+            mainViewModel.applyProtocolFilter(type)
         }
     }
 
@@ -724,7 +724,7 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
      * Refreshes the home memory card (MB + green/amber/red status), or hides it per preference.
      */
     private fun updateMemoryCard() {
-        val show = MmkvManager.decodeSettingsBool(AppConfig.PREF_SHOW_MEMORY, true)
+        val show = MmkvManager.decodeSettingsBool(AppConfig.PREF_SHOW_MEMORY, false)
         binding.cardMemory.isVisible = show
         if (!show) return
         val mb = MemoryStatsManager.currentUsedMb()
