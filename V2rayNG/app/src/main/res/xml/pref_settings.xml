@@ -66,6 +66,12 @@
             android:summary="@string/summary_pref_auto_fallback"
             android:title="@string/title_pref_auto_fallback" />
 
+        <CheckBoxPreference
+            android:defaultValue="true"
+            android:key="pref_show_memory"
+            android:summary="@string/summary_pref_show_memory"
+            android:title="@string/title_pref_show_memory" />
+
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/title_vpn_settings">

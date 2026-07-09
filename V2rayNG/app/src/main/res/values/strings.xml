@@ -308,6 +308,13 @@
     <string name="sub_unpin">Unpin subscription</string>
     <string name="sub_support">Support</string>
     <string name="sub_website">Website</string>
+    <string name="memory_app_usage">App memory</string>
+    <string name="memory_value" translatable="false">%1$d MB · %2$s</string>
+    <string name="memory_normal">Normal</string>
+    <string name="memory_elevated">Elevated</string>
+    <string name="memory_high">High</string>
+    <string name="title_pref_show_memory">Show memory usage on home</string>
+    <string name="summary_pref_show_memory">Display this app\'s live memory usage (MB) on the home screen</string>
     <string name="color_theme_blue">Blue (departament)</string>
     <string name="color_theme_mono">Black &amp; white</string>
     <string name="title_pref_use_hev_tunnel">Enable Hev TUN Feature</string>

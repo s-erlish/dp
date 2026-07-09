@@ -34,6 +34,7 @@ import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
 import com.v2ray.ang.util.LogUtil
+import com.v2ray.ang.util.MemoryStatsManager
 import com.v2ray.ang.util.Utils
 import com.v2ray.ang.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
@@ -61,6 +62,14 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
         if (mainViewModel.isRunning.value == true) {
             healthCheckPending = true
             mainViewModel.testCurrentServerRealPing()
+        }
+    }
+
+    // Live app-memory card (home), refreshed every 2s while the activity is visible.
+    private val memoryRunnable = object : Runnable {
+        override fun run() {
+            updateMemoryCard()
+            timerHandler.postDelayed(this, 2000L)
         }
     }
 
@@ -341,6 +350,23 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     /**
      * Updates the selected server name shown in the hero panel.
      */
+    /**
+     * Refreshes the home memory card (MB + green/amber/red status), or hides it per preference.
+     */
+    private fun updateMemoryCard() {
+        val show = MmkvManager.decodeSettingsBool(AppConfig.PREF_SHOW_MEMORY, true)
+        binding.cardMemory.isVisible = show
+        if (!show) return
+        val mb = MemoryStatsManager.currentPssMb()
+        val (labelRes, colorRes) = when (MemoryStatsManager.levelFor(mb)) {
+            MemoryStatsManager.Level.NORMAL -> R.string.memory_normal to R.color.color_connected
+            MemoryStatsManager.Level.ELEVATED -> R.string.memory_elevated to R.color.colorConfigType
+            MemoryStatsManager.Level.HIGH -> R.string.memory_high to R.color.colorPingRed
+        }
+        binding.tvMemory.text = getString(R.string.memory_value, mb, getString(labelRes))
+        binding.dotMemory.backgroundTintList = android.content.res.ColorStateList.valueOf(getColor(colorRes))
+    }
+
     private fun updateSelectedServer() {
         val guid = MmkvManager.getSelectServer()
         val remarks = guid?.let { MmkvManager.decodeServerConfig(it)?.remarks }
@@ -403,16 +429,13 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
     override fun onResume() {
         super.onResume()
         updateSelectedServer()
+        timerHandler.removeCallbacks(memoryRunnable)
+        timerHandler.post(memoryRunnable)
     }
 
     override fun onPause() {
         super.onPause()
-    }
-
-    override fun onDestroy() {
-        timerHandler.removeCallbacks(timerRunnable)
-        timerHandler.removeCallbacks(healthCheckRunnable)
-        super.onDestroy()
+        timerHandler.removeCallbacks(memoryRunnable)
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -875,6 +898,9 @@ class MainActivity : HelperBaseActivity(), NavigationView.OnNavigationItemSelect
 
     override fun onDestroy() {
         tabMediator?.detach()
+        timerHandler.removeCallbacks(timerRunnable)
+        timerHandler.removeCallbacks(healthCheckRunnable)
+        timerHandler.removeCallbacks(memoryRunnable)
         super.onDestroy()
     }
 }

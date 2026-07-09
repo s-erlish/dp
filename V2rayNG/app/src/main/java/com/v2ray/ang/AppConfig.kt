@@ -55,6 +55,7 @@ object AppConfig {
     const val PREF_COLOR_THEME = "pref_color_theme"
     const val PREF_PING_METHOD = "pref_ping_method"
     const val PREF_AUTO_FALLBACK = "pref_auto_fallback"
+    const val PREF_SHOW_MEMORY = "pref_show_memory"
     const val PREF_IPV6_ENABLED = "pref_ipv6_enabled"
     const val PREF_PREFER_IPV6 = "pref_prefer_ipv6"
     const val PREF_PROXY_SHARING = "pref_proxy_sharing_enabled"
