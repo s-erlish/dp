@@ -17,6 +17,7 @@ import com.v2ray.ang.core.CoreServiceManager
 import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.extension.toSpeedString
 import com.v2ray.ang.ui.MainActivity
+import com.v2ray.ang.util.FlagUtil
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.MessageUtil
 import kotlinx.coroutines.CoroutineScope
@@ -92,12 +93,18 @@ object NotificationManager {
                 ""
             }
 
+        val title = currentConfig?.let { cfg ->
+            "${FlagUtil.resolveFlag(cfg)} ${FlagUtil.stripLeadingFlag(cfg.remarks)}"
+        }
         mBuilder = NotificationCompat.Builder(service, channelId)
             .setSmallIcon(R.drawable.ic_stat_name)
-            .setContentTitle(currentConfig?.remarks)
-            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setContentTitle(title)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
-            .setShowWhen(false)
+            // System-rendered live uptime stopwatch (no per-second push, battery-free).
+            .setWhen(System.currentTimeMillis())
+            .setUsesChronometer(true)
+            .setShowWhen(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(contentPendingIntent)
             .addAction(
@@ -148,12 +155,14 @@ object NotificationManager {
     private fun createNotificationChannel(): String {
         val channelId = AppConfig.RAY_NG_CHANNEL_ID
         val channelName = AppConfig.RAY_NG_CHANNEL_NAME
+        // IMPORTANCE_LOW keeps the ongoing notification pinned and visible (with the live
+        // uptime chronometer) while staying silent.
         val chan = NotificationChannel(
             channelId,
-            channelName, NotificationManager.IMPORTANCE_HIGH
+            channelName, NotificationManager.IMPORTANCE_LOW
         )
         chan.lightColor = Color.DKGRAY
-        chan.importance = NotificationManager.IMPORTANCE_NONE
+        chan.setShowBadge(false)
         chan.lockscreenVisibility = Notification.VISIBILITY_PRIVATE
         getNotificationManager()?.createNotificationChannel(chan)
         return channelId

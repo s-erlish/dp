@@ -179,8 +179,8 @@ object AppConfig {
     const val MSG_MEASURE_CONFIG_FINISH = 74
 
     /** Notification channel IDs and names. */
-    const val RAY_NG_CHANNEL_ID = "RAY_NG_M_CH_ID"
-    const val RAY_NG_CHANNEL_NAME = "v2rayNG Background Service"
+    const val RAY_NG_CHANNEL_ID = "DEPARTAMENT_VPN_CH_ID"
+    const val RAY_NG_CHANNEL_NAME = "departament VPN"
 
     /** Protocols Scheme **/
     const val VMESS = "vmess://"
