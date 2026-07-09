@@ -60,15 +60,69 @@ object NotificationManager {
     }
 
     /**
-     * Shows the notification.
+     * Shows the notification and promotes the service to the foreground.
+     *
+     * A foreground service MUST call startForeground() within ~5s with a valid notification or
+     * the system kills the process (which strands the UI on "Подключение…" and shows an app
+     * crash). This method is therefore hardened so it can NEVER throw: if building the rich
+     * notification (flag title, chronometer, actions) fails for any reason, it falls back to a
+     * minimal valid notification, and startForeground() itself is guarded. Missing/invalid
+     * drawables, a cleared service reference, PendingIntent issues, or a foreground-service
+     * policy exception can no longer take down the VPN process.
+     *
      * @param currentConfig The current profile configuration.
+     * @return true if the service was promoted to the foreground, false otherwise.
      */
-    fun showNotification(currentConfig: ProfileItem?) {
-        val service = getService() ?: return
+    fun showNotification(currentConfig: ProfileItem?): Boolean {
+        val service = getService() ?: run {
+            LogUtil.e(AppConfig.TAG, "showNotification: service reference is null; cannot start foreground")
+            return false
+        }
 
         // Reset last query time to avoid querying stats too soon after showing the notification
         lastQueryTime = System.currentTimeMillis()
 
+        val channelId =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                try {
+                    createNotificationChannel()
+                } catch (e: Exception) {
+                    LogUtil.e(AppConfig.TAG, "showNotification: failed to create channel", e)
+                    AppConfig.RAY_NG_CHANNEL_ID
+                }
+            } else {
+                // If earlier version channel ID is not used
+                // https://developer.android.com/reference/android/support/v4/app/NotificationCompat.Builder.html#NotificationCompat.Builder(android.content.Context)
+                ""
+            }
+
+        val notification = try {
+            buildRichNotification(service, channelId, currentConfig)
+        } catch (e: Exception) {
+            // Any failure while assembling the rich notification must not prevent the mandatory
+            // startForeground() call. Fall back to a minimal, always-valid notification.
+            LogUtil.e(AppConfig.TAG, "showNotification: rich notification build failed, using fallback", e)
+            mBuilder = null
+            buildFallbackNotification(service, channelId)
+        }
+
+        return try {
+            service.startForeground(NOTIFICATION_ID, notification)
+            true
+        } catch (e: Exception) {
+            // startForeground can throw ForegroundServiceStartNotAllowedException / SecurityException /
+            // InvalidForegroundServiceTypeException on newer Android. Swallow so the caller can decide
+            // how to recover instead of crashing the whole service process.
+            LogUtil.e(AppConfig.TAG, "showNotification: startForeground failed", e)
+            false
+        }
+    }
+
+    /**
+     * Builds the rich ongoing notification (flag + server name title, live uptime chronometer,
+     * stop/restart actions) and caches its builder in [mBuilder] for later speed updates.
+     */
+    private fun buildRichNotification(service: Service, channelId: String, currentConfig: ProfileItem?): Notification {
         val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
 
         val startMainIntent = Intent(service, MainActivity::class.java)
@@ -84,19 +138,16 @@ object NotificationManager {
         restartV2RayIntent.putExtra("key", AppConfig.MSG_STATE_RESTART)
         val restartV2RayPendingIntent = PendingIntent.getBroadcast(service, NOTIFICATION_PENDING_INTENT_RESTART_V2RAY, restartV2RayIntent, flags)
 
-        val channelId =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                createNotificationChannel()
-            } else {
-                // If earlier version channel ID is not used
-                // https://developer.android.com/reference/android/support/v4/app/NotificationCompat.Builder.html#NotificationCompat.Builder(android.content.Context)
-                ""
-            }
-
+        // Resolving the flag/name is pure string work but is defensively guarded so a malformed
+        // remark can never abort the notification build.
         val title = currentConfig?.let { cfg ->
-            "${FlagUtil.resolveFlag(cfg)} ${FlagUtil.stripLeadingFlag(cfg.remarks)}"
+            try {
+                "${FlagUtil.resolveFlag(cfg)} ${FlagUtil.stripLeadingFlag(cfg.remarks)}"
+            } catch (e: Exception) {
+                cfg.remarks
+            }
         }
-        mBuilder = NotificationCompat.Builder(service, channelId)
+        val builder = NotificationCompat.Builder(service, channelId)
             .setSmallIcon(R.drawable.ic_stat_name)
             .setContentTitle(title)
             .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -118,9 +169,22 @@ object NotificationManager {
                 restartV2RayPendingIntent
             )
 
-        //mBuilder?.setDefaults(NotificationCompat.FLAG_ONLY_ALERT_ONCE)
+        mBuilder = builder
+        return builder.build()
+    }
 
-        service.startForeground(NOTIFICATION_ID, mBuilder?.build())
+    /**
+     * Minimal, always-valid foreground notification used when the rich build fails. It only
+     * needs a small icon and a title to satisfy the foreground-service requirement.
+     */
+    private fun buildFallbackNotification(service: Service, channelId: String): Notification {
+        return NotificationCompat.Builder(service, channelId)
+            .setSmallIcon(R.drawable.ic_stat_name)
+            .setContentTitle(service.getString(R.string.app_name))
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .build()
     }
 
     /**

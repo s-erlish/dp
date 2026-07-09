@@ -104,6 +104,17 @@ class MainActivity : HelperBaseActivity() {
         }
     }
 
+    // Connect watchdog: if a start neither succeeds nor reports a failure within the timeout
+    // (e.g. the core/daemon process crashed without broadcasting any state), recover the UI to
+    // idle instead of hanging forever on "Подключение…".
+    private val connectWatchdogRunnable = Runnable {
+        if (mainViewModel.isRunning.value != true) {
+            // Render idle through the existing state path and tell the user the start failed.
+            applyRunningState(isLoading = false, isRunning = false)
+            toastError(R.string.toast_services_failure)
+        }
+    }
+
     // Live app-memory card (home), refreshed every 2s while the activity is visible.
     private val memoryRunnable = object : Runnable {
         override fun run() {
@@ -115,6 +126,8 @@ class MainActivity : HelperBaseActivity() {
     private companion object {
         const val KEY_CONNECTION_START = "cache_connection_start_time"
         const val HEALTH_CHECK_DELAY_MS = 7000L
+        // Upper bound for a connect attempt before the UI gives up and returns to idle.
+        const val CONNECT_TIMEOUT_MS = 20000L
     }
 
     private val requestVpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -235,10 +248,14 @@ class MainActivity : HelperBaseActivity() {
                 restartV2Ray()
             } else {
                 applyRunningState(isLoading = true, isRunning = false)
+                scheduleConnectWatchdog()
                 startVpnWithPermission()
             }
         }
         mainViewModel.isRunning.observe(this) { isRunning ->
+            // A definitive running/stopped state arrived (success or failure): the connect
+            // attempt is over, so the watchdog is no longer needed.
+            cancelConnectWatchdog()
             applyRunningState(false, isRunning)
             if (isRunning) scheduleHealthCheckIfEnabled() else cancelHealthCheck()
         }
@@ -734,10 +751,12 @@ class MainActivity : HelperBaseActivity() {
 
         if (mainViewModel.isRunning.value == true) {
             // Stop: no "connecting" visual, the isRunning observer will settle the idle state.
+            cancelConnectWatchdog()
             CoreServiceManager.stopVService(this)
         } else {
             // Start: show the subtle blue "connecting" state (pulsing ring), never a bright fill.
             applyRunningState(isLoading = true, isRunning = false)
+            scheduleConnectWatchdog()
             startVpnWithPermission()
         }
     }
@@ -963,6 +982,17 @@ class MainActivity : HelperBaseActivity() {
     private fun cancelHealthCheck() {
         healthCheckPending = false
         timerHandler.removeCallbacks(healthCheckRunnable)
+    }
+
+    /** Arms the connect watchdog so a stalled/crashed start can't hang the UI on "connecting". */
+    private fun scheduleConnectWatchdog() {
+        timerHandler.removeCallbacks(connectWatchdogRunnable)
+        timerHandler.postDelayed(connectWatchdogRunnable, CONNECT_TIMEOUT_MS)
+    }
+
+    /** Cancels the connect watchdog once the attempt resolved (success/failure/stop). */
+    private fun cancelConnectWatchdog() {
+        timerHandler.removeCallbacks(connectWatchdogRunnable)
     }
 
     private val timerRunnable = object : Runnable {
@@ -1622,6 +1652,7 @@ class MainActivity : HelperBaseActivity() {
         timerHandler.removeCallbacks(timerRunnable)
         timerHandler.removeCallbacks(healthCheckRunnable)
         timerHandler.removeCallbacks(memoryRunnable)
+        timerHandler.removeCallbacks(connectWatchdogRunnable)
         stopGlowPulse()
         super.onDestroy()
     }

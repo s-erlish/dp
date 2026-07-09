@@ -83,8 +83,15 @@ object CoreConfigManager {
         // Hidden/locked templates are stored encrypted; decodeRuntimeRaw transparently
         // decrypts them and returns non-locked raw configs unchanged. All the template's
         // routing/DNS/obfuscation rules are applied as-authored from this point on.
-        val raw = TemplateManager.decodeRuntimeRaw(configContext.guid)
-            ?: return ConfigResult(status = false, guid = configContext.guid, errorMessage = "Custom config is empty")
+        // Defensive: if template/keystore decoding ever throws (rare OEM Keystore breakage,
+        // corrupt payload), fall back to the plain stored raw so an ordinary/custom config can
+        // never be blocked from connecting by the template layer.
+        val raw = try {
+            TemplateManager.decodeRuntimeRaw(configContext.guid)
+        } catch (e: Exception) {
+            LogUtil.e(AppConfig.TAG, "buildV2rayCustomConfig: template decode failed, using plain raw", e)
+            MmkvManager.decodeServerRaw(configContext.guid)
+        } ?: return ConfigResult(status = false, guid = configContext.guid, errorMessage = "Custom config is empty")
         val result = ConfigResult(true, configContext.guid, raw)
         if (!needTun()) {
             return result
