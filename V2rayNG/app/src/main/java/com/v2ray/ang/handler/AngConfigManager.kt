@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.text.TextUtils
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
+import com.v2ray.ang.auth.AuthTokenStore
 import com.v2ray.ang.core.CoreConfigManager
 import com.v2ray.ang.dto.SubscriptionUpdateResult
 import com.v2ray.ang.dto.UrlContentRequest
@@ -591,6 +592,8 @@ object AngConfigManager {
             val userAgent = it.subscription.userAgent
             val proxyUsername = SettingsManager.getSocksUsername()
             val proxyPassword = SettingsManager.getSocksPassword()
+            // Stable per-install device id (HWID) header, opt-out via settings.
+            val hwid = if (SettingsManager.isSendHwid()) AuthTokenStore.deviceId() else null
 
             var result = try {
                 val httpPort = SettingsManager.getHttpPort()
@@ -601,7 +604,8 @@ object AngConfigManager {
                         timeout = 15000,
                         httpPort = httpPort,
                         proxyUsername = proxyUsername,
-                        proxyPassword = proxyPassword
+                        proxyPassword = proxyPassword,
+                        hwid = hwid
                     )
                 )
             } catch (e: Exception) {
@@ -613,7 +617,8 @@ object AngConfigManager {
                     HttpUtil.getUrlContentWithUserAgentEx(
                         UrlContentRequest(
                             url = url,
-                            userAgent = userAgent
+                            userAgent = userAgent,
+                            hwid = hwid
                         )
                     )
                 } catch (e: Exception) {

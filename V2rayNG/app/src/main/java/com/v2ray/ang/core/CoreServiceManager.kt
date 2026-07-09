@@ -254,6 +254,14 @@ object CoreServiceManager {
 
         NotificationManager.showNotification(currentConfig)
         CoreNativeManager.reconcileBrowserDialer(dialerAddr)
+
+        // Memory limit: SettingsManager.isMemoryLimitEnabled()/getMemoryLimit() (MB) hold the
+        // user's requested soft cap. Enforcement WOULD be applied here, right before the core
+        // loop starts (e.g. a Go-side runtime/debug.SetMemoryLimit or a GOMEMLIMIT env read at
+        // core init). The prebuilt libv2ray/AndroidLibXrayLite binding currently exposes no such
+        // setter, so no cap can be applied from Kotlin. Wiring it up requires a core-lib change
+        // (add an exported setter to libv2ray, then call it here with getMemoryLimit()*1024*1024
+        // when isMemoryLimitEnabled() is true, or leave unbounded when disabled).
         coreController.startLoop(result.content, tunFd)
 
         if (!coreController.isRunning) {

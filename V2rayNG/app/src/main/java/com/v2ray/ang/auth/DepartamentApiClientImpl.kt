@@ -2,6 +2,7 @@ package com.v2ray.ang.auth
 
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
+import com.v2ray.ang.AppConfig
 import com.v2ray.ang.auth.dto.AuthCodeRequest
 import com.v2ray.ang.auth.dto.AuthPollRequest
 import com.v2ray.ang.auth.dto.AuthPollResponse
@@ -10,6 +11,7 @@ import com.v2ray.ang.auth.dto.AuthStartResponse
 import com.v2ray.ang.auth.dto.RefreshRequest
 import com.v2ray.ang.auth.dto.SubscriptionInfoDto
 import com.v2ray.ang.auth.dto.UserProfileDto
+import com.v2ray.ang.handler.SettingsManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -84,6 +86,9 @@ class DepartamentApiClientImpl(
             .url(BackendConfig.baseUrl + path)
             .header("Accept", "application/json")
             .header("User-Agent", BackendConfig.subscriptionUserAgent)
+        if (SettingsManager.isSendHwid()) {
+            builder.header(AppConfig.HEADER_HWID, AuthTokenStore.deviceId())
+        }
         if (!token.isNullOrBlank()) {
             builder.header("Authorization", "Bearer $token")
         }

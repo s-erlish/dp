@@ -162,6 +162,10 @@ object HttpUtil {
                 .header("User-agent", finalUserAgent)
                 .header("Connection", "close")
 
+            request.hwid?.takeIf { it.isNotBlank() }?.let {
+                requestBuilder.addHeader(AppConfig.HEADER_HWID, it)
+            }
+
             applyEmbeddedBasicAuthHeader(currentUrl, requestBuilder)
 
             if (request.httpPort != 0 && !request.proxyUsername.isNullOrBlank() && !request.proxyPassword.isNullOrBlank()) {
@@ -235,6 +239,10 @@ object HttpUtil {
                 .get()
                 .header("User-agent", finalUserAgent)
                 .header("Connection", "close")
+
+            request.hwid?.takeIf { it.isNotBlank() }?.let {
+                requestBuilder.addHeader(AppConfig.HEADER_HWID, it)
+            }
 
             applyEmbeddedBasicAuthHeader(currentUrl, requestBuilder)
 

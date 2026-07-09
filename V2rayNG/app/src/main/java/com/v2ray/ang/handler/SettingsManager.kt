@@ -329,6 +329,29 @@ object SettingsManager {
         return getSocksPort() + if (Utils.isXray()) 0 else 1
     }
 
+    /**
+     * Whether the stable per-install device id (HWID) is attached to subscription
+     * and backend requests. Default TRUE.
+     */
+    fun isSendHwid(): Boolean {
+        return MmkvManager.decodeSettingsBool(AppConfig.PREF_SEND_HWID, true)
+    }
+
+    /**
+     * Soft memory cap (in megabytes) requested for the core runtime. Default 100.
+     * Only meaningful when [isMemoryLimitEnabled] is true.
+     */
+    fun getMemoryLimit(): Int {
+        return Utils.parseInt(MmkvManager.decodeSettingsString(AppConfig.PREF_MEMORY_LIMIT), 100)
+    }
+
+    /**
+     * Whether the memory limit should be enforced. Default TRUE.
+     */
+    fun isMemoryLimitEnabled(): Boolean {
+        return MmkvManager.decodeSettingsBool(AppConfig.PREF_MEMORY_LIMIT_ENABLED, true)
+    }
+
     private fun IsDynamicSocksPort(): Boolean {
         return MmkvManager.decodeSettingsBool(AppConfig.PREF_DYNAMIC_SOCKS_PORT, false)
     }
