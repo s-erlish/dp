@@ -374,6 +374,14 @@ class MainActivity : HelperBaseActivity() {
     private fun setupEmptyState() {
         binding.layoutEmpty.btnImportClipboard.setOnClickListener { importClipboard() }
         binding.layoutEmpty.btnScanQr.setOnClickListener { importQRcode() }
+        // Home empty state (shown when no subscriptions/servers exist yet).
+        binding.layoutHomeEmpty.btnHomeAddQr.setOnClickListener { importQRcode() }
+        binding.layoutHomeEmpty.btnHomeAddClipboard.setOnClickListener { importClipboard() }
+    }
+
+    /** On Home, show the two add-buttons when there are no servers; otherwise show the meta bar. */
+    private fun updateHomeEmptyState() {
+        binding.layoutHomeEmpty.homeEmptyRoot.isVisible = mainViewModel.serversCache.isEmpty()
     }
 
     /**
@@ -386,6 +394,7 @@ class MainActivity : HelperBaseActivity() {
         homeAdapter.setSections(mainViewModel.serversCache, subs, showHeaders = false, index = index)
         updateServersChrome(subs.size)
         bindHomeMetaBar()
+        updateHomeEmptyState()
     }
 
     private fun updateServersChrome(providerCount: Int) {
@@ -445,8 +454,23 @@ class MainActivity : HelperBaseActivity() {
         meta.btnPin.setOnClickListener { toggleHomePin() }
         meta.btnSupport.setOnClickListener { openSubUrl(MmkvManager.decodeSubscription(currentMetaSubId())?.supportUrl) }
         meta.btnTelegram.setOnClickListener { openSubUrl(MmkvManager.decodeSubscription(currentMetaSubId())?.supportUrl) }
-        meta.btnWebsite.setOnClickListener { openSubUrl(MmkvManager.decodeSubscription(currentMetaSubId())?.webPageUrl) }
+        meta.root.setOnLongClickListener { confirmDeleteSubscription(); true }
         bindHomeMetaBar()
+    }
+
+    /** Long-press the Home subscription card to delete the subscription and its servers. */
+    private fun confirmDeleteSubscription() {
+        val subId = currentMetaSubId()
+        if (subId.isEmpty()) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.sub_delete)
+            .setMessage(R.string.sub_delete_confirm)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                MmkvManager.removeSubscription(subId)
+                mainViewModel.reloadServerList()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun toggleMetaBody() {
@@ -588,7 +612,6 @@ class MainActivity : HelperBaseActivity() {
             meta.tvAnnounce.visibility = android.view.View.GONE
         }
         meta.btnSupport.visibility = if (sub.supportUrl.isNotBlank()) android.view.View.VISIBLE else android.view.View.GONE
-        meta.btnWebsite.visibility = if (sub.webPageUrl.isNotBlank()) android.view.View.VISIBLE else android.view.View.GONE
         // Compact Telegram shortcut in the collapsed header, shown only when a support URL exists.
         meta.btnTelegram.visibility = if (sub.supportUrl.isNotBlank()) android.view.View.VISIBLE else android.view.View.GONE
 
@@ -795,15 +818,6 @@ class MainActivity : HelperBaseActivity() {
         }
     }
 
-    private fun handleLayoutTestClick() {
-        if (mainViewModel.isRunning.value == true) {
-            setTestState(getString(R.string.connection_test_testing))
-            mainViewModel.testCurrentServerRealPing()
-        } else {
-            // service not running: keep existing no-op (could show a message if desired)
-        }
-    }
-
     private fun startV2Ray() {
         if (MmkvManager.getSelectServer().isNullOrEmpty()) {
             toast(R.string.title_file_chooser)
@@ -820,10 +834,6 @@ class MainActivity : HelperBaseActivity() {
             delay(500)
             startV2Ray()
         }
-    }
-
-    private fun setTestState(content: String?) {
-        binding.tvTestState.text = content
     }
 
     /**
@@ -851,31 +861,27 @@ class MainActivity : HelperBaseActivity() {
         }
 
         if (isRunning) {
-            // Connected: green shield/glow/label, steady (no pulse).
+            // Connected: blue shield/glow, label shows the connected server name.
             val connected = themeColor(R.attr.connectedColor)
             stopGlowPulse()
             binding.viewConnectGlow.visibility = android.view.View.VISIBLE
             binding.imgConnect.setColorFilter(connected)
             binding.tvConnectionStatus.setTextColor(connected)
             binding.cardConnect.contentDescription = getString(R.string.action_stop_service)
-            binding.tvConnectionStatus.text = getString(R.string.connection_connected)
-            binding.layoutServerInfo.isFocusable = true
+            binding.tvConnectionStatus.text = selectedServerName()
             startConnectionTimer()
         } else {
-            // Idle: neutral shield, no glow.
+            // Idle: neutral shield, no glow; label shows the selected server name.
             stopGlowPulse()
             binding.viewConnectGlow.visibility = android.view.View.INVISIBLE
             binding.imgConnect.setColorFilter(themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
             binding.tvConnectionStatus.setTextColor(themeColor(com.google.android.material.R.attr.colorOnSurface))
             binding.cardConnect.contentDescription = getString(R.string.tasker_start_service)
-            binding.tvConnectionStatus.text = getString(R.string.connection_not_connected)
-            binding.layoutServerInfo.isFocusable = false
-            setTestState(getString(R.string.connection_test_pending))
+            binding.tvConnectionStatus.text = selectedServerName()
             stopConnectionTimer()
             binding.tvDownloadSpeed.text = getString(R.string.speed_zero)
             binding.tvUploadSpeed.text = getString(R.string.speed_zero)
         }
-        updateSelectedServer()
     }
 
     /**
@@ -955,10 +961,17 @@ class MainActivity : HelperBaseActivity() {
         binding.dotMemory.backgroundTintList = android.content.res.ColorStateList.valueOf(getColor(colorRes))
     }
 
-    private fun updateSelectedServer() {
+    /** The name shown under the shield when idle/connected (selected server remarks). */
+    private fun selectedServerName(): String {
         val guid = MmkvManager.getSelectServer()
         val remarks = guid?.let { MmkvManager.decodeServerConfig(it)?.remarks }
-        binding.tvSelectedServer.text = remarks?.takeIf { it.isNotBlank() } ?: getString(R.string.title_file_chooser)
+        return remarks?.takeIf { it.isNotBlank() } ?: getString(R.string.title_file_chooser)
+    }
+
+    private fun updateSelectedServer() {
+        // Connecting/connected labels are owned by applyRunningState; only refresh the idle label.
+        if (mainViewModel.isRunning.value == true) return
+        binding.tvConnectionStatus.text = selectedServerName()
     }
 
     /**
@@ -1070,6 +1083,11 @@ class MainActivity : HelperBaseActivity() {
 
         R.id.import_clipboard -> {
             importClipboard()
+            true
+        }
+
+        R.id.tv_send -> {
+            startActivity(Intent(this, TvSendActivity::class.java))
             true
         }
 
