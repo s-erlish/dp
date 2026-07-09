@@ -51,8 +51,8 @@ class MainRecyclerAdapter(
     private var rows: List<Row> = emptyList()
 
     /**
-     * Long-press callback for a server row (guid). Set by the host activity to open the
-     * Incy server-actions bottom sheet (share / edit / duplicate / set default / delete).
+     * Retained for host-activity API compatibility. The long-press server-actions menu was
+     * removed, so this callback is no longer invoked by the adapter.
      */
     var onItemLongClick: ((String) -> Unit)? = null
 
@@ -191,11 +191,6 @@ class MainRecyclerAdapter(
         binding.tvJson.visibility = if (complex) View.VISIBLE else View.GONE
         binding.tvStatistics.text = transportSecurity(guid, profile)
 
-        // Subscription remarks badge (only meaningful in all-servers mode).
-        val subRemarks = getSubscriptionRemarks(profile)
-        binding.tvSubscription.text = subRemarks
-        binding.layoutSubscription.visibility = if (subRemarks.isEmpty()) View.GONE else View.VISIBLE
-
         // Ping dot + latency text.
         val aff = MmkvManager.decodeServerAffiliationInfo(guid)
         val delay = aff?.testDelayMillis ?: 0L
@@ -224,11 +219,7 @@ class MainRecyclerAdapter(
         binding.infoContainer.setOnClickListener {
             adapterListener?.onSelectServer(guid)
         }
-        // Long-press opens the Incy server-actions bottom sheet (inline actions removed in S3).
-        binding.infoContainer.setOnLongClickListener {
-            onItemLongClick?.invoke(guid)
-            true
-        }
+        // Long-press server-actions menu removed: long-press is a no-op (no listener set).
     }
 
     private fun primaryProtocol(guid: String, profile: ProfileItem): String {
@@ -291,15 +282,6 @@ class MainRecyclerAdapter(
         }
         customProtoCache[guid] = info
         return info
-    }
-
-    private fun getSubscriptionRemarks(profile: ProfileItem): String {
-        val subRemarks =
-            if (mainViewModel.subscriptionId.isEmpty())
-                MmkvManager.decodeSubscription(profile.subscriptionId)?.remarks?.firstOrNull()
-            else
-                null
-        return subRemarks?.toString() ?: ""
     }
 
     /** Removes a server row by guid and rebuilds the flat list. */
