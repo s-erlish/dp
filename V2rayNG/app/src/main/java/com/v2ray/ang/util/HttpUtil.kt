@@ -222,8 +222,11 @@ object HttpUtil {
         while (redirects++ < maxRedirects) {
             if (currentUrl == null) continue
             val client = buildOkHttpClient(request.timeout, request.httpPort, request.proxyUsername, request.proxyPassword, followRedirects = false)
+            // Subscription fetch: default to the v2rayNG User-Agent so panels (Remnawave/3x-ui)
+            // that key the response format (XRAY_JSON template vs base64 link list) off a
+            // recognised client return the correct managed format. Overridable per-subscription.
             val finalUserAgent = if (request.userAgent.isNullOrBlank()) {
-                "departament/${BuildConfig.VERSION_NAME}"
+                "v2rayNG/${BuildConfig.VERSION_NAME}"
             } else {
                 request.userAgent
             }
