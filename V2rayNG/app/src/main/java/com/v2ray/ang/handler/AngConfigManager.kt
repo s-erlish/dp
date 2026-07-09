@@ -398,10 +398,15 @@ object AngConfigManager {
         // A locked (operator-managed, hidden) subscription stamps every imported profile and
         // stores its raw template obfuscated/encrypted. Non-locked subs keep the plaintext path.
         val locked = MmkvManager.decodeSubscription(subid)?.locked == true
-        if (server.contains("inbounds")
+        // Robustly detect a raw Xray JSON body (single object or array of configs).
+        // Remnawave XRAY_JSON templates may omit "inbounds"/"routing", so key off the
+        // structure (starts with { or [) plus the mandatory "outbounds" key, rather than
+        // requiring all three substrings. Base64 / vless:// link lists are handled upstream
+        // in parseConfigViaSub (parseBatchConfig) before this custom-JSON path is reached.
+        val trimmedServer = server.trim()
+        val looksLikeJson = (trimmedServer.startsWith("{") || trimmedServer.startsWith("["))
             && server.contains("outbounds")
-            && server.contains("routing")
-        ) {
+        if (looksLikeJson) {
             try {
                 val serverList: Array<Any> =
                     JsonUtil.fromJson(server, Array<Any>::class.java) ?: arrayOf()
