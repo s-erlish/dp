@@ -1,23 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Departament Telegram auth module. New strings only; do not merge into strings.xml. -->
-    <string name="auth_login_title">Sign in</string>
-    <!-- auth_sign_in_telegram is defined (in Russian) in strings.xml to avoid a duplicate. -->
-    <string name="auth_intro_headline">Sign in with Telegram</string>
-    <string name="auth_intro_desc">Connect your Telegram account to import your subscription automatically.</string>
-    <string name="auth_continue_telegram">Continue with Telegram</string>
-    <string name="auth_awaiting_title">Waiting for confirmation</string>
-    <string name="auth_awaiting_desc">Open Telegram and press Start, then come back here. Waiting for confirmation…</string>
-    <string name="auth_open_telegram_again">Open Telegram again</string>
-    <string name="auth_enter_code_manually">Or enter the code from the bot</string>
-    <string name="auth_code_hint">Paste code</string>
-    <string name="auth_submit_code">Submit code</string>
-    <string name="auth_success">Signed in successfully</string>
-    <string name="auth_error_generic">Something went wrong. Please try again.</string>
-    <string name="auth_error_network">Network error. Check your connection and try again.</string>
-    <string name="auth_error_unauthorized">Invalid or expired code. Please try again.</string>
-    <string name="auth_error_rate_limited">Too many attempts. Please wait a moment and retry.</string>
-    <string name="auth_error_timeout">Login timed out. Please try again.</string>
-    <string name="auth_error_telegram_not_installed">Telegram is not installed. Use the manual code instead.</string>
-    <string name="auth_not_configured">Sign-in is not available in this build.</string>
+    <!-- Departament auth module. New Russian strings only; do NOT merge into strings.xml.
+         Note: auth_sign_in_telegram is defined (in Russian) in strings.xml — do not redefine here. -->
+
+    <string name="auth_title">Вход</string>
+
+    <!-- Telegram section -->
+    <string name="auth_tg_headline">Вход через Telegram</string>
+    <string name="auth_tg_desc">Подключите аккаунт Telegram, чтобы войти в один тап.</string>
+    <string name="auth_btn_telegram">Войти через Telegram</string>
+    <string name="auth_awaiting">Ожидаем подтверждения в Telegram…</string>
+    <string name="auth_restart">Начать заново</string>
+    <string name="auth_telegram_not_installed">Приложение Telegram не установлено</string>
+
+    <!-- Site section -->
+    <string name="auth_site_headline">Вход через сайт</string>
+    <string name="auth_email_hint">Электронная почта</string>
+    <string name="auth_password_hint">Пароль</string>
+    <string name="auth_btn_site">Войти через сайт</string>
+    <string name="auth_fields_required">Заполните все поля</string>
+
+    <!-- Two-factor (TOTP) -->
+    <string name="auth_2fa_desc">Введите 6-значный код из приложения</string>
+    <string name="auth_2fa_hint">6-значный код</string>
+    <string name="auth_btn_2fa">Подтвердить</string>
+    <string name="auth_code_required">Введите код</string>
+
+    <!-- Result / errors -->
+    <string name="auth_success">Вход выполнен</string>
+    <string name="auth_err_gone">Ссылка устарела, начните заново</string>
+    <string name="auth_err_unavailable">Сервис временно недоступен</string>
+    <string name="auth_err_network">Проблема с сетью</string>
+    <string name="auth_err_not_configured">Вход недоступен</string>
+    <string name="auth_err_generic">Что-то пошло не так. Попробуйте снова.</string>
 </resources>
