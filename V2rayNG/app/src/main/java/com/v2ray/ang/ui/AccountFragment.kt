@@ -1,5 +1,6 @@
 package com.v2ray.ang.ui
 
+import android.animation.ValueAnimator
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -10,6 +11,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.AnimationUtils
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.view.updatePadding
@@ -32,6 +35,7 @@ import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.util.AvatarManager
+import com.v2ray.ang.util.reducedMotion
 import com.v2ray.ang.viewmodel.AccountViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -60,6 +64,11 @@ class AccountFragment : Fragment() {
 
     private var pendingPayment = false
     private var pollJob: Job? = null
+
+    // Last balance figure actually shown, so a re-render counts UP from it instead of hard-swapping.
+    // Null until the first paint (which sets the value instantly — no spin on open).
+    private var lastBalance: Double? = null
+    private var balanceAnimator: ValueAnimator? = null
 
     // Set right before a purchase/top-up call so the NEXT error emission is surfaced as the real
     // "Ошибка оплаты" diagnostic dialog instead of the friendly toast. Cleared on success.
@@ -93,6 +102,8 @@ class AccountFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        balanceAnimator?.cancel()
+        balanceAnimator = null
         _binding = null
     }
 
@@ -150,7 +161,10 @@ class AccountFragment : Fragment() {
         latestProfile = profile
         if (profile == null) {
             binding.tvEmail.text = ""
-            // Null/error state: blank the balance rather than showing a fake "Баланс: 0 ₽".
+            // Null/error state: blank the balance rather than showing a fake "Баланс: 0 ₽". Forget the
+            // last figure so a profile arriving later paints instantly instead of counting up from stale.
+            balanceAnimator?.cancel()
+            lastBalance = null
             binding.tvBalance.text = ""
             binding.tvReferral.visibility = View.GONE
             binding.btnCopyReferral.visibility = View.GONE
@@ -167,7 +181,14 @@ class AccountFragment : Fragment() {
         binding.tvEmail.text = primary
         AvatarManager.setMonogram(binding.tvAvatarInitial, primary)
         AvatarManager.applyAvatar(viewLifecycleOwner.lifecycleScope, requireContext(), binding.imgAvatar, binding.tvAvatarInitial, profile)
-        binding.tvBalance.text = getString(R.string.account_balance_inline, formatMoney(profile.balance, profile.currency))
+        val previousBalance = lastBalance
+        if (previousBalance == null || previousBalance == profile.balance) {
+            // First paint (or an unchanged re-render): land the figure instantly, no count-up spin.
+            binding.tvBalance.text = getString(R.string.account_balance_inline, formatMoney(profile.balance, profile.currency))
+        } else {
+            animateMoney(binding.tvBalance, previousBalance, profile.balance, profile.currency)
+        }
+        lastBalance = profile.balance
         if (profile.referralCode.isNotBlank()) {
             binding.tvReferral.visibility = View.VISIBLE
             binding.btnCopyReferral.visibility = View.VISIBLE
@@ -175,6 +196,35 @@ class AccountFragment : Fragment() {
         } else {
             binding.tvReferral.visibility = View.GONE
             binding.btnCopyReferral.visibility = View.GONE
+        }
+    }
+
+    /**
+     * Counts the balance figure UP from [from] to [to] over ~motion_reveal, ease_out_quart, formatting
+     * every frame through the same money formatter so the ₽ sign and tabular figures stay put. Any
+     * in-flight count-up is cancelled first so rapid balance changes don't stack. Reduced motion (or a
+     * no-op delta): the final value lands instantly.
+     */
+    private fun animateMoney(textView: TextView, from: Double, to: Double, currency: String) {
+        balanceAnimator?.cancel()
+        // Whole-ruble balances count on integers so the tabular figure never flickers decimals mid-flight;
+        // fractional balances keep their 2-decimal shape the formatter already applies.
+        val wholeOnly = from % 1.0 == 0.0 && to % 1.0 == 0.0
+        val show = { value: Double ->
+            val shown = if (wholeOnly) Math.round(value).toDouble() else value
+            textView.text = getString(R.string.account_balance_inline, formatMoney(shown, currency))
+        }
+        if (textView.reducedMotion() || from == to) {
+            show(to)
+            return
+        }
+        balanceAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = resources.getInteger(R.integer.motion_reveal).toLong()
+            interpolator = AnimationUtils.loadInterpolator(textView.context, R.interpolator.ease_out_quart)
+            addUpdateListener { anim ->
+                show(from + (to - from) * anim.animatedFraction)
+            }
+            start()
         }
     }
 
