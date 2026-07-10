@@ -423,6 +423,16 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />
 
+            <!-- ==================== ACCOUNT TAB ==================== -->
+            <!-- Host for AccountFragment (attached lazily the first time the tab is opened). A
+                 plain FrameLayout, not a FragmentContainerView, so the fragment is added manually
+                 and the tab only exists while signed in. -->
+            <FrameLayout
+                android:id="@+id/group_account"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
+
             </FrameLayout>
 
             <!-- Faint gradient scrim (transparent -> surface): the content fades out

@@ -124,11 +124,6 @@
             android:name=".ui.LoginActivity"
             android:exported="false" />
 
-        <activity
-            android:name=".ui.AccountActivity"
-            android:exported="false"
-            android:parentActivityName=".ui.MainActivity" />
-
         <!-- =====================Android TV: QR Wi-Fi subscription transfer===================== -->
         <!-- TV-side receiver: shows the pairing QR and runs the one-shot LAN listener. -->
         <activity

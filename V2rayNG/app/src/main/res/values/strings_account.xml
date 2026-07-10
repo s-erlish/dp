@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Russian strings for the Account / Payments screen (AccountActivity).
+  Russian strings for the Account / Payments screen (AccountFragment).
   Kept separate from the shared strings.xml on purpose.
 -->
 <resources>

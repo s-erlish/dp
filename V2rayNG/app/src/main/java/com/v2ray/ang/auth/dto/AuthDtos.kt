@@ -99,6 +99,14 @@ data class UserProfileDto(
     val telegramLinked: Boolean = false,
     val telegramId: Long? = null,
     val telegramUsername: String? = null,
+    // Telegram display / first name, when the backend exposes it. Preferred for the primary
+    // account line; the key name varies across backends so accept the common spellings. Stays
+    // null (so the @username/email fallback is used unchanged) when absent.
+    @SerializedName(
+        value = "telegramName",
+        alternate = ["telegramFirstName", "firstName", "first_name", "name", "displayName", "tgName"],
+    )
+    val telegramName: String? = null,
     val referralCode: String = "",
     val remnawaveUuid: String = "",
     val trialUsed: Boolean = false,

@@ -8,12 +8,16 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.EditText
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.core.view.updatePadding
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -43,14 +47,19 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 
 /**
- * Account / Payments screen for the departament backend. Shows the profile + balance,
- * subscriptions, the tariff catalog, account actions (upgrade / add-devices / promo / trial)
- * and the payment history. Purchases open a provider checkout in a Custom Tab; a PAID result
- * only ever arrives via webhook, so on return we re-poll rather than assume success.
+ * Account / Payments screen for the departament backend, hosted IN-PLACE as the Account bottom-nav
+ * tab (no sliding Activity, no toolbar). Shows the profile + balance, subscriptions, the tariff
+ * catalog, account actions (upgrade / add-devices / promo / trial) and the payment history.
+ * Purchases open a provider checkout in a Custom Tab; a PAID result only ever arrives via webhook,
+ * so on return we re-poll rather than assume success.
  */
-class AccountActivity : BaseActivity() {
+class AccountFragment : Fragment() {
 
-    private val binding by lazy { ActivityAccountBinding.inflate(layoutInflater) }
+    // Nullable binding so the view refs are released in onDestroyView (avoids leaking the whole
+    // account view tree while the tab is detached).
+    private var _binding: ActivityAccountBinding? = null
+    private val binding get() = _binding!!
+
     private val viewModel: AccountViewModel by viewModels()
 
     private val subsAdapter by lazy {
@@ -69,26 +78,43 @@ class AccountActivity : BaseActivity() {
     private var pollJob: Job? = null
 
     // Gallery picker for a custom avatar. GetContent grants a one-shot read grant, which is
-    // enough since we copy the bytes into app storage immediately.
+    // enough since we copy the bytes into app storage immediately. Registered at construction
+    // (valid for a Fragment), never after STARTED.
     private val pickAvatar =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri -> onAvatarPicked(uri) }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = getString(R.string.account_title))
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
+        _binding = ActivityAccountBinding.inflate(inflater, container, false)
+        return binding.root
+    }
 
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        // The bottom nav overlays tab content, so keep the last card scrollable clear of it (this
+        // tab has no inset listener of its own like the Home/Servers lists do).
+        binding.scrollRoot.clipToPadding = false
+        binding.scrollRoot.updatePadding(bottom = (96 * resources.displayMetrics.density).toInt())
         setupRecyclers()
         wireActions()
         observeState()
         loadAll()
     }
 
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
+    }
+
     private fun setupRecyclers() {
-        binding.rvSubscriptions.layoutManager = LinearLayoutManager(this)
+        binding.rvSubscriptions.layoutManager = LinearLayoutManager(requireContext())
         binding.rvSubscriptions.adapter = subsAdapter
-        binding.rvTariffs.layoutManager = LinearLayoutManager(this)
+        binding.rvTariffs.layoutManager = LinearLayoutManager(requireContext())
         binding.rvTariffs.adapter = tariffAdapter
-        binding.rvPayments.layoutManager = LinearLayoutManager(this)
+        binding.rvPayments.layoutManager = LinearLayoutManager(requireContext())
         binding.rvPayments.adapter = paymentsAdapter
         updateDeviceStepperUi()
     }
@@ -121,8 +147,8 @@ class AccountActivity : BaseActivity() {
     }
 
     private fun observeState() {
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.profile.collect { renderProfile(it) } }
                 launch { viewModel.subscriptions.collect { renderSubscriptions(it) } }
                 launch { viewModel.tariffs.collect { renderTariffs(it) } }
@@ -133,6 +159,18 @@ class AccountActivity : BaseActivity() {
             }
         }
     }
+
+    // The in-place Account tab has no toolbar/app bar, so there is no global spinner surface like
+    // BaseActivity's. Loading stays silent here; the flows are quick and the payment re-poll uses
+    // tv_pending for its own progress hint.
+    private fun showLoading() {}
+
+    private fun hideLoading() {}
+
+    // Context-scoped toast helpers so the ported (Context.toast) calls work from a Fragment.
+    private fun toast(message: Int) = requireContext().toast(message)
+    private fun toastError(message: Int) = requireContext().toastError(message)
+    private fun toastSuccess(message: Int) = requireContext().toastSuccess(message)
 
     // region rendering
 
@@ -145,20 +183,26 @@ class AccountActivity : BaseActivity() {
             binding.tvReferral.visibility = View.GONE
             binding.btnTrial.visibility = View.GONE
             AvatarManager.setMonogram(binding.tvAvatarInitial, null)
-            AvatarManager.applyAvatar(lifecycleScope, this, binding.imgAvatar, binding.tvAvatarInitial, null)
+            AvatarManager.applyAvatar(viewLifecycleOwner.lifecycleScope, requireContext(), binding.imgAvatar, binding.tvAvatarInitial, null)
             return
         }
-        // Primary line = Telegram @nick when linked, otherwise the account e-mail.
+        // Primary line prefers the Telegram display name, then the @nick, then the account e-mail.
         val uname = profile.telegramUsername?.takeIf { it.isNotBlank() }
-        val primary = uname?.let { "@$it" } ?: profile.email
+        val handle = uname?.let { "@$it" }
+        val display = profile.telegramName?.takeIf { it.isNotBlank() }
+        val primary = display ?: handle ?: profile.email
         binding.tvEmail.text = primary
+        // Secondary line keeps the @username/email identity. When a real display name is shown
+        // above, put the @handle (or e-mail) beneath it; otherwise this matches the prior behaviour.
         binding.tvTelegram.text = when {
+            display != null && handle != null -> handle
+            display != null && profile.email.isNotBlank() -> profile.email
             uname != null && profile.email.isNotBlank() -> profile.email
             uname != null -> getString(R.string.account_telegram, uname)
             else -> getString(R.string.account_no_telegram)
         }
         AvatarManager.setMonogram(binding.tvAvatarInitial, primary)
-        AvatarManager.applyAvatar(lifecycleScope, this, binding.imgAvatar, binding.tvAvatarInitial, profile)
+        AvatarManager.applyAvatar(viewLifecycleOwner.lifecycleScope, requireContext(), binding.imgAvatar, binding.tvAvatarInitial, profile)
         binding.tvBalance.text = formatMoney(profile.balance, profile.currency)
         if (profile.referralCode.isNotBlank()) {
             binding.tvReferral.visibility = View.VISIBLE
@@ -175,7 +219,8 @@ class AccountActivity : BaseActivity() {
         binding.tvSubsEmpty.visibility = if (empty) View.VISIBLE else View.GONE
         binding.rvSubscriptions.visibility = if (empty) View.GONE else View.VISIBLE
 
-        // Keep the active selection if still present; otherwise default to the first sub.
+        // Keep the active selection if still present; otherwise default to the first sub, which
+        // renders as the most-emphasized (blue-outlined) card at the top of the list.
         val current = activeSub
         val resolved = list.firstOrNull { it.remnawaveUuid == current?.remnawaveUuid } ?: list.firstOrNull()
         activeSub = resolved
@@ -269,11 +314,11 @@ class AccountActivity : BaseActivity() {
     }
 
     private fun showTopUpDialog() {
-        val input = EditText(this).apply {
+        val input = EditText(requireContext()).apply {
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
             hint = getString(R.string.account_top_up_hint)
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(requireContext())
             .setTitle(R.string.account_top_up_title)
             .setView(input)
             .setPositiveButton(android.R.string.ok) { _, _ ->
@@ -288,7 +333,7 @@ class AccountActivity : BaseActivity() {
 
     private fun copyReferralCode() {
         val code = latestProfile?.referralCode?.takeIf { it.isNotBlank() } ?: return
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
+        val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
         clipboard.setPrimaryClip(ClipData.newPlainText("referral", code))
         toast(R.string.account_referral_copied)
     }
@@ -296,20 +341,20 @@ class AccountActivity : BaseActivity() {
     // region avatar
 
     private fun showAvatarOptions() {
-        val hasCustom = AvatarManager.hasCustomAvatar(this)
+        val hasCustom = AvatarManager.hasCustomAvatar(requireContext())
         val items = if (hasCustom) {
             arrayOf(getString(R.string.account_avatar_gallery), getString(R.string.account_avatar_remove))
         } else {
             arrayOf(getString(R.string.account_avatar_gallery))
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(requireContext())
             .setTitle(R.string.account_change_avatar)
             .setItems(items) { _, which ->
                 when (which) {
                     0 -> launchAvatarPicker()
                     1 -> {
-                        AvatarManager.clearCustomAvatar(this)
-                        AvatarManager.applyAvatar(lifecycleScope, this, binding.imgAvatar, binding.tvAvatarInitial, latestProfile)
+                        AvatarManager.clearCustomAvatar(requireContext())
+                        AvatarManager.applyAvatar(viewLifecycleOwner.lifecycleScope, requireContext(), binding.imgAvatar, binding.tvAvatarInitial, latestProfile)
                         toast(R.string.account_avatar_updated)
                     }
                 }
@@ -328,8 +373,8 @@ class AccountActivity : BaseActivity() {
 
     private fun onAvatarPicked(uri: Uri?) {
         if (uri == null) return
-        if (AvatarManager.saveCustomAvatar(this, uri)) {
-            AvatarManager.applyAvatar(lifecycleScope, this, binding.imgAvatar, binding.tvAvatarInitial, latestProfile)
+        if (AvatarManager.saveCustomAvatar(requireContext(), uri)) {
+            AvatarManager.applyAvatar(viewLifecycleOwner.lifecycleScope, requireContext(), binding.imgAvatar, binding.tvAvatarInitial, latestProfile)
             toast(R.string.account_avatar_updated)
         } else {
             toastError(R.string.account_avatar_error)
@@ -350,7 +395,7 @@ class AccountActivity : BaseActivity() {
             return
         }
         val labels = tariffs.map { it.name }.toTypedArray()
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(requireContext())
             .setTitle(R.string.account_upgrade_title)
             .setItems(labels) { _, which ->
                 val target = tariffs[which]
@@ -416,7 +461,7 @@ class AccountActivity : BaseActivity() {
         val uri = Uri.parse(url)
         pendingPayment = true
         try {
-            CustomTabsIntent.Builder().build().launchUrl(this, uri)
+            CustomTabsIntent.Builder().build().launchUrl(requireContext(), uri)
         } catch (e: ActivityNotFoundException) {
             try {
                 startActivity(Intent(Intent.ACTION_VIEW, uri))
@@ -439,7 +484,7 @@ class AccountActivity : BaseActivity() {
     private fun startPaymentPolling() {
         if (pollJob?.isActive == true) return
         binding.tvPending.visibility = View.VISIBLE
-        pollJob = lifecycleScope.launch {
+        pollJob = viewLifecycleOwner.lifecycleScope.launch {
             repeat(6) {
                 viewModel.loadSubscriptions()
                 viewModel.loadPayments()

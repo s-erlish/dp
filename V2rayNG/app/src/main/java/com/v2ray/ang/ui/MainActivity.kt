@@ -259,12 +259,9 @@ class MainActivity : HelperBaseActivity() {
         binding.navHome.setOnClickListener { selectNav(R.id.nav_home) }
         binding.navServers.setOnClickListener { selectNav(R.id.nav_servers) }
         binding.navSettings.setOnClickListener { selectNav(R.id.nav_settings) }
-        // The Account item is an action, not a content tab: it opens AccountActivity and leaves
-        // the currently selected tab in place (re-tinted so the account item doesn't stay lit).
-        binding.navAccount.setOnClickListener {
-            requestActivityLauncher.launch(Intent(this, AccountActivity::class.java))
-            updateNavSelection()
-        }
+        // The Account item is now a real in-place content tab (AccountFragment), selected like the
+        // others; its content is attached lazily the first time it is opened (see showTab).
+        binding.navAccount.setOnClickListener { selectNav(R.id.nav_account) }
         selectNav(R.id.nav_home)
     }
 
@@ -286,8 +283,7 @@ class MainActivity : HelperBaseActivity() {
             Triple(R.id.nav_home, binding.navHomeIcon, binding.navHomeLabel),
             Triple(R.id.nav_servers, binding.navServersIcon, binding.navServersLabel),
             Triple(R.id.nav_settings, binding.navSettingsIcon, binding.navSettingsLabel),
-            // Never becomes the selected tab (it launches AccountActivity), so it always
-            // renders in the inactive tint.
+            // The Account tab tints blue when selected, exactly like the other tabs.
             Triple(R.id.nav_account, binding.navAccountIcon, binding.navAccountLabel),
         )
         items.forEach { (id, icon, label) ->
@@ -297,10 +293,22 @@ class MainActivity : HelperBaseActivity() {
         }
     }
 
+    // The Account tab's fragment is attached lazily (and only once) the first time the tab is
+    // opened, so signed-out users never pay for it.
+    private var accountFragmentAdded = false
+
     private fun showTab(tab: Int) {
         binding.groupHome.isVisible = tab == R.id.nav_home
         binding.groupServers.isVisible = tab == R.id.nav_servers
         binding.groupSettings.root.isVisible = tab == R.id.nav_settings
+        binding.groupAccount.isVisible = tab == R.id.nav_account
+        // Attach the Account fragment on first entry into its tab (guarded so it is added once).
+        if (tab == R.id.nav_account && !accountFragmentAdded) {
+            accountFragmentAdded = true
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.group_account, AccountFragment())
+                .commit()
+        }
         // No tab shows a title or "+" in the top bar, so the fixed AppBarLayout is hidden on ALL
         // tabs (each tab's content gets the status-bar top inset directly in setupEdgeToEdge). This
         // removes the empty top band the toolbar left on the Servers/Settings tabs.
@@ -325,6 +333,7 @@ class MainActivity : HelperBaseActivity() {
             binding.groupHome.updatePadding(top = bars.top)
             binding.groupServers.updatePadding(top = bars.top)
             binding.groupSettings.root.updatePadding(top = bars.top)
+            binding.groupAccount.updatePadding(top = bars.top)
             // Small fixed bottom pad (NOT the full gesture-bar inset): on gesture nav the thin
             // pill was lifting the whole bar well above the edge. Cap at ~8dp so the items sit
             // low, just a few dp clear of the bottom. Material's auto bottom-inset padding is
@@ -611,10 +620,8 @@ class MainActivity : HelperBaseActivity() {
             ctaDismissed = true
             header.ctaLinkTelegram.isVisible = false
         }
-        // Signed-in chip opens the account screen.
-        header.chipAccount.setOnClickListener {
-            requestActivityLauncher.launch(Intent(this, AccountActivity::class.java))
-        }
+        // Signed-in chip selects the in-place Account tab.
+        header.chipAccount.setOnClickListener { selectNav(R.id.nav_account) }
         // Onboarding-card sign-in buttons (same login screen).
         binding.layoutHomeEmpty.btnHomeLoginTg.setOnClickListener { openLoginScreen() }
         binding.layoutHomeEmpty.btnHomeLoginSite.setOnClickListener { openLoginScreen() }
@@ -644,6 +651,8 @@ class MainActivity : HelperBaseActivity() {
         header.groupLogin.isVisible = !loggedIn
         header.chipAccount.isVisible = loggedIn
         binding.navAccount.isVisible = loggedIn
+        // Logging out while on the Account tab: the tab is now hidden, so fall back to Home.
+        if (!loggedIn && selectedNavId == R.id.nav_account) selectNav(R.id.nav_home)
         if (state is AccountSession.AccountState.LoggedIn) {
             bindAccountChip(state.profile)
         } else {
@@ -656,16 +665,23 @@ class MainActivity : HelperBaseActivity() {
         accountLoggedIn = loggedIn
     }
 
-    /** Fills the signed-in account chip from the profile (Telegram @handle, else email). */
+    /**
+     * Fills the signed-in account chip from the profile. Primary line prefers the Telegram display
+     * name, then the @handle, then the e-mail; when a real display name is shown, the @handle/email
+     * identity moves to the secondary line (otherwise it keeps the neutral "open account" hint, so
+     * there is no visible change when the backend sends no display name).
+     */
     private fun bindAccountChip(profile: UserProfileDto) {
         val header = binding.layoutHomeAccount
-        val name = profile.telegramUsername?.takeIf { it.isNotBlank() }?.let { "@$it" }
-            ?: profile.email.takeIf { it.isNotBlank() }
-            ?: getString(R.string.auth_account)
-        header.tvAccountName.text = name
-        AvatarManager.setMonogram(header.tvAvatarInitial, name)
+        val handle = profile.telegramUsername?.takeIf { it.isNotBlank() }?.let { "@$it" }
+        val identity = handle ?: profile.email.takeIf { it.isNotBlank() }
+        val display = profile.telegramName?.takeIf { it.isNotBlank() }
+        val primary = display ?: identity ?: getString(R.string.auth_account)
+        header.tvAccountName.text = primary
+        AvatarManager.setMonogram(header.tvAvatarInitial, primary)
         AvatarManager.applyAvatar(lifecycleScope, this, header.imgAvatar, header.tvAvatarInitial, profile)
-        header.tvAccountSub.text = getString(R.string.auth_open_account)
+        header.tvAccountSub.text = if (display != null && identity != null) identity
+            else getString(R.string.auth_open_account)
     }
 
     /**
