@@ -37,7 +37,11 @@
     <string name="lp_hide_icon">Скрыть значок (только прокси)</string>
     <string name="lp_hide_icon_sub">Работать без VPN, только локальный прокси</string>
     <string name="lp_hotspot">Доступ через хотспот</string>
-    <string name="lp_hotspot_sub">Разрешить подключения из локальной сети</string>
+    <string name="lp_hotspot_sub">Ручной SOCKS5-прокси для устройств в сети</string>
+    <string name="lp_hotspot_hint">Пропишите этот SOCKS5-прокси в настройках другого устройства — тогда его трафик пойдёт через VPN. Это не сквозной перехват: без ручной настройки прокси ничего не перенаправляется.</string>
+    <string name="lp_hotspot_warning">Подключения из локальной сети. Убедитесь, что вы в доверенной сети.</string>
+    <string name="lp_hotspot_endpoint">Адрес для других устройств</string>
+    <string name="lp_hotspot_no_ip">Wi-Fi недоступен — включите точку доступа или подключитесь к Wi-Fi</string>
     <string name="lp_route_domain">Маршрутизация по домену</string>
     <string name="lp_route_domain_sub">Определять правила по имени домена</string>
 </resources>

@@ -322,6 +322,49 @@ object SettingsManager {
     }
 
     /**
+     * Get the SOCKS port used for LAN/hotspot proxy sharing.
+     *
+     * This is a separate, dedicated port from [getSocksPort]: the loopback socks inbound
+     * (used by the local tun bridge) stays bound to 127.0.0.1, while the shared inbound is
+     * bound to 0.0.0.0. Binding 0.0.0.0 would otherwise subsume the loopback bind, so the two
+     * inbounds MUST use different ports.
+     */
+    fun getSocksSharePort(): Int {
+        return Utils.parseInt(
+            MmkvManager.decodeSettingsString(AppConfig.PREF_SOCKS_SHARE_PORT),
+            AppConfig.PORT_SOCKS_SHARE.toInt()
+        )
+    }
+
+    /**
+     * Ensure SOCKS5 credentials exist, generating and persisting them when empty.
+     *
+     * The LAN/hotspot inbound is bound to 0.0.0.0, so it must NEVER be reachable without
+     * authentication (an open relay). When sharing is enabled with empty credentials this
+     * generates a login (dep_ + 6 hex) and password (12 hex) and persists them, mirroring the
+     * generator used by the local proxy screen. Returns the effective (user, pass) pair.
+     */
+    @Synchronized
+    fun ensureSocksShareCredentials(): Pair<String, String> {
+        var user = getSocksUsername()
+        var pass = getSocksPassword()
+        if (user.isNullOrEmpty() || pass.isNullOrEmpty()) {
+            user = "dep_" + randomHex(6)
+            pass = randomHex(12)
+            MmkvManager.encodeSettings(AppConfig.PREF_SOCKS_USERNAME, user)
+            MmkvManager.encodeSettings(AppConfig.PREF_SOCKS_PASSWORD, pass)
+        }
+        return user to pass
+    }
+
+    private fun randomHex(length: Int): String {
+        val chars = "0123456789abcdef"
+        return buildString(length) {
+            repeat(length) { append(chars[Random.nextInt(chars.length)]) }
+        }
+    }
+
+    /**
      * Get the HTTP port.
      * @return The HTTP port.
      */

@@ -62,6 +62,7 @@ object AppConfig {
     const val PREF_ALLOW_INSECURE = "pref_allow_insecure"
     const val PREF_ENABLE_LOCAL_PROXY = "pref_enable_local_proxy"
     const val PREF_SOCKS_PORT = "pref_socks_port"
+    const val PREF_SOCKS_SHARE_PORT = "pref_socks_share_port"
     const val PREF_DYNAMIC_SOCKS_PORT = "pref_dynamic_socks_port"
     const val PREF_SOCKS_USERNAME = "pref_socks_username"
     const val PREF_SOCKS_PASSWORD = "pref_socks_password"
@@ -155,6 +156,7 @@ object AppConfig {
     /** Ports and addresses for various services. */
     const val PORT_LOCAL_DNS = "10853"
     const val PORT_SOCKS = "10808"
+    const val PORT_SOCKS_SHARE = "10810"
     const val WIREGUARD_LOCAL_ADDRESS_V4 = "172.16.0.2/32"
     const val WIREGUARD_LOCAL_ADDRESS_V6 = "2606:4700:110:8f81:d551:a0:532e:a2b3/128"
     const val WIREGUARD_LOCAL_MTU = "1420"

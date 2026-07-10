@@ -615,25 +615,26 @@ object CoreConfigManager {
         val enableLocalProxy = forcedByHev || MmkvManager.decodeSettingsBool(AppConfig.PREF_ENABLE_LOCAL_PROXY, true)
 
         val socksPort = SettingsManager.getSocksPort()
-        // Proxy sharing binds the socks inbound to 0.0.0.0 (see the listen decision below) so
-        // other devices on the LAN/hotspot can use the phone as a proxy and ride its VPN.
-        // The local tun bridge (hev-socks5-tunnel) connects to this SAME inbound on 127.0.0.1,
-        // so the inbound is ALWAYS kept "noauth": requiring SOCKS5 auth here rejected the local
-        // tunnel and killed the phone's VPN (and the hotspot too). Auth is deliberately not
-        // enforced on the inbound; a shared proxy is only reachable while sharing is enabled.
+        // Two-inbound topology for LAN/hotspot sharing:
+        //  - inbound1 ("socks") is ALWAYS bound to 127.0.0.1 (loopback) and ALWAYS "noauth".
+        //    The local tun bridge (hev-socks5-tunnel) and internal okhttp connect to this SAME
+        //    inbound on 127.0.0.1 with NO credentials, so requiring auth here (or rebinding it to
+        //    0.0.0.0) rejected the local tunnel and killed the phone's VPN. It must never change.
+        //  - When PREF_PROXY_SHARING is ON a SEPARATE authenticated "socks-lan" inbound is added
+        //    below, bound to 0.0.0.0 on a dedicated share port, so tethered devices can point
+        //    their SOCKS5 client at the phone and ride its VPN without exposing an open relay.
         val proxySharing = MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING) == true
         val inbound1 = v2rayConfig.inbounds[0]
         if (inbound1.settings == null) {
             inbound1.settings = V2rayConfig.InboundBean.InSettingsBean()
         }
 
-        if (!proxySharing) {
-            inbound1.listen = AppConfig.LOOPBACK
-        }
+        // Loopback-only, unconditionally: never rebind the local inbound to 0.0.0.0.
+        inbound1.listen = AppConfig.LOOPBACK
         inbound1.port = socksPort
         inbound1.settings?.udp = MmkvManager.decodeSettingsBool(AppConfig.PREF_SOCKS_ENABLE_UDP, true)
-        // Always noauth so the loopback tun bridge is never locked out; enabling SOCKS5 auth or
-        // hotspot sharing therefore can no longer break the phone's VPN or the shared connection.
+        // Always noauth so the loopback tun bridge is never locked out; LAN sharing uses the
+        // separate authenticated "socks-lan" inbound instead of ever weakening this one.
         inbound1.settings?.auth = "noauth"
         inbound1.settings?.accounts = null
         val fakedns = MmkvManager.decodeSettingsBool(AppConfig.PREF_FAKE_DNS_ENABLED) == true
@@ -653,11 +654,40 @@ object CoreConfigManager {
             val inbound2 = JsonUtil.fromJson(JsonUtil.toJson(inbound1), V2rayConfig.InboundBean::class.java)
                 ?: error("Failed to clone inbound template")
             inbound2.tag = EConfigType.HTTP.name.lowercase()
+            // HTTP is cleartext: keep it loopback-only, never expose it on the LAN.
+            inbound2.listen = AppConfig.LOOPBACK
             inbound2.port = SettingsManager.getHttpPort()
             inbound2.protocol = EConfigType.HTTP.name.lowercase()
             inbound2.settings?.auth = null
             inbound2.settings?.udp = null
             v2rayConfig.inbounds.add(inbound2)
+        }
+
+        // Authenticated LAN/hotspot SOCKS5 inbound. Added only when sharing is enabled AND the
+        // local proxy is active. Bound to 0.0.0.0 on a dedicated port, ALWAYS password-authed:
+        // credentials are auto-generated + persisted first when empty, so this can never become
+        // an open relay. Routing/outbounds key off the outbound tag (not the inbound), so this
+        // inbound rides the same VPN as the loopback one.
+        if (proxySharing && enableLocalProxy) {
+            val (shareUser, sharePass) = SettingsManager.ensureSocksShareCredentials()
+            val lanInbound = JsonUtil.fromJson(JsonUtil.toJson(inbound1), V2rayConfig.InboundBean::class.java)
+            if (lanInbound != null) {
+                lanInbound.tag = "socks-lan"
+                lanInbound.protocol = EConfigType.SOCKS.name.lowercase()
+                lanInbound.listen = "0.0.0.0"
+                lanInbound.port = SettingsManager.getSocksSharePort()
+                if (lanInbound.settings == null) {
+                    lanInbound.settings = V2rayConfig.InboundBean.InSettingsBean()
+                }
+                lanInbound.settings?.auth = "password"
+                lanInbound.settings?.udp = inbound1.settings?.udp
+                lanInbound.settings?.accounts = listOf(
+                    V2rayConfig.InboundBean.InSettingsBean.SocksAccountBean(shareUser, sharePass)
+                )
+                v2rayConfig.inbounds.add(lanInbound)
+            } else {
+                LogUtil.w(AppConfig.TAG, "Failed to clone socks-lan inbound; LAN sharing inbound not added")
+            }
         }
 
         if (!enableLocalProxy) {

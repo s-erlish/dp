@@ -16,6 +16,8 @@ import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.util.Utils
+import java.net.Inet4Address
+import java.net.NetworkInterface
 import kotlin.random.Random
 
 /**
@@ -37,7 +39,15 @@ class LocalProxyActivity : BaseActivity() {
     private lateinit var etSocksPort: EditText
     private lateinit var btnTogglePass: ImageButton
 
+    private lateinit var switchHotspot: MaterialSwitch
+    private lateinit var groupHotspotDetails: LinearLayout
+    private lateinit var etHotspotEndpoint: EditText
+    private lateinit var etHotspotUser: EditText
+    private lateinit var etHotspotPass: EditText
+    private lateinit var btnToggleHotspotPass: ImageButton
+
     private var passwordVisible = false
+    private var hotspotPasswordVisible = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -209,13 +219,7 @@ class LocalProxyActivity : BaseActivity() {
             MmkvManager.encodeSettings(AppConfig.PREF_ENABLE_LOCAL_PROXY, checked)
         }
 
-        bindSwitchRow(
-            R.id.row_hotspot,
-            R.id.switch_hotspot,
-            MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING, false)
-        ) { checked ->
-            MmkvManager.encodeSettings(AppConfig.PREF_PROXY_SHARING, checked)
-        }
+        bindHotspotSection()
 
         bindSwitchRow(
             R.id.row_route_domain,
@@ -232,6 +236,105 @@ class LocalProxyActivity : BaseActivity() {
         sw.isChecked = initial
         row.setOnClickListener { sw.toggle() }
         sw.setOnCheckedChangeListener { _, isChecked -> onChange(isChecked) }
+    }
+    // endregion
+
+    // region ДОСТУП ЧЕРЕЗ ХОТСПОТ (ручной SOCKS5-прокси в LAN)
+    private fun bindHotspotSection() {
+        switchHotspot = findViewById(R.id.switch_hotspot)
+        groupHotspotDetails = findViewById(R.id.group_hotspot_details)
+        etHotspotEndpoint = findViewById(R.id.et_hotspot_endpoint)
+        etHotspotUser = findViewById(R.id.et_hotspot_user)
+        etHotspotPass = findViewById(R.id.et_hotspot_pass)
+        btnToggleHotspotPass = findViewById(R.id.btn_toggle_hotspot_pass)
+
+        val enabled = MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING, false)
+        switchHotspot.isChecked = enabled
+        groupHotspotDetails.visibility = if (enabled) View.VISIBLE else View.GONE
+        if (enabled) {
+            // Ядро включит LAN-инбаунд только с авторизацией: гарантируем наличие кред.
+            SettingsManager.ensureSocksShareCredentials()
+        }
+        refreshHotspotEndpoint()
+
+        findViewById<View>(R.id.row_hotspot).setOnClickListener { switchHotspot.toggle() }
+        switchHotspot.setOnCheckedChangeListener { _, isChecked ->
+            MmkvManager.encodeSettings(AppConfig.PREF_PROXY_SHARING, isChecked)
+            groupHotspotDetails.visibility = if (isChecked) View.VISIBLE else View.GONE
+            if (isChecked) {
+                // Включение с пустыми кредами — сгенерировать, сохранить и показать пароль.
+                SettingsManager.ensureSocksShareCredentials()
+                refreshHotspotEndpoint()
+                setHotspotPasswordVisible(true)
+            }
+        }
+
+        btnToggleHotspotPass.setOnClickListener { setHotspotPasswordVisible(!hotspotPasswordVisible) }
+        findViewById<ImageButton>(R.id.btn_copy_hotspot_endpoint).setOnClickListener {
+            Utils.setClipboard(this, etHotspotEndpoint.text.toString())
+            toastSuccess(R.string.lp_copied)
+        }
+        findViewById<ImageButton>(R.id.btn_copy_hotspot_user).setOnClickListener {
+            Utils.setClipboard(this, etHotspotUser.text.toString())
+            toastSuccess(R.string.lp_copied)
+        }
+        findViewById<ImageButton>(R.id.btn_copy_hotspot_pass).setOnClickListener {
+            Utils.setClipboard(this, etHotspotPass.text.toString())
+            toastSuccess(R.string.lp_copied)
+        }
+    }
+
+    private fun refreshHotspotEndpoint() {
+        val ip = resolveLanIpv4()
+        val port = SettingsManager.getSocksSharePort()
+        etHotspotEndpoint.setText(
+            if (ip != null) "SOCKS5  $ip:$port" else getString(R.string.lp_hotspot_no_ip)
+        )
+        etHotspotUser.setText(SettingsManager.getSocksUsername() ?: "")
+        etHotspotPass.setText(SettingsManager.getSocksPassword() ?: "")
+        // Пароль повторно маскируется при каждом обновлении полей.
+        setHotspotPasswordVisible(hotspotPasswordVisible)
+    }
+
+    private fun setHotspotPasswordVisible(visible: Boolean) {
+        hotspotPasswordVisible = visible
+        etHotspotPass.inputType = if (visible) {
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+        } else {
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        btnToggleHotspotPass.setImageResource(
+            if (visible) R.drawable.ic_lp_eye_off else R.drawable.ic_lp_eye
+        )
+        btnToggleHotspotPass.contentDescription =
+            getString(if (visible) R.string.lp_hide_password else R.string.lp_show_password)
+    }
+
+    /**
+     * Resolve the phone's own Wi-Fi/hotspot IPv4 address by enumerating up, non-loopback
+     * interfaces (read-only, needs no extra permission). Prefers wlan/ap/swlan; falls back to
+     * any site-local IPv4. Returns null when there is no usable LAN address.
+     */
+    private fun resolveLanIpv4(): String? {
+        return try {
+            val candidates = mutableListOf<Pair<String, String>>() // ifaceName to ip
+            val interfaces = NetworkInterface.getNetworkInterfaces() ?: return null
+            for (nif in interfaces) {
+                if (!nif.isUp || nif.isLoopback || nif.isVirtual) continue
+                val name = nif.name?.lowercase().orEmpty()
+                for (addr in nif.inetAddresses) {
+                    if (addr is Inet4Address && !addr.isLoopbackAddress && addr.isSiteLocalAddress) {
+                        val host = addr.hostAddress ?: continue
+                        candidates.add(name to host)
+                    }
+                }
+            }
+            candidates.firstOrNull {
+                it.first.startsWith("wlan") || it.first.startsWith("ap") || it.first.startsWith("swlan")
+            }?.second ?: candidates.firstOrNull()?.second
+        } catch (e: Exception) {
+            null
+        }
     }
     // endregion
 }
