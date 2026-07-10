@@ -10,6 +10,7 @@ import androidx.browser.customtabs.CustomTabsIntent
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.AuthManager.LoginState
@@ -36,6 +37,10 @@ class LoginActivity : BaseActivity() {
 
     // tempToken из потока twoFactor — нужен для подтверждения кода.
     private var pendingTempToken: String? = null
+
+    // Последняя попытка входа была через сайт (email/пароль или 2FA), а не Telegram.
+    // Только для таких ошибок показываем диагностический диалог с реальной причиной.
+    private var lastAttemptWasSite = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,11 +74,13 @@ class LoginActivity : BaseActivity() {
         }
 
         binding.btnTelegram.setOnClickListener {
+            lastAttemptWasSite = false
             hideError()
             viewModel.startTelegramLogin()
         }
 
         binding.btnRestart.setOnClickListener {
+            lastAttemptWasSite = false
             hideError()
             currentDeepLink = null
             viewModel.startTelegramLogin()
@@ -85,6 +92,7 @@ class LoginActivity : BaseActivity() {
             if (email.isEmpty() || password.isEmpty()) {
                 toast(R.string.auth_fields_required)
             } else {
+                lastAttemptWasSite = true
                 hideError()
                 viewModel.loginSite(email, password)
             }
@@ -97,6 +105,7 @@ class LoginActivity : BaseActivity() {
                 token == null -> return@setOnClickListener
                 code.isEmpty() -> toast(R.string.auth_code_required)
                 else -> {
+                    lastAttemptWasSite = true
                     hideError()
                     viewModel.submit2fa(token, code)
                 }
@@ -169,10 +178,38 @@ class LoginActivity : BaseActivity() {
         binding.layoutAwaiting.visibility = View.GONE
         binding.tvError.setText(messageFor(error))
         binding.tvError.visibility = View.VISIBLE
+        // Для входа через сайт показываем диагностический диалог с реальной причиной
+        // с бэкенда (её можно заскринить), чтобы понять, почему вход не проходит.
+        if (lastAttemptWasSite) showSiteErrorDialog(error)
     }
 
     private fun hideError() {
         binding.tvError.visibility = View.GONE
+    }
+
+    /**
+     * Диалог с реальной причиной отказа во входе через сайт. Для [ApiError.Server] и
+     * [ApiError.Unauthorized] показываем «сырой» detail из тела ответа бэкенда (уже
+     * очищенный от токенов/URL в слое данных); для сети/таймаута — дружелюбный RU-текст.
+     */
+    private fun showSiteErrorDialog(error: ApiError) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.auth_err_dialog_title)
+            .setMessage(detailFor(error))
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
+
+    private fun detailFor(error: ApiError): CharSequence = when (error) {
+        is ApiError.Server -> {
+            val detail = error.detail?.takeIf { it.isNotBlank() }
+            if (detail != null) "HTTP ${error.code}\n$detail" else "HTTP ${error.code}"
+        }
+
+        is ApiError.Unauthorized ->
+            error.detail?.takeIf { it.isNotBlank() } ?: getString(messageFor(error))
+
+        else -> getString(messageFor(error))
     }
 
     private fun messageFor(error: ApiError): Int = when (error) {

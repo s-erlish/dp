@@ -34,4 +34,7 @@
     <string name="auth_err_network">Проблема с сетью</string>
     <string name="auth_err_not_configured">Вход недоступен</string>
     <string name="auth_err_generic">Что-то пошло не так. Попробуйте снова.</string>
+
+    <!-- Site-login error diagnostic dialog: shows the real backend reason so it can be screenshotted. -->
+    <string name="auth_err_dialog_title">Ошибка входа</string>
 </resources>
