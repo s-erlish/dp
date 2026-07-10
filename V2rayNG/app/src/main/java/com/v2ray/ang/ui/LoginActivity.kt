@@ -10,7 +10,6 @@ import androidx.browser.customtabs.CustomTabsIntent
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.v2ray.ang.BuildConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.AuthManager.LoginState
@@ -46,6 +45,27 @@ class LoginActivity : BaseActivity() {
             setResult(RESULT_OK)
             finish()
             return
+        }
+
+        // Режим экрана задаётся вызывающей стороной через EXTRA_MODE:
+        //   "site"     — только карточка входа через сайт;
+        //   "telegram" — только карточка входа через Telegram;
+        //   отсутствует — обе карточки.
+        when (intent.getStringExtra(EXTRA_MODE)) {
+            MODE_SITE -> {
+                binding.cardTelegram.visibility = View.GONE
+                binding.cardSite.visibility = View.VISIBLE
+            }
+
+            MODE_TELEGRAM -> {
+                binding.cardTelegram.visibility = View.VISIBLE
+                binding.cardSite.visibility = View.GONE
+            }
+
+            else -> {
+                binding.cardTelegram.visibility = View.VISIBLE
+                binding.cardSite.visibility = View.VISIBLE
+            }
         }
 
         binding.btnTelegram.setOnClickListener {
@@ -174,13 +194,12 @@ class LoginActivity : BaseActivity() {
     }
 
     /**
-     * Открывает страницу регистрации на сайте. URL берём из существующего
-     * BACKEND_BASE_URL (без «/api»), чтобы не заводить отдельное поле сборки.
+     * Открывает страницу регистрации на основном сайте [REGISTER_URL].
+     * Это именно сайт (departament.site), а не API-хост из BACKEND_BASE_URL
+     * (web.departament.site), поэтому адрес задан явной константой.
      */
     private fun openRegister() {
-        val siteUrl = BuildConfig.BACKEND_BASE_URL.removeSuffix("/api").removeSuffix("/")
-        if (siteUrl.isBlank()) return
-        val uri = Uri.parse(siteUrl)
+        val uri = Uri.parse(REGISTER_URL)
         try {
             CustomTabsIntent.Builder().build().launchUrl(this, uri)
         } catch (e: ActivityNotFoundException) {
@@ -190,5 +209,19 @@ class LoginActivity : BaseActivity() {
                 toastError(R.string.auth_err_not_configured)
             }
         }
+    }
+
+    companion object {
+        /** Ключ Intent-экстры, задающей режим экрана входа. */
+        const val EXTRA_MODE = "login_mode"
+
+        /** Показать только карточку входа через сайт. */
+        const val MODE_SITE = "site"
+
+        /** Показать только карточку входа через Telegram. */
+        const val MODE_TELEGRAM = "telegram"
+
+        /** Основной сайт для регистрации (не API-хост). */
+        private const val REGISTER_URL = "https://departament.site"
     }
 }
