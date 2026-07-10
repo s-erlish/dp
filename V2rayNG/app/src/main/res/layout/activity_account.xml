@@ -19,8 +19,7 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingHorizontal="16dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="24dp">
+        android:paddingTop="12dp">
 
         <!-- ============ 1. Profile card (compact) ============ -->
         <TextView
@@ -77,7 +76,7 @@
                             android:layout_gravity="center"
                             android:gravity="center"
                             android:text="?"
-                            android:textColor="@color/icon_blue"
+                            android:textColor="?attr/iconTintBlue"
                             android:textSize="20sp"
                             android:textStyle="bold"
                             tools:ignore="HardcodedText" />
@@ -154,7 +153,7 @@
                         android:layout_height="wrap_content"
                         android:contentDescription="@string/account_copy_referral"
                         app:icon="@drawable/ic_copy"
-                        app:iconTint="@color/icon_blue" />
+                        app:iconTint="?attr/iconTintBlue" />
                 </LinearLayout>
 
                 <!-- Top-up -->
@@ -471,7 +470,7 @@
                     <FrameLayout
                         android:layout_width="40dp"
                         android:layout_height="40dp"
-                        android:background="@drawable/bg_icon_purple">
+                        android:background="@drawable/bg_icon_blue">
 
                         <ImageView
                             android:layout_width="22dp"
@@ -479,7 +478,7 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_acc_history"
-                            app:tint="?attr/iconTintPurple" />
+                            app:tint="?attr/iconTintBlue" />
                     </FrameLayout>
 
                     <LinearLayout

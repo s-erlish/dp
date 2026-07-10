@@ -29,6 +29,7 @@ import com.v2ray.ang.databinding.ActivityAccountBinding
 import com.v2ray.ang.databinding.DialogTopUpBinding
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
+import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.util.AvatarManager
 import com.v2ray.ang.viewmodel.AccountViewModel
 import kotlinx.coroutines.Job
@@ -131,6 +132,7 @@ class AccountFragment : Fragment() {
     // Context-scoped toast helpers so the ported (Context.toast) calls work from a Fragment.
     private fun toast(message: Int) = requireContext().toast(message)
     private fun toastError(message: Int) = requireContext().toastError(message)
+    private fun toastSuccess(message: Int) = requireContext().toastSuccess(message)
 
     // region rendering
 
@@ -138,7 +140,8 @@ class AccountFragment : Fragment() {
         latestProfile = profile
         if (profile == null) {
             binding.tvEmail.text = ""
-            binding.tvBalance.text = getString(R.string.account_balance_inline, formatMoney(0.0, ""))
+            // Null/error state: blank the balance rather than showing a fake "Баланс: 0 ₽".
+            binding.tvBalance.text = ""
             binding.tvReferral.visibility = View.GONE
             binding.btnCopyReferral.visibility = View.GONE
             AvatarManager.setMonogram(binding.tvAvatarInitial, null)
@@ -269,25 +272,32 @@ class AccountFragment : Fragment() {
             .setView(dialogBinding.root)
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 val amount = dialogBinding.etTopUp.text?.toString()?.trim()?.toDoubleOrNull()
-                if (amount != null && amount > 0.0) showPaymentMethodSheet(amount)
+                if (amount != null && amount > 0.0) {
+                    showPaymentMethodSheet(amount)
+                } else {
+                    toastError(R.string.account_top_up_invalid)
+                }
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
-    /** Lets the user pick a payment method (balance or a Platega method) for the entered amount. */
+    /**
+     * Lets the user pick a Platega payment method (СБП / карта) for the entered top-up amount.
+     * The balance option is deliberately withheld (balanceLabel = null): a top-up ADDS to the
+     * balance, so paying it FROM the balance would be circular.
+     */
     private fun showPaymentMethodSheet(amount: Double) {
         val methods = viewModel.publicConfig.value?.plategaMethods?.map { it.id to it.label } ?: emptyList()
-        val profile = latestProfile
-        val balanceLabel = profile?.let { formatMoney(it.balance, it.currency) }
         PaymentMethodSheet.show(
             parentFragmentManager,
             getString(R.string.account_top_up_title),
-            balanceLabel,
+            null,
             methods,
         ) { id ->
             if (id == "balance") {
                 viewModel.payWithBalance(PaymentRequestDto(amount = amount, currency = "RUB")) {
+                    toastSuccess(R.string.account_top_up_success)
                     viewModel.refreshProfile()
                     viewModel.loadSubscriptions()
                 }

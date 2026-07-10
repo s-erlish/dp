@@ -73,6 +73,8 @@
     <!-- Top-up dialog -->
     <string name="account_top_up_title">Сумма пополнения</string>
     <string name="account_top_up_hint">Введите сумму</string>
+    <string name="account_top_up_invalid">Введите корректную сумму</string>
+    <string name="account_top_up_success">Баланс пополнён</string>
 
     <!-- Payment statuses -->
     <string name="account_status_paid">Оплачено</string>
