@@ -59,7 +59,7 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_backup_24dp"
-                            app:tint="@color/icon_blue" />
+                            app:tint="?attr/iconTintBlue" />
                     </FrameLayout>
 
                     <TextView
@@ -110,7 +110,7 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_share_24dp"
-                            app:tint="@color/icon_green" />
+                            app:tint="?attr/iconTintGreen" />
                     </FrameLayout>
 
                     <TextView
@@ -161,7 +161,7 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_restore_24dp"
-                            app:tint="@color/icon_orange" />
+                            app:tint="?attr/iconTintOrange" />
                     </FrameLayout>
 
                     <TextView
@@ -226,7 +226,7 @@
                         android:layout_gravity="center"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_settings_24dp"
-                        app:tint="@color/icon_purple" />
+                        app:tint="?attr/iconTintPurple" />
                 </FrameLayout>
 
                 <TextView

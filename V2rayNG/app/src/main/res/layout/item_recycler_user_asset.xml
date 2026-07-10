@@ -36,7 +36,7 @@
                     android:layout_gravity="center"
                     android:importantForAccessibility="no"
                     app:srcCompat="@drawable/ic_globe_24dp"
-                    app:tint="@color/icon_blue" />
+                    app:tint="?attr/iconTintBlue" />
             </FrameLayout>
 
             <LinearLayout
@@ -101,7 +101,7 @@
                     android:layout_height="@dimen/image_size_dp24"
                     android:importantForAccessibility="no"
                     app:srcCompat="@drawable/ic_delete_24dp"
-                    app:tint="@color/icon_red" />
+                    app:tint="?attr/iconTintRed" />
             </LinearLayout>
         </LinearLayout>
 

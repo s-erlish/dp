@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- Incy settings section header (uppercase grey label) -->
+    <!-- Incy settings section header (sentence-case grey label) -->
     <style name="SettingsSectionLabel" parent="TextAppearance.Material3.LabelMedium">
         <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
         <item name="android:textSize">12sp</item>
-        <item name="android:textAllCaps">true</item>
+        <item name="android:textAllCaps">false</item>
         <item name="android:letterSpacing">0.04</item>
         <item name="android:paddingStart">16dp</item>
         <item name="android:paddingEnd">16dp</item>
@@ -49,6 +49,7 @@
 
     <!-- Section / list titles. 16sp bold. -->
     <style name="TextAppearance.App.Title" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:fontFamily">@font/space_grotesk</item>
         <item name="android:textSize">16sp</item>
         <item name="android:textStyle">bold</item>
         <item name="android:textColor">?attr/colorOnSurface</item>

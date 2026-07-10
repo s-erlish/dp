@@ -101,7 +101,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:text="?"
-                android:textColor="@color/icon_blue"
+                android:textColor="?attr/iconTintBlue"
                 android:textSize="16sp"
                 android:textStyle="bold" />
 

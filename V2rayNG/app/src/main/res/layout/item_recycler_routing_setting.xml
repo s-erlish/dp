@@ -41,7 +41,7 @@
                     android:layout_gravity="center"
                     android:importantForAccessibility="no"
                     app:srcCompat="@drawable/ic_outline_filter_alt_24"
-                    app:tint="@color/icon_green" />
+                    app:tint="?attr/iconTintGreen" />
             </FrameLayout>
 
             <LinearLayout

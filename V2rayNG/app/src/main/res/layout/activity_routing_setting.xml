@@ -62,7 +62,7 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_globe_24dp"
-                            app:tint="@color/icon_purple" />
+                            app:tint="?attr/iconTintPurple" />
                     </FrameLayout>
 
                     <LinearLayout
