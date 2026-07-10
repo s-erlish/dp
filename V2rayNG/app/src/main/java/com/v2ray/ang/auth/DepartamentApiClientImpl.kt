@@ -1,5 +1,6 @@
 package com.v2ray.ang.auth
 
+import android.os.Build
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import com.v2ray.ang.AppConfig
@@ -33,6 +34,7 @@ import com.v2ray.ang.auth.dto.UpgradeQuoteDto
 import com.v2ray.ang.auth.dto.UpgradeRequestDto
 import com.v2ray.ang.auth.dto.UserProfileDto
 import com.v2ray.ang.handler.SettingsManager
+import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -73,7 +75,12 @@ class DepartamentApiClientImpl(
                 builder.header("Authorization", "Bearer $it")
             }
             if (SettingsManager.isSendHwid()) {
+                // Stable per-install HWID + real, stable device model so the panel keeps ONE
+                // device entry per physical device and labels it with the actual model.
                 builder.header(AppConfig.HEADER_HWID, AuthTokenStore.deviceId())
+                builder.header(AppConfig.HEADER_DEVICE_OS, "android")
+                builder.header(AppConfig.HEADER_VER_OS, Build.VERSION.RELEASE ?: "")
+                builder.header(AppConfig.HEADER_DEVICE_MODEL, Utils.getDeviceName())
             }
             chain.proceed(builder.build())
         }

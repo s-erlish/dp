@@ -1,5 +1,6 @@
 package com.v2ray.ang.util
 
+import android.os.Build
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.LOOPBACK
 import com.v2ray.ang.BuildConfig
@@ -162,9 +163,7 @@ object HttpUtil {
                 .header("User-agent", finalUserAgent)
                 .header("Connection", "close")
 
-            request.hwid?.takeIf { it.isNotBlank() }?.let {
-                requestBuilder.addHeader(AppConfig.HEADER_HWID, it)
-            }
+            attachDeviceHeaders(request, requestBuilder)
 
             applyEmbeddedBasicAuthHeader(currentUrl, requestBuilder)
 
@@ -248,9 +247,7 @@ object HttpUtil {
                 .header("User-agent", finalUserAgent)
                 .header("Connection", "close")
 
-            request.hwid?.takeIf { it.isNotBlank() }?.let {
-                requestBuilder.addHeader(AppConfig.HEADER_HWID, it)
-            }
+            attachDeviceHeaders(request, requestBuilder)
 
             applyEmbeddedBasicAuthHeader(currentUrl, requestBuilder)
 
@@ -291,6 +288,21 @@ object HttpUtil {
             }
         }
         throw IOException("Too many redirects")
+    }
+
+    /**
+     * Attaches the stable Remnawave device identity to a subscription request: the persisted
+     * per-install HWID plus device OS/version/model. Remnawave keys the panel device entry off
+     * [AppConfig.HEADER_HWID] (stable -> one entry per device, no slot pollution) and labels it
+     * from [AppConfig.HEADER_DEVICE_MODEL] (the real model, not a User-Agent guess). All values
+     * are stable across calls, so they never register new device entries.
+     */
+    private fun attachDeviceHeaders(request: UrlContentRequest, requestBuilder: Request.Builder) {
+        val hwid = request.hwid?.takeIf { it.isNotBlank() } ?: return
+        requestBuilder.addHeader(AppConfig.HEADER_HWID, hwid)
+        requestBuilder.addHeader(AppConfig.HEADER_DEVICE_OS, "android")
+        requestBuilder.addHeader(AppConfig.HEADER_VER_OS, Build.VERSION.RELEASE ?: "")
+        requestBuilder.addHeader(AppConfig.HEADER_DEVICE_MODEL, Utils.getDeviceName())
     }
 
     private fun applyEmbeddedBasicAuthHeader(rawUrl: String, requestBuilder: Request.Builder) {

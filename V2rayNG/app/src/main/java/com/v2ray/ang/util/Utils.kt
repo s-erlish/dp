@@ -305,6 +305,24 @@ object Utils {
     }
 
     /**
+     * Human-readable, STABLE device name reported to the panel (Remnawave `x-device-model`),
+     * e.g. "Samsung SM-G991B". Built from [Build.MANUFACTURER] + [Build.MODEL]; when the model
+     * already carries the vendor we avoid duplicating it. Never blank so the panel entry is
+     * always labelled with the real model instead of a User-Agent guess.
+     */
+    fun getDeviceName(): String {
+        val manufacturer = Build.MANUFACTURER?.trim().orEmpty()
+        val model = Build.MODEL?.trim().orEmpty()
+        val name = when {
+            model.isBlank() -> manufacturer
+            manufacturer.isBlank() -> model
+            model.startsWith(manufacturer, ignoreCase = true) -> model
+            else -> "$manufacturer $model"
+        }.trim()
+        return name.ifBlank { "Android Device" }
+    }
+
+    /**
      * Decode a URL-encoded string.
      *
      * @param url The URL-encoded string.

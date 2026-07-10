@@ -233,6 +233,16 @@ object AppConfig {
     /** Hardware/device id header sent on subscription & backend requests. */
     const val HEADER_HWID = "X-HWID"
 
+    /**
+     * Remnawave device-metadata headers sent alongside [HEADER_HWID] on subscription/HWID
+     * requests. Remnawave records/labels the panel device entry from these; without a model
+     * header it falls back to guessing the name from the User-Agent (wrong/empty name). Values
+     * are stable per device (android.os.Build), so they never cause new device-slot entries.
+     */
+    const val HEADER_DEVICE_OS = "x-device-os"
+    const val HEADER_VER_OS = "x-ver-os"
+    const val HEADER_DEVICE_MODEL = "x-device-model"
+
     const val UNIDENTIFIED_PACKAGE = "__unknown_app__"
 
     val DNS_ALIDNS_ADDRESSES = arrayListOf("223.5.5.5", "223.6.6.6", "2400:3200::1", "2400:3200:baba::1")
