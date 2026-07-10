@@ -8,7 +8,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.AccountRepository
+import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.dto.DeviceDto
+import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.databinding.ActivityDevicesBinding
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
@@ -37,6 +39,9 @@ class DeviceManagementActivity : BaseActivity() {
 
     private var remnawaveUuid: String? = null
 
+    /** How many devices the ACTIVE subscription reports as connected (from /subscription/all). */
+    private var expectedCount: Int = 0
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = getString(R.string.devices_title))
@@ -52,7 +57,12 @@ class DeviceManagementActivity : BaseActivity() {
         showLoading()
         showEmpty(false)
         lifecycleScope.launch {
-            val uuid = remnawaveUuid ?: resolveUuid()
+            var uuid = remnawaveUuid
+            if (uuid.isNullOrBlank()) {
+                val sub = resolveActiveSub()
+                uuid = sub?.remnawaveUuid?.takeIf { it.isNotBlank() }
+                expectedCount = sub?.connectedDevices ?: 0
+            }
             if (uuid.isNullOrBlank()) {
                 hideLoading()
                 showEmptyState(getString(R.string.devices_error_no_subscription), isError = true)
@@ -61,20 +71,56 @@ class DeviceManagementActivity : BaseActivity() {
             remnawaveUuid = uuid
 
             repo.getDevices(uuid)
-                .onSuccess { render(it.items) }
-                .onFailure {
+                .onSuccess { result ->
+                    render(result.devices)
+                    // The list parsed empty but the subscription says devices ARE connected:
+                    // the /client/devices response shape doesn't match. Surface the raw response
+                    // so the real backend contract can be diagnosed and fixed precisely.
+                    if (result.devices.isEmpty() && expectedCount > 0) {
+                        showDiagnostic(
+                            getString(R.string.devices_diag_empty, expectedCount),
+                            result.httpCode,
+                            result.rawBody,
+                        )
+                    }
+                }
+                .onFailure { error ->
                     showEmptyState(getString(R.string.devices_error_generic), isError = true)
+                    val (code, detail) = httpDetailOf(error)
+                    showDiagnostic(getString(R.string.devices_diag_failed), code, detail)
                 }
             hideLoading()
         }
     }
 
-    /** Resolve the active subscription's remnawaveUuid via the repo (first non-blank one). */
-    private suspend fun resolveUuid(): String? =
+    /** Resolve the active subscription (first with a non-blank remnawaveUuid) via the repo. */
+    private suspend fun resolveActiveSub(): SubInfoDto? =
         repo.loadSubscriptions().getOrNull()
             ?.items
             ?.firstOrNull { it.remnawaveUuid.isNotBlank() }
-            ?.remnawaveUuid
+
+    /** Extracts a best-effort HTTP status + sanitized body from an [ApiError] for diagnostics. */
+    private fun httpDetailOf(error: Throwable): Pair<Int, String?> = when (error) {
+        is ApiError.Server -> error.code to error.detail
+        is ApiError.Unauthorized -> 401 to error.detail
+        is ApiError.NotFound -> 404 to null
+        is ApiError.Gone -> 410 to null
+        is ApiError.RateLimited -> 429 to null
+        is ApiError.ServiceUnavailable -> 503 to null
+        else -> 0 to null
+    }
+
+    /** Small dialog with the raw HTTP status + response body, safe to screenshot and share. */
+    private fun showDiagnostic(summary: String, httpCode: Int, body: String?) {
+        val codeLine = if (httpCode > 0) getString(R.string.devices_diag_http, httpCode) else ""
+        val bodyText = body?.trim()?.takeIf { it.isNotBlank() } ?: getString(R.string.devices_diag_no_body)
+        val message = listOf(summary, codeLine, bodyText).filter { it.isNotBlank() }.joinToString("\n\n")
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.devices_diag_title)
+            .setMessage(message)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
 
     private fun render(devices: List<DeviceDto>) {
         adapter.submit(devices)

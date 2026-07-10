@@ -1,7 +1,7 @@
 package com.v2ray.ang.auth
 
 import com.v2ray.ang.auth.dto.AuthResult
-import com.v2ray.ang.auth.dto.DevicesDto
+import com.v2ray.ang.auth.dto.DevicesResult
 import com.v2ray.ang.auth.dto.LoginResult
 import com.v2ray.ang.auth.dto.PaymentInitDto
 import com.v2ray.ang.auth.dto.PaymentRequestDto
@@ -47,7 +47,7 @@ interface DepartamentApiClient {
     suspend fun upgrade(targetTariffId: String, method: String, paymentMethod: String? = null, subscriptionUuid: String): PaymentInitDto
 
     // Devices
-    suspend fun getDevices(remnawaveUuid: String): DevicesDto
+    suspend fun getDevices(remnawaveUuid: String): DevicesResult
     suspend fun deleteDevice(hwid: String, remnawaveUuid: String)
 
     // Payments

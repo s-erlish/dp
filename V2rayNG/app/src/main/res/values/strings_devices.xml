@@ -16,4 +16,9 @@
     <string name="devices_last_active">Активно: %1$s</string>
     <string name="devices_unknown_model">Неизвестное устройство</string>
     <string name="devices_hwid">ID: %1$s</string>
+    <string name="devices_diag_title">Ответ сервера (диагностика)</string>
+    <string name="devices_diag_http">HTTP: %1$d</string>
+    <string name="devices_diag_empty">Подписка сообщает об устройствах: %1$d, но список пуст. Ниже — ответ сервера. Пришлите скриншот, чтобы мы исправили.</string>
+    <string name="devices_diag_failed">Не удалось загрузить устройства. Ниже — ответ сервера. Пришлите скриншот, чтобы мы исправили.</string>
+    <string name="devices_diag_no_body">Пустой ответ сервера.</string>
 </resources>

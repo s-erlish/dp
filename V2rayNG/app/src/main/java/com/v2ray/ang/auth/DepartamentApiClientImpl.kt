@@ -8,6 +8,7 @@ import com.v2ray.ang.auth.dto.AuthResult
 import com.v2ray.ang.auth.dto.AutoRenewRequestDto
 import com.v2ray.ang.auth.dto.DeleteDeviceRequestDto
 import com.v2ray.ang.auth.dto.DevicesDto
+import com.v2ray.ang.auth.dto.DevicesResult
 import com.v2ray.ang.auth.dto.GoogleLoginRequestDto
 import com.v2ray.ang.auth.dto.LoginRequestDto
 import com.v2ray.ang.auth.dto.LoginResponseDto
@@ -194,10 +195,18 @@ class DepartamentApiClientImpl(
 
     // region devices
 
-    override suspend fun getDevices(remnawaveUuid: String): DevicesDto {
+    override suspend fun getDevices(remnawaveUuid: String): DevicesResult {
         ensureConfigured()
         val url = urlOf(BackendConfig.Endpoints.devices).addQueryParameter("uuid", remnawaveUuid).build()
-        return call(Request.Builder().url(url).get().build(), DevicesDto::class.java)
+        val resp = execute(Request.Builder().url(url).get().build())
+        resp.use {
+            val body = it.body?.string().orEmpty()
+            if (!it.isSuccessful) throw mapError(it.code, sanitizeBody(body))
+            // Keep the raw (sanitized) body so the UI can surface a diagnostic when the parsed
+            // list is empty but the subscription reports connected devices (shape mismatch).
+            val devices = parse(body, DevicesDto::class.java).devices()
+            return DevicesResult(devices, it.code, sanitizeBody(body).orEmpty())
+        }
     }
 
     override suspend fun deleteDevice(hwid: String, remnawaveUuid: String) {

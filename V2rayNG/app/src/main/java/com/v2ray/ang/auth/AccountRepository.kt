@@ -1,6 +1,6 @@
 package com.v2ray.ang.auth
 
-import com.v2ray.ang.auth.dto.DevicesDto
+import com.v2ray.ang.auth.dto.DevicesResult
 import com.v2ray.ang.auth.dto.PaymentInitDto
 import com.v2ray.ang.auth.dto.PaymentRequestDto
 import com.v2ray.ang.auth.dto.PaymentResultDto
@@ -91,7 +91,7 @@ class AccountRepository(
         paymentMethod: String? = null,
     ): Result<PaymentInitDto> = guard { api.addDevices(scope, id, extraDevices, method, paymentMethod) }
 
-    suspend fun getDevices(remnawaveUuid: String): Result<DevicesDto> = guard { api.getDevices(remnawaveUuid) }
+    suspend fun getDevices(remnawaveUuid: String): Result<DevicesResult> = guard { api.getDevices(remnawaveUuid) }
     suspend fun deleteDevice(hwid: String, remnawaveUuid: String): Result<Unit> =
         guard { api.deleteDevice(hwid, remnawaveUuid) }
 
