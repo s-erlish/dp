@@ -193,9 +193,11 @@
                     android:paddingBottom="@dimen/space_24">
 
                         <FrameLayout
+                            android:id="@+id/hero_frame"
                             android:layout_width="230dp"
                             android:layout_height="230dp"
-                            android:layout_gravity="center">
+                            android:layout_gravity="center"
+                            android:clipChildren="false">
 
                             <View
                                 android:id="@+id/view_connect_glow"
@@ -209,6 +211,18 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="match_parent"
                                 android:background="@drawable/bg_connect_ring" />
+
+                            <!-- One-shot sonar pulse: an expanding ring emitted once the moment
+                                 the tunnel confirms (connect_confirm.xml scales it out + fades it
+                                 to nothing). Invisible at rest; never loops, no second ring. -->
+                            <View
+                                android:id="@+id/view_connect_pulse"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:layout_gravity="center"
+                                android:background="@drawable/bg_connect_ring"
+                                android:importantForAccessibility="no"
+                                android:visibility="invisible" />
 
                             <!-- Thin rotating arc that sweeps around the ring while
                                  connecting (and while a subscription is loading). No solid
@@ -254,6 +268,18 @@
                                     android:importantForAccessibility="no"
                                     app:srcCompat="@drawable/ic_shield_outline"
                                     app:tint="?attr/colorOnSurfaceVariant" />
+
+                                <!-- Solid shield stacked over the outline; crossfades in on
+                                     connect (alpha 0 -> 1) so the shield reads as "filling". -->
+                                <ImageView
+                                    android:id="@+id/img_connect_filled"
+                                    android:layout_width="80dp"
+                                    android:layout_height="80dp"
+                                    android:layout_gravity="center"
+                                    android:alpha="0"
+                                    android:importantForAccessibility="no"
+                                    app:srcCompat="@drawable/ic_shield_filled"
+                                    app:tint="?attr/connectedColor" />
 
                             </com.google.android.material.card.MaterialCardView>
 

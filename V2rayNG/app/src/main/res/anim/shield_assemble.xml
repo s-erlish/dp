@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cold-start "assemble": the connect hero settles in once per process — scales up
+     from 0.9 and fades in over ~400ms, ease-out only (no overshoot). Ends at rest
+     (scale 1.0 / alpha 1.0), so there is nothing to clean up. Reduced motion: the
+     caller skips loading this and the view stays at its rest state. -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="400"
+    android:fillAfter="false"
+    android:interpolator="@interpolator/ease_out_quint">
+
+    <scale
+        android:fromXScale="0.9"
+        android:fromYScale="0.9"
+        android:toXScale="1.0"
+        android:toYScale="1.0"
+        android:pivotX="50%"
+        android:pivotY="50%" />
+
+    <alpha
+        android:fromAlpha="0.0"
+        android:toAlpha="1.0" />
+
+</set>

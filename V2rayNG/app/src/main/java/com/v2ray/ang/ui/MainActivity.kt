@@ -1,8 +1,9 @@
 package com.v2ray.ang.ui
 
 import android.animation.Animator
-import android.animation.AnimatorSet
+import android.animation.ArgbEvaluator
 import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
 import android.animation.ValueAnimator
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -46,8 +47,10 @@ import com.v2ray.ang.dto.entities.usedTraffic
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.enums.PermissionType
 import com.v2ray.ang.enums.PingMethod
+import android.view.HapticFeedbackConstants
 import android.view.View
-import android.view.animation.OvershootInterpolator
+import android.view.animation.AnimationUtils
+import androidx.core.view.doOnPreDraw
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.v2ray.ang.auth.AccountRepository
@@ -73,6 +76,10 @@ import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.MemoryStatsManager
 import com.v2ray.ang.util.SubscriptionOrigin
 import com.v2ray.ang.util.Utils
+import com.v2ray.ang.util.animationsEnabled
+import com.v2ray.ang.util.pressHaptic
+import com.v2ray.ang.util.reducedMotion
+import com.v2ray.ang.util.tickHaptic
 import com.v2ray.ang.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -123,6 +130,24 @@ class MainActivity : HelperBaseActivity() {
     private var connectArcConnecting = false
     private var connectArcSubLoads = 0
 
+    // Cached easing curves (loaded once) so the imperative hero/nav motion rides the same
+    // ease-out tempo as the declarative res/interpolator + res/anim resources. No bounce.
+    private val easeOutQuart by lazy { AnimationUtils.loadInterpolator(this, R.interpolator.ease_out_quart) }
+    private val easeOutQuint by lazy { AnimationUtils.loadInterpolator(this, R.interpolator.ease_out_quint) }
+    private val easeStandard by lazy { AnimationUtils.loadInterpolator(this, R.interpolator.ease_standard) }
+
+    // Shared motion durations (ms), read from the res/values/motion.xml tempo tokens.
+    private val durPressIn get() = resources.getInteger(R.integer.motion_press_in).toLong()
+    private val durPressOut get() = resources.getInteger(R.integer.motion_press_out).toLong()
+    private val durState get() = resources.getInteger(R.integer.motion_state).toLong()
+    private val durReveal get() = resources.getInteger(R.integer.motion_reveal).toLong()
+    private val durStagger get() = resources.getInteger(R.integer.motion_stagger).toLong()
+
+    // The reveal stagger plays once per list, on first populated bind — never again on
+    // scroll or a later notify (see revealListStagger).
+    private var homeListRevealed = false
+    private var serversListRevealed = false
+
     // Auto-fallback: one-shot post-connect health check that switches to the fastest
     // working server if the current tunnel doesn't actually pass traffic.
     // The "already fired this session" flag lives in the ViewModel (autoFallbackUsed).
@@ -162,6 +187,10 @@ class MainActivity : HelperBaseActivity() {
         // Remembers which bottom-nav tab was selected so it survives an activity
         // recreate (theme/language change) instead of snapping back to Home.
         const val KEY_SELECTED_NAV = "selected_bottom_nav"
+
+        // The cold-start shield "assemble" plays once per process, not on every
+        // theme/language recreate. Static so it survives the activity instance.
+        private var heroAssembled = false
     }
 
     private val requestVpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -239,7 +268,24 @@ class MainActivity : HelperBaseActivity() {
         SubscriptionUpdater.sync()
         mainViewModel.reloadServerList()
 
+        playColdStartAssemble()
+
         checkAndRequestPermission(PermissionType.POST_NOTIFICATIONS) {
+        }
+    }
+
+    /**
+     * Cold-start "assemble": the connect hero scales up from 0.9 and fades in (~400ms, ease-out)
+     * as the screen settles — once per process, guarded by a static flag so a theme/language
+     * recreate doesn't replay it. Reduced motion / animations-off: the hero stays at its rest
+     * state, nothing plays.
+     */
+    private fun playColdStartAssemble() {
+        if (heroAssembled) return
+        heroAssembled = true
+        if (binding.heroFrame.reducedMotion()) return
+        binding.heroFrame.doOnPreDraw {
+            it.startAnimation(AnimationUtils.loadAnimation(this, R.anim.shield_assemble))
         }
     }
 
@@ -271,13 +317,19 @@ class MainActivity : HelperBaseActivity() {
 
     /** Selects a bottom-nav tab: repaints the custom bar and swaps the visible tab content. */
     private fun selectNav(navId: Int) {
+        val previous = selectedNavId
         selectedNavId = navId
-        updateNavSelection()
-        showTab(navId)
+        updateNavSelection(previous)
+        showTab(navId, previous)
     }
 
-    /** Tints the custom bar items: blue (colorPrimary) for the selected one, grey otherwise. */
-    private fun updateNavSelection() {
+    /**
+     * Tints the custom bar items: blue (colorPrimary) for the selected one, grey otherwise. On a
+     * real tab change (animations enabled) the two involved items TWEEN their icon+label colour
+     * grey↔blue over motion_state; everything else (initial paint, reduced motion, unchanged items)
+     * sets the colour instantly.
+     */
+    private fun updateNavSelection(previousNavId: Int = selectedNavId) {
         val active = themeColor(androidx.appcompat.R.attr.colorPrimary)
         val inactive = themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
         val items = listOf(
@@ -287,10 +339,36 @@ class MainActivity : HelperBaseActivity() {
             // The Account tab tints blue when selected, exactly like the other tabs.
             Triple(R.id.nav_account, binding.navAccountIcon, binding.navAccountLabel),
         )
+        val animate = animationsEnabled() && previousNavId != selectedNavId
         items.forEach { (id, icon, label) ->
-            val color = if (id == selectedNavId) active else inactive
-            icon.setColorFilter(color)
-            label.setTextColor(color)
+            val target = if (id == selectedNavId) active else inactive
+            val involved = id == selectedNavId || id == previousNavId
+            if (animate && involved) {
+                val from = if (id == selectedNavId) inactive else active
+                tweenNavItemColor(icon, label, from, target)
+            } else {
+                icon.setColorFilter(target)
+                label.setTextColor(target)
+            }
+        }
+    }
+
+    /** Tweens one nav item's icon tint + label colour from -> to over motion_state (ease-out). */
+    private fun tweenNavItemColor(
+        icon: android.widget.ImageView,
+        label: android.widget.TextView,
+        from: Int,
+        to: Int,
+    ) {
+        ValueAnimator.ofObject(ArgbEvaluator(), from, to).apply {
+            duration = 200
+            interpolator = easeStandard
+            addUpdateListener {
+                val c = it.animatedValue as Int
+                icon.setColorFilter(c)
+                label.setTextColor(c)
+            }
+            start()
         }
     }
 
@@ -298,11 +376,16 @@ class MainActivity : HelperBaseActivity() {
     // opened, so signed-out users never pay for it.
     private var accountFragmentAdded = false
 
-    private fun showTab(tab: Int) {
-        binding.groupHome.isVisible = tab == R.id.nav_home
-        binding.groupServers.isVisible = tab == R.id.nav_servers
-        binding.groupSettings.root.isVisible = tab == R.id.nav_settings
-        binding.groupAccount.isVisible = tab == R.id.nav_account
+    /** The tab-content group view for a nav id (null for an unknown id). */
+    private fun tabGroup(navId: Int): View? = when (navId) {
+        R.id.nav_home -> binding.groupHome
+        R.id.nav_servers -> binding.groupServers
+        R.id.nav_settings -> binding.groupSettings.root
+        R.id.nav_account -> binding.groupAccount
+        else -> null
+    }
+
+    private fun showTab(tab: Int, previous: Int = tab) {
         // Attach the Account fragment on first entry into its tab (guarded so it is added once).
         if (tab == R.id.nav_account && !accountFragmentAdded) {
             accountFragmentAdded = true
@@ -315,6 +398,43 @@ class MainActivity : HelperBaseActivity() {
         // removes the empty top band the toolbar left on the Servers/Settings tabs.
         binding.appbarLayout.isVisible = false
         supportActionBar?.title = ""
+
+        val incoming = tabGroup(tab)
+        val outgoing = tabGroup(previous)?.takeIf { previous != tab }
+
+        // Instant swap on the initial paint, a same-tab reselect, or reduced motion.
+        if (incoming == null || outgoing == null || binding.homeRoot.reducedMotion()) {
+            binding.groupHome.isVisible = tab == R.id.nav_home
+            binding.groupServers.isVisible = tab == R.id.nav_servers
+            binding.groupSettings.root.isVisible = tab == R.id.nav_settings
+            binding.groupAccount.isVisible = tab == R.id.nav_account
+            maybeRevealServersTab(tab)
+            return
+        }
+
+        // Fade-through: the outgoing group fades out (150ms), then the incoming group fades in
+        // while rising 8dp (200ms). A light tick marks the change.
+        binding.bottomNav.tickHaptic()
+        val dy = 8f * resources.displayMetrics.density
+        outgoing.animate().cancel()
+        outgoing.animate().alpha(0f).setDuration(150).setInterpolator(easeStandard).withEndAction {
+            outgoing.isVisible = false
+            outgoing.alpha = 1f
+            incoming.alpha = 0f
+            incoming.translationY = dy
+            incoming.isVisible = true
+            incoming.animate().alpha(1f).translationY(0f)
+                .setDuration(200).setInterpolator(easeOutQuint).start()
+            maybeRevealServersTab(tab)
+        }.start()
+    }
+
+    /** First time the Servers tab is shown with rows, plays the reveal stagger (once only). */
+    private fun maybeRevealServersTab(tab: Int) {
+        if (tab == R.id.nav_servers && !serversListRevealed && mainViewModel.serversCache.isNotEmpty()) {
+            serversListRevealed = true
+            revealListStagger(binding.rvServers)
+        }
     }
 
     /**
@@ -382,7 +502,12 @@ class MainActivity : HelperBaseActivity() {
             // A definitive running/stopped state arrived (success or failure): the connect
             // attempt is over, so the watchdog is no longer needed.
             cancelConnectWatchdog()
-            applyRunningState(false, isRunning)
+            // Play the signature confirm/reverse ONLY on a genuine live transition — a connect the
+            // user just triggered (connectInProgress), or a real running-state flip. Never on the
+            // LiveData replay at launch (prev == null, no connect in progress), which jumps to end.
+            val prevRunning = lastRunningState
+            val liveTransition = connectInProgress || (prevRunning != null && prevRunning != isRunning)
+            applyRunningState(false, isRunning, animate = liveTransition)
             if (isRunning) scheduleHealthCheckIfEnabled() else cancelHealthCheck()
 
             // Subtle gray status toast, fired only on a genuine transition. LiveData replays
@@ -592,6 +717,37 @@ class MainActivity : HelperBaseActivity() {
         // Adding/removing a departament subscription must show/hide the Account tab and the home
         // account header immediately (the AccountSession collector only fires on login changes).
         updateAccountGate()
+        // First populated bind of the visible Home list plays the reveal stagger (once only).
+        if (!homeListRevealed && binding.rvHomeServers.isVisible && mainViewModel.serversCache.isNotEmpty()) {
+            homeListRevealed = true
+            revealListStagger(binding.rvHomeServers)
+        }
+    }
+
+    /**
+     * Reveal stagger for a freshly bound list: each of the first rows rises 12dp and fades in,
+     * offset by index * motion_stagger. CAPPED at 8 rows (beyond that rows appear instantly, at
+     * rest) so the whole reveal never runs long. Runs once per list (the caller guards with a
+     * flag), never on scroll or a later notify. Reduced motion / animations-off: no-op — rows are
+     * already at their rest state, so the list simply appears.
+     */
+    private fun revealListStagger(rv: androidx.recyclerview.widget.RecyclerView) {
+        if (rv.reducedMotion()) return
+        val dy = 12f * resources.displayMetrics.density
+        rv.doOnPreDraw {
+            val count = minOf(rv.childCount, 8)
+            for (i in 0 until count) {
+                val child = rv.getChildAt(i)
+                child.translationY = dy
+                child.alpha = 0f
+                child.animate()
+                    .translationY(0f).alpha(1f)
+                    .setStartDelay(i * durStagger)
+                    .setDuration(durReveal)
+                    .setInterpolator(easeOutQuint)
+                    .start()
+            }
+        }
     }
 
     private fun updateServersChrome(providerCount: Int) {
@@ -1192,14 +1348,24 @@ class MainActivity : HelperBaseActivity() {
         binding.homeRoot.setBackgroundResource(R.drawable.bg_home_gradient_mono)
         binding.viewConnectGlow.setBackgroundResource(R.drawable.bg_connect_glow_mono)
         binding.viewConnectRing.setBackgroundResource(R.drawable.bg_connect_ring_mono)
+        // The sonar pulse reuses the ring drawable, so keep it in the mono variant too.
+        binding.viewConnectPulse.setBackgroundResource(R.drawable.bg_connect_ring_mono)
     }
 
-    private fun applyRunningState(isLoading: Boolean, isRunning: Boolean) {
-        // Connecting: a thin rotating arc sweeps the ring + a gentle shield pulse, blue
-        // outline shield. No solid blue fill (the glow stays off while establishing).
+    /**
+     * Applies the connect visual for a state. [animate] is true ONLY on a genuine live transition
+     * (a real connect/disconnect the user just triggered), so the signature confirmation and its
+     * reverse play then — not on the LiveData replay after a rotation/theme recreate, which jumps
+     * straight to the end state. Under reduced motion / animations-off every branch also jumps to
+     * its end state (the confirm haptic still fires).
+     */
+    private fun applyRunningState(isLoading: Boolean, isRunning: Boolean, animate: Boolean = false) {
+        // Connecting: a thin rotating arc sweeps the ring + the glow breathes softly, blue
+        // outline shield at full opacity (no solid fill yet).
         if (isLoading) {
             val active = themeColor(R.attr.connectActiveColor)
-            binding.viewConnectGlow.visibility = android.view.View.INVISIBLE
+            binding.imgConnectFilled.alpha = 0f
+            binding.imgConnect.alpha = 1f
             startConnectingAnim()
             binding.imgConnect.setColorFilter(active)
             binding.tvConnectionStatus.setTextColor(active)
@@ -1208,28 +1374,131 @@ class MainActivity : HelperBaseActivity() {
         }
 
         if (isRunning) {
-            // Connected: subtle blue glow (soft halo, not a solid fill) + blue shield,
-            // label shows the connected server name.
-            val connected = themeColor(R.attr.connectedColor)
-            stopConnectingAnim()
-            binding.viewConnectGlow.visibility = android.view.View.VISIBLE
-            binding.imgConnect.setColorFilter(connected)
-            binding.tvConnectionStatus.setTextColor(connected)
-            binding.cardConnect.contentDescription = getString(R.string.action_stop_service)
-            binding.tvConnectionStatus.text = selectedServerName()
-            startConnectionTimer()
+            applyConnectedState(animate)
         } else {
-            // Idle: neutral shield, no glow; label is a neutral status (never a server name).
-            stopConnectingAnim()
-            binding.viewConnectGlow.visibility = android.view.View.INVISIBLE
-            binding.imgConnect.setColorFilter(themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
-            binding.tvConnectionStatus.setTextColor(themeColor(com.google.android.material.R.attr.colorOnSurface))
-            binding.cardConnect.contentDescription = getString(R.string.tasker_start_service)
-            binding.tvConnectionStatus.text = idleStatusText()
-            stopConnectionTimer()
-            binding.tvDownloadSpeed.text = getString(R.string.speed_zero)
-            binding.tvUploadSpeed.text = getString(R.string.speed_zero)
+            applyIdleState(animate)
         }
+    }
+
+    /**
+     * Connected visual. On a live transition ([animate]) the signature confirmation plays: the
+     * outline shield crossfades to the solid one while its tint warms grey→blue (over motion_state),
+     * the halo glow reveals (0→1 over motion_reveal), and ONE sonar ring pulses out once
+     * (connect_confirm.xml over motion_emphasis) — with a CONFIRM haptic on the fill beat. Otherwise
+     * (replay / reduced motion) it jumps straight to the connected end state; the haptic still fires
+     * on a live transition.
+     */
+    private fun applyConnectedState(animate: Boolean) {
+        val connected = themeColor(R.attr.connectedColor)
+        stopConnectingAnim()
+        binding.tvConnectionStatus.setTextColor(connected)
+        binding.cardConnect.contentDescription = getString(R.string.action_stop_service)
+        binding.tvConnectionStatus.text = selectedServerName()
+        binding.imgConnect.setColorFilter(connected)
+        binding.imgConnect.alpha = 1f
+        startConnectionTimer()
+
+        // The fill-beat haptic fires on every live confirm, even under reduced motion.
+        if (animate) binding.cardConnect.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+
+        if (!animate || binding.cardConnect.reducedMotion()) {
+            // Jump to the connected end state: solid shield shown, outline hidden, glow on.
+            binding.imgConnectFilled.setColorFilter(connected)
+            binding.imgConnectFilled.alpha = 1f
+            binding.imgConnect.alpha = 0f
+            binding.viewConnectGlow.alpha = 1f
+            binding.viewConnectGlow.visibility = android.view.View.VISIBLE
+            return
+        }
+
+        // Crossfade outline -> filled, tint warming grey -> blue over the fill.
+        val grey = themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
+        binding.imgConnectFilled.setColorFilter(grey)
+        binding.imgConnectFilled.alpha = 0f
+        ValueAnimator.ofObject(ArgbEvaluator(), grey, connected).apply {
+            duration = durState
+            interpolator = easeStandard
+            addUpdateListener { binding.imgConnectFilled.setColorFilter(it.animatedValue as Int) }
+            start()
+        }
+        binding.imgConnectFilled.animate().cancel()
+        binding.imgConnectFilled.animate().alpha(1f).setDuration(durState).setInterpolator(easeStandard).start()
+        binding.imgConnect.animate().cancel()
+        binding.imgConnect.animate().alpha(0f).setDuration(durState).setInterpolator(easeStandard).start()
+
+        // Halo glow reveals from nothing.
+        binding.viewConnectGlow.animate().cancel()
+        binding.viewConnectGlow.alpha = 0f
+        binding.viewConnectGlow.visibility = android.view.View.VISIBLE
+        binding.viewConnectGlow.animate().alpha(1f).setDuration(durReveal).setInterpolator(easeOutQuint).start()
+
+        // ONE sonar ring pulse.
+        val pulse = binding.viewConnectPulse
+        pulse.animate().cancel()
+        pulse.alpha = 1f
+        pulse.scaleX = 1f
+        pulse.scaleY = 1f
+        pulse.visibility = android.view.View.VISIBLE
+        val anim = AnimationUtils.loadAnimation(this, R.anim.connect_confirm)
+        anim.setAnimationListener(object : android.view.animation.Animation.AnimationListener {
+            override fun onAnimationStart(a: android.view.animation.Animation?) {}
+            override fun onAnimationRepeat(a: android.view.animation.Animation?) {}
+            override fun onAnimationEnd(a: android.view.animation.Animation?) {
+                pulse.visibility = android.view.View.INVISIBLE
+            }
+        })
+        pulse.startAnimation(anim)
+    }
+
+    /**
+     * Idle visual. On a live disconnect ([animate]) the confirmation reverses at ~75% duration —
+     * the solid shield fades back to the outline (tint cooling blue→grey) and the glow fades out.
+     * Otherwise (replay / reduced motion) it jumps straight to the idle end state.
+     */
+    private fun applyIdleState(animate: Boolean) {
+        stopConnectingAnim()
+        val grey = themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
+        binding.imgConnect.setColorFilter(grey)
+        binding.tvConnectionStatus.setTextColor(themeColor(com.google.android.material.R.attr.colorOnSurface))
+        binding.cardConnect.contentDescription = getString(R.string.tasker_start_service)
+        binding.tvConnectionStatus.text = idleStatusText()
+        stopConnectionTimer()
+        binding.tvDownloadSpeed.text = getString(R.string.speed_zero)
+        binding.tvUploadSpeed.text = getString(R.string.speed_zero)
+
+        // Disabled-knob affordance: a selectable server is required to connect. With none
+        // selected the shield dims to 0.38 so the knob reads as unavailable, not idle.
+        val hasServer = !MmkvManager.getSelectServer().isNullOrEmpty()
+        val restAlpha = if (hasServer) 1f else 0.38f
+
+        binding.viewConnectPulse.animate().cancel()
+        binding.viewConnectPulse.visibility = android.view.View.INVISIBLE
+
+        if (!animate || binding.cardConnect.reducedMotion()) {
+            binding.imgConnectFilled.alpha = 0f
+            binding.imgConnect.alpha = restAlpha
+            binding.viewConnectGlow.alpha = 1f
+            binding.viewConnectGlow.visibility = android.view.View.INVISIBLE
+            return
+        }
+
+        // Reverse the confirmation, faster than the enter (~75% of the state/reveal tempo).
+        val revState = (durState * 3) / 4
+        val revReveal = (durReveal * 3) / 4
+        val connected = themeColor(R.attr.connectedColor)
+        ValueAnimator.ofObject(ArgbEvaluator(), connected, grey).apply {
+            duration = revState
+            interpolator = easeStandard
+            addUpdateListener { binding.imgConnectFilled.setColorFilter(it.animatedValue as Int) }
+            start()
+        }
+        binding.imgConnectFilled.animate().cancel()
+        binding.imgConnectFilled.animate().alpha(0f).setDuration(revState).setInterpolator(easeStandard).start()
+        binding.imgConnect.animate().cancel()
+        binding.imgConnect.animate().alpha(restAlpha).setDuration(revState).setInterpolator(easeStandard).start()
+        binding.viewConnectGlow.animate().cancel()
+        binding.viewConnectGlow.animate().alpha(0f).setDuration(revReveal).setInterpolator(easeStandard)
+            .withEndAction { binding.viewConnectGlow.visibility = android.view.View.INVISIBLE }.start()
     }
 
     /**
@@ -1258,36 +1527,62 @@ class MainActivity : HelperBaseActivity() {
     }
 
     /**
-     * Incy-style press feedback on the connect button: a distinct "depress" (scale-down, as if
-     * pushed in) that springs back with an overshoot. Purely cosmetic — there is NO colour/fill
-     * change on press (the ripple and pressed foreground are cleared in the layout), so this
-     * scale is the only press feedback.
+     * Incy-style press feedback on the connect knob: a quick "depress" (scale to 0.94 over
+     * motion_press_in, ease-out-quart) that eases back to rest (over motion_press_out,
+     * ease-out-quint). Ease-out only — no overshoot or bounce (impeccable animate.md). There is
+     * NO colour/fill change on press (ripple and pressed foreground are cleared in the layout), so
+     * this scale is the only visual press feedback. The VIRTUAL_KEY haptic fires on the tap even
+     * under reduced motion; when motion is off the scale simply stays at rest.
      */
     private fun animateConnectPress() {
+        binding.cardConnect.pressHaptic()
+        if (binding.cardConnect.reducedMotion()) return
         binding.cardConnect.animate().cancel()
         binding.cardConnect.animate()
-            .scaleX(0.88f).scaleY(0.88f)
-            .setInterpolator(android.view.animation.AccelerateInterpolator())
-            .setDuration(110)
+            .scaleX(0.94f).scaleY(0.94f)
+            .setInterpolator(easeOutQuart)
+            .setDuration(durPressIn)
             .withEndAction {
                 binding.cardConnect.animate()
                     .scaleX(1f).scaleY(1f)
-                    .setInterpolator(OvershootInterpolator(2.5f))
-                    .setDuration(260)
+                    .setInterpolator(easeOutQuint)
+                    .setDuration(durPressOut)
                     .start()
             }
             .start()
     }
 
     /**
-     * "Connecting" visual: shows the thin rotating arc around the ring and a gentle
-     * breathing pulse on the shield. No solid blue fill (the glow drawable stays off).
+     * "Connecting" visual: the thin rotating arc sweeps the ring while the halo glow BREATHES
+     * softly (scale 0.96↔1.04, alpha 0.3↔0.6, ~850ms reverse, ease-in-out). The shield stays a
+     * full-opacity blue outline — no alpha fade (which read as "broken"), no solid fill. Reduced
+     * motion / animations-off: the arc is the only signal, the glow stays off (nothing breathes).
      */
     private fun startConnectingAnim() {
         connectArcConnecting = true
         refreshConnectArc()
+        binding.imgConnect.alpha = 1f
         connectPulse?.cancel()
-        connectPulse = ObjectAnimator.ofFloat(binding.imgConnect, View.ALPHA, 1f, 0.45f).apply {
+        val glow = binding.viewConnectGlow
+        if (binding.cardConnect.reducedMotion()) {
+            connectPulse = null
+            glow.animate().cancel()
+            glow.scaleX = 1f
+            glow.scaleY = 1f
+            glow.visibility = android.view.View.INVISIBLE
+            return
+        }
+        glow.animate().cancel()
+        glow.visibility = android.view.View.VISIBLE
+        glow.alpha = 0.3f
+        glow.scaleX = 0.96f
+        glow.scaleY = 0.96f
+        connectPulse = ObjectAnimator.ofPropertyValuesHolder(
+            glow,
+            PropertyValuesHolder.ofFloat(View.ALPHA, 0.3f, 0.6f),
+            PropertyValuesHolder.ofFloat(View.SCALE_X, 0.96f, 1.04f),
+            PropertyValuesHolder.ofFloat(View.SCALE_Y, 0.96f, 1.04f),
+        ).apply {
             duration = 850
             repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.REVERSE
@@ -1296,13 +1591,20 @@ class MainActivity : HelperBaseActivity() {
         }
     }
 
-    /** Stops the connecting pulse and hides the arc (unless a subscription is still loading). */
+    /**
+     * Stops the connecting breathe and hides the arc (unless a subscription is still loading).
+     * Resets the glow scale to rest so the connected/idle glow renders cleanly; the caller owns
+     * the glow's final visibility/alpha.
+     */
     private fun stopConnectingAnim() {
         connectArcConnecting = false
         refreshConnectArc()
         connectPulse?.cancel()
         connectPulse = null
         binding.imgConnect.alpha = 1f
+        binding.viewConnectGlow.animate().cancel()
+        binding.viewConnectGlow.scaleX = 1f
+        binding.viewConnectGlow.scaleY = 1f
     }
 
     /**
