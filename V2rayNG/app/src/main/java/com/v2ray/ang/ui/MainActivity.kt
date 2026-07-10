@@ -36,6 +36,7 @@ import com.v2ray.ang.contracts.MainAdapterListener
 import com.v2ray.ang.core.CoreServiceManager
 import com.v2ray.ang.databinding.ActivityMainBinding
 import com.v2ray.ang.databinding.ItemQrcodeBinding
+import com.v2ray.ang.databinding.LayoutSubscriptionMetaBarBinding
 import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.dto.entities.hasExpiry
@@ -48,9 +49,14 @@ import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.enums.PermissionType
 import com.v2ray.ang.enums.PingMethod
 import android.view.HapticFeedbackConstants
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.view.animation.AnimationUtils
 import androidx.core.view.doOnPreDraw
+import androidx.viewpager2.widget.CompositePageTransformer
+import androidx.viewpager2.widget.MarginPageTransformer
+import androidx.viewpager2.widget.ViewPager2
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.v2ray.ang.auth.AccountRepository
@@ -99,6 +105,11 @@ class MainActivity : HelperBaseActivity() {
     private lateinit var homeAdapter: MainRecyclerAdapter
     // Home server list collapse state, toggled by the meta-bar chevron.
     private var homeListCollapsed = false
+
+    // Home provider meta-bar carousel: one page per subscription.
+    private lateinit var homeMetaAdapter: HomeMetaPagerAdapter
+    private var homeMetaSubIds: List<String> = emptyList()
+    private var homeMetaPage = 0
 
     // Tracks the last observed signed-in state so the post-login auto-import fires only on a real
     // logged-out -> logged-in transition, not on every state replay. Seeded from the persisted
@@ -260,7 +271,7 @@ class MainActivity : HelperBaseActivity() {
         binding.btnHomeAdd.setOnClickListener { showImportMenu(it) }
 
         setupServersHeader()
-        setupHomeMetaBar()
+        setupHomeMetaPager()
         setupEmptyState()
         setupAccountHeader()
         setupSettings()
@@ -680,7 +691,7 @@ class MainActivity : HelperBaseActivity() {
         updateOnboardingLogin()
         updateBottomNavVisibility()
         if (empty) {
-            binding.layoutHomeMetaBar.root.isVisible = false
+            binding.groupHomeMeta.isVisible = false
             binding.rvHomeServers.isVisible = false
             // Nothing selectable: neutral under-shield label, not a stale server name.
             if (mainViewModel.isRunning.value != true) {
@@ -715,9 +726,13 @@ class MainActivity : HelperBaseActivity() {
 
     /** Applies the Home server-list visibility and chevron rotation from the collapse flag. */
     private fun applyHomeListVisibility() {
-        val show = mainViewModel.serversCache.isNotEmpty() && !homeListCollapsed
-        binding.rvHomeServers.isVisible = show
-        binding.layoutHomeMetaBar.btnCollapse.rotation = if (homeListCollapsed) -90f else 0f
+        val hasServers = mainViewModel.serversCache.isNotEmpty()
+        binding.groupHomeMeta.isVisible = hasServers
+        binding.rvHomeServers.isVisible = hasServers && !homeListCollapsed
+        // The chevron lives on each carousel page; re-bind the visible one to reflect the state.
+        if (::homeMetaAdapter.isInitialized && homeMetaAdapter.itemCount > 0) {
+            homeMetaAdapter.notifyItemChanged(homeMetaPage)
+        }
     }
 
     /**
@@ -740,7 +755,7 @@ class MainActivity : HelperBaseActivity() {
         serversAdapter.setSections(mainViewModel.serversCache, subs, showHeaders = true, index = index)
         homeAdapter.setSections(mainViewModel.serversCache, subs, showHeaders = false, index = index)
         updateServersChrome(subs.size)
-        bindHomeMetaBar()
+        rebuildHomeMeta()
         updateHomeEmptyState()
         // The "link Telegram" CTA depends on whether a departament subscription is present, so
         // re-evaluate it once the list is (re)built.
@@ -795,27 +810,145 @@ class MainActivity : HelperBaseActivity() {
     }
 
     /**
-     * Binds the Home provider meta bar to the selected server's subscription (or the first
-     * provider). Reuses the collapsible meta-bar layout shared with the old fragment.
+     * Sets up the Home provider meta-bar carousel: a ViewPager2 with one page per subscription. A
+     * single subscription reads as one static card (identical to before); multiple subscriptions
+     * become separate swipeable cards with page dots. Per-page buttons act on that page's own
+     * subscription; collapse / ping / refresh are list-wide.
      */
-    private fun setupHomeMetaBar() {
-        val meta = binding.layoutHomeMetaBar
-        meta.btnCollapse.setOnClickListener { toggleHomeServerList() }
-        meta.btnRefresh.setOnClickListener { refreshHomeSub() }
-        meta.btnPing.setOnClickListener {
-            mainViewModel.testAllServers()
-            markAllServersTesting()
+    private fun setupHomeMetaPager() {
+        homeMetaAdapter = HomeMetaPagerAdapter(
+            bindPage = { meta, sub -> bindMetaBar(meta, sub) },
+            onToggleList = { toggleHomeServerList() },
+            onPingAll = {
+                mainViewModel.testAllServers()
+                markAllServersTesting()
+            },
+            onRefreshAll = { refreshHomeSub() },
+            onTogglePin = { subId -> toggleHomePin(subId) },
+            onDeleteSub = { subId -> confirmDeleteSubscription(subId) },
+            onOpenSupport = { subId -> openSubUrl(MmkvManager.decodeSubscription(subId)?.supportUrl) },
+            onOpenTelegram = { subId -> openSubUrl(MmkvManager.decodeSubscription(subId)?.supportUrl) },
+            collapsed = { homeListCollapsed },
+        )
+        binding.vpHomeMeta.apply {
+            adapter = homeMetaAdapter
+            offscreenPageLimit = 1
+            clipToPadding = false
+            registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+                private var dragged = false
+                override fun onPageScrollStateChanged(state: Int) {
+                    if (state == ViewPager2.SCROLL_STATE_DRAGGING) dragged = true
+                }
+
+                override fun onPageSelected(position: Int) {
+                    homeMetaPage = position
+                    updateHomeMetaDots(position)
+                    if (dragged) {
+                        binding.vpHomeMeta.tickHaptic()
+                        dragged = false
+                    }
+                }
+            })
         }
-        meta.btnPin.setOnClickListener { toggleHomePin() }
-        meta.btnSupport.setOnClickListener { openSubUrl(MmkvManager.decodeSubscription(currentMetaSubId())?.supportUrl) }
-        meta.btnTelegram.setOnClickListener { openSubUrl(MmkvManager.decodeSubscription(currentMetaSubId())?.supportUrl) }
-        meta.root.setOnLongClickListener { confirmDeleteSubscription(); true }
-        bindHomeMetaBar()
+        rebuildHomeMeta()
+    }
+
+    /**
+     * Rebuilds the meta-bar carousel from the current provider groups, keeping the user on the same
+     * subscription across list rebuilds (pin reorders, refresh, deletes) by restoring the page by its
+     * subscription id. Page dots + the inter-page gap appear only when there is more than one card.
+     */
+    private fun rebuildHomeMeta() {
+        val ids = mainViewModel.getProviderGroups().map { it.id }
+        val keepSubId = homeMetaSubIds.getOrNull(homeMetaPage)
+        homeMetaSubIds = ids
+        homeMetaAdapter.submit(ids)
+        val count = ids.size
+        val many = count > 1
+        // Neighbour cards peek past the 16dp gutter; a 12dp gap keeps them from touching.
+        binding.vpHomeMeta.setPageTransformer(
+            if (many) CompositePageTransformer().apply {
+                addTransformer(MarginPageTransformer(resources.getDimensionPixelSize(R.dimen.space_12)))
+            } else null
+        )
+        val restore = keepSubId?.let { ids.indexOf(it) }?.takeIf { it >= 0 } ?: 0
+        homeMetaPage = restore.coerceIn(0, (count - 1).coerceAtLeast(0))
+        if (count > 0) binding.vpHomeMeta.setCurrentItem(homeMetaPage, false)
+        buildHomeMetaDots(count)
+        updateHomeMetaDots(homeMetaPage)
+        binding.llHomeMetaDots.isVisible = many
+        measureHomeMetaHeight()
+    }
+
+    /**
+     * ViewPager2 cannot wrap_content, so fix its height to the tallest page. Each page's height
+     * varies (traffic row, announce banner), so measure every subscription's meta bar at the page
+     * width and take the max — one stable height so peeking neighbours stay aligned.
+     */
+    private fun measureHomeMetaHeight() {
+        if (homeMetaSubIds.isEmpty()) return
+        binding.vpHomeMeta.doOnPreDraw {
+            val innerWidth = binding.vpHomeMeta.width -
+                binding.vpHomeMeta.paddingStart - binding.vpHomeMeta.paddingEnd
+            if (innerWidth <= 0) return@doOnPreDraw
+            val widthSpec = View.MeasureSpec.makeMeasureSpec(innerWidth, View.MeasureSpec.EXACTLY)
+            val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+            val inflater = LayoutInflater.from(this)
+            var maxH = 0
+            for (id in homeMetaSubIds) {
+                val sub = MmkvManager.decodeSubscription(id) ?: continue
+                val probe = LayoutSubscriptionMetaBarBinding.inflate(inflater, binding.vpHomeMeta, false)
+                (probe.root.layoutParams as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
+                bindMetaBar(probe, sub)
+                probe.root.measure(widthSpec, heightSpec)
+                maxH = maxOf(maxH, probe.root.measuredHeight)
+            }
+            if (maxH > 0 && binding.vpHomeMeta.layoutParams.height != maxH) {
+                binding.vpHomeMeta.layoutParams = binding.vpHomeMeta.layoutParams.apply { height = maxH }
+            }
+        }
+    }
+
+    /** Rebuilds the meta-bar page dots to match [count] pages (nothing shown for 0/1 page). */
+    private fun buildHomeMetaDots(count: Int) {
+        val container = binding.llHomeMetaDots
+        container.removeAllViews()
+        if (count <= 1) return
+        val size = resources.getDimensionPixelSize(R.dimen.dot_size)
+        val activeSize = resources.getDimensionPixelSize(R.dimen.dot_size_active)
+        val gap = resources.getDimensionPixelSize(R.dimen.space_4)
+        for (i in 0 until count) {
+            val selected = i == homeMetaPage
+            val dim = if (selected) activeSize else size
+            val dot = View(this).apply {
+                layoutParams = android.widget.LinearLayout.LayoutParams(dim, dim).apply {
+                    if (i > 0) marginStart = gap
+                }
+                setBackgroundResource(if (selected) R.drawable.dot_active else R.drawable.dot_inactive)
+            }
+            container.addView(dot)
+        }
+    }
+
+    /** Swaps the dot backgrounds/sizes so only [position]'s dot reads as active. */
+    private fun updateHomeMetaDots(position: Int) {
+        val container = binding.llHomeMetaDots
+        val size = resources.getDimensionPixelSize(R.dimen.dot_size)
+        val activeSize = resources.getDimensionPixelSize(R.dimen.dot_size_active)
+        for (i in 0 until container.childCount) {
+            val dot = container.getChildAt(i)
+            val selected = i == position
+            dot.setBackgroundResource(if (selected) R.drawable.dot_active else R.drawable.dot_inactive)
+            val dim = if (selected) activeSize else size
+            dot.layoutParams = dot.layoutParams.apply {
+                width = dim
+                height = dim
+            }
+        }
     }
 
     /** Long-press the Home subscription card to delete the subscription and its servers. */
-    private fun confirmDeleteSubscription() {
-        val subId = currentMetaSubId()
+    private fun confirmDeleteSubscription(subId: String) {
         if (subId.isEmpty()) return
         AlertDialog.Builder(this)
             .setTitle(R.string.sub_delete)
@@ -1016,39 +1149,31 @@ class MainActivity : HelperBaseActivity() {
         showStatusToast(getString(R.string.toast_subscription_linked))
     }
 
-    /** Subscription shown in the Home meta bar: the selected server's, else the first provider. */
+    /** Subscription currently shown in the Home meta-bar carousel: the paged one, else the selected
+     *  server's, else the first provider. */
     private fun currentMetaSubId(): String {
+        homeMetaSubIds.getOrNull(homeMetaPage)?.takeIf { it.isNotEmpty() }?.let { return it }
         mainViewModel.findSubscriptionIdBySelect()?.takeIf { it.isNotEmpty() }?.let { return it }
         return mainViewModel.getProviderGroups().firstOrNull()?.id.orEmpty()
     }
 
-    private fun bindHomeMetaBar() {
-        val subId = currentMetaSubId()
-        val sub = if (subId.isEmpty()) null else MmkvManager.decodeSubscription(subId)
-        bindMetaBar(sub)
-    }
-
-    private fun toggleHomePin() {
-        val subId = currentMetaSubId()
+    private fun toggleHomePin(subId: String) {
         val sub = MmkvManager.decodeSubscription(subId) ?: return
         sub.pinned = !sub.pinned
         MmkvManager.encodeSubscription(subId, sub)
-        bindHomeMetaBar()
+        homeMetaAdapter.notifyItemChanged(homeMetaPage)
         mainViewModel.reloadServerList()
     }
 
     private fun refreshHomeSub() {
-        val meta = binding.layoutHomeMetaBar
         // Progress shows on the connect circle (shared rotating arc), not a top bar.
         showLoading()
-        meta.btnRefresh.isEnabled = false
         lifecycleScope.launch(Dispatchers.IO) {
             val result = mainViewModel.updateConfigViaSubAll()
             launch(Dispatchers.Main) {
                 if (result.configCount > 0) mainViewModel.reloadServerList()
-                bindHomeMetaBar()
+                rebuildHomeMeta()
                 hideLoading()
-                meta.btnRefresh.isEnabled = true
                 if (result.successCount > 0) {
                     // Route subscription-update completion through the app's custom gray status
                     // toast («Обновлено») instead of the default green success toast.
@@ -1114,8 +1239,7 @@ class MainActivity : HelperBaseActivity() {
      * label centered on it; the expiry marker shows the infinity glyph when there is no (or an
      * effectively unlimited) expiry, otherwise the real date.
      */
-    private fun bindMetaBar(sub: SubscriptionItem?) {
-        val meta = binding.layoutHomeMetaBar
+    private fun bindMetaBar(meta: LayoutSubscriptionMetaBarBinding, sub: SubscriptionItem?) {
         if (sub == null) {
             meta.root.visibility = android.view.View.GONE
             return
@@ -1278,7 +1402,14 @@ class MainActivity : HelperBaseActivity() {
             serversAdapter.setSelectServer(selected, guid)
             homeAdapter.setSelectServer(selected, guid)
             updateSelectedServer()
-            bindHomeMetaBar()
+            // Surface the selected server's subscription card in the carousel.
+            mainViewModel.findSubscriptionIdBySelect()?.let { selectedSubId ->
+                val idx = homeMetaSubIds.indexOf(selectedSubId)
+                if (idx >= 0 && idx != homeMetaPage) {
+                    homeMetaPage = idx
+                    binding.vpHomeMeta.setCurrentItem(idx, true)
+                }
+            }
             if (mainViewModel.isRunning.value == true) {
                 restartV2Ray()
             }

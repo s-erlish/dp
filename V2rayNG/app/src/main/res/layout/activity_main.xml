@@ -407,14 +407,35 @@
                     android:importantForAccessibility="no"
                     android:visibility="gone" />
 
-                <!-- Current provider meta bar (collapsible), reused from the subscription header -->
-                <include
-                    android:id="@+id/layout_home_meta_bar"
-                    layout="@layout/layout_subscription_meta_bar"
+                <!-- Provider meta bar(s): a swipeable carousel, one page per subscription. A single
+                     subscription renders as one static card identical to before; multiple show as
+                     separate swipeable cards with page dots. -->
+                <LinearLayout
+                    android:id="@+id/group_home_meta"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/screen_gutter"
-                    android:layout_marginEnd="@dimen/screen_gutter" />
+                    android:layout_marginTop="@dimen/space_8"
+                    android:orientation="vertical">
+
+                    <androidx.viewpager2.widget.ViewPager2
+                        android:id="@+id/vp_home_meta"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:clipToPadding="false"
+                        android:paddingStart="@dimen/screen_gutter"
+                        android:paddingEnd="@dimen/screen_gutter" />
+
+                    <LinearLayout
+                        android:id="@+id/ll_home_meta_dots"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginTop="@dimen/space_8"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:visibility="gone" />
+
+                </LinearLayout>
 
                 <!-- Server list right here, below the provider -->
                 <androidx.recyclerview.widget.RecyclerView
