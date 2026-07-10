@@ -494,6 +494,9 @@ class MainActivity : HelperBaseActivity() {
     private fun updateHomeEmptyState() {
         val empty = mainViewModel.serversCache.isEmpty()
         binding.layoutHomeEmpty.homeEmptyRoot.isVisible = empty
+        // The big connect shield only makes sense once there's a subscription to connect to.
+        binding.cardHero.isVisible = !empty
+        updateOnboardingLogin()
         if (empty) {
             binding.layoutHomeMetaBar.root.isVisible = false
             binding.rvHomeServers.isVisible = false
@@ -602,13 +605,8 @@ class MainActivity : HelperBaseActivity() {
      */
     private fun setupAccountHeader() {
         val header = binding.layoutHomeAccount
-        val openLogin = View.OnClickListener {
-            requestActivityLauncher.launch(Intent(this, LoginActivity::class.java))
-        }
-        // Signed-out entry points: both buttons and the CTA open the same login screen.
-        header.btnTelegramLogin.setOnClickListener(openLogin)
-        header.btnSiteLogin.setOnClickListener(openLogin)
-        header.ctaLinkTelegram.setOnClickListener(openLogin)
+        // The "link Telegram" CTA banner opens the same login screen as the onboarding buttons.
+        header.ctaLinkTelegram.setOnClickListener { openLoginScreen() }
         header.btnCtaDismiss.setOnClickListener {
             ctaDismissed = true
             header.ctaLinkTelegram.isVisible = false
@@ -617,6 +615,9 @@ class MainActivity : HelperBaseActivity() {
         header.chipAccount.setOnClickListener {
             requestActivityLauncher.launch(Intent(this, AccountActivity::class.java))
         }
+        // Onboarding-card sign-in buttons (same login screen).
+        binding.layoutHomeEmpty.btnHomeLoginTg.setOnClickListener { openLoginScreen() }
+        binding.layoutHomeEmpty.btnHomeLoginSite.setOnClickListener { openLoginScreen() }
         // Single source of truth: repaint the header (and the Account nav tab) whenever the
         // logged-in/out state changes, and auto-import subscriptions on a fresh login.
         lifecycleScope.launch {
@@ -648,6 +649,7 @@ class MainActivity : HelperBaseActivity() {
         } else {
             updateLoginCtaVisibility()
         }
+        updateOnboardingLogin()
         // Fire the one-shot post-login import only on a genuine logged-out -> logged-in transition,
         // not on the state replay that happens every time the activity restarts while signed in.
         if (loggedIn && !accountLoggedIn) onLoggedIn()
@@ -675,6 +677,21 @@ class MainActivity : HelperBaseActivity() {
         val header = binding.layoutHomeAccount
         val show = !AccountSession.isLoggedIn() && !ctaDismissed && mainViewModel.serversCache.isNotEmpty()
         header.ctaLinkTelegram.isVisible = show
+    }
+
+    /** Opens the in-app login screen (Telegram + site). */
+    private fun openLoginScreen() {
+        requestActivityLauncher.launch(Intent(this, LoginActivity::class.java))
+    }
+
+    /**
+     * The onboarding-card sign-in buttons show only when a backend is configured and the user
+     * is signed out. They live inside the empty-state card, so they're only actually on screen
+     * while there are no servers yet.
+     */
+    private fun updateOnboardingLogin() {
+        binding.layoutHomeEmpty.groupHomeLogin.isVisible =
+            BackendConfig.isConfigured() && !AccountSession.isLoggedIn()
     }
 
     /**

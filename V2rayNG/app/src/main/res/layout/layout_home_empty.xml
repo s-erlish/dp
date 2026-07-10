@@ -61,6 +61,53 @@
             app:icon="@drawable/ic_copy"
             app:iconGravity="textStart" />
 
+        <!-- Sign-in entry points (only when a backend is configured and the user is signed out).
+             Kept together with the add buttons so onboarding lives in one card. -->
+        <LinearLayout
+            android:id="@+id/group_home_login"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:gravity="center"
+                android:text="@string/home_or_sign_in"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="12sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_home_login_tg"
+                style="@style/Widget.Material3.Button.TonalButton.Icon"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="10dp"
+                android:text="@string/auth_sign_in_telegram"
+                android:textAllCaps="false"
+                android:textColor="?attr/colorOnPrimaryContainer"
+                android:textStyle="bold"
+                app:backgroundTint="?attr/colorPrimaryContainer"
+                app:cornerRadius="26dp"
+                app:icon="@drawable/ic_telegram_24dp"
+                app:iconGravity="textStart"
+                app:iconTint="@null" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_home_login_site"
+                style="@style/Widget.Material3.Button.OutlinedButton.Icon"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/auth_sign_in_site"
+                android:textAllCaps="false"
+                app:icon="@drawable/ic_globe_24dp"
+                app:iconGravity="textStart" />
+
+        </LinearLayout>
+
     </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView>

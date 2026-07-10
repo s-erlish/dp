@@ -14,6 +14,7 @@
     <string name="home_empty_subtitle">Добавьте подписку, чтобы начать пользоваться</string>
     <string name="home_empty_add_qr">Добавить по QR-коду</string>
     <string name="home_empty_add_clipboard">Добавить из буфера обмена</string>
+    <string name="home_or_sign_in">или войдите в свой аккаунт</string>
     <!-- Neutral under-shield label when no server is selected/available -->
     <string name="home_select_server">Выберите сервер</string>
     <!-- Neutral under-shield label when a server is selected but not connected -->

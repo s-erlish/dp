@@ -17,43 +17,14 @@
     android:layout_marginEnd="12dp"
     android:visibility="gone">
 
-    <!-- Signed out: login entry points -->
+    <!-- Signed out: the "link Telegram" CTA for pasted-sub users. The primary login buttons
+         now live in the onboarding card (layout_home_empty); this container only carries the CTA. -->
     <LinearLayout
         android:id="@+id/group_login"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:visibility="gone">
-
-        <!-- Telegram login pill -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_telegram_login"
-            style="@style/Widget.Material3.Button.TonalButton.Icon"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:text="@string/auth_sign_in_telegram"
-            android:textAllCaps="false"
-            android:textColor="?attr/colorOnPrimaryContainer"
-            android:textStyle="bold"
-            app:backgroundTint="?attr/colorPrimaryContainer"
-            app:cornerRadius="26dp"
-            app:icon="@drawable/ic_telegram_24dp"
-            app:iconGravity="textStart"
-            app:iconTint="@null" />
-
-        <!-- Site (email) login -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_site_login"
-            style="@style/Widget.Material3.Button.TextButton.Icon"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:layout_marginTop="4dp"
-            android:text="@string/auth_sign_in_site"
-            android:textAllCaps="false"
-            android:textColor="?attr/colorPrimary"
-            app:icon="@drawable/ic_globe_24dp"
-            app:iconGravity="textStart"
-            app:iconTint="?attr/colorPrimary" />
 
         <!-- Dismissible CTA banner: prompt pasted-sub users to link Telegram -->
         <LinearLayout
