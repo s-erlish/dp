@@ -53,7 +53,26 @@ data class SubInfoDto(
     val tariffPrice: Double? = null,
     val tariffCurrency: String? = null,
     val renewalPrice: Double? = null,
-)
+) {
+    /**
+     * Best-effort tariff badge name ("Base" / "Plus") derived from THIS sub's own fields, used as a
+     * fallback when the tariff catalog can't resolve [tariffId]. Prefers the raw remnawave record's
+     * product name, then its subscriptionProductName, then the friendly [tariffDisplayName] — but
+     * skips the generic service label ("departament vpn") so the badge only ever shows a real tariff.
+     */
+    fun tariffBadgeName(): String? {
+        val raw = subscription?.raw()
+        return sequenceOf(
+            raw?.productName,
+            raw?.subscriptionProductName,
+            tariffDisplayName,
+        ).firstOrNull { !it.isNullOrBlank() && !isGenericServiceName(it) }
+            ?.trim()
+    }
+
+    private fun isGenericServiceName(name: String): Boolean =
+        name.trim().lowercase().let { it == "departament vpn" || it == "departament" }
+}
 
 /**
  * GET /client/subscription — the authoritative ACTIVE (root) subscription summary.

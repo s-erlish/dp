@@ -186,6 +186,20 @@ class AccountViewModel : ViewModel() {
             .onFailure { report(it) }
     }
 
+    /**
+     * Resolves a tariff's display name ("Base" / "Plus") from its [tariffId] against the loaded
+     * catalog ([tariffs]). Returns null when the catalog isn't loaded yet or the id doesn't match,
+     * so callers can fall back to the sub's own product name.
+     */
+    fun tariffNameFor(tariffId: String?): String? {
+        if (tariffId.isNullOrBlank()) return null
+        return _tariffs.value.asSequence()
+            .flatMap { it.tariffs.asSequence() }
+            .firstOrNull { it.id == tariffId }
+            ?.name
+            ?.takeIf { it.isNotBlank() }
+    }
+
     fun loadPayments() = viewModelScope.launch {
         repo.getPayments()
             .onSuccess { _payments.value = it.items }
@@ -258,8 +272,26 @@ class AccountViewModel : ViewModel() {
         repo.checkPromo(code).onSuccess { onResult(it) }.onFailure { report(it) }
     }
 
-    fun toggleAutoRenew(id: String, autoRenew: Boolean, onDone: () -> Unit = {}) = viewModelScope.launch {
-        repo.toggleAutoRenew(id, autoRenew).onSuccess { onDone() }.onFailure { report(it) }
+    fun toggleAutoRenew(
+        id: String,
+        autoRenew: Boolean,
+        onError: (ApiError) -> Unit = { report(it) },
+        onDone: () -> Unit = {},
+    ) = viewModelScope.launch {
+        repo.toggleAutoRenew(id, autoRenew)
+            .onSuccess { onDone() }
+            .onFailure { t -> onError(t as? ApiError ?: ApiError.Network(t)) }
+    }
+
+    /** Auto-renew for the active (root/primary) subscription — hits the id-less primary endpoint. */
+    fun togglePrimaryAutoRenew(
+        autoRenew: Boolean,
+        onError: (ApiError) -> Unit = { report(it) },
+        onDone: () -> Unit = {},
+    ) = viewModelScope.launch {
+        repo.togglePrimaryAutoRenew(autoRenew)
+            .onSuccess { onDone() }
+            .onFailure { t -> onError(t as? ApiError ?: ApiError.Network(t)) }
     }
 
     fun activateTrial(onDone: () -> Unit = {}) = viewModelScope.launch {

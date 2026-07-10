@@ -117,6 +117,8 @@ class AccountFragment : Fragment() {
         viewModel.refreshProfile()
         viewModel.loadSubscriptions()
         viewModel.loadPublicConfig()
+        // Needed to resolve the active sub's tariff badge name (Base/Plus) from its tariffId.
+        viewModel.loadTariffs()
     }
 
     private fun observeState() {
@@ -124,6 +126,8 @@ class AccountFragment : Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.profile.collect { renderProfile(it) } }
                 launch { viewModel.subscriptions.collect { renderSubscriptions(it) } }
+                // Re-render the active sub when the tariff catalog arrives so the badge resolves.
+                launch { viewModel.tariffs.collect { updateActiveSubUi() } }
                 launch { viewModel.error.collect { renderError(it) } }
             }
         }
@@ -190,6 +194,16 @@ class AccountFragment : Fragment() {
             ?: sub.tariffDisplayName?.takeIf { it.isNotBlank() }
             ?: sub.defaultLabel?.takeIf { it.isNotBlank() }
             ?: getString(R.string.account_subs_header)
+
+        // Tariff badge (Base/Plus): prefer the catalog name matched on tariffId, else the sub's own
+        // product-name fallback. Only shown when a real tariff name resolves.
+        val tariffBadge = viewModel.tariffNameFor(sub.tariffId) ?: sub.tariffBadgeName()
+        if (tariffBadge.isNullOrBlank()) {
+            binding.tvTariffBadge.visibility = View.GONE
+        } else {
+            binding.tvTariffBadge.text = tariffBadge
+            binding.tvTariffBadge.visibility = View.VISIBLE
+        }
 
         if (sub.expireAtIso.isNullOrBlank()) {
             binding.tvSubExpiry.visibility = View.GONE
@@ -271,12 +285,50 @@ class AccountFragment : Fragment() {
     // region actions
 
     private fun onAutoRenewToggled(sub: SubInfoDto, checked: Boolean) {
-        if (sub.id.isBlank()) {
-            // No real subscription id to target — revert the visual toggle and bail.
-            binding.switchAutoRenew.isChecked = sub.autoRenewEnabled
-            return
+        // Remember the state to restore on failure.
+        val previous = sub.autoRenewEnabled
+        val onError: (ApiError) -> Unit = { error ->
+            // Don't leave the switch visually toggled on a failed request.
+            binding.switchAutoRenew.isChecked = previous
+            showAutoRenewErrorDialog(error)
         }
-        viewModel.toggleAutoRenew(sub.id, checked) { viewModel.loadSubscriptions() }
+        val reload = { viewModel.loadSubscriptions() }
+        // The active/root subscription toggles auto-renew via the id-less primary endpoint;
+        // secondary subscriptions target their own id.
+        if (sub.type.equals("root", ignoreCase = true)) {
+            viewModel.togglePrimaryAutoRenew(checked, onError = onError, onDone = { reload() })
+        } else if (sub.id.isNotBlank()) {
+            viewModel.toggleAutoRenew(sub.id, checked, onError = onError, onDone = { reload() })
+        } else {
+            // A secondary sub with no id to target — revert the visual toggle and bail.
+            binding.switchAutoRenew.isChecked = sub.autoRenewEnabled
+        }
+    }
+
+    /** Diagnostic dialog with the raw HTTP status + sanitized backend detail for a failed toggle. */
+    private fun showAutoRenewErrorDialog(error: ApiError) {
+        val code = when (error) {
+            is ApiError.Unauthorized -> "401/403"
+            is ApiError.Server -> error.code.toString()
+            is ApiError.RateLimited -> "429"
+            is ApiError.ServiceUnavailable -> "502/503"
+            is ApiError.NotFound -> "404"
+            is ApiError.Gone -> "410"
+            is ApiError.Timeout -> "timeout"
+            is ApiError.Network -> "network"
+            else -> "—"
+        }
+        val detail = when (error) {
+            is ApiError.Unauthorized -> error.detail
+            is ApiError.Server -> error.detail
+            else -> null
+        }
+        val body = if (detail.isNullOrBlank()) "HTTP: $code" else "HTTP: $code\n\n$detail"
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Автопродление — ошибка")
+            .setMessage(body)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     private fun showTopUpDialog() {
@@ -433,14 +485,18 @@ private fun formatMoney(amount: Double, currency: String): String {
     return "$n ${currencySymbol(currency)}"
 }
 
-/** Maps a currency CODE to its display symbol; blank/unknown defaults to the RUB ruble sign. */
+/**
+ * Maps a currency CODE to its display symbol. This is a RUB-only product: the backend can return
+ * "USD" (or a blank/unknown value) for accounts created via the site, but the balance is always in
+ * rubles, so "RUB", "", "USD" and anything unrecognised all render as the ruble sign. Only genuinely
+ * distinct currencies keep their own symbol.
+ */
 private fun currencySymbol(currency: String): String = when (currency.trim().uppercase(Locale.US)) {
-    "RUB", "" -> "₽"
-    "USD" -> "$"
     "EUR" -> "€"
     "KZT" -> "₸"
     "UAH" -> "₴"
-    else -> currency
+    // "RUB", "", "USD" and any unknown value → treat as rubles.
+    else -> "₽"
 }
 
 private fun formatIsoDate(iso: String?): String {

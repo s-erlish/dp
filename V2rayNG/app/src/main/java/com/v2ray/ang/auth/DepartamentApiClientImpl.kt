@@ -264,6 +264,12 @@ class DepartamentApiClientImpl(
         executeVoid(Request.Builder().url(urlOf(BackendConfig.Endpoints.secondaryAutoRenew(id)).build()).patch(body).build())
     }
 
+    override suspend fun setPrimaryAutoRenew(autoRenew: Boolean) {
+        ensureConfigured()
+        val body = gson.toJson(AutoRenewRequestDto(autoRenew)).toRequestBody(JSON)
+        executeVoid(Request.Builder().url(urlOf(BackendConfig.Endpoints.primaryAutoRenew).build()).patch(body).build())
+    }
+
     override suspend fun getReferralStats(): ReferralStatsDto =
         getJson(BackendConfig.Endpoints.referralStats, ReferralStatsDto::class.java)
 

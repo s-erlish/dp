@@ -62,5 +62,6 @@ interface DepartamentApiClient {
     suspend fun activatePromo(code: String)
     suspend fun activateTrial()
     suspend fun setSecondaryAutoRenew(id: String, autoRenew: Boolean)
+    suspend fun setPrimaryAutoRenew(autoRenew: Boolean)
     suspend fun getReferralStats(): ReferralStatsDto
 }

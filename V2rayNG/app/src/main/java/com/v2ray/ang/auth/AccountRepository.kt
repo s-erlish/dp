@@ -130,5 +130,9 @@ class AccountRepository(
     suspend fun activateTrial(): Result<Unit> = guard { api.activateTrial() }
     suspend fun toggleAutoRenew(id: String, autoRenew: Boolean): Result<Unit> =
         guard { api.setSecondaryAutoRenew(id, autoRenew) }
+
+    /** Auto-renew of the active (root/primary) subscription — targets the id-less primary endpoint. */
+    suspend fun togglePrimaryAutoRenew(autoRenew: Boolean): Result<Unit> =
+        guard { api.setPrimaryAutoRenew(autoRenew) }
     suspend fun getReferralStats(): Result<ReferralStatsDto> = guard { api.getReferralStats() }
 }

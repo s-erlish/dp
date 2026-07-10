@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bottom-nav touch feedback: NO ripple/glow. The item scales down slightly
+     under the finger (state_pressed) and springs back to 1.0 on release.
+     Applied via android:stateListAnimator on each nav_* item container. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <set>
+            <objectAnimator
+                android:duration="100"
+                android:propertyName="scaleX"
+                android:valueTo="0.92"
+                android:valueType="floatType" />
+            <objectAnimator
+                android:duration="100"
+                android:propertyName="scaleY"
+                android:valueTo="0.92"
+                android:valueType="floatType" />
+        </set>
+    </item>
+    <item>
+        <set>
+            <objectAnimator
+                android:duration="120"
+                android:propertyName="scaleX"
+                android:valueTo="1.0"
+                android:valueType="floatType" />
+            <objectAnimator
+                android:duration="120"
+                android:propertyName="scaleY"
+                android:valueTo="1.0"
+                android:valueType="floatType" />
+        </set>
+    </item>
+</selector>

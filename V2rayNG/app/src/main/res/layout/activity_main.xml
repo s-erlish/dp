@@ -503,11 +503,12 @@
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
-                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:background="@null"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center"
-                    android:orientation="vertical">
+                    android:orientation="vertical"
+                    android:stateListAnimator="@anim/nav_press">
 
                     <ImageView
                         android:id="@+id/nav_home_icon"
@@ -533,11 +534,12 @@
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
-                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:background="@null"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center"
-                    android:orientation="vertical">
+                    android:orientation="vertical"
+                    android:stateListAnimator="@anim/nav_press">
 
                     <ImageView
                         android:id="@+id/nav_servers_icon"
@@ -563,11 +565,12 @@
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
-                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:background="@null"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center"
-                    android:orientation="vertical">
+                    android:orientation="vertical"
+                    android:stateListAnimator="@anim/nav_press">
 
                     <ImageView
                         android:id="@+id/nav_settings_icon"
@@ -596,11 +599,12 @@
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
-                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:background="@null"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center"
                     android:orientation="vertical"
+                    android:stateListAnimator="@anim/nav_press"
                     android:visibility="gone">
 
                     <ImageView

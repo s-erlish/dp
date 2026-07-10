@@ -9,6 +9,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.AccountCache
 import com.v2ray.ang.auth.AccountRepository
+import com.v2ray.ang.auth.AccountSession
 import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.dto.DeviceDto
 import com.v2ray.ang.auth.dto.SubInfoDto
@@ -83,6 +84,11 @@ class DeviceManagementActivity : BaseActivity() {
                 uuid = sub?.remnawaveUuid?.takeIf { it.isNotBlank() }
                 expectedCount = sub?.connectedDevices ?: 0
             }
+            // The /all list is empty for accounts whose only subscription is the primary one, so
+            // fall back to the logged-in profile's remnawaveUuid before declaring "no subscription".
+            if (uuid.isNullOrBlank()) {
+                uuid = loggedInProfileUuid()
+            }
             if (uuid.isNullOrBlank()) {
                 hideLoading()
                 showEmptyState(getString(R.string.devices_error_no_subscription), isError = true)
@@ -130,6 +136,13 @@ class DeviceManagementActivity : BaseActivity() {
         repo.loadSubscriptions().getOrNull()
             ?.items
             ?.firstOrNull { it.remnawaveUuid.isNotBlank() }
+
+    /** remnawaveUuid of the currently logged-in profile, if any (covers primary-only accounts). */
+    private fun loggedInProfileUuid(): String? =
+        (AccountSession.state.value as? AccountSession.AccountState.LoggedIn)
+            ?.profile
+            ?.remnawaveUuid
+            ?.takeIf { it.isNotBlank() }
 
     /** Extracts a best-effort HTTP status + sanitized body from an [ApiError] for diagnostics. */
     private fun httpDetailOf(error: Throwable): Pair<Int, String?> = when (error) {

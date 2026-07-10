@@ -1,11 +1,14 @@
 package com.v2ray.ang.auth
 
+import android.provider.Settings
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.tencent.mmkv.MMKV
+import com.v2ray.ang.AngApplication
 import com.v2ray.ang.auth.dto.UserProfileDto
 import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.util.Utils
+import java.security.MessageDigest
 
 /**
  * Dedicated MMKV-backed store for the app session JWT (7-day, no refresh), the cached user
@@ -47,13 +50,46 @@ object AuthTokenStore {
         }
     }
 
-    /** Stable per-install device id (HWID), generated once and reused. */
+    // Emulator/QA sentinel: many devices report this exact ANDROID_ID, so it isn't unique.
+    private const val BAD_ANDROID_ID = "9774d56d682e549c"
+
+    /**
+     * Stable per-device HWID that survives reinstall, computed once and reused.
+     *
+     * Existing installs keep whatever id is already cached (no churn). First run derives the id
+     * from [Settings.Secure.ANDROID_ID] — stable for the signing key + device + user across
+     * reinstalls — hashed to a 32-hex-char id (MD5) to match the UUID-without-dashes format the
+     * backend expects, so a clean reinstall on the same device yields the SAME HWID and the panel
+     * keeps a single device slot. Falls back to a random uuid only when ANDROID_ID is unusable.
+     */
     fun deviceId(): String {
         val existing = store.decodeString(KEY_DEVICE_ID)
         if (!existing.isNullOrBlank()) return existing
-        val generated = Utils.getUuid()
+        val generated = computeStableDeviceId()
         store.encode(KEY_DEVICE_ID, generated)
         return generated
+    }
+
+    /** MD5(ANDROID_ID) as 32 lowercase hex chars, or a random uuid when ANDROID_ID is unusable. */
+    private fun computeStableDeviceId(): String {
+        val androidId = try {
+            Settings.Secure.getString(
+                AngApplication.application.contentResolver,
+                Settings.Secure.ANDROID_ID,
+            )
+        } catch (e: Throwable) {
+            null
+        }
+        if (androidId.isNullOrBlank() || androidId == BAD_ANDROID_ID) {
+            return Utils.getUuid()
+        }
+        return try {
+            MessageDigest.getInstance("MD5")
+                .digest(androidId.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+        } catch (e: Throwable) {
+            Utils.getUuid()
+        }
     }
 
     /** Persists a new session. No refresh token in this backend. */

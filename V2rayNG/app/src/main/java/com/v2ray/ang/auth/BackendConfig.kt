@@ -66,5 +66,8 @@ object BackendConfig {
         const val trial = "/client/trial"
         const val referralStats = "/client/referral-stats"
         fun secondaryAutoRenew(id: String) = "/client/secondary-subscriptions/$id/auto-renew"
+
+        /** Auto-renew of the ACTIVE (root/primary) subscription — no id in the path. */
+        const val primaryAutoRenew = "/client/subscription/auto-renew"
     }
 }
