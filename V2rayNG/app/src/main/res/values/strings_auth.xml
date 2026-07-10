@@ -31,7 +31,7 @@
     <string name="auth_success">Вход выполнен</string>
     <string name="auth_err_gone">Ссылка устарела, начните заново</string>
     <string name="auth_err_unavailable">Сервис временно недоступен</string>
-    <string name="auth_err_network">Проблема с сетью</string>
+    <string name="auth_err_network">Ошибка сети. Проверьте подключение</string>
     <string name="auth_err_not_configured">Вход недоступен</string>
     <string name="auth_err_generic">Что-то пошло не так. Попробуйте снова.</string>
 
