@@ -61,6 +61,30 @@
             app:icon="@drawable/ic_copy"
             app:iconGravity="textStart" />
 
+        <!-- Signed-in + no-subscription state: buy a subscription (bound to the account) instead of
+             pasting one. Shown (and the QR/clipboard buttons above hidden) only when logged in;
+             GONE by default so the signed-out onboarding is unchanged. -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_home_buy"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/home_buy_subscription"
+            android:visibility="gone" />
+
+        <!-- Offered alongside the buy CTA only when the account's Telegram is not yet linked. -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_home_link_tg"
+            style="@style/Widget.Material3.Button.OutlinedButton.Icon"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/home_link_telegram"
+            android:visibility="gone"
+            app:icon="@drawable/ic_telegram_24dp"
+            app:iconGravity="textStart"
+            app:iconTint="@null" />
+
         <!-- Sign-in entry points (only when a backend is configured and the user is signed out).
              Kept together with the add buttons so onboarding lives in one card. -->
         <LinearLayout

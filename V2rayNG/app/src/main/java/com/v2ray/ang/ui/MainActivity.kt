@@ -493,6 +493,11 @@ class MainActivity : HelperBaseActivity() {
         // Home empty state (shown when no subscriptions/servers exist yet).
         binding.layoutHomeEmpty.btnHomeAddQr.setOnClickListener { importQRcode() }
         binding.layoutHomeEmpty.btnHomeAddClipboard.setOnClickListener { importClipboard() }
+        // Signed-in + no-subscription CTAs: buy a subscription (bound to the account) / link Telegram.
+        binding.layoutHomeEmpty.btnHomeBuy.setOnClickListener {
+            startActivity(Intent(this, BuyTariffActivity::class.java))
+        }
+        binding.layoutHomeEmpty.btnHomeLinkTg.setOnClickListener { openLoginScreen("telegram") }
     }
 
     /**
@@ -738,13 +743,30 @@ class MainActivity : HelperBaseActivity() {
     }
 
     /**
-     * The onboarding-card sign-in buttons show only when a backend is configured and the user
-     * is signed out. They live inside the empty-state card, so they're only actually on screen
-     * while there are no servers yet.
+     * Configures the empty-state onboarding card for the current auth state. Two shapes, driven by
+     * whether the user is signed in (the card itself is only on screen while there are no servers):
+     *   - signed out: paste-a-subscription buttons (QR/clipboard) + the Telegram/site login block.
+     *   - signed in : the "Купить подписку" CTA (a subscription is bought and bound to the account,
+     *     not pasted), plus "Привязать Telegram" only when the profile's Telegram isn't linked yet.
+     *     The QR/clipboard buttons and the login block are hidden so no dead space is left below.
+     * When no backend is configured, login is meaningless, so the signed-out onboarding is shown
+     * unchanged.
      */
     private fun updateOnboardingLogin() {
-        binding.layoutHomeEmpty.groupHomeLogin.isVisible =
-            BackendConfig.isConfigured() && !AccountSession.isLoggedIn()
+        val empty = binding.layoutHomeEmpty
+        val configured = BackendConfig.isConfigured()
+        val loggedIn = AccountSession.isLoggedIn()
+        val buyState = configured && loggedIn
+        val telegramLinked =
+            (AccountSession.state.value as? AccountSession.AccountState.LoggedIn)?.profile?.telegramLinked == true
+        // Signed-out login block (Telegram/site): only when a backend is configured and signed out.
+        empty.groupHomeLogin.isVisible = configured && !loggedIn
+        // Paste-a-subscription buttons: signed-in users buy instead, so hide them in the buy state.
+        empty.btnHomeAddQr.isVisible = !buyState
+        empty.btnHomeAddClipboard.isVisible = !buyState
+        // Buy CTA (+ optional link-Telegram) only in the signed-in, no-subscription state.
+        empty.btnHomeBuy.isVisible = buyState
+        empty.btnHomeLinkTg.isVisible = buyState && !telegramLinked
     }
 
     /**

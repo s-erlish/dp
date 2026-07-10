@@ -10,12 +10,15 @@
     <string name="servers_add_clipboard">Добавить из буфера</string>
     <string name="servers_section_local">Локальные</string>
     <!-- Home empty state (no servers/subscriptions yet) -->
-    <string name="home_welcome_title">Приветствуем вас в departament</string>
-    <string name="home_empty_title">Пока нет подписок</string>
+    <string name="home_welcome_title">Приветствуем!</string>
+    <string name="home_empty_title">У вас пока не добавлены подписки.</string>
     <string name="home_empty_subtitle">Добавьте подписку, чтобы начать пользоваться</string>
     <string name="home_empty_add_qr">Добавить по QR-коду</string>
     <string name="home_empty_add_clipboard">Добавить из буфера обмена</string>
-    <string name="home_or_sign_in">или войдите в свой аккаунт</string>
+    <string name="home_or_sign_in">Или войдите в свой аккаунт</string>
+    <!-- Signed-in + no-subscription home state -->
+    <string name="home_buy_subscription">Купить подписку</string>
+    <string name="home_link_telegram">Привязать Telegram</string>
     <!-- Neutral under-shield label when no server is selected/available -->
     <string name="home_select_server">Выберите сервер</string>
     <!-- Neutral under-shield label when a server is selected but not connected -->
