@@ -460,7 +460,7 @@
             <View
                 android:id="@+id/bottom_nav_scrim"
                 android:layout_width="match_parent"
-                android:layout_height="128dp"
+                android:layout_height="160dp"
                 android:layout_gravity="bottom"
                 android:background="@drawable/bg_bottom_nav_scrim" />
 
@@ -473,11 +473,12 @@
             <LinearLayout
                 android:id="@+id/bottom_nav"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
+                android:layout_height="wrap_content"
                 android:layout_gravity="bottom"
                 android:background="@android:color/transparent"
                 android:baselineAligned="false"
                 android:gravity="center_vertical"
+                android:minHeight="56dp"
                 android:orientation="horizontal">
 
                 <LinearLayout

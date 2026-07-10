@@ -17,15 +17,21 @@ class AuthManager(
     private val api: DepartamentApiClient = DepartamentApiClientImpl(),
 ) {
 
-    /** UI-facing state of a Telegram login attempt. */
+    /** UI-facing state of a login attempt (Telegram deep-link, site email/password, or 2FA). */
     sealed interface LoginState {
         object Idle : LoginState
 
-        /** Deep link is ready; the UI should open Telegram (Custom Tab) with it. */
+        /** Deep link is ready; the UI should open Telegram via ACTION_VIEW with it. */
         data class AwaitingTelegram(val deepLink: String) : LoginState
 
         /** Polling the backend for confirmation. Carries the deep link so the UI can reopen it. */
         data class Polling(val deepLink: String) : LoginState
+
+        /**
+         * A site email/password or 2FA request is in flight. The UI shows an inline busy indicator
+         * on the site/2FA button; unlike [Polling] it never opens Telegram or the awaiting card.
+         */
+        object SiteLoading : LoginState
 
         /** Confirmed — session persisted; carries the profile. */
         data class Success(val profile: UserProfileDto) : LoginState

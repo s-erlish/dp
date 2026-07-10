@@ -254,9 +254,9 @@ class MainActivity : HelperBaseActivity() {
      * subscription/server list, and Settings shows the custom Incy settings screen.
      */
     private fun setupBottomNav() {
-        // The custom bar is a plain LinearLayout; consume the window insets so nothing auto-pads
-        // it (setupEdgeToEdge applies the single small gesture-bar bottom pad as the one source).
-        ViewCompat.setOnApplyWindowInsetsListener(binding.bottomNav) { _, insets -> insets }
+        // The custom bar is a plain LinearLayout with no fitsSystemWindows behaviour, so it never
+        // auto-pads itself; setupEdgeToEdge's parent listener is the single source of its bottom
+        // inset padding. (A no-op listener returning the insets unchanged used to sit here.)
         binding.navHome.setOnClickListener { selectNav(R.id.nav_home) }
         binding.navServers.setOnClickListener { selectNav(R.id.nav_servers) }
         binding.navSettings.setOnClickListener { selectNav(R.id.nav_settings) }
@@ -335,15 +335,18 @@ class MainActivity : HelperBaseActivity() {
             binding.groupServers.updatePadding(top = bars.top)
             binding.groupSettings.root.updatePadding(top = bars.top)
             binding.groupAccount.updatePadding(top = bars.top)
-            // Small fixed bottom pad (NOT the full gesture-bar inset): on gesture nav the thin
-            // pill was lifting the whole bar well above the edge. Cap at ~8dp so the items sit
-            // low, just a few dp clear of the bottom. Material's auto bottom-inset padding is
-            // disabled in setupBottomNav so this stays the one source of truth (no doubled gap).
+            // Pad the custom bar by the FULL bottom inset so its icons/labels sit ABOVE whatever the
+            // system draws: the ~48dp of Android 3-button navigation, or the ~24dp gesture pill. The
+            // bar has wrap_content height (min 56dp) and hugs the bottom, so this padding grows it
+            // UPWARD, lifting the content clear of the buttons. The bottom_nav_scrim and home gradient
+            // keep flowing behind it, so there is no black bar in either nav mode.
             val density = resources.displayMetrics.density
-            binding.bottomNav.updatePadding(bottom = minOf(bars.bottom, (8 * density).toInt()))
-            // The nav overlays the content, so pad the scrollable lists to keep the last row
-            // clear of the nav using the REAL inset (nav height + the full gesture-bar inset).
-            val navPad = bars.bottom + (72 * density).toInt()
+            binding.bottomNav.updatePadding(bottom = bars.bottom)
+            // The nav overlays the content, so pad the scrollable lists so the last row clears the
+            // full nav footprint: the system inset + the 56dp bar content + 16dp breathing room.
+            val navHeightPx = (56 * density).toInt()
+            val breathingPx = (16 * density).toInt()
+            val navPad = bars.bottom + navHeightPx + breathingPx
             binding.rvHomeServers.updatePadding(bottom = navPad)
             binding.rvServers.updatePadding(bottom = navPad)
             insets

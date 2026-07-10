@@ -47,7 +47,7 @@ class AuthViewModel : ViewModel() {
     fun loginSite(email: String, password: String) {
         loginJob?.cancel()
         _twoFactor.value = null
-        _state.value = LoginState.Polling("")
+        _state.value = LoginState.SiteLoading
         loginJob = viewModelScope.launch {
             try {
                 when (val result = authManager.loginSite(email, password)) {
@@ -66,7 +66,7 @@ class AuthViewModel : ViewModel() {
     /** Completes a 2FA login started by [loginSite]. */
     fun submit2fa(tempToken: String, code: String) {
         loginJob?.cancel()
-        _state.value = LoginState.Polling("")
+        _state.value = LoginState.SiteLoading
         loginJob = viewModelScope.launch {
             try {
                 val profile = authManager.submit2fa(tempToken, code)
@@ -75,6 +75,16 @@ class AuthViewModel : ViewModel() {
             } catch (e: ApiError) {
                 _state.value = LoginState.Error(e)
             }
+        }
+    }
+
+    /**
+     * Resets a terminal [LoginState.Error] back to [LoginState.Idle] once the UI has shown it.
+     * Prevents the persisted error from re-firing on every STARTED re-subscription (e.g. rotation).
+     */
+    fun consumeError() {
+        if (_state.value is LoginState.Error) {
+            _state.value = LoginState.Idle
         }
     }
 }

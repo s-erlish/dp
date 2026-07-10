@@ -11,6 +11,7 @@ import android.graphics.Color
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.core.CoreServiceManager
@@ -31,7 +32,6 @@ object NotificationManager {
     private const val NOTIFICATION_PENDING_INTENT_CONTENT = 0
     private const val NOTIFICATION_PENDING_INTENT_STOP_V2RAY = 1
     private const val NOTIFICATION_PENDING_INTENT_RESTART_V2RAY = 2
-    private const val NOTIFICATION_ICON_THRESHOLD = 3000
     private const val QUERY_INTERVAL_MS = 3000L
 
     private var lastQueryTime = 0L
@@ -147,6 +147,7 @@ object NotificationManager {
         }
         val builder = NotificationCompat.Builder(service, channelId)
             .setSmallIcon(R.drawable.ic_stat_name)
+            .setColor(ContextCompat.getColor(service, R.color.icon_blue))
             .setContentTitle(title)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
@@ -157,12 +158,12 @@ object NotificationManager {
             .setOnlyAlertOnce(true)
             .setContentIntent(contentPendingIntent)
             .addAction(
-                R.drawable.ic_delete_24dp,
+                R.drawable.ic_notif_stop,
                 service.getString(R.string.notification_action_stop_v2ray),
                 stopV2RayPendingIntent
             )
             .addAction(
-                R.drawable.ic_delete_24dp,
+                R.drawable.ic_notif_restart,
                 service.getString(R.string.title_service_restart),
                 restartV2RayPendingIntent
             )
@@ -178,6 +179,7 @@ object NotificationManager {
     private fun buildFallbackNotification(service: Service, channelId: String): Notification {
         return NotificationCompat.Builder(service, channelId)
             .setSmallIcon(R.drawable.ic_stat_name)
+            .setColor(ContextCompat.getColor(service, R.color.icon_blue))
             .setContentTitle(service.getString(R.string.app_name))
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
@@ -238,13 +240,6 @@ object NotificationManager {
      */
     private fun updateNotification(contentText: String?, proxyTraffic: Long, directTraffic: Long) {
         if (mBuilder != null) {
-            if (proxyTraffic < NOTIFICATION_ICON_THRESHOLD && directTraffic < NOTIFICATION_ICON_THRESHOLD) {
-                mBuilder?.setSmallIcon(R.drawable.ic_stat_name)
-            } else if (proxyTraffic > directTraffic) {
-                mBuilder?.setSmallIcon(R.drawable.ic_stat_proxy)
-            } else {
-                mBuilder?.setSmallIcon(R.drawable.ic_stat_direct)
-            }
             mBuilder?.setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
             mBuilder?.setContentText(contentText)
             getNotificationManager()?.notify(NOTIFICATION_ID, mBuilder?.build())

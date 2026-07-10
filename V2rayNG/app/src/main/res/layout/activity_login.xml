@@ -134,6 +134,15 @@
                     android:textAppearance="@style/TextAppearance.App.Title"
                     android:textColor="?attr/colorOnSurface" />
 
+                <TextView
+                    android:id="@+id/tv_site_desc"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_8"
+                    android:text="@string/auth_site_desc"
+                    android:textAppearance="@style/TextAppearance.App.Subtitle"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/til_email"
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
@@ -176,17 +185,32 @@
                         android:maxLines="1" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_site"
+                <FrameLayout
                     android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:layout_marginTop="@dimen/space_16"
-                    android:text="@string/auth_btn_site"
-                    android:textAllCaps="false"
-                    android:textColor="?attr/colorOnPrimary"
-                    android:textStyle="bold"
-                    app:backgroundTint="?attr/colorPrimary"
-                    app:cornerRadius="26dp" />
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_16">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_site"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:text="@string/auth_btn_site"
+                        android:textAllCaps="false"
+                        android:textColor="?attr/colorOnPrimary"
+                        android:textStyle="bold"
+                        app:backgroundTint="?attr/colorPrimary"
+                        app:cornerRadius="26dp" />
+
+                    <ProgressBar
+                        android:id="@+id/pb_site"
+                        style="?android:attr/progressBarStyleSmall"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="center"
+                        android:indeterminateTint="?attr/colorOnPrimary"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+                </FrameLayout>
 
                 <!-- Двухфакторный код (TOTP) -->
                 <LinearLayout
@@ -232,17 +256,32 @@
                             android:maxLines="1" />
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_confirm_2fa"
+                    <FrameLayout
                         android:layout_width="match_parent"
-                        android:layout_height="52dp"
-                        android:layout_marginTop="@dimen/space_12"
-                        android:text="@string/auth_btn_2fa"
-                        android:textAllCaps="false"
-                        android:textColor="?attr/colorOnPrimary"
-                        android:textStyle="bold"
-                        app:backgroundTint="?attr/colorPrimary"
-                        app:cornerRadius="26dp" />
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_12">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_confirm_2fa"
+                            android:layout_width="match_parent"
+                            android:layout_height="52dp"
+                            android:text="@string/auth_btn_2fa"
+                            android:textAllCaps="false"
+                            android:textColor="?attr/colorOnPrimary"
+                            android:textStyle="bold"
+                            app:backgroundTint="?attr/colorPrimary"
+                            app:cornerRadius="26dp" />
+
+                        <ProgressBar
+                            android:id="@+id/pb_confirm_2fa"
+                            style="?android:attr/progressBarStyleSmall"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_gravity="center"
+                            android:indeterminateTint="?attr/colorOnPrimary"
+                            android:visibility="gone"
+                            tools:visibility="visible" />
+                    </FrameLayout>
                 </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton

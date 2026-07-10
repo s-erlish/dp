@@ -4,13 +4,18 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Patterns
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import androidx.activity.viewModels
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.core.view.isVisible
+import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.v2ray.ang.BuildConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.AuthManager.LoginState
@@ -44,6 +49,13 @@ class LoginActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Восстанавливаем то, что нельзя пересоздать из состояния ViewModel: уже открытый deep link
+        // (чтобы поворот экрана НЕ переоткрыл Telegram) и признак попытки входа через сайт.
+        if (savedInstanceState != null) {
+            currentDeepLink = savedInstanceState.getString(KEY_DEEP_LINK)
+            lastAttemptWasSite = savedInstanceState.getBoolean(KEY_LAST_ATTEMPT_SITE)
+        }
 
         // Режим ПРИВЯЗКИ Telegram к уже вошедшему аккаунту (вход через сайт → привязать Telegram).
         // Запрос создания токена уходит с текущим JWT (interceptor), поэтому бэкенд привязывает
@@ -94,33 +106,50 @@ class LoginActivity : BaseActivity() {
             viewModel.startTelegramLogin()
         }
 
-        binding.btnSite.setOnClickListener {
-            val email = binding.etEmail.text?.toString()?.trim().orEmpty()
-            val password = binding.etPassword.text?.toString().orEmpty()
-            if (email.isEmpty() || password.isEmpty()) {
-                toast(R.string.auth_fields_required)
-            } else {
-                lastAttemptWasSite = true
-                hideError()
-                viewModel.loginSite(email, password)
-            }
-        }
-
-        binding.btnConfirm2fa.setOnClickListener {
-            val token = pendingTempToken
-            val code = binding.etCode.text?.toString()?.trim().orEmpty()
-            when {
-                token == null -> return@setOnClickListener
-                code.isEmpty() -> toast(R.string.auth_code_required)
-                else -> {
-                    lastAttemptWasSite = true
-                    hideError()
-                    viewModel.submit2fa(token, code)
-                }
-            }
-        }
-
+        binding.btnSite.setOnClickListener { submitSiteLogin() }
+        binding.btnConfirm2fa.setOnClickListener { submit2faCode() }
         binding.btnRegisterSite.setOnClickListener { openRegister() }
+
+        // Живая проверка полей: подсказки об ошибке под каждым полем и активация кнопки только
+        // при валидном вводе. Ошибка гаснет, как только пользователь исправляет значение.
+        binding.etEmail.doAfterTextChanged {
+            val email = it?.toString()?.trim().orEmpty()
+            binding.tilEmail.error =
+                if (email.isNotEmpty() && !isEmail(email)) getString(R.string.auth_email_invalid) else null
+            updateSiteSubmitEnabled()
+        }
+        binding.etPassword.doAfterTextChanged {
+            binding.tilPassword.error = null
+            updateSiteSubmitEnabled()
+        }
+        binding.etCode.doAfterTextChanged {
+            val code = it?.toString()?.trim().orEmpty()
+            binding.tilCode.error =
+                if (code.isNotEmpty() && !isSixDigits(code)) getString(R.string.auth_code_invalid) else null
+            update2faSubmitEnabled()
+        }
+
+        // IME «Готово» отправляет форму прямо из поля, не тянясь к кнопке.
+        binding.etPassword.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                submitSiteLogin()
+                true
+            } else {
+                false
+            }
+        }
+        binding.etCode.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                submit2faCode()
+                true
+            } else {
+                false
+            }
+        }
+
+        // Кнопки отправки неактивны, пока ввод не валиден.
+        updateSiteSubmitEnabled()
+        update2faSubmitEnabled()
 
         observe()
         showIntro()
@@ -130,6 +159,14 @@ class LoginActivity : BaseActivity() {
         if (linkMode && savedInstanceState == null) {
             viewModel.startTelegramLogin()
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        // Сохраняем то, что нельзя восстановить из ViewModel: уже открытый deep link (иначе поворот
+        // экрана переоткроет Telegram) и признак попытки входа через сайт.
+        outState.putString(KEY_DEEP_LINK, currentDeepLink)
+        outState.putBoolean(KEY_LAST_ATTEMPT_SITE, lastAttemptWasSite)
     }
 
     private fun observe() {
@@ -143,7 +180,10 @@ class LoginActivity : BaseActivity() {
 
     private fun render(state: LoginState) {
         when (state) {
-            is LoginState.Idle -> showIntro()
+            is LoginState.Idle -> {
+                setSiteBusy(false)
+                showIntro()
+            }
 
             is LoginState.AwaitingTelegram -> {
                 openTelegramOnce(state.deepLink)
@@ -157,6 +197,10 @@ class LoginActivity : BaseActivity() {
                 showAwaiting()
             }
 
+            // Вход через сайт / 2FA в процессе: спиннер на нужной кнопке, submit заблокированы.
+            // НЕ трогаем карточку Telegram и не открываем deep link.
+            is LoginState.SiteLoading -> setSiteBusy(true)
+
             is LoginState.Success -> {
                 showLoading()
                 toastSuccess(R.string.auth_success)
@@ -164,7 +208,13 @@ class LoginActivity : BaseActivity() {
                 finish()
             }
 
-            is LoginState.Error -> showError(state.error)
+            is LoginState.Error -> {
+                setSiteBusy(false)
+                showError(state.error)
+                // Сбрасываем терминальную ошибку, чтобы она не всплывала повторно
+                // при каждой повторной подписке (например, после поворота экрана).
+                viewModel.consumeError()
+            }
         }
     }
 
@@ -178,23 +228,99 @@ class LoginActivity : BaseActivity() {
         }
     }
 
+    /** Validates the site fields and launches email/password login. Shared by the button and IME. */
+    private fun submitSiteLogin() {
+        val email = binding.etEmail.text?.toString()?.trim().orEmpty()
+        val password = binding.etPassword.text?.toString().orEmpty()
+        when {
+            email.isEmpty() || password.isEmpty() -> toast(R.string.auth_fields_required)
+            !isEmail(email) -> binding.tilEmail.error = getString(R.string.auth_email_invalid)
+            else -> {
+                lastAttemptWasSite = true
+                hideError()
+                viewModel.loginSite(email, password)
+            }
+        }
+    }
+
+    /** Validates the 6-digit code and completes the 2FA login. Shared by the button and IME. */
+    private fun submit2faCode() {
+        val token = pendingTempToken ?: return
+        val code = binding.etCode.text?.toString()?.trim().orEmpty()
+        when {
+            code.isEmpty() -> toast(R.string.auth_code_required)
+            !isSixDigits(code) -> binding.tilCode.error = getString(R.string.auth_code_invalid)
+            else -> {
+                lastAttemptWasSite = true
+                hideError()
+                viewModel.submit2fa(token, code)
+            }
+        }
+    }
+
+    private fun updateSiteSubmitEnabled() {
+        val email = binding.etEmail.text?.toString()?.trim().orEmpty()
+        val password = binding.etPassword.text?.toString().orEmpty()
+        binding.btnSite.isEnabled = isEmail(email) && password.isNotEmpty()
+    }
+
+    private fun update2faSubmitEnabled() {
+        val code = binding.etCode.text?.toString()?.trim().orEmpty()
+        binding.btnConfirm2fa.isEnabled = isSixDigits(code)
+    }
+
+    private fun isEmail(value: String): Boolean =
+        value.isNotEmpty() && Patterns.EMAIL_ADDRESS.matcher(value).matches()
+
+    private fun isSixDigits(value: String): Boolean =
+        value.length == 6 && value.all { it.isDigit() }
+
     private fun showIntro() {
         binding.layoutAwaiting.visibility = View.GONE
-        hideError()
+        binding.btnTelegram.isEnabled = true
+        // Намеренно НЕ вызываем hideError(): render(Error) сбрасывает состояние в Idle сразу после
+        // показа ошибки, и showIntro не должен затирать только что показанный текст.
     }
 
     private fun showAwaiting() {
         binding.layoutAwaiting.visibility = View.VISIBLE
+        // Блокируем повторный запуск входа через Telegram, пока идёт ожидание подтверждения.
+        binding.btnTelegram.isEnabled = false
         hideError()
+    }
+
+    /**
+     * Встроенный индикатор занятости для входа через сайт / 2FA: спиннер на нужной кнопке,
+     * все кнопки отправки заблокированы. По завершении восстанавливает подписи и активность.
+     */
+    private fun setSiteBusy(busy: Boolean) {
+        binding.btnTelegram.isEnabled = !busy
+        if (busy) {
+            binding.btnSite.isEnabled = false
+            binding.btnConfirm2fa.isEnabled = false
+            // Спиннер показываем на той кнопке, которая инициировала запрос.
+            val on2fa = binding.layout2fa.isVisible
+            binding.pbSite.isVisible = !on2fa
+            binding.pbConfirm2fa.isVisible = on2fa
+            binding.btnSite.text = if (on2fa) getString(R.string.auth_btn_site) else ""
+            binding.btnConfirm2fa.text = if (on2fa) "" else getString(R.string.auth_btn_2fa)
+        } else {
+            binding.pbSite.isVisible = false
+            binding.pbConfirm2fa.isVisible = false
+            binding.btnSite.setText(R.string.auth_btn_site)
+            binding.btnConfirm2fa.setText(R.string.auth_btn_2fa)
+            updateSiteSubmitEnabled()
+            update2faSubmitEnabled()
+        }
     }
 
     private fun showError(error: ApiError) {
         binding.layoutAwaiting.visibility = View.GONE
         binding.tvError.setText(messageFor(error))
         binding.tvError.visibility = View.VISIBLE
-        // Для входа через сайт показываем диагностический диалог с реальной причиной
-        // с бэкенда (её можно заскринить), чтобы понять, почему вход не проходит.
-        if (lastAttemptWasSite) showSiteErrorDialog(error)
+        // Диагностический диалог с «сырой» причиной отказа — только в отладочной сборке.
+        // В релизе пользователь видит понятную строку auth_err_*, а не тело HTTP-ответа.
+        if (lastAttemptWasSite && BuildConfig.DEBUG) showSiteErrorDialog(error)
     }
 
     private fun hideError() {
@@ -227,6 +353,8 @@ class LoginActivity : BaseActivity() {
     }
 
     private fun messageFor(error: ApiError): Int = when (error) {
+        // 401/403 на входе через сайт — почти всегда неверные учётные данные.
+        is ApiError.Unauthorized -> R.string.auth_err_credentials
         is ApiError.Gone -> R.string.auth_err_gone
         is ApiError.ServiceUnavailable -> R.string.auth_err_unavailable
         is ApiError.Network, is ApiError.Timeout -> R.string.auth_err_network
@@ -277,5 +405,11 @@ class LoginActivity : BaseActivity() {
 
         /** Основной сайт для регистрации (не API-хост). */
         private const val REGISTER_URL = "https://departament.site"
+
+        /** savedInstanceState: уже открытый deep link Telegram (защита от переоткрытия). */
+        private const val KEY_DEEP_LINK = "deep_link"
+
+        /** savedInstanceState: последняя попытка входа была через сайт. */
+        private const val KEY_LAST_ATTEMPT_SITE = "last_attempt_site"
     }
 }
