@@ -56,6 +56,7 @@
                      The fixed toolbar is hidden on all tabs; the top status-bar inset is applied to
                      this scroll content at runtime so the row starts just below the clock. -->
                 <LinearLayout
+                    android:id="@+id/home_stats_row"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:baselineAligned="false"
@@ -349,12 +350,49 @@
 
                 </com.google.android.material.card.MaterialCardView>
 
+                <!-- Onboarding centering: two equal-weight spacers bracket the welcome heading +
+                     onboarding card. group_home is fillViewport, so the child LinearLayout is
+                     stretched to the viewport; the visible spacers split the leftover height so the
+                     block sits in the vertical middle. Both are GONE once servers exist, restoring
+                     the normal top-aligned layout. -->
+                <View
+                    android:id="@+id/home_empty_spacer_top"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:importantForAccessibility="no"
+                    android:visibility="gone" />
+
+                <!-- Welcome heading (empty state only): bold brand-style greeting above the card. -->
+                <TextView
+                    android:id="@+id/tv_home_welcome"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="24dp"
+                    android:layout_marginEnd="24dp"
+                    android:layout_marginBottom="14dp"
+                    android:gravity="center"
+                    android:letterSpacing="0.0"
+                    android:text="@string/home_welcome_title"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="25sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+
                 <!-- Empty state (no servers/subscriptions yet): two Incy add buttons. -->
                 <include
                     android:id="@+id/layout_home_empty"
                     layout="@layout/layout_home_empty"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
+
+                <View
+                    android:id="@+id/home_empty_spacer_bottom"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:importantForAccessibility="no"
+                    android:visibility="gone" />
 
                 <!-- Current provider meta bar (collapsible), reused from the subscription header -->
                 <include

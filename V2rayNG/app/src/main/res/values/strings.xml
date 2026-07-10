@@ -10,6 +10,7 @@
     <string name="servers_add_clipboard">Добавить из буфера</string>
     <string name="servers_section_local">Локальные</string>
     <!-- Home empty state (no servers/subscriptions yet) -->
+    <string name="home_welcome_title">Приветствуем вас в departament</string>
     <string name="home_empty_title">Пока нет подписок</string>
     <string name="home_empty_subtitle">Добавьте подписку, чтобы начать пользоваться</string>
     <string name="home_empty_add_qr">Добавить по QR-коду</string>

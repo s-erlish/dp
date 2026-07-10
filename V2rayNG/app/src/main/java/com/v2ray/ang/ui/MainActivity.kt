@@ -505,7 +505,15 @@ class MainActivity : HelperBaseActivity() {
         binding.layoutHomeEmpty.homeEmptyRoot.isVisible = empty
         // The big connect shield only makes sense once there's a subscription to connect to.
         binding.cardHero.isVisible = !empty
+        // Empty onboarding state: show the welcome heading and center the block with the two
+        // weighted spacers; hide the top stats row (↑/timer/↓ + "+") since nothing is running.
+        // Servers present: heading + spacers gone -> content restores its normal top alignment.
+        binding.tvHomeWelcome.isVisible = empty
+        binding.homeEmptySpacerTop.isVisible = empty
+        binding.homeEmptySpacerBottom.isVisible = empty
+        binding.homeStatsRow.isVisible = !empty
         updateOnboardingLogin()
+        updateBottomNavVisibility()
         if (empty) {
             binding.layoutHomeMetaBar.root.isVisible = false
             binding.rvHomeServers.isVisible = false
@@ -515,6 +523,28 @@ class MainActivity : HelperBaseActivity() {
             }
         } else {
             applyHomeListVisibility()
+        }
+    }
+
+    /**
+     * Hides the whole bottom nav (bar + scrim) in the pure onboarding state — signed out AND no
+     * servers — so the sign-in screen reads as a clean solid background with no tab buttons. It
+     * returns as soon as EITHER is true (logged in OR at least one server). The nav is an overlay
+     * in a FrameLayout (it never reserved layout space), so hiding it leaves no phantom bottom gap.
+     * When it reappears we guarantee a valid selected tab (the Account tab is only valid while
+     * signed in; otherwise fall back to Home).
+     */
+    private fun updateBottomNavVisibility() {
+        val show = AccountSession.isLoggedIn() || mainViewModel.serversCache.isNotEmpty()
+        val becomingVisible = show && !binding.bottomNav.isVisible
+        binding.bottomNav.isVisible = show
+        binding.bottomNavScrim.isVisible = show
+        if (becomingVisible) {
+            val valid = selectedNavId == R.id.nav_home ||
+                selectedNavId == R.id.nav_servers ||
+                selectedNavId == R.id.nav_settings ||
+                (selectedNavId == R.id.nav_account && AccountSession.isLoggedIn())
+            if (!valid) selectNav(R.id.nav_home)
         }
     }
 
@@ -614,17 +644,17 @@ class MainActivity : HelperBaseActivity() {
      */
     private fun setupAccountHeader() {
         val header = binding.layoutHomeAccount
-        // The "link Telegram" CTA banner opens the same login screen as the onboarding buttons.
-        header.ctaLinkTelegram.setOnClickListener { openLoginScreen() }
+        // The "link Telegram" CTA banner opens the Telegram login flow.
+        header.ctaLinkTelegram.setOnClickListener { openLoginScreen("telegram") }
         header.btnCtaDismiss.setOnClickListener {
             ctaDismissed = true
             header.ctaLinkTelegram.isVisible = false
         }
         // Signed-in chip selects the in-place Account tab.
         header.chipAccount.setOnClickListener { selectNav(R.id.nav_account) }
-        // Onboarding-card sign-in buttons (same login screen).
-        binding.layoutHomeEmpty.btnHomeLoginTg.setOnClickListener { openLoginScreen() }
-        binding.layoutHomeEmpty.btnHomeLoginSite.setOnClickListener { openLoginScreen() }
+        // Onboarding-card sign-in buttons open the login screen preselecting their method.
+        binding.layoutHomeEmpty.btnHomeLoginTg.setOnClickListener { openLoginScreen("telegram") }
+        binding.layoutHomeEmpty.btnHomeLoginSite.setOnClickListener { openLoginScreen("site") }
         // Single source of truth: repaint the header (and the Account nav tab) whenever the
         // logged-in/out state changes, and auto-import subscriptions on a fresh login.
         lifecycleScope.launch {
@@ -659,6 +689,8 @@ class MainActivity : HelperBaseActivity() {
             updateLoginCtaVisibility()
         }
         updateOnboardingLogin()
+        // Login state feeds the onboarding-nav gate: signing in reveals the bar even with no servers.
+        updateBottomNavVisibility()
         // Fire the one-shot post-login import only on a genuine logged-out -> logged-in transition,
         // not on the state replay that happens every time the activity restarts while signed in.
         if (loggedIn && !accountLoggedIn) onLoggedIn()
@@ -695,9 +727,14 @@ class MainActivity : HelperBaseActivity() {
         header.ctaLinkTelegram.isVisible = show
     }
 
-    /** Opens the in-app login screen (Telegram + site). */
-    private fun openLoginScreen() {
-        requestActivityLauncher.launch(Intent(this, LoginActivity::class.java))
+    /**
+     * Opens the in-app login screen (Telegram + site). An optional [mode] ("telegram"/"site") is
+     * passed through as the "login_mode" intent extra so the login screen can preselect a method.
+     */
+    private fun openLoginScreen(mode: String? = null) {
+        val i = Intent(this, LoginActivity::class.java)
+        if (mode != null) i.putExtra("login_mode", mode)
+        requestActivityLauncher.launch(i)
     }
 
     /**
