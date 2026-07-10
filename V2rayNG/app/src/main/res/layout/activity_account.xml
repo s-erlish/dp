@@ -114,7 +114,8 @@
                         tools:text="Erlish" />
                 </LinearLayout>
 
-                <!-- Balance is the hero of the plate: quiet label + big brand-font value -->
+                <!-- Balance is the hero of the plate: quiet label above, then the big
+                     brand-font value with the top-up pill right-aligned on the same line. -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -122,16 +123,50 @@
                     android:text="@string/account_balance"
                     android:textAppearance="@style/TextAppearance.App.Caption" />
 
-                <TextView
-                    android:id="@+id/tv_balance"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_4"
-                    android:fontFeatureSettings="&quot;tnum&quot; on, &quot;lnum&quot; on"
-                    android:textAppearance="@style/TextAppearance.App.Display"
-                    tools:text="1 500 ₽" />
+                    android:baselineAligned="false"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                <!-- Referral: ONE quiet tappable chip, kept well below the balance -->
+                    <TextView
+                        android:id="@+id/tv_balance"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:fontFeatureSettings="&quot;tnum&quot; on, &quot;lnum&quot; on"
+                        android:textAppearance="@style/TextAppearance.App.Display"
+                        tools:text="1 500 ₽" />
+
+                    <!-- Compact primary pill, right of the balance line -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_top_up"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_12"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:paddingStart="@dimen/space_16"
+                        android:paddingTop="@dimen/space_8"
+                        android:paddingEnd="@dimen/space_16"
+                        android:paddingBottom="@dimen/space_8"
+                        android:text="@string/account_top_up"
+                        android:textAllCaps="false"
+                        android:textStyle="bold"
+                        app:cornerRadius="20dp"
+                        app:icon="@drawable/ic_add_24dp"
+                        app:iconGravity="textStart"
+                        app:iconSize="18dp" />
+                </LinearLayout>
+
+                <!-- Referral: ONE quiet chip reading just the code; copy is the trailing
+                     icon/tap (no "копировать" word). Kept below the balance row. -->
                 <LinearLayout
                     android:id="@+id/row_referral"
                     android:layout_width="wrap_content"
@@ -150,7 +185,7 @@
                         android:paddingHorizontal="@dimen/space_12"
                         android:paddingVertical="@dimen/space_8"
                         android:textAppearance="@style/TextAppearance.App.Caption"
-                        tools:text="Реф-код ABC123 · копировать" />
+                        tools:text="Реф-код ABC123" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_copy_referral"
@@ -163,19 +198,6 @@
                         app:iconSize="18dp"
                         app:iconTint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
-
-                <!-- Top-up (unified primary: 52dp height, full-pill radius) -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_top_up"
-                    android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:layout_marginTop="@dimen/space_16"
-                    android:text="@string/account_top_up"
-                    android:textAllCaps="false"
-                    android:textStyle="bold"
-                    app:cornerRadius="26dp"
-                    app:icon="@drawable/ic_add_24dp"
-                    app:iconGravity="textStart" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

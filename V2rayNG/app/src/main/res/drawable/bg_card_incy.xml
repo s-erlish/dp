@@ -1,25 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Incy card: dark rounded surface + hairline outline, lifted by a 1dp top rim-light.
-     In light theme @color/card_edge_highlight is transparent, so the rim is a no-op. -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Base card surface -->
-    <item>
-        <shape android:shape="rectangle">
-            <solid android:color="?attr/colorSurface" />
-            <corners android:radius="@dimen/radius_card" />
-            <stroke
-                android:width="1dp"
-                android:color="?attr/colorOutlineVariant" />
-        </shape>
-    </item>
-    <!-- Rim-light: 1dp top edge, inset 2dp from the sides so it stays inside the corners -->
-    <item
-        android:left="2dp"
-        android:right="2dp"
-        android:gravity="top"
-        android:height="1dp">
-        <shape android:shape="rectangle">
-            <solid android:color="@color/card_edge_highlight" />
-        </shape>
-    </item>
-</layer-list>
+<!-- Incy card: dark rounded surface + hairline outline. No top rim-light here: on the
+     compact top-bar surfaces this sits on (account chip / link-Telegram CTA) the 1dp
+     highlight read as a stray border, so the edge is a single even outline on all sides. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?attr/colorSurface" />
+    <corners android:radius="@dimen/radius_card" />
+    <stroke
+        android:width="1dp"
+        android:color="?attr/colorOutlineVariant" />
+</shape>

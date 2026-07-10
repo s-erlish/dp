@@ -21,7 +21,7 @@
     <!-- Header / balance -->
     <string name="account_balance">Баланс</string>
     <string name="account_top_up">Пополнить баланс</string>
-    <string name="account_referral">Реф-код %1$s · копировать</string>
+    <string name="account_referral">Реф-код %1$s</string>
     <string name="account_telegram">Telegram: \@%1$s</string>
     <string name="account_no_telegram">Telegram не привязан</string>
     <string name="account_copy_referral">Скопировать код</string>
