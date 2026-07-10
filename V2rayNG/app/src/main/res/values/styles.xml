@@ -28,56 +28,97 @@
 
     <!-- Brand wordmark shown as the toolbar title on the main screen -->
     <style name="ToolbarBrandTitle" parent="TextAppearance.Material3.TitleLarge">
-        <item name="android:textStyle">bold</item>
-        <item name="android:textColor">?attr/colorOnBackground</item>
-        <item name="android:letterSpacing">0.0</item>
-        <item name="android:textSize">20sp</item>
         <item name="android:fontFamily">@font/space_grotesk</item>
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textColor">?attr/colorOnBackground</item>
+        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:textSize">20sp</item>
     </style>
 
     <!-- ============================================================= -->
     <!-- Incy type scale (dark-theme aware; colors via theme attrs)     -->
     <!-- ============================================================= -->
 
-    <!-- Screen titles / welcome. Brand font, 24sp bold. -->
+    <!--
+        Type ramp — Space Grotesk (variable) for display/titles at REAL weights
+        via android:textFontWeight (700/500), system font for reading sizes.
+        No android:textStyle="bold" on any Space Grotesk style: the variable ttf
+        carries genuine masters, so no synthetic bold. textFontWeight is API 28+;
+        the multi-weight space_grotesk.xml family covers older devices.
+    -->
+
+    <!-- Big hero / balance figure. Brand font, 34sp 700, tight tracking. -->
+    <style name="TextAppearance.App.Display" parent="TextAppearance.Material3.HeadlineMedium">
+        <item name="android:fontFamily">@font/space_grotesk</item>
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textSize">34sp</item>
+        <item name="android:letterSpacing">-0.02</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+
+    <!-- Screen titles / welcome. Brand font, 24sp 700. -->
     <style name="TextAppearance.App.Headline" parent="TextAppearance.Material3.HeadlineSmall">
         <item name="android:fontFamily">@font/space_grotesk</item>
+        <item name="android:textFontWeight">700</item>
         <item name="android:textSize">24sp</item>
-        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">-0.01</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
 
-    <!-- Section / list titles. 16sp bold. -->
+    <!-- Section / list titles. Brand font, 16sp 700. -->
     <style name="TextAppearance.App.Title" parent="TextAppearance.Material3.TitleMedium">
         <item name="android:fontFamily">@font/space_grotesk</item>
+        <item name="android:textFontWeight">700</item>
         <item name="android:textSize">16sp</item>
-        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.0</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
 
-    <!-- Primary body copy. 14sp. -->
+    <!-- Softer section title. Brand font, 16sp 500 (medium master). -->
+    <style name="TextAppearance.App.Title.Medium" parent="TextAppearance.App.Title">
+        <item name="android:textFontWeight">500</item>
+    </style>
+
+    <!-- Primary body copy. System font, 14sp, gentle tracking. -->
     <style name="TextAppearance.App.Body" parent="TextAppearance.Material3.BodyMedium">
         <item name="android:textSize">14sp</item>
+        <item name="android:letterSpacing">0.01</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
 
-    <!-- Secondary / supporting text. 13sp muted. -->
+    <!-- Secondary / supporting text. System font, 13sp muted. -->
     <style name="TextAppearance.App.Subtitle" parent="TextAppearance.Material3.BodyMedium">
         <item name="android:textSize">13sp</item>
+        <item name="android:letterSpacing">0.01</item>
         <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
     </style>
 
-    <!-- Captions / metadata. 12sp muted. -->
+    <!-- Captions / metadata. System font, 12sp muted. -->
     <style name="TextAppearance.App.Caption" parent="TextAppearance.Material3.BodySmall">
         <item name="android:textSize">12sp</item>
+        <item name="android:letterSpacing">0.02</item>
         <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
     </style>
 
-    <!-- Chip / badge labels. 11sp bold, slight tracking. -->
+    <!-- Chip / badge labels. Brand font, 11sp 500, open tracking. -->
     <style name="TextAppearance.App.Chip" parent="TextAppearance.Material3.LabelSmall">
+        <item name="android:fontFamily">@font/space_grotesk</item>
+        <item name="android:textFontWeight">500</item>
         <item name="android:textSize">11sp</item>
-        <item name="android:textStyle">bold</item>
-        <item name="android:letterSpacing">0.02</item>
+        <item name="android:letterSpacing">0.04</item>
+    </style>
+
+    <!--
+        Tabular figures for live-updating numbers (traffic counters, ping, balance
+        digits) so glyph widths stay fixed and the value doesn't jitter as it
+        counts. Brand font + tnum/lnum OpenType features, neutral tracking.
+        Apply as textAppearance; pair with a weight-bearing style where needed.
+    -->
+    <style name="TextAppearance.App.Numeric" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:fontFamily">@font/space_grotesk</item>
+        <item name="android:fontFeatureSettings">"tnum" on, "lnum" on</item>
+        <item name="android:letterSpacing">0.0</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
 
     <!--

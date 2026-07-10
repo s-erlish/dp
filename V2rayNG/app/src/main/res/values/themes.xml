@@ -33,6 +33,15 @@
         <item name="colorOnSurfaceVariant">@color/md_theme_onSurfaceVariant</item>
         <item name="colorSurfaceInverse">@color/md_theme_inverseSurface</item>
         <item name="colorOnSurfaceInverse">@color/md_theme_inverseOnSurface</item>
+        <!-- Tonal surface ramp -> depth layers. Elevation is expressed by tone,
+             not shadow (Material dark-theme rule). Night ramp:
+               L0 base page     = android:colorBackground   #0A0B0D
+               L1 colorSurfaceContainerLow    #111316  (sunken / rows on a card)
+               L2 colorSurfaceContainer       #141619  (the default card surface)
+               L3 colorSurfaceContainerHigh   #1A1D21  (raised: sheets, menus)
+                  colorSurfaceContainerHighest#20242B  (neutral tiles, hover)
+             WP3/WP5: reference ?attr/colorSurfaceContainerLow|…|High(est) —
+             never raw hex — so light/mono resolve automatically. -->
         <item name="colorSurfaceContainer">@color/md_theme_surfaceContainer</item>
         <item name="colorSurfaceContainerHigh">@color/md_theme_surfaceContainerHigh</item>
         <item name="colorSurfaceContainerHighest">@color/md_theme_surfaceContainerHighest</item>

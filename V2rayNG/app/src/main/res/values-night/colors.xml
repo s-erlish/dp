@@ -22,6 +22,17 @@
     <color name="ping_good">#22C55E</color>
     <color name="ping_bad">#F04452</color>
 
+    <!-- Neutral (non-accent) icon tile, dark. Solid surfaceContainerHighest
+         fill (#20242B) + muted onSurfaceVariant glyph — no accent spent. -->
+    <color name="icon_tile_neutral">#20242B</color>
+    <color name="icon_glyph_neutral">#9BA1AD</color>
+
+    <!-- Card rim-light / depth (dark-only). ~8% white top-edge highlight lifts
+         near-black cards off the near-black background; hero variant (~10%) for
+         the connect knob. Transparent in light theme. -->
+    <color name="card_edge_highlight">#14FFFFFF</color>
+    <color name="card_edge_highlight_hero">#1AFFFFFF</color>
+
     <!-- Primary - bright blue -->
     <color name="md_theme_primary">#4C8DFF</color>
     <color name="md_theme_onPrimary">#00183A</color>
@@ -54,7 +65,10 @@
     <color name="md_theme_surface">#141619</color>
     <color name="md_theme_onSurface">#F2F4F8</color>
     <color name="md_theme_surfaceVariant">#1E2126</color>
-    <color name="md_theme_onSurfaceVariant">#8A909C</color>
+    <!-- Secondary/caption text. Lifted #8A909C -> #9BA1AD: the old value sat at
+         the AA edge for 12-13sp Subtitle/Caption; #9BA1AD clears AA (~7:1 on
+         surface, ~4.9:1 on surfaceContainerHighest) while staying muted. -->
+    <color name="md_theme_onSurfaceVariant">#9BA1AD</color>
     <color name="md_theme_inverseSurface">#F2F4F8</color>
     <color name="md_theme_inverseOnSurface">#141619</color>
 

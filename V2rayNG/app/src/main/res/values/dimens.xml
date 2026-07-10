@@ -22,6 +22,10 @@
     <dimen name="radius_chip">12dp</dimen>
     <dimen name="radius_card">20dp</dimen>
     <dimen name="radius_tile">12dp</dimen>
+    <!-- Effective pill: large enough to fully round any control height. -->
+    <dimen name="radius_pill">100dp</dimen>
+    <!-- Bottom-sheet / modal top corners. -->
+    <dimen name="radius_sheet">24dp</dimen>
 
     <!-- Incy component tokens -->
     <dimen name="tile_size">40dp</dimen>

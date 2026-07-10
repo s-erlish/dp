@@ -42,6 +42,19 @@
     <color name="icon_tile_red">#33F04452</color>
     <color name="icon_tile_yellow">#33EAB308</color>
 
+    <!-- Neutral (non-accent) icon tile: solid surface fill + muted glyph.
+         Spends no accent budget so default/utility rows stay quiet and the
+         blue reads as the only accent. Light = surfaceContainerHighest tone;
+         night overrides in values-night/. -->
+    <color name="icon_tile_neutral">#E3EAF4</color>
+    <color name="icon_glyph_neutral">#54607A</color>
+
+    <!-- Card rim-light / depth. Top-edge highlight that lifts near-black cards
+         off the background (Linear/Vercel dark-card treatment). Dark-only
+         effect: fully transparent in light so it no-ops. Night overrides. -->
+    <color name="card_edge_highlight">#00000000</color>
+    <color name="card_edge_highlight_hero">#00000000</color>
+
     <!-- Primary colors - main tone: departament blue -->
     <color name="md_theme_primary">#1E5FC7</color>
     <color name="md_theme_onPrimary">#FFFFFF</color>

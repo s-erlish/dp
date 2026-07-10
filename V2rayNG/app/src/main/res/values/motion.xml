@@ -20,4 +20,7 @@
     <!-- Per-item delay for list/grid stagger. Cap the staggered count so the
          total never exceeds ~400ms. -->
     <integer name="motion_stagger">40</integer>
+    <!-- Emphasis: the one hero moment (connect sonar / assemble). Longest token
+         in the system; reserve for the single primary action, never chrome. -->
+    <integer name="motion_emphasis">600</integer>
 </resources>
