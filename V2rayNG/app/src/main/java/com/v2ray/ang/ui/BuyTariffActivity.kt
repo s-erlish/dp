@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.AnimationUtils
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -27,6 +28,7 @@ import com.v2ray.ang.auth.dto.TariffGroupDto
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
+import com.v2ray.ang.util.reducedMotion
 import com.v2ray.ang.viewmodel.AccountViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -167,14 +169,18 @@ class BuyTariffActivity : BaseActivity() {
     }
 
     private fun showBuyLoading() {
-        progressBuy.visibility = View.VISIBLE
-        // Skeleton placeholder cards ride the loading state; the error/empty glyph stays hidden.
-        skeleton.visibility = View.VISIBLE
+        // One loading signal, not three. The skeleton silhouette IS the loading affordance, so the
+        // circular spinner and the "Загрузка" label are NOT stacked on top of it — that redundancy
+        // (spinner + label + skeleton, then a hard pop to real cards) is what read as janky. The
+        // glyph + label are reserved for the skeleton-less states (error/empty) below.
+        progressBuy.visibility = View.GONE
         stateIcon.visibility = View.GONE
         btnRetry.visibility = View.GONE
-        stateView.text = getString(R.string.buy_loading)
-        stateView.visibility = View.VISIBLE
+        stateView.visibility = View.GONE
         tariffsHeader.visibility = View.GONE
+        // Reset alpha in case a prior skeleton→content cross-fade was interrupted by a reload.
+        skeleton.alpha = 1f
+        skeleton.visibility = View.VISIBLE
     }
 
     private fun showError() {
@@ -197,25 +203,26 @@ class BuyTariffActivity : BaseActivity() {
         tariffsHeader.visibility = View.GONE
     }
 
-    private fun hideState() {
-        progressBuy.visibility = View.GONE
-        // Tariffs rendered: retire both the skeleton and the state glyph.
-        skeleton.visibility = View.GONE
-        stateIcon.visibility = View.GONE
-        btnRetry.visibility = View.GONE
-        stateView.visibility = View.GONE
-    }
-
     private fun renderTariffs(groups: List<TariffGroupDto>) {
         val hasAny = groups.any { it.tariffs.isNotEmpty() }
         if (!hasAny) {
             showEmpty()
             return
         }
-        hideState()
-        tariffsHeader.visibility = View.VISIBLE
 
+        // Was the skeleton what the user is currently looking at? Only then do we cross-fade;
+        // a plain re-render (the catalog flow re-emits after content is already up) swaps in place.
+        val fromSkeleton = skeleton.visibility == View.VISIBLE
+
+        // The spinner/glyph/label never coexist with real content — retire them immediately.
+        progressBuy.visibility = View.GONE
+        stateIcon.visibility = View.GONE
+        btnRetry.visibility = View.GONE
+        stateView.visibility = View.GONE
+
+        // Build the real cards FIRST so the fade reveals a fully-rendered list, not a blank frame.
         // Rebuild once; selection is then mutated in place.
+        tariffsHeader.visibility = View.VISIBLE
         tariffsContainer.removeAllViews()
         checkMarks.clear()
         optionRows.clear()
@@ -226,6 +233,50 @@ class BuyTariffActivity : BaseActivity() {
                 addTariffCard(inflater, tariffsContainer, group.emoji, tariff)
             }
         }
+
+        if (fromSkeleton) {
+            crossFadeSkeletonToContent()
+        } else {
+            // Already on content: no animation, just make sure everything is at full opacity.
+            skeleton.visibility = View.GONE
+            skeleton.alpha = 1f
+            tariffsHeader.alpha = 1f
+            tariffsContainer.alpha = 1f
+        }
+    }
+
+    /**
+     * Gentle skeleton → content hand-off: fade the placeholder silhouette out while the real tariff
+     * list fades in over [R.integer.motion_state], instead of a hard visibility pop. Gated by
+     * reduced motion (via [reducedMotion], which reads the OS ANIMATOR_DURATION_SCALE like every
+     * other animated screen in the app): when motion is off we swap instantly.
+     */
+    private fun crossFadeSkeletonToContent() {
+        if (skeleton.reducedMotion()) {
+            skeleton.visibility = View.GONE
+            skeleton.alpha = 1f
+            tariffsHeader.alpha = 1f
+            tariffsContainer.alpha = 1f
+            return
+        }
+
+        val duration = resources.getInteger(R.integer.motion_state).toLong()
+        val easeOut = AnimationUtils.loadInterpolator(this, R.interpolator.ease_out_quart)
+
+        skeleton.animate()
+            .alpha(0f)
+            .setDuration(duration)
+            .setInterpolator(easeOut)
+            .withEndAction {
+                skeleton.visibility = View.GONE
+                skeleton.alpha = 1f
+            }
+            .start()
+
+        tariffsHeader.alpha = 0f
+        tariffsContainer.alpha = 0f
+        tariffsHeader.animate().alpha(1f).setDuration(duration).setInterpolator(easeOut).start()
+        tariffsContainer.animate().alpha(1f).setDuration(duration).setInterpolator(easeOut).start()
     }
 
     private fun addTariffCard(

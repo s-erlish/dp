@@ -90,7 +90,10 @@
             android:visibility="gone"
             tools:visibility="visible" />
 
-        <!-- Loading skeleton: wire-ready placeholder tariff cards toggled during load. -->
+        <!-- Loading skeleton: calm placeholder silhouettes that mirror the real tariff cards.
+             The silhouette itself is the loading affordance (no spinner or label on top). Fill is
+             the theme's surfaceVariant (matches bg_skeleton.xml) so it reads as a soft placeholder
+             in BOTH light and dark, never a stark dark block. No shimmer/gradient — static, calm. -->
         <LinearLayout
             android:id="@+id/ll_skeleton"
             android:layout_width="match_parent"
@@ -103,7 +106,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="76dp"
                 android:layout_marginBottom="@dimen/space_12"
-                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
+                app:cardBackgroundColor="?attr/colorSurfaceVariant"
                 app:cardCornerRadius="@dimen/radius_card"
                 app:cardElevation="0dp" />
 
@@ -111,14 +114,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="76dp"
                 android:layout_marginBottom="@dimen/space_12"
-                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
+                app:cardBackgroundColor="?attr/colorSurfaceVariant"
                 app:cardCornerRadius="@dimen/radius_card"
                 app:cardElevation="0dp" />
 
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="76dp"
-                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
+                app:cardBackgroundColor="?attr/colorSurfaceVariant"
                 app:cardCornerRadius="@dimen/radius_card"
                 app:cardElevation="0dp" />
         </LinearLayout>
