@@ -16,7 +16,9 @@ import androidx.browser.customtabs.CustomTabsIntent
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.v2ray.ang.R
+import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.dto.PaymentInitDto
 import com.v2ray.ang.auth.dto.PaymentRequestDto
 import com.v2ray.ang.auth.dto.PriceOptionDto
@@ -48,6 +50,10 @@ class BuyTariffActivity : BaseActivity() {
     private val checkMarks = mutableMapOf<String, ImageView>()
     // Per-tariff option rows, so the selected row can be highlighted without a rebuild.
     private val optionRows = mutableMapOf<String, MutableList<Pair<PriceOptionDto, View>>>()
+
+    // A purchase/balance payment was just fired: the NEXT error must surface as the
+    // "Ошибка оплаты" diagnostic dialog (with the real backend detail), not be swallowed.
+    private var awaitingPaymentError = false
 
     private lateinit var stateView: TextView
     private lateinit var tariffsHeader: TextView
@@ -100,6 +106,17 @@ class BuyTariffActivity : BaseActivity() {
                         else -> showState(getString(R.string.buy_loading))
                     }
                 }
+        }
+        // Surface payment failures. Without this the СБП/balance flow "does nothing" on error —
+        // the request fails silently in the ViewModel and the user never learns why.
+        lifecycleScope.launch {
+            viewModel.error.collect { error ->
+                if (error != null && awaitingPaymentError) {
+                    awaitingPaymentError = false
+                    showPaymentErrorDialog(error)
+                    viewModel.clearError()
+                }
+            }
         }
     }
 
@@ -322,20 +339,62 @@ class BuyTariffActivity : BaseActivity() {
     }
 
     private fun onMethodPicked(tariff: TariffDto, option: PriceOptionDto, methodId: String) {
-        val req = PaymentRequestDto(
-            tariffId = tariff.id,
-            tariffPriceOptionId = option.id,
-            deviceCount = extraDevices.takeIf { it > 0 },
-            paymentMethod = methodId,
-        )
-        if (methodId == "balance") {
+        // Arm the diagnostic: whichever request we fire, a failure now becomes a visible dialog.
+        awaitingPaymentError = true
+        val deviceCount = extraDevices.takeIf { it > 0 }
+        if (methodId == PaymentMethodSheet.ID_BALANCE) {
+            val req = PaymentRequestDto(
+                tariffId = tariff.id,
+                tariffPriceOptionId = option.id,
+                deviceCount = deviceCount,
+            )
             viewModel.payWithBalance(req) {
+                awaitingPaymentError = false
                 toast(getString(R.string.buy_success))
                 finish()
             }
         } else {
-            viewModel.buy(req) { init -> openCheckout(init) }
+            val req = PaymentRequestDto(
+                tariffId = tariff.id,
+                tariffPriceOptionId = option.id,
+                deviceCount = deviceCount,
+                paymentMethod = methodId.toIntOrNull(),
+            )
+            viewModel.buy(req) { init ->
+                awaitingPaymentError = false
+                openCheckout(init)
+            }
         }
+    }
+
+    /** Dialog with the raw HTTP code + sanitized backend detail for a failed payment. */
+    private fun showPaymentErrorDialog(error: ApiError) {
+        val code = when (error) {
+            is ApiError.Unauthorized -> "401/403"
+            is ApiError.Server -> error.code.toString()
+            is ApiError.RateLimited -> "429"
+            is ApiError.ServiceUnavailable -> "502/503"
+            is ApiError.NotFound -> "404"
+            is ApiError.Gone -> "410"
+            is ApiError.Timeout -> "timeout"
+            is ApiError.Network -> "network"
+            else -> "—"
+        }
+        val detail = when (error) {
+            is ApiError.Unauthorized -> error.detail
+            is ApiError.Server -> error.detail
+            else -> null
+        }
+        val body = if (detail.isNullOrBlank()) {
+            getString(R.string.account_payment_error_body_nodetail, code)
+        } else {
+            getString(R.string.account_payment_error_body, code, detail)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.account_payment_error_title)
+            .setMessage(body)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     /** Opens the provider checkout URL, mirroring AccountFragment.openCheckout. */
@@ -395,7 +454,17 @@ class BuyTariffActivity : BaseActivity() {
         private fun formatMoney(amount: Double, currency: String): String {
             val n = if (amount % 1.0 == 0.0) amount.toLong().toString()
             else String.format(Locale.US, "%.2f", amount)
-            return if (currency.isBlank()) n else "$n $currency"
+            return if (currency.isBlank()) n else "$n ${currencySymbol(currency)}"
+        }
+
+        /** Maps an ISO currency code to a trailing symbol: RUB→₽, USD→$, EUR→€, KZT→₸, UAH→₴. */
+        private fun currencySymbol(currency: String): String = when (currency.uppercase(Locale.US)) {
+            "RUB" -> "₽"
+            "USD" -> "$"
+            "EUR" -> "€"
+            "KZT" -> "₸"
+            "UAH" -> "₴"
+            else -> currency
         }
 
         private fun formatBytes(bytes: Long): String {

@@ -20,7 +20,7 @@
 
     <!-- Extra devices -->
     <string name="buy_extra_devices_title">Дополнительные устройства</string>
-    <string name="buy_extra_devices_count">Доп. устройства: %1$d</string>
+    <string name="buy_extra_devices_count">%1$d</string>
     <string name="buy_extra_devices_cost">+ %1$s</string>
     <string name="buy_extra_devices_minus">Убрать устройство</string>
     <string name="buy_extra_devices_plus">Добавить устройство</string>

@@ -71,9 +71,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="18dp">
+                android:padding="16dp">
 
-                <!-- Extra devices stepper -->
+                <!-- Extra devices stepper: icon + label on the left, «− N +» control on the right -->
                 <LinearLayout
                     android:id="@+id/ll_extra_devices"
                     android:layout_width="match_parent"
@@ -82,13 +82,13 @@
                     android:orientation="horizontal">
 
                     <FrameLayout
-                        android:layout_width="34dp"
-                        android:layout_height="34dp"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
                         android:background="@drawable/bg_icon_blue">
 
                         <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_acc_devices"
@@ -103,12 +103,11 @@
                         android:orientation="vertical">
 
                         <TextView
-                            android:id="@+id/tv_extra_devices_count"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:text="@string/buy_extra_devices_title"
                             android:textColor="?attr/colorOnSurface"
-                            android:textSize="14sp"
-                            tools:text="Доп. устройства: 1" />
+                            android:textSize="14sp" />
 
                         <TextView
                             android:id="@+id/tv_extra_devices_cost"
@@ -130,27 +129,44 @@
                         android:contentDescription="@string/buy_extra_devices_minus"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
                         android:padding="0dp"
                         app:backgroundTint="?attr/iconTileBgBlue"
                         app:cornerRadius="20dp"
                         app:icon="@drawable/ic_remove_24dp"
+                        app:iconGravity="textStart"
                         app:iconPadding="0dp"
                         app:iconSize="20dp"
                         app:iconTint="@color/icon_blue" />
+
+                    <TextView
+                        android:id="@+id/tv_extra_devices_count"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="4dp"
+                        android:minWidth="28dp"
+                        android:gravity="center"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        tools:text="1" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_dev_plus"
                         style="@style/Widget.Material3.Button.IconButton"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
-                        android:layout_marginStart="8dp"
                         android:contentDescription="@string/buy_extra_devices_plus"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
                         android:padding="0dp"
                         app:backgroundTint="?attr/iconTileBgBlue"
                         app:cornerRadius="20dp"
                         app:icon="@drawable/ic_add_24dp"
+                        app:iconGravity="textStart"
                         app:iconPadding="0dp"
                         app:iconSize="20dp"
                         app:iconTint="@color/icon_blue" />
