@@ -24,22 +24,19 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <!-- Disclosure chevron: glyph optically flush with the card's content gutter
-             (paddingStart 0) so it lines up with the traffic/support content below,
-             while the 28dp box keeps a comfortable touch target. -->
+        <!-- Disclosure chevron: unified 22dp glyph (matches the group-header chevron).
+             The 48dp box gives an interactive ≥48dp touch target; 13dp padding insets the
+             fitCenter glyph to 22dp so it reads at the same size as the section chevron. -->
         <ImageView
             android:id="@+id/btn_collapse"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_marginEnd="@dimen/space_8"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
             android:contentDescription="@string/title_servers"
             android:focusable="true"
-            android:paddingStart="0dp"
-            android:paddingTop="@dimen/space_4"
-            android:paddingEnd="@dimen/space_4"
-            android:paddingBottom="@dimen/space_4"
+            android:padding="13dp"
             android:scaleType="fitCenter"
             app:srcCompat="@drawable/ic_arrow_drop_down"
             app:tint="?attr/colorOnSurfaceVariant" />

@@ -5,10 +5,10 @@
     android:id="@+id/item_bg"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginStart="20dp"
-    android:layout_marginTop="2dp"
-    android:layout_marginEnd="20dp"
-    android:layout_marginBottom="1dp"
+    android:layout_marginStart="@dimen/screen_gutter"
+    android:layout_marginTop="@dimen/space_4"
+    android:layout_marginEnd="@dimen/screen_gutter"
+    android:layout_marginBottom="@dimen/space_4"
     android:gravity="center_vertical">
 
     <LinearLayout
@@ -19,12 +19,12 @@
         android:clickable="true"
         android:focusable="true"
         android:gravity="center_vertical"
-        android:minHeight="42dp"
+        android:minHeight="@dimen/row_min_height"
         android:orientation="horizontal"
-        android:paddingStart="6dp"
-        android:paddingTop="5dp"
-        android:paddingEnd="10dp"
-        android:paddingBottom="5dp"
+        android:paddingStart="@dimen/space_12"
+        android:paddingTop="@dimen/space_8"
+        android:paddingEnd="@dimen/space_12"
+        android:paddingBottom="@dimen/space_8"
         android:stateListAnimator="@anim/press_scale">
 
         <!-- Selection indicator: the side-stripe is retired (impeccable Absolute Ban:
@@ -42,7 +42,7 @@
             android:layout_width="28dp"
             android:layout_height="28dp"
             android:layout_gravity="center_vertical"
-            android:layout_marginEnd="2dp"
+            android:layout_marginEnd="@dimen/space_4"
             android:background="@drawable/bg_flag_tile"
             android:gravity="center"
             android:importantForAccessibility="no"
@@ -54,7 +54,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:paddingStart="6dp">
+            android:paddingStart="@dimen/space_8">
 
             <TextView
                 android:id="@+id/tv_name"
@@ -62,15 +62,13 @@
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="15sp"
-                android:textStyle="bold"
+                android:textAppearance="@style/TextAppearance.App.Title"
                 tools:text="🇳🇱 Netherlands • Amsterdam" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
+                android:layout_marginTop="@dimen/space_4"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -84,21 +82,19 @@
                     android:paddingTop="2dp"
                     android:paddingEnd="8dp"
                     android:paddingBottom="2dp"
+                    android:textAppearance="@style/TextAppearance.App.Chip"
                     android:textColor="?attr/chipTypeText"
-                    android:textSize="10sp"
-                    android:textStyle="bold"
                     tools:text="VLESS" />
 
                 <TextView
                     android:id="@+id/tv_statistics"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
+                    android:layout_marginStart="@dimen/space_8"
                     android:layout_weight="1"
                     android:ellipsize="end"
                     android:lines="1"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="11sp" />
+                    android:textAppearance="@style/TextAppearance.App.Caption" />
 
                 <!-- Per-row ping spinner: shown while a latency test is in flight
                      (testDelayMillis == -2L sentinel), replaced by tv_test_result on completion. -->

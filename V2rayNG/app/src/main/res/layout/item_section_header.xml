@@ -10,17 +10,21 @@
     android:focusable="true"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingStart="18dp"
-    android:paddingTop="14dp"
-    android:paddingEnd="18dp"
-    android:paddingBottom="6dp">
+    android:paddingStart="@dimen/screen_gutter"
+    android:paddingTop="@dimen/space_12"
+    android:paddingEnd="@dimen/screen_gutter"
+    android:paddingBottom="@dimen/space_4">
 
+    <!-- Disclosure chevron: unified 22dp glyph (matches the meta bar collapse chevron).
+         Decorative here — the whole section_header_root row carries the click + the
+         ≥48dp touch target, so this stays a bare glyph flush at the 16dp gutter. -->
     <ImageView
         android:id="@+id/section_chevron"
-        android:layout_width="20dp"
-        android:layout_height="20dp"
-        android:layout_marginEnd="6dp"
+        android:layout_width="@dimen/tile_glyph"
+        android:layout_height="@dimen/tile_glyph"
+        android:layout_marginEnd="@dimen/space_8"
         android:importantForAccessibility="no"
+        android:scaleType="fitCenter"
         app:srcCompat="@drawable/ic_arrow_drop_down"
         app:tint="?attr/colorOnSurfaceVariant" />
 

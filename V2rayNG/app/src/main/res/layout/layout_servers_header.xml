@@ -7,10 +7,10 @@
     android:layout_height="wrap_content"
     android:background="@android:color/transparent"
     android:orientation="vertical"
-    android:paddingStart="16dp"
-    android:paddingTop="8dp"
-    android:paddingEnd="12dp"
-    android:paddingBottom="4dp">
+    android:paddingStart="@dimen/screen_gutter"
+    android:paddingTop="@dimen/space_8"
+    android:paddingEnd="@dimen/space_12"
+    android:paddingBottom="@dimen/space_4">
 
     <!-- Title + circular action buttons -->
     <LinearLayout
@@ -80,7 +80,7 @@
         android:id="@+id/tv_servers_subtitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
+        android:layout_marginTop="@dimen/space_4"
         android:textAppearance="@style/TextAppearance.App.Subtitle"
         tools:text="15 серверов · 1 провайдер" />
 
