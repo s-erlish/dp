@@ -245,6 +245,23 @@ class AccountViewModel : ViewModel() {
             ?.takeIf { it.isNotBlank() }
     }
 
+    /**
+     * Resolves a tariff's display name ("Base" / "Plus") from the PRICE-OPTION id the subscription
+     * renews on ([SubInfoDto.tariffPriceOptionId]) against the loaded catalog. Used as the second
+     * badge source when [tariffNameFor] can't resolve because the sub carries no [tariffId]: the
+     * price-option id reflects the option the sub CURRENTLY renews on, so it points at the real
+     * current tariff even after a Base→Plus upgrade (unlike the stale provisioning product name).
+     * Returns null when the id is blank, the catalog isn't loaded yet, or nothing matches.
+     */
+    fun tariffNameForPriceOptionId(priceOptionId: String?): String? {
+        if (priceOptionId.isNullOrBlank()) return null
+        return _tariffs.value.asSequence()
+            .flatMap { it.tariffs.asSequence() }
+            .firstOrNull { tariff -> tariff.priceOptions.any { it.id == priceOptionId } }
+            ?.name
+            ?.takeIf { it.isNotBlank() }
+    }
+
     fun loadPayments() = viewModelScope.launch {
         repo.getPayments()
             .onSuccess {

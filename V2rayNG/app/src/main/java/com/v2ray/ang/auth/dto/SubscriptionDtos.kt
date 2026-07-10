@@ -58,22 +58,17 @@ data class SubInfoDto(
 ) {
     /**
      * Best-effort tariff badge name ("Base" / "Plus") derived from THIS sub's own fields, used as a
-     * fallback when the tariff catalog can't resolve [tariffId]. Prefers the authoritative summary
-     * [tariffDisplayName] (which reflects the CURRENT tariff), then the raw remnawave record's
-     * product name / subscriptionProductName — those are fixed at provisioning and go stale after an
-     * upgrade (e.g. still read "Base" after a Base→Plus upgrade), so they must never win over the
-     * summary name. Skips the generic service label ("departament vpn") so the badge only ever shows
-     * a real tariff.
+     * LAST-RESORT fallback when the tariff catalog can't resolve the sub by [tariffId] or by its
+     * renewing price-option. Uses ONLY the authoritative summary [tariffDisplayName], which reflects
+     * the CURRENT tariff. The raw remnawave record's `productName` / `subscriptionProductName` are
+     * intentionally EXCLUDED: they are fixed at provisioning and go stale after an upgrade (e.g. they
+     * still read "Base" after a Base→Plus upgrade), so trusting them would surface a WRONG badge. The
+     * generic service label ("departament vpn") is filtered out so the badge only ever shows a real
+     * tariff name; a generic-only display name yields null (badge hidden).
      */
-    fun tariffBadgeName(): String? {
-        val raw = subscription?.raw()
-        return sequenceOf(
-            tariffDisplayName,
-            raw?.productName,
-            raw?.subscriptionProductName,
-        ).firstOrNull { !it.isNullOrBlank() && !isGenericServiceName(it) }
-            ?.trim()
-    }
+    fun tariffBadgeName(): String? =
+        tariffDisplayName?.trim()
+            ?.takeIf { it.isNotBlank() && !isGenericServiceName(it) }
 
     private fun isGenericServiceName(name: String): Boolean =
         name.trim().lowercase().let { it == "departament vpn" || it == "departament" }
