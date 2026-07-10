@@ -6,9 +6,11 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import androidx.activity.viewModels
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.v2ray.ang.BuildConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.AuthManager.LoginState
@@ -80,6 +82,8 @@ class LoginActivity : BaseActivity() {
                 }
             }
         }
+
+        binding.btnRegisterSite.setOnClickListener { openRegister() }
 
         observe()
         showIntro()
@@ -166,6 +170,25 @@ class LoginActivity : BaseActivity() {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(deepLink)))
         } catch (e: ActivityNotFoundException) {
             toastError(R.string.auth_telegram_not_installed)
+        }
+    }
+
+    /**
+     * Открывает страницу регистрации на сайте. URL берём из существующего
+     * BACKEND_BASE_URL (без «/api»), чтобы не заводить отдельное поле сборки.
+     */
+    private fun openRegister() {
+        val siteUrl = BuildConfig.BACKEND_BASE_URL.removeSuffix("/api").removeSuffix("/")
+        if (siteUrl.isBlank()) return
+        val uri = Uri.parse(siteUrl)
+        try {
+            CustomTabsIntent.Builder().build().launchUrl(this, uri)
+        } catch (e: ActivityNotFoundException) {
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, uri))
+            } catch (e2: ActivityNotFoundException) {
+                toastError(R.string.auth_err_not_configured)
+            }
         }
     }
 }

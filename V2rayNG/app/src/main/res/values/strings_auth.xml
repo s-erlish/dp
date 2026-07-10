@@ -18,6 +18,7 @@
     <string name="auth_email_hint">Электронная почта</string>
     <string name="auth_password_hint">Пароль</string>
     <string name="auth_btn_site">Войти через сайт</string>
+    <string name="auth_register_site">Регистрация на сайте</string>
     <string name="auth_fields_required">Заполните все поля</string>
 
     <!-- Two-factor (TOTP) -->
