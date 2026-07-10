@@ -62,10 +62,10 @@
                     android:baselineAligned="false"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingStart="18dp"
-                    android:paddingTop="6dp"
-                    android:paddingEnd="12dp"
-                    android:paddingBottom="2dp">
+                    android:paddingStart="@dimen/screen_gutter"
+                    android:paddingTop="@dimen/space_4"
+                    android:paddingEnd="@dimen/screen_gutter"
+                    android:paddingBottom="@dimen/space_4">
 
                     <!-- Invisible left spacer matching the top-right "+" button width (42dp) so the
                          3-weight stats block is centered between two equal edges -> the middle
@@ -96,9 +96,8 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="↑"
-                                android:textColor="@color/color_upload"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
+                                android:textAppearance="@style/TextAppearance.App.Caption"
+                                android:textColor="?attr/colorPrimary" />
 
                             <TextView
                                 android:id="@+id/tv_upload_speed"
@@ -138,9 +137,8 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="↓"
-                                android:textColor="@color/color_download"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
+                                android:textAppearance="@style/TextAppearance.App.Caption"
+                                android:textColor="?attr/colorPrimary" />
 
                             <TextView
                                 android:id="@+id/tv_download_speed"
@@ -178,26 +176,21 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
 
-                <com.google.android.material.card.MaterialCardView
+                <!-- Signature connect block. A plain LinearLayout, not a wrapping card:
+                     the shield/ring is the ONE hero element, everything else stays quiet
+                     (impeccable: no nested/transparent cards). -->
+                <LinearLayout
                     android:id="@+id/card_hero"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    android:layout_marginTop="4dp"
-                    app:cardBackgroundColor="@android:color/transparent"
-                    app:cardCornerRadius="0dp"
-                    app:cardElevation="0dp"
-                    app:strokeWidth="0dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_horizontal"
-                        android:orientation="vertical"
-                        android:paddingStart="20dp"
-                        android:paddingTop="28dp"
-                        android:paddingEnd="20dp"
-                        android:paddingBottom="24dp">
+                    android:layout_marginTop="@dimen/space_4"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingStart="@dimen/screen_gutter"
+                    android:paddingTop="@dimen/space_24"
+                    android:paddingEnd="@dimen/screen_gutter"
+                    android:paddingBottom="@dimen/space_24">
 
                         <FrameLayout
                             android:layout_width="230dp"
@@ -272,21 +265,16 @@
                             android:id="@+id/tv_connection_status"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="18dp"
-                            android:layout_marginStart="24dp"
-                            android:layout_marginEnd="24dp"
+                            android:layout_marginTop="@dimen/space_16"
+                            android:layout_marginStart="@dimen/space_24"
+                            android:layout_marginEnd="@dimen/space_24"
                             android:ellipsize="end"
                             android:gravity="center"
-                            android:letterSpacing="0.01"
                             android:maxLines="1"
                             android:text="@string/title_file_chooser"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="19sp"
-                            android:textStyle="bold" />
+                            android:textAppearance="@style/TextAppearance.App.Title" />
 
-                    </LinearLayout>
-
-                </com.google.android.material.card.MaterialCardView>
+                </LinearLayout>
 
                 <!-- App memory usage card (Incy-style). Hidden by default so it never flashes on
                      first launch before updateMemoryCard() runs; shown only when PREF_SHOW_MEMORY. -->
@@ -294,9 +282,9 @@
                     android:id="@+id/card_memory"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:layout_marginEnd="12dp"
-                    android:layout_marginBottom="12dp"
+                    android:layout_marginStart="@dimen/screen_gutter"
+                    android:layout_marginEnd="@dimen/screen_gutter"
+                    android:layout_marginBottom="@dimen/space_12"
                     android:visibility="gone"
                     app:cardBackgroundColor="?attr/colorSurface"
                     app:cardCornerRadius="20dp"
@@ -309,16 +297,16 @@
                         android:layout_height="wrap_content"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingStart="18dp"
-                        android:paddingTop="14dp"
-                        android:paddingEnd="18dp"
-                        android:paddingBottom="14dp">
+                        android:paddingStart="@dimen/space_16"
+                        android:paddingTop="@dimen/space_12"
+                        android:paddingEnd="@dimen/space_16"
+                        android:paddingBottom="@dimen/space_12">
 
                         <View
                             android:id="@+id/dot_memory"
-                            android:layout_width="10dp"
-                            android:layout_height="10dp"
-                            android:layout_marginEnd="12dp"
+                            android:layout_width="@dimen/space_8"
+                            android:layout_height="@dimen/space_8"
+                            android:layout_marginEnd="@dimen/space_12"
                             android:background="@drawable/bg_status_dot" />
 
                         <LinearLayout
@@ -331,17 +319,14 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="@string/memory_app_usage"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:textSize="12sp" />
+                                android:textAppearance="@style/TextAppearance.App.Caption" />
 
                             <TextView
                                 android:id="@+id/tv_memory"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:textColor="?attr/colorOnSurface"
-                                android:textSize="15sp"
-                                android:textStyle="bold"
+                                android:layout_marginTop="@dimen/space_4"
+                                android:textAppearance="@style/TextAppearance.App.Title"
                                 tools:text="25 MB · Normal" />
 
                         </LinearLayout>
@@ -368,15 +353,12 @@
                     android:id="@+id/tv_home_welcome"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="24dp"
-                    android:layout_marginEnd="24dp"
-                    android:layout_marginBottom="14dp"
+                    android:layout_marginStart="@dimen/space_24"
+                    android:layout_marginEnd="@dimen/space_24"
+                    android:layout_marginBottom="@dimen/space_12"
                     android:gravity="center"
-                    android:letterSpacing="0.0"
                     android:text="@string/home_welcome_title"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="25sp"
-                    android:textStyle="bold"
+                    android:textAppearance="@style/TextAppearance.App.Headline"
                     android:visibility="gone" />
 
                 <!-- Empty state (no servers/subscriptions yet): two Incy add buttons. -->
@@ -400,18 +382,18 @@
                     layout="@layout/layout_subscription_meta_bar"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="20dp"
-                    android:layout_marginEnd="20dp" />
+                    android:layout_marginStart="@dimen/screen_gutter"
+                    android:layout_marginEnd="@dimen/screen_gutter" />
 
                 <!-- Server list right here, below the provider -->
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/rv_home_servers"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="@dimen/space_4"
                     android:clipToPadding="false"
                     android:nestedScrollingEnabled="false"
-                    android:paddingBottom="12dp" />
+                    android:paddingBottom="@dimen/space_12" />
 
                 </LinearLayout>
 

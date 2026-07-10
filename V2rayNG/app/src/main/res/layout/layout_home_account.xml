@@ -12,9 +12,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginStart="12dp"
-    android:layout_marginTop="8dp"
-    android:layout_marginEnd="12dp"
+    android:layout_marginStart="@dimen/screen_gutter"
+    android:layout_marginTop="@dimen/space_8"
+    android:layout_marginEnd="@dimen/screen_gutter"
     android:visibility="gone">
 
     <!-- Signed out: the "link Telegram" CTA for pasted-sub users. The primary login buttons
@@ -31,22 +31,22 @@
             android:id="@+id/cta_link_telegram"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="@dimen/space_8"
             android:background="@drawable/bg_card_incy"
             android:clickable="true"
             android:focusable="true"
             android:foreground="?attr/selectableItemBackground"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="12dp"
-            android:paddingTop="10dp"
-            android:paddingEnd="4dp"
-            android:paddingBottom="10dp"
+            android:paddingStart="@dimen/space_12"
+            android:paddingTop="@dimen/space_8"
+            android:paddingEnd="@dimen/space_4"
+            android:paddingBottom="@dimen/space_8"
             android:visibility="gone">
 
             <ImageView
-                android:layout_width="22dp"
-                android:layout_height="22dp"
+                android:layout_width="@dimen/tile_glyph"
+                android:layout_height="@dimen/tile_glyph"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_telegram_24dp" />
 
@@ -54,10 +54,9 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="12dp"
+                android:layout_marginStart="@dimen/space_12"
                 android:text="@string/auth_link_telegram_cta"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="13sp" />
+                android:textAppearance="@style/TextAppearance.App.Subtitle" />
 
             <TextView
                 android:id="@+id/btn_cta_dismiss"
@@ -85,10 +84,10 @@
         android:foreground="?attr/selectableItemBackground"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingTop="10dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="10dp"
+        android:paddingStart="@dimen/space_12"
+        android:paddingTop="@dimen/space_8"
+        android:paddingEnd="@dimen/space_12"
+        android:paddingBottom="@dimen/space_8"
         android:visibility="gone">
 
         <FrameLayout
@@ -120,7 +119,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="@dimen/space_12"
             android:orientation="vertical">
 
             <TextView
@@ -130,26 +129,23 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:text="@string/auth_account"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="16sp"
-                android:textStyle="bold" />
+                android:textAppearance="@style/TextAppearance.App.Title" />
 
             <TextView
                 android:id="@+id/tv_account_sub"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="@dimen/space_4"
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:text="@string/auth_open_account"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="12sp" />
+                android:textAppearance="@style/TextAppearance.App.Caption" />
         </LinearLayout>
 
         <ImageView
             android:layout_width="20dp"
             android:layout_height="20dp"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="@dimen/space_8"
             android:contentDescription="@null"
             android:src="@drawable/ic_chevron_right"
             app:tint="?attr/colorOnSurfaceVariant" />

@@ -13,11 +13,17 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingBottom="16dp">
+        android:paddingBottom="@dimen/space_16">
 
         <!-- ==================== ПОДКЛЮЧЕНИЕ ==================== -->
         <TextView
             style="@style/SettingsSectionLabel"
+            android:textAppearance="@style/TextAppearance.App.Title"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textAllCaps="false"
+            android:letterSpacing="0"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/settings_section_connection" />
@@ -25,10 +31,10 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
+            android:layout_marginStart="@dimen/screen_gutter"
+            android:layout_marginEnd="@dimen/screen_gutter"
             app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
+            app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
@@ -47,20 +53,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_blue">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_shield_outline"
@@ -70,26 +76,24 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="@dimen/space_16"
                         android:layout_weight="1"
                         android:text="@string/settings_mode"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <TextView
                         android:id="@+id/value_mode"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
+                        android:layout_marginStart="@dimen/space_8"
                         android:maxLines="1"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="13sp"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
                         tools:text="VPN" />
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -98,7 +102,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Прокси по приложениям -->
@@ -110,20 +114,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_orange">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_per_apps_24dp"
@@ -133,26 +137,24 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="@dimen/space_16"
                         android:layout_weight="1"
                         android:text="@string/settings_per_app"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <TextView
                         android:id="@+id/value_per_app"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
+                        android:layout_marginStart="@dimen/space_8"
                         android:maxLines="1"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="13sp"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
                         tools:text="Выкл" />
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -161,7 +163,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Обход локальной сети (toggle) -->
@@ -173,20 +175,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_green">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_globe_24dp"
@@ -196,8 +198,8 @@
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -205,16 +207,14 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/settings_bypass_lan"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp" />
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="@dimen/space_4"
                             android:text="@string/settings_bypass_lan_sub"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp" />
+                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
                     </LinearLayout>
 
                     <com.google.android.material.materialswitch.MaterialSwitch
@@ -228,7 +228,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- DNS -->
@@ -240,20 +240,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_purple">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_privacy_24dp"
@@ -263,26 +263,24 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="@dimen/space_16"
                         android:layout_weight="1"
                         android:text="@string/settings_dns"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <TextView
                         android:id="@+id/value_dns"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
+                        android:layout_marginStart="@dimen/space_8"
                         android:maxLines="1"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="13sp"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
                         tools:text="1.1.1.1" />
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -291,7 +289,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Пинг (ping method) -->
@@ -303,20 +301,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_yellow">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_ping_24dp"
@@ -326,26 +324,24 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="@dimen/space_16"
                         android:layout_weight="1"
                         android:text="@string/settings_ping_method"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <TextView
                         android:id="@+id/value_ping_method"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
+                        android:layout_marginStart="@dimen/space_8"
                         android:maxLines="1"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="13sp"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
                         tools:text="Real delay" />
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -354,7 +350,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Локальный прокси -->
@@ -366,20 +362,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_red">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_hub_local_proxy"
@@ -389,8 +385,8 @@
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -398,22 +394,20 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/settings_local_proxy"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp" />
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="@dimen/space_4"
                             android:text="@string/settings_local_proxy_sub"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp" />
+                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
                     </LinearLayout>
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -424,6 +418,12 @@
         <!-- ==================== ОБХОД БЛОКИРОВОК ==================== -->
         <TextView
             style="@style/SettingsSectionLabel"
+            android:textAppearance="@style/TextAppearance.App.Title"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textAllCaps="false"
+            android:letterSpacing="0"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/settings_section_bypass" />
@@ -431,10 +431,10 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
+            android:layout_marginStart="@dimen/screen_gutter"
+            android:layout_marginEnd="@dimen/screen_gutter"
             app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
+            app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
@@ -453,20 +453,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_blue">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_qu_switch_24dp"
@@ -476,8 +476,8 @@
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -485,16 +485,14 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/settings_mux"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp" />
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="@dimen/space_4"
                             android:text="@string/settings_mux_sub"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp" />
+                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
                     </LinearLayout>
 
                     <com.google.android.material.materialswitch.MaterialSwitch
@@ -509,7 +507,7 @@
                     android:id="@+id/divider_mux"
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Число соединений Mux (visible only when Mux on) -->
@@ -521,20 +519,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_blue">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_speed_24dp"
@@ -544,26 +542,24 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="@dimen/space_16"
                         android:layout_weight="1"
                         android:text="@string/settings_mux_concurrency"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <TextView
                         android:id="@+id/value_mux_concurrency"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
+                        android:layout_marginStart="@dimen/space_8"
                         android:maxLines="1"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="13sp"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
                         tools:text="8" />
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -573,7 +569,7 @@
                     android:id="@+id/divider_concurrency"
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Фрагментация пакетов (toggle) -->
@@ -585,20 +581,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_purple">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_source_code_24dp"
@@ -608,8 +604,8 @@
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -617,16 +613,14 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/settings_fragment"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp" />
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="@dimen/space_4"
                             android:text="@string/settings_fragment_sub"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp" />
+                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
                     </LinearLayout>
 
                     <com.google.android.material.materialswitch.MaterialSwitch
@@ -642,6 +636,12 @@
         <!-- ==================== ИНТЕРФЕЙС ==================== -->
         <TextView
             style="@style/SettingsSectionLabel"
+            android:textAppearance="@style/TextAppearance.App.Title"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textAllCaps="false"
+            android:letterSpacing="0"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/settings_section_interface" />
@@ -649,10 +649,10 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
+            android:layout_marginStart="@dimen/screen_gutter"
+            android:layout_marginEnd="@dimen/screen_gutter"
             app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
+            app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
@@ -671,20 +671,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_purple">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_palette_24dp"
@@ -694,12 +694,11 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
                         android:text="@string/settings_theme_dark"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switch_theme_dark"
@@ -712,7 +711,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Чёрно-белый режим (toggle) -->
@@ -724,20 +723,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_blue">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_contrast_24dp"
@@ -747,12 +746,11 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
                         android:text="@string/settings_theme_mono"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switch_theme_mono"
@@ -765,7 +763,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Язык -->
@@ -777,20 +775,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_green">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_globe_24dp"
@@ -800,26 +798,24 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="@dimen/space_16"
                         android:layout_weight="1"
                         android:text="@string/settings_language"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <TextView
                         android:id="@+id/value_language"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
+                        android:layout_marginStart="@dimen/space_8"
                         android:maxLines="1"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="13sp"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
                         tools:text="Русский" />
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -828,7 +824,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Запуск при загрузке (toggle) -->
@@ -840,20 +836,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_orange">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_power_settings"
@@ -863,8 +859,8 @@
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -872,16 +868,14 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/settings_boot"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp" />
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="@dimen/space_4"
                             android:text="@string/settings_boot_sub"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp" />
+                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
                     </LinearLayout>
 
                     <com.google.android.material.materialswitch.MaterialSwitch
@@ -897,6 +891,12 @@
         <!-- ==================== ПОДПИСКА ==================== -->
         <TextView
             style="@style/SettingsSectionLabel"
+            android:textAppearance="@style/TextAppearance.App.Title"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textAllCaps="false"
+            android:letterSpacing="0"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/settings_section_subscription" />
@@ -904,10 +904,10 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
+            android:layout_marginStart="@dimen/screen_gutter"
+            android:layout_marginEnd="@dimen/screen_gutter"
             app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
+            app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
@@ -926,20 +926,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_blue">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_refresh_24dp"
@@ -949,26 +949,24 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="@dimen/space_16"
                         android:layout_weight="1"
                         android:text="@string/settings_sub_auto_update"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <TextView
                         android:id="@+id/value_sub_auto_update"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
+                        android:layout_marginStart="@dimen/space_8"
                         android:maxLines="1"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="13sp"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
                         tools:text="24 часа" />
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -977,7 +975,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Маршрутизация -->
@@ -989,20 +987,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_purple">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_routing_24dp"
@@ -1012,16 +1010,15 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="@dimen/space_16"
                         android:layout_weight="1"
                         android:text="@string/settings_routing"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -1030,7 +1027,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Файлы ресурсов -->
@@ -1042,20 +1039,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_green">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_file_24dp"
@@ -1065,16 +1062,15 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="@dimen/space_16"
                         android:layout_weight="1"
                         android:text="@string/settings_assets"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -1083,7 +1079,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Настройки провайдеров -->
@@ -1095,20 +1091,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_orange">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_hub_provider"
@@ -1118,8 +1114,8 @@
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -1127,22 +1123,20 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/settings_provider"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp" />
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="@dimen/space_4"
                             android:text="@string/settings_provider_sub"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp" />
+                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
                     </LinearLayout>
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -1153,6 +1147,12 @@
         <!-- ==================== УСТРОЙСТВА ==================== -->
         <TextView
             style="@style/SettingsSectionLabel"
+            android:textAppearance="@style/TextAppearance.App.Title"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textAllCaps="false"
+            android:letterSpacing="0"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/settings_section_devices" />
@@ -1160,10 +1160,10 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
+            android:layout_marginStart="@dimen/screen_gutter"
+            android:layout_marginEnd="@dimen/screen_gutter"
             app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
+            app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
@@ -1182,20 +1182,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_blue">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_tv_24dp"
@@ -1205,16 +1205,15 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="@dimen/space_16"
                         android:layout_weight="1"
                         android:text="@string/settings_tv_send"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -1224,7 +1223,7 @@
                     android:id="@+id/divider_tv_receive"
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant"
                     android:visibility="gone" />
 
@@ -1237,21 +1236,21 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp"
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12"
                     android:visibility="gone">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_green">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_tv_24dp"
@@ -1261,16 +1260,15 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="@dimen/space_16"
                         android:layout_weight="1"
                         android:text="@string/settings_tv_receive"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -1281,6 +1279,12 @@
         <!-- ==================== О ПРИЛОЖЕНИИ ==================== -->
         <TextView
             style="@style/SettingsSectionLabel"
+            android:textAppearance="@style/TextAppearance.App.Title"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textAllCaps="false"
+            android:letterSpacing="0"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/settings_section_about" />
@@ -1288,10 +1292,10 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
+            android:layout_marginStart="@dimen/screen_gutter"
+            android:layout_marginEnd="@dimen/screen_gutter"
             app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
+            app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
@@ -1310,20 +1314,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_blue">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_about_24dp"
@@ -1333,26 +1337,24 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="@dimen/space_16"
                         android:layout_weight="1"
                         android:text="@string/settings_about"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <TextView
                         android:id="@+id/value_about"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
+                        android:layout_marginStart="@dimen/space_8"
                         android:maxLines="1"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="13sp"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
                         tools:text="1.0.0" />
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -1361,7 +1363,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Резервное копирование -->
@@ -1373,20 +1375,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_green">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_backup_24dp"
@@ -1396,16 +1398,15 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="@dimen/space_16"
                         android:layout_weight="1"
                         android:text="@string/settings_backup"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -1414,7 +1415,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Схемы URL-адресов -->
@@ -1426,20 +1427,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="60dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_purple">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_hub_url_scheme"
@@ -1449,8 +1450,8 @@
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -1458,22 +1459,20 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/settings_url_scheme"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp" />
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="@dimen/space_4"
                             android:text="@string/settings_url_scheme_sub"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp" />
+                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
                     </LinearLayout>
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />

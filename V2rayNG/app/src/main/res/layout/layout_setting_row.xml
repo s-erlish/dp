@@ -9,22 +9,22 @@
     android:clickable="true"
     android:focusable="true"
     android:gravity="center_vertical"
-    android:minHeight="60dp"
+    android:minHeight="@dimen/row_min_height"
     android:orientation="horizontal"
-    android:paddingStart="14dp"
-    android:paddingEnd="14dp"
-    android:paddingVertical="10dp">
+    android:paddingStart="@dimen/space_16"
+    android:paddingEnd="@dimen/space_16"
+    android:paddingVertical="@dimen/space_12">
 
     <FrameLayout
         android:id="@+id/setting_icon_bg"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+        android:layout_width="@dimen/tile_size"
+        android:layout_height="@dimen/tile_size"
         android:background="@drawable/bg_icon_blue">
 
         <ImageView
             android:id="@+id/setting_icon"
-            android:layout_width="22dp"
-            android:layout_height="22dp"
+            android:layout_width="@dimen/tile_glyph"
+            android:layout_height="@dimen/tile_glyph"
             android:layout_gravity="center"
             android:importantForAccessibility="no"
             app:srcCompat="@drawable/ic_settings_24dp"
@@ -34,7 +34,7 @@
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="14dp"
+        android:layout_marginStart="@dimen/space_16"
         android:layout_weight="1"
         android:orientation="vertical">
 
@@ -42,17 +42,15 @@
             android:id="@+id/setting_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp"
+            android:textAppearance="@style/TextAppearance.App.Body"
             tools:text="Тема" />
 
         <TextView
             android:id="@+id/setting_subtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="12sp"
+            android:layout_marginTop="@dimen/space_4"
+            android:textAppearance="@style/TextAppearance.App.Subtitle"
             android:visibility="gone"
             tools:text="subtitle"
             tools:visibility="visible" />
@@ -62,17 +60,16 @@
         android:id="@+id/setting_value"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
+        android:layout_marginStart="@dimen/space_8"
         android:maxLines="1"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="13sp"
+        android:textAppearance="@style/TextAppearance.App.Subtitle"
         tools:text="Тёмная" />
 
     <ImageView
         android:id="@+id/setting_chevron"
         android:layout_width="18dp"
         android:layout_height="18dp"
-        android:layout_marginStart="4dp"
+        android:layout_marginStart="@dimen/space_4"
         android:importantForAccessibility="no"
         app:srcCompat="@drawable/ic_chevron_right"
         app:tint="?attr/colorOnSurfaceVariant" />

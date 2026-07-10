@@ -563,12 +563,12 @@
 
     <!-- Incy settings tab -->
     <string name="bottom_nav_settings">Настройки</string>
-    <string name="settings_section_connection">ПОДКЛЮЧЕНИЕ</string>
-    <string name="settings_section_bypass">ОБХОД БЛОКИРОВОК</string>
-    <string name="settings_section_interface">ИНТЕРФЕЙС</string>
-    <string name="settings_section_subscription">ПОДПИСКА</string>
-    <string name="settings_section_devices">УСТРОЙСТВА</string>
-    <string name="settings_section_about">О ПРИЛОЖЕНИИ</string>
+    <string name="settings_section_connection">Подключение</string>
+    <string name="settings_section_bypass">Обход блокировок</string>
+    <string name="settings_section_interface">Интерфейс</string>
+    <string name="settings_section_subscription">Подписка</string>
+    <string name="settings_section_devices">Устройства</string>
+    <string name="settings_section_about">О приложении</string>
     <string name="settings_mode">Режим</string>
     <string name="settings_mode_vpn">VPN</string>
     <string name="settings_mode_proxy">Только прокси</string>

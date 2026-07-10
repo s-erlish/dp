@@ -5,10 +5,10 @@
     android:id="@+id/home_empty_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginStart="12dp"
-    android:layout_marginTop="4dp"
-    android:layout_marginEnd="12dp"
-    android:layout_marginBottom="4dp"
+    android:layout_marginStart="@dimen/screen_gutter"
+    android:layout_marginTop="@dimen/space_4"
+    android:layout_marginEnd="@dimen/screen_gutter"
+    android:layout_marginBottom="@dimen/space_4"
     app:cardBackgroundColor="?attr/colorSurface"
     app:cardCornerRadius="20dp"
     app:cardElevation="0dp"
@@ -20,33 +20,30 @@
         android:layout_height="wrap_content"
         android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:paddingStart="20dp"
-        android:paddingTop="24dp"
-        android:paddingEnd="20dp"
-        android:paddingBottom="22dp">
+        android:paddingStart="@dimen/screen_gutter"
+        android:paddingTop="@dimen/space_24"
+        android:paddingEnd="@dimen/screen_gutter"
+        android:paddingBottom="@dimen/space_24">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/home_empty_title"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="17sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.App.Title" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="@dimen/space_8"
             android:gravity="center"
             android:text="@string/home_empty_subtitle"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="13sp" />
+            android:textAppearance="@style/TextAppearance.App.Subtitle" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_home_add_qr"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="@dimen/space_24"
             android:text="@string/home_empty_add_qr"
             app:icon="@drawable/ic_scan_24dp"
             app:iconGravity="textStart" />
@@ -56,7 +53,7 @@
             style="@style/Widget.Material3.Button.OutlinedButton.Icon"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="@dimen/space_8"
             android:text="@string/home_empty_add_clipboard"
             app:icon="@drawable/ic_copy"
             app:iconGravity="textStart" />
@@ -68,7 +65,7 @@
             android:id="@+id/btn_home_buy"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="@dimen/space_24"
             android:text="@string/home_buy_subscription"
             android:visibility="gone" />
 
@@ -78,7 +75,7 @@
             style="@style/Widget.Material3.Button.OutlinedButton.Icon"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="@dimen/space_8"
             android:text="@string/home_link_telegram"
             android:visibility="gone"
             app:icon="@drawable/ic_telegram_24dp"
@@ -97,18 +94,17 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
+                android:layout_marginTop="@dimen/space_16"
                 android:gravity="center"
                 android:text="@string/home_or_sign_in"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="12sp" />
+                android:textAppearance="@style/TextAppearance.App.Caption" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_home_login_tg"
                 style="@style/Widget.Material3.Button.TonalButton.Icon"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="@dimen/space_8"
                 android:text="@string/auth_sign_in_telegram"
                 android:textAllCaps="false"
                 android:textColor="?attr/colorOnPrimaryContainer"
@@ -124,7 +120,7 @@
                 style="@style/Widget.Material3.Button.OutlinedButton.Icon"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="@dimen/space_8"
                 android:text="@string/auth_sign_in_site"
                 android:textAllCaps="false"
                 app:icon="@drawable/ic_globe_24dp"

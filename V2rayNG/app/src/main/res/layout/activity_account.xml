@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Account HUB, hosted in-place as the Account bottom-nav tab.
-  Settings-style: a compact profile card + a subscription summary + grouped entry cards
-  that open sub-screens (devices / buy / history). Incy language: colorSurface, 20dp radius,
-  0 elevation, colorOutlineVariant 1dp stroke, blue accents, calm 16dp spacing.
+  Settings-style: a compact profile card + a subscription summary + grouped entry rows
+  that open sub-screens (buy / devices / history). Incy language: pure dark, ONE blue
+  accent, brand type, token spacing/radii/tiles, sentence-case Russian, 0 elevation,
+  1dp colorOutlineVariant stroke, no nested cards, no gradients.
 -->
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -11,6 +12,7 @@
     android:id="@+id/scroll_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:clipToPadding="false"
     android:fillViewport="true"
     android:scrollbars="none">
 
@@ -18,25 +20,24 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="12dp">
+        android:paddingHorizontal="@dimen/screen_gutter"
+        android:paddingTop="@dimen/space_12"
+        android:paddingBottom="@dimen/space_24">
 
         <!-- ============ 1. Profile card (compact) ============ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:layout_marginBottom="10dp"
+            android:layout_marginStart="@dimen/space_4"
+            android:layout_marginBottom="@dimen/space_8"
             android:text="@string/account_profile_title"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.App.Title" />
 
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
+            app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
@@ -45,7 +46,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="@dimen/space_16">
 
                 <!-- Avatar + name -->
                 <LinearLayout
@@ -97,7 +98,7 @@
                             android:layout_gravity="bottom|end"
                             android:background="@drawable/bg_avatar_edit"
                             android:importantForAccessibility="no"
-                            android:padding="4dp"
+                            android:padding="@dimen/space_4"
                             app:srcCompat="@drawable/ic_acc_camera" />
                     </FrameLayout>
 
@@ -105,13 +106,11 @@
                         android:id="@+id/tv_email"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
+                        android:layout_marginStart="@dimen/space_12"
                         android:layout_weight="1"
                         android:ellipsize="end"
                         android:maxLines="1"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
+                        android:textAppearance="@style/TextAppearance.App.Title"
                         tools:text="Erlish" />
                 </LinearLayout>
 
@@ -120,18 +119,16 @@
                     android:id="@+id/tv_balance"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    tools:text="Баланс: 0 RUB" />
+                    android:layout_marginTop="@dimen/space_12"
+                    android:textAppearance="@style/TextAppearance.App.Title"
+                    tools:text="Баланс: 0 ₽" />
 
                 <!-- Referral code + copy -->
                 <LinearLayout
                     android:id="@+id/row_referral"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="@dimen/space_4"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
@@ -142,8 +139,7 @@
                         android:layout_weight="1"
                         android:ellipsize="end"
                         android:maxLines="1"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="13sp"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
                         tools:text="Реферальный код: ABC123" />
 
                     <com.google.android.material.button.MaterialButton
@@ -156,16 +152,16 @@
                         app:iconTint="?attr/iconTintBlue" />
                 </LinearLayout>
 
-                <!-- Top-up -->
+                <!-- Top-up (unified primary: 52dp height, full-pill radius) -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_top_up"
                     android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:layout_marginTop="10dp"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="@dimen/space_16"
                     android:text="@string/account_top_up"
                     android:textAllCaps="false"
                     android:textStyle="bold"
-                    app:cornerRadius="25dp"
+                    app:cornerRadius="26dp"
                     app:icon="@drawable/ic_add_24dp"
                     app:iconGravity="textStart" />
             </LinearLayout>
@@ -176,31 +172,28 @@
             android:id="@+id/tv_pending"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="@dimen/space_12"
             android:background="@drawable/bg_acc_chip"
-            android:padding="14dp"
+            android:padding="@dimen/space_12"
             android:text="@string/account_payment_pending"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="14sp"
+            android:textAppearance="@style/TextAppearance.App.Body"
             android:visibility="gone" />
 
         <!-- ============ 2. Subscription summary ============ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:layout_marginTop="20dp"
-            android:layout_marginBottom="10dp"
+            android:layout_marginStart="@dimen/space_4"
+            android:layout_marginTop="@dimen/space_24"
+            android:layout_marginBottom="@dimen/space_8"
             android:text="@string/account_sub_summary_title"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.App.Title" />
 
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
+            app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
@@ -209,7 +202,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="@dimen/space_16">
 
                 <!-- Empty state: shown ONLY when there is truly no subscription -->
                 <TextView
@@ -217,8 +210,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/account_no_subscription"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="14sp"
+                    android:textAppearance="@style/TextAppearance.App.Body"
                     android:visibility="gone" />
 
                 <!-- Active state -->
@@ -242,22 +234,19 @@
                             android:layout_weight="1"
                             android:ellipsize="end"
                             android:maxLines="1"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp"
-                            android:textStyle="bold"
+                            android:textAppearance="@style/TextAppearance.App.Title"
                             tools:text="Premium" />
 
                         <TextView
                             android:id="@+id/tv_tariff_badge"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"
+                            android:layout_marginStart="@dimen/space_8"
                             android:background="@drawable/bg_acc_badge"
-                            android:paddingHorizontal="10dp"
-                            android:paddingVertical="3dp"
+                            android:paddingHorizontal="@dimen/space_8"
+                            android:paddingVertical="@dimen/space_4"
+                            android:textAppearance="@style/TextAppearance.App.Chip"
                             android:textColor="?attr/colorPrimary"
-                            android:textSize="11sp"
-                            android:textStyle="bold"
                             android:visibility="gone"
                             tools:ignore="HardcodedText"
                             tools:text="Base"
@@ -268,24 +257,22 @@
                         android:id="@+id/tv_sub_expiry"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="13sp"
+                        android:layout_marginTop="@dimen/space_4"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
                         tools:text="Действует до 31.12.2026" />
 
                     <TextView
                         android:id="@+id/tv_sub_devices"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="13sp"
+                        android:layout_marginTop="@dimen/space_4"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
                         tools:text="Устройства: 1 / 3" />
 
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
-                        android:layout_marginTop="14dp"
+                        android:layout_marginTop="@dimen/space_16"
                         android:background="?attr/colorOutlineVariant" />
 
                     <!-- Auto-renew -->
@@ -293,9 +280,9 @@
                         android:id="@+id/row_auto_renew"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="@dimen/space_4"
                         android:gravity="center_vertical"
-                        android:minHeight="48dp"
+                        android:minHeight="@dimen/row_min_height"
                         android:orientation="horizontal">
 
                         <TextView
@@ -303,8 +290,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="@string/account_auto_renew"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="15sp" />
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
                         <com.google.android.material.materialswitch.MaterialSwitch
                             android:id="@+id/switch_auto_renew"
@@ -315,23 +301,21 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ============ 3. Entry cards (open sub-screens) ============ -->
+        <!-- ============ 3. Entry rows (open sub-screens) ============ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:layout_marginTop="20dp"
-            android:layout_marginBottom="10dp"
+            android:layout_marginStart="@dimen/space_4"
+            android:layout_marginTop="@dimen/space_24"
+            android:layout_marginBottom="@dimen/space_8"
             android:text="@string/account_manage_title"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.App.Title" />
 
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
+            app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
@@ -350,31 +334,31 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="64dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/screen_gutter"
+                    android:paddingEnd="@dimen/screen_gutter"
+                    android:paddingVertical="@dimen/space_8">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_icon_green">
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
+                        android:background="@drawable/bg_icon_blue">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_acc_upgrade"
-                            app:tint="?attr/iconTintGreen" />
+                            app:tint="?attr/iconTintBlue" />
                     </FrameLayout>
 
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -382,22 +366,20 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/account_hub_buy"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp" />
+                            android:textAppearance="@style/TextAppearance.App.Title" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="@dimen/space_4"
                             android:text="@string/account_hub_buy_sub"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp" />
+                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
                     </LinearLayout>
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -406,7 +388,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="70dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Устройства -->
@@ -418,20 +400,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="64dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/screen_gutter"
+                    android:paddingEnd="@dimen/screen_gutter"
+                    android:paddingVertical="@dimen/space_8">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_blue">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_acc_devices"
@@ -441,8 +423,8 @@
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -450,22 +432,20 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/account_hub_devices"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp" />
+                            android:textAppearance="@style/TextAppearance.App.Title" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="@dimen/space_4"
                             android:text="@string/account_hub_devices_sub"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp" />
+                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
                     </LinearLayout>
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -474,7 +454,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="70dp"
+                    android:layout_marginStart="72dp"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- История платежей -->
@@ -486,20 +466,20 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="64dp"
+                    android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp"
-                    android:paddingVertical="10dp">
+                    android:paddingStart="@dimen/screen_gutter"
+                    android:paddingEnd="@dimen/screen_gutter"
+                    android:paddingVertical="@dimen/space_8">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_blue">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_acc_history"
@@ -509,8 +489,8 @@
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -518,22 +498,20 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/account_hub_history"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp" />
+                            android:textAppearance="@style/TextAppearance.App.Title" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginTop="@dimen/space_4"
                             android:text="@string/account_hub_history_sub"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp" />
+                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
                     </LinearLayout>
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />

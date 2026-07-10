@@ -9,14 +9,14 @@
         android:id="@+id/toolbar"
         android:layout_width="0dp"
         android:layout_height="?attr/actionBarSize"
-        android:background="?attr/colorSurface"
+        android:background="@android:color/transparent"
         android:elevation="0dp"
         android:stateListAnimator="@null"
         app:elevation="0dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:titleTextAppearance="@style/TextAppearance.AppCompat.Title" />
+        app:titleTextAppearance="@style/ToolbarBrandTitle" />
 
     <com.google.android.material.progressindicator.LinearProgressIndicator
         android:id="@+id/progress_bar"
