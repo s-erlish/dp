@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Russian strings for the Account / Payments screen (AccountActivity).
+  Kept separate from the shared strings.xml on purpose.
+-->
+<resources>
+    <string name="account_title">Аккаунт</string>
+
+    <!-- Header / balance -->
+    <string name="account_balance">Баланс</string>
+    <string name="account_top_up">Пополнить баланс</string>
+    <string name="account_referral">Реферальный код: %1$s</string>
+    <string name="account_telegram">Telegram: \@%1$s</string>
+    <string name="account_no_telegram">Telegram не привязан</string>
+    <string name="account_copy_referral">Скопировать код</string>
+    <string name="account_referral_copied">Реферальный код скопирован</string>
+
+    <!-- Subscriptions -->
+    <string name="account_subs_header">Мои подписки</string>
+    <string name="account_subs_empty">У вас пока нет подписок</string>
+    <string name="account_no_subscription">нет активной подписки</string>
+    <string name="account_expires">Действует до %1$s</string>
+    <string name="account_devices">Устройства: %1$s / %2$s</string>
+    <string name="account_traffic">Трафик: %1$s / %2$s</string>
+    <string name="account_unlimited">∞</string>
+    <string name="account_trial_badge">ПРОБНЫЙ</string>
+    <string name="account_auto_renew">Автопродление</string>
+
+    <!-- Tariffs -->
+    <string name="account_tariffs_header">Тарифы</string>
+    <string name="account_tariffs_empty">Тарифы недоступны</string>
+    <string name="account_price_option">%1$d дн. — %2$s</string>
+    <string name="account_tariff_devices">Устройства: %1$d</string>
+    <string name="account_tariff_traffic">Трафик: %1$s</string>
+
+    <!-- Actions -->
+    <string name="account_actions_header">Действия</string>
+    <string name="account_active_sub">Активная подписка: %1$s</string>
+    <string name="account_active_sub_none">Выберите подписку выше</string>
+    <string name="account_upgrade">Улучшить тариф</string>
+    <string name="account_upgrade_title">Выберите новый тариф</string>
+    <string name="account_upgrade_no_sub">Сначала выберите подписку</string>
+    <string name="account_add_devices">Добавить устройства</string>
+    <string name="account_add_devices_count">Доп. устройства: %1$d</string>
+    <string name="account_add_devices_limit">Достигнут лимит устройств</string>
+    <string name="account_promo_hint">Промокод</string>
+    <string name="account_promo_check">Проверить</string>
+    <string name="account_promo_discount">Скидка %1$d%%</string>
+    <string name="account_promo_free_days">Бесплатно %1$d дн.</string>
+    <string name="account_promo_invalid">Промокод недействителен</string>
+    <string name="account_trial">Активировать пробный период</string>
+    <string name="account_trial_activated">Пробный период активирован</string>
+
+    <!-- Payments history -->
+    <string name="account_payments_header">История платежей</string>
+    <string name="account_payments_empty">Платежей пока нет</string>
+    <string name="account_payment_pending">Платёж обрабатывается…</string>
+
+    <!-- Top-up dialog -->
+    <string name="account_top_up_title">Сумма пополнения</string>
+    <string name="account_top_up_hint">Введите сумму</string>
+
+    <!-- Payment statuses -->
+    <string name="account_status_paid">Оплачено</string>
+    <string name="account_status_pending">В обработке</string>
+    <string name="account_status_failed">Ошибка</string>
+    <string name="account_status_canceled">Отменён</string>
+
+    <!-- Errors -->
+    <string name="account_error_service_unavailable">Сервис временно недоступен</string>
+    <string name="account_error_network">Ошибка сети. Проверьте подключение</string>
+    <string name="account_error_unauthorized">Требуется вход в аккаунт</string>
+    <string name="account_error_rate_limited">Слишком много запросов. Попробуйте позже</string>
+    <string name="account_error_timeout">Превышено время ожидания</string>
+    <string name="account_error_generic">Что-то пошло не так</string>
+    <string name="account_checkout_no_browser">Не удалось открыть страницу оплаты</string>
+</resources>
