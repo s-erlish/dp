@@ -32,6 +32,51 @@
         <item name="android:textColor">?attr/colorOnBackground</item>
         <item name="android:letterSpacing">0.0</item>
         <item name="android:textSize">20sp</item>
+        <item name="android:fontFamily">@font/space_grotesk</item>
+    </style>
+
+    <!-- ============================================================= -->
+    <!-- Incy type scale (dark-theme aware; colors via theme attrs)     -->
+    <!-- ============================================================= -->
+
+    <!-- Screen titles / welcome. Brand font, 24sp bold. -->
+    <style name="TextAppearance.App.Headline" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:fontFamily">@font/space_grotesk</item>
+        <item name="android:textSize">24sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+
+    <!-- Section / list titles. 16sp bold. -->
+    <style name="TextAppearance.App.Title" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+
+    <!-- Primary body copy. 14sp. -->
+    <style name="TextAppearance.App.Body" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+
+    <!-- Secondary / supporting text. 13sp muted. -->
+    <style name="TextAppearance.App.Subtitle" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+    </style>
+
+    <!-- Captions / metadata. 12sp muted. -->
+    <style name="TextAppearance.App.Caption" parent="TextAppearance.Material3.BodySmall">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+    </style>
+
+    <!-- Chip / badge labels. 11sp bold, slight tracking. -->
+    <style name="TextAppearance.App.Chip" parent="TextAppearance.Material3.LabelSmall">
+        <item name="android:textSize">11sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.02</item>
     </style>
 
     <!--

@@ -12,7 +12,7 @@
     <color name="color_fab_inactive">#3A3F49</color>
     <color name="color_connected">#22C55E</color>
     <color name="color_upload">#4C8DFF</color>
-    <color name="color_download">#9B7DFF</color>
+    <color name="color_download">#4C8DFF</color>
     <color name="divider_color_light">#20242B</color>
 
     <!-- Themed-attr accent values (Blue theme, dark). icon_tile_* inherit from values/. -->
@@ -28,11 +28,11 @@
     <color name="md_theme_primaryContainer">#17325C</color>
     <color name="md_theme_onPrimaryContainer">#CFE0FF</color>
 
-    <!-- Secondary - purple accent -->
-    <color name="md_theme_secondary">#9B7DFF</color>
-    <color name="md_theme_onSecondary">#1B0E45</color>
-    <color name="md_theme_secondaryContainer">#2A2350</color>
-    <color name="md_theme_onSecondaryContainer">#E4DBFF</color>
+    <!-- Secondary - blue accent (de-purpled to the single Incy blue) -->
+    <color name="md_theme_secondary">#7FA8FF</color>
+    <color name="md_theme_onSecondary">#00183A</color>
+    <color name="md_theme_secondaryContainer">#17325C</color>
+    <color name="md_theme_onSecondaryContainer">#CFE0FF</color>
 
     <!-- Tertiary - green -->
     <color name="md_theme_tertiary">#22C55E</color>

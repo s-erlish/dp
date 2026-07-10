@@ -72,18 +72,22 @@
         <item name="pingGood">@color/ping_good</item>
         <item name="pingBad">@color/ping_bad</item>
         <item name="indicatorColor">@color/colorIndicator</item>
+        <!-- Incy: one bright-blue accent. All hues collapse to blue except the
+             red (destructive/delete) treatment, which stays semantically red.
+             Repointed here (not renamed) so every layout referencing these attrs
+             recolours instantly with zero layout edits. -->
         <item name="iconTintBlue">@color/icon_blue</item>
-        <item name="iconTintGreen">@color/icon_green</item>
-        <item name="iconTintOrange">@color/icon_orange</item>
-        <item name="iconTintPurple">@color/icon_purple</item>
+        <item name="iconTintGreen">@color/icon_blue</item>
+        <item name="iconTintOrange">@color/icon_blue</item>
+        <item name="iconTintPurple">@color/icon_blue</item>
         <item name="iconTintRed">@color/icon_red</item>
-        <item name="iconTintYellow">@color/icon_yellow</item>
+        <item name="iconTintYellow">@color/icon_blue</item>
         <item name="iconTileBgBlue">@color/icon_tile_blue</item>
-        <item name="iconTileBgGreen">@color/icon_tile_green</item>
-        <item name="iconTileBgOrange">@color/icon_tile_orange</item>
-        <item name="iconTileBgPurple">@color/icon_tile_purple</item>
+        <item name="iconTileBgGreen">@color/icon_tile_blue</item>
+        <item name="iconTileBgOrange">@color/icon_tile_blue</item>
+        <item name="iconTileBgPurple">@color/icon_tile_blue</item>
         <item name="iconTileBgRed">@color/icon_tile_red</item>
-        <item name="iconTileBgYellow">@color/icon_tile_yellow</item>
+        <item name="iconTileBgYellow">@color/icon_tile_blue</item>
 
         <!-- App-wide AlertDialog styling (departament design). Applies to every
              androidx.appcompat AlertDialog.Builder dialog; adapts per theme via

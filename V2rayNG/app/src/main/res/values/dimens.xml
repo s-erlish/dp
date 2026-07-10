@@ -9,4 +9,23 @@
     <dimen name="view_height_dp64">64dp</dimen>
     <dimen name="view_height_dp120">120dp</dimen>
     <dimen name="view_height_dp160">160dp</dimen>
+
+    <!-- Incy spacing scale (app-wide) -->
+    <dimen name="space_4">4dp</dimen>
+    <dimen name="space_8">8dp</dimen>
+    <dimen name="space_12">12dp</dimen>
+    <dimen name="space_16">16dp</dimen>
+    <dimen name="space_24">24dp</dimen>
+    <dimen name="space_32">32dp</dimen>
+
+    <!-- Incy radius tokens -->
+    <dimen name="radius_chip">12dp</dimen>
+    <dimen name="radius_card">20dp</dimen>
+    <dimen name="radius_tile">12dp</dimen>
+
+    <!-- Incy component tokens -->
+    <dimen name="tile_size">40dp</dimen>
+    <dimen name="tile_glyph">22dp</dimen>
+    <dimen name="row_min_height">56dp</dimen>
+    <dimen name="screen_gutter">16dp</dimen>
 </resources>
