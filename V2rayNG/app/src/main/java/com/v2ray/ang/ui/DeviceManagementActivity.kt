@@ -173,6 +173,9 @@ class DeviceManagementActivity : BaseActivity() {
     private fun showEmpty(show: Boolean) {
         binding.layoutDevicesEmpty.visibility = if (show) View.VISIBLE else View.GONE
         binding.rvDevices.visibility = if (show) View.GONE else View.VISIBLE
+        // Hide the "devices connected to your subscription" subtitle while the empty/error
+        // overlay is up — it contradicts "no devices" / "subscription not found".
+        binding.tvDevicesSubtitle.visibility = if (show) View.GONE else View.VISIBLE
     }
 
     companion object {
