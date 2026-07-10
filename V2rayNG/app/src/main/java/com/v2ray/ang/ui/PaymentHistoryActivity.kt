@@ -47,7 +47,7 @@ class PaymentHistoryActivity : BaseActivity() {
         }
 
         observeState()
-        showLoading()
+        showHistoryLoading()
         viewModel.loadPayments()
     }
 
@@ -89,7 +89,7 @@ class PaymentHistoryActivity : BaseActivity() {
         else -> R.string.history_error_generic
     }
 
-    private fun showLoading() {
+    private fun showHistoryLoading() {
         if (loaded) return
         binding.progressHistory.visibility = View.VISIBLE
         binding.tvEmpty.visibility = View.GONE

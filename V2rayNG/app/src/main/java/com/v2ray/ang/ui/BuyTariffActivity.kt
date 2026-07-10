@@ -212,7 +212,7 @@ class BuyTariffActivity : BaseActivity() {
         }
         checkMarks.forEach { (_, iv) -> iv.visibility = View.INVISIBLE }
 
-        card.strokeColor = resolveAttrColor(com.google.android.material.R.attr.colorPrimary)
+        card.strokeColor = resolveAttrColor(androidx.appcompat.R.attr.colorPrimary)
         card.strokeWidth = dp(2)
         llOptions.visibility = View.VISIBLE
         checkMarks[tariffKey(tariff)]?.visibility = View.VISIBLE
