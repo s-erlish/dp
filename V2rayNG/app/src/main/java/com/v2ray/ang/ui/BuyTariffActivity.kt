@@ -69,6 +69,8 @@ class BuyTariffActivity : BaseActivity() {
     private var pollJob: Job? = null
 
     private lateinit var progressBuy: ProgressBar
+    private lateinit var skeleton: LinearLayout
+    private lateinit var stateIcon: ImageView
     private lateinit var btnRetry: MaterialButton
     private lateinit var tvPending: TextView
     private lateinit var stateView: TextView
@@ -88,6 +90,8 @@ class BuyTariffActivity : BaseActivity() {
         setContentViewWithToolbar(R.layout.activity_buy_tariff, title = getString(R.string.buy_title))
 
         progressBuy = findViewById(R.id.progress_buy)
+        skeleton = findViewById(R.id.ll_skeleton)
+        stateIcon = findViewById(R.id.iv_state_icon)
         btnRetry = findViewById(R.id.btn_retry)
         tvPending = findViewById(R.id.tv_pending)
         stateView = findViewById(R.id.tv_state)
@@ -164,6 +168,9 @@ class BuyTariffActivity : BaseActivity() {
 
     private fun showBuyLoading() {
         progressBuy.visibility = View.VISIBLE
+        // Skeleton placeholder cards ride the loading state; the error/empty glyph stays hidden.
+        skeleton.visibility = View.VISIBLE
+        stateIcon.visibility = View.GONE
         btnRetry.visibility = View.GONE
         stateView.text = getString(R.string.buy_loading)
         stateView.visibility = View.VISIBLE
@@ -172,6 +179,8 @@ class BuyTariffActivity : BaseActivity() {
 
     private fun showError() {
         progressBuy.visibility = View.GONE
+        skeleton.visibility = View.GONE
+        stateIcon.visibility = View.VISIBLE
         btnRetry.visibility = View.VISIBLE
         stateView.text = getString(R.string.buy_error)
         stateView.visibility = View.VISIBLE
@@ -180,6 +189,8 @@ class BuyTariffActivity : BaseActivity() {
 
     private fun showEmpty() {
         progressBuy.visibility = View.GONE
+        skeleton.visibility = View.GONE
+        stateIcon.visibility = View.VISIBLE
         btnRetry.visibility = View.GONE
         stateView.text = getString(R.string.buy_empty)
         stateView.visibility = View.VISIBLE
@@ -188,6 +199,9 @@ class BuyTariffActivity : BaseActivity() {
 
     private fun hideState() {
         progressBuy.visibility = View.GONE
+        // Tariffs rendered: retire both the skeleton and the state glyph.
+        skeleton.visibility = View.GONE
+        stateIcon.visibility = View.GONE
         btnRetry.visibility = View.GONE
         stateView.visibility = View.GONE
     }
@@ -228,11 +242,13 @@ class BuyTariffActivity : BaseActivity() {
         val ivCheck = card.findViewById<ImageView>(R.id.iv_check)
         val llOptions = card.findViewById<LinearLayout>(R.id.ll_price_options)
 
+        // The design retired the emoji chrome: keep tv_group_emoji GONE in both branches so the
+        // star/group glyph never shows, regardless of whether the group carries an emoji.
         if (emoji.isBlank()) {
             tvEmoji.visibility = View.GONE
         } else {
-            tvEmoji.visibility = View.VISIBLE
             tvEmoji.text = emoji
+            tvEmoji.visibility = View.GONE
         }
         tvName.text = tariff.name
 

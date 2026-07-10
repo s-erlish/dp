@@ -21,6 +21,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.ApiError
+import com.v2ray.ang.auth.dto.PaymentDto
 import com.v2ray.ang.auth.dto.PaymentInitDto
 import com.v2ray.ang.auth.dto.PaymentRequestDto
 import com.v2ray.ang.auth.dto.SubInfoDto
@@ -107,6 +108,8 @@ class AccountFragment : Fragment() {
         binding.rowDevices.setOnClickListener { openSubScreen(DeviceManagementActivity::class.java) }
         binding.rowBuy.setOnClickListener { openSubScreen(BuyTariffActivity::class.java) }
         binding.rowHistory.setOnClickListener { openSubScreen(PaymentHistoryActivity::class.java) }
+        // No-active-sub CTA: same destination as the buy row; only shown in the empty state.
+        binding.btnNoSubBuy.setOnClickListener { openSubScreen(BuyTariffActivity::class.java) }
     }
 
     private fun openSubScreen(target: Class<*>) {
@@ -119,6 +122,8 @@ class AccountFragment : Fragment() {
         viewModel.loadPublicConfig()
         // Needed to resolve the active sub's tariff badge name (Base/Plus) from its tariffId.
         viewModel.loadTariffs()
+        // Feeds the history row's trailing last-payment date.
+        viewModel.loadPayments()
     }
 
     private fun observeState() {
@@ -128,6 +133,7 @@ class AccountFragment : Fragment() {
                 launch { viewModel.subscriptions.collect { renderSubscriptions(it) } }
                 // Re-render the active sub when the tariff catalog arrives so the badge resolves.
                 launch { viewModel.tariffs.collect { updateActiveSubUi() } }
+                launch { viewModel.payments.collect { renderHistoryValue(it) } }
                 launch { viewModel.error.collect { renderError(it) } }
             }
         }
@@ -185,9 +191,13 @@ class AccountFragment : Fragment() {
         if (sub == null) {
             binding.groupActiveSub.visibility = View.GONE
             binding.tvNoSub.visibility = View.VISIBLE
+            // Empty state: offer the buy CTA and clear the device row's trailing value.
+            binding.btnNoSubBuy.visibility = View.VISIBLE
+            binding.tvRowValueDevices.visibility = View.GONE
             return
         }
         binding.tvNoSub.visibility = View.GONE
+        binding.btnNoSubBuy.visibility = View.GONE
         binding.groupActiveSub.visibility = View.VISIBLE
 
         binding.tvSubName.text = sub.displayName?.takeIf { it.isNotBlank() }
@@ -220,12 +230,28 @@ class AccountFragment : Fragment() {
         val totalDevicesStr = if (unlimitedDevices) getString(R.string.account_unlimited) else sub.totalDevices.toString()
         binding.tvSubDevices.text = getString(R.string.account_devices, sub.deviceCount.toString(), totalDevicesStr)
 
+        // Devices row's trailing "N / M" slot — bare figures (the row already carries its label).
+        binding.tvRowValueDevices.text = "${sub.deviceCount} / $totalDevicesStr"
+        binding.tvRowValueDevices.visibility = View.VISIBLE
+
         // Auto-renew — set state without firing the click handler for programmatic changes.
         binding.switchAutoRenew.isChecked = sub.autoRenewEnabled
         // The toggle PATCHes /client/secondary-subscriptions/{id}/auto-renew, so it needs a real
         // subscription id. A primary sub synthesized purely from /client/subscription (when /all
         // has no root entry) has no such id — reflect state but disable the toggle in that case.
         binding.switchAutoRenew.isEnabled = sub.id.isNotBlank()
+    }
+
+    /** Fills the history row's trailing slot with the most recent payment date, or hides it. */
+    private fun renderHistoryValue(payments: List<PaymentDto>) {
+        val latestIso = payments.maxByOrNull { it.createdAt }?.createdAt
+        val date = formatIsoDate(latestIso)
+        if (date.isBlank()) {
+            binding.tvRowValueHistory.visibility = View.GONE
+        } else {
+            binding.tvRowValueHistory.text = date
+            binding.tvRowValueHistory.visibility = View.VISIBLE
+        }
     }
 
     private fun renderError(error: ApiError?) {

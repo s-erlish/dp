@@ -1,5 +1,6 @@
 package com.v2ray.ang.ui
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.View
@@ -50,6 +51,11 @@ class PaymentHistoryActivity : BaseActivity() {
         binding.rvPayments.layoutManager = LinearLayoutManager(this)
         binding.rvPayments.adapter = paymentsAdapter
 
+        // Empty-state CTA: send the user straight into the buy flow.
+        binding.btnHistoryBuy.setOnClickListener {
+            startActivity(Intent(this, BuyTariffActivity::class.java))
+        }
+
         binding.refreshLayout.setColorSchemeColors(resolveThemeColor(R.attr.iconTintBlue))
         binding.refreshLayout.setOnRefreshListener {
             loaded = false
@@ -68,8 +74,11 @@ class PaymentHistoryActivity : BaseActivity() {
             showingCache = true
             binding.progressHistory.visibility = View.GONE
             paymentsAdapter.submit(cached)
-            binding.tvEmpty.text = getString(R.string.history_empty)
-            binding.tvEmpty.visibility = if (cached.isEmpty()) View.VISIBLE else View.GONE
+            if (cached.isEmpty()) {
+                showEmptyBlock(getString(R.string.history_empty), withBuyCta = true)
+            } else {
+                hideEmptyBlock()
+            }
         } else {
             showHistoryLoading()
             viewModel.loadPayments()
@@ -95,8 +104,11 @@ class PaymentHistoryActivity : BaseActivity() {
         binding.progressHistory.visibility = View.GONE
         paymentsAdapter.submit(list)
         AccountCache.putPayments(list)
-        binding.tvEmpty.text = getString(R.string.history_empty)
-        binding.tvEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+        if (list.isEmpty()) {
+            showEmptyBlock(getString(R.string.history_empty), withBuyCta = true)
+        } else {
+            hideEmptyBlock()
+        }
     }
 
     private fun renderError(error: ApiError?) {
@@ -104,10 +116,10 @@ class PaymentHistoryActivity : BaseActivity() {
         binding.refreshLayout.isRefreshing = false
         binding.progressHistory.visibility = View.GONE
         loaded = true
-        // Only surface the error banner in the empty area if we have nothing to show.
+        // Only surface the error banner in the empty area if we have nothing to show. The buy CTA
+        // stays hidden here — this is an error, not a genuine "no payments yet" empty state.
         if (paymentsAdapter.itemCount == 0) {
-            binding.tvEmpty.text = getString(messageFor(error))
-            binding.tvEmpty.visibility = View.VISIBLE
+            showEmptyBlock(getString(messageFor(error)), withBuyCta = false)
         }
         viewModel.clearError()
     }
@@ -122,7 +134,25 @@ class PaymentHistoryActivity : BaseActivity() {
     private fun showHistoryLoading() {
         if (loaded) return
         binding.progressHistory.visibility = View.VISIBLE
+        hideEmptyBlock()
+    }
+
+    /**
+     * Reveals the centred empty/error block ([R.id.ll_empty_state]) with [message]. [withBuyCta]
+     * shows the «Купить подписку» button — only for the genuine "no payments yet" empty state, not
+     * for errors.
+     */
+    private fun showEmptyBlock(message: String, withBuyCta: Boolean) {
+        binding.tvEmpty.text = message
+        binding.tvEmpty.visibility = View.VISIBLE
+        binding.btnHistoryBuy.visibility = if (withBuyCta) View.VISIBLE else View.GONE
+        binding.llEmptyState.visibility = View.VISIBLE
+    }
+
+    private fun hideEmptyBlock() {
         binding.tvEmpty.visibility = View.GONE
+        binding.btnHistoryBuy.visibility = View.GONE
+        binding.llEmptyState.visibility = View.GONE
     }
 
     /** Resolves a theme colour attr (e.g. [R.attr.iconTintBlue]) to an ARGB int for the current theme. */
