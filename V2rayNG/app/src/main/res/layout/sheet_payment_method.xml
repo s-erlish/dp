@@ -17,7 +17,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingBottom="18dp">
+        android:paddingBottom="@dimen/space_16">
 
         <!-- Grab handle -->
         <View
@@ -32,14 +32,12 @@
             android:id="@+id/tv_pay_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="@dimen/space_12"
             android:ellipsize="end"
             android:maxLines="1"
-            android:paddingHorizontal="18dp"
-            android:paddingBottom="4dp"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="18sp"
-            android:textStyle="bold"
+            android:paddingHorizontal="@dimen/space_16"
+            android:paddingBottom="@dimen/space_4"
+            android:textAppearance="@style/TextAppearance.App.Title"
             tools:text="Способ оплаты" />
 
         <!-- Runtime-populated rows (item_payment_method.xml) -->

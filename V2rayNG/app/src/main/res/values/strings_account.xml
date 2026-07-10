@@ -8,7 +8,7 @@
 
     <!-- Hub -->
     <string name="account_profile_title">Ваш профиль</string>
-    <string name="account_balance_inline">Баланс: %1$s</string>
+    <string name="account_balance_inline">%1$s</string>
     <string name="account_sub_summary_title">Ваша подписка</string>
     <string name="account_manage_title">Управление</string>
     <string name="account_hub_devices">Устройства</string>
@@ -21,7 +21,7 @@
     <!-- Header / balance -->
     <string name="account_balance">Баланс</string>
     <string name="account_top_up">Пополнить баланс</string>
-    <string name="account_referral">Реферальный код: %1$s</string>
+    <string name="account_referral">Реф-код %1$s · копировать</string>
     <string name="account_telegram">Telegram: \@%1$s</string>
     <string name="account_no_telegram">Telegram не привязан</string>
     <string name="account_copy_referral">Скопировать код</string>
@@ -30,7 +30,7 @@
     <!-- Subscriptions -->
     <string name="account_subs_header">Мои подписки</string>
     <string name="account_subs_empty">У вас пока нет подписок</string>
-    <string name="account_no_subscription">Нет активной подписки</string>
+    <string name="account_no_subscription">Пока нет активной подписки. Оформите её, чтобы подключиться.</string>
     <string name="account_expires">Действует до %1$s</string>
     <string name="account_devices">Устройства: %1$s / %2$s</string>
     <string name="account_traffic">Трафик: %1$s / %2$s</string>

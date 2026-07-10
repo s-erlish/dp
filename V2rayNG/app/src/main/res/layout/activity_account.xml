@@ -110,46 +110,57 @@
                         android:layout_weight="1"
                         android:ellipsize="end"
                         android:maxLines="1"
-                        android:textAppearance="@style/TextAppearance.App.Title"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
                         tools:text="Erlish" />
                 </LinearLayout>
 
-                <!-- Balance on one line -->
+                <!-- Balance is the hero of the plate: quiet label + big brand-font value -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_16"
+                    android:text="@string/account_balance"
+                    android:textAppearance="@style/TextAppearance.App.Caption" />
+
                 <TextView
                     android:id="@+id/tv_balance"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_12"
-                    android:textAppearance="@style/TextAppearance.App.Title"
-                    tools:text="Баланс: 0 ₽" />
+                    android:layout_marginTop="@dimen/space_4"
+                    android:textAppearance="@style/TextAppearance.App.Headline"
+                    tools:text="1 500 ₽" />
 
-                <!-- Referral code + copy -->
+                <!-- Referral: ONE quiet tappable chip, kept well below the balance -->
                 <LinearLayout
                     android:id="@+id/row_referral"
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_4"
+                    android:layout_marginTop="@dimen/space_12"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
                     <TextView
                         android:id="@+id/tv_referral"
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
+                        android:background="@drawable/bg_acc_chip"
                         android:ellipsize="end"
                         android:maxLines="1"
-                        android:textAppearance="@style/TextAppearance.App.Subtitle"
-                        tools:text="Реферальный код: ABC123" />
+                        android:paddingHorizontal="@dimen/space_12"
+                        android:paddingVertical="@dimen/space_8"
+                        android:textAppearance="@style/TextAppearance.App.Caption"
+                        tools:text="Реф-код ABC123 · копировать" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_copy_referral"
                         style="@style/Widget.Material3.Button.IconButton"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_4"
                         android:contentDescription="@string/account_copy_referral"
                         app:icon="@drawable/ic_copy"
-                        app:iconTint="?attr/iconTintBlue" />
+                        app:iconSize="18dp"
+                        app:iconTint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
                 <!-- Top-up (unified primary: 52dp height, full-pill radius) -->
@@ -204,7 +215,8 @@
                 android:orientation="vertical"
                 android:padding="@dimen/space_16">
 
-                <!-- Empty state: shown ONLY when there is truly no subscription -->
+                <!-- Empty state: inviting onboarding block, shown ONLY when there is no subscription.
+                     btn_no_sub_buy is a GONE placeholder the code can wire to the buy flow later. -->
                 <TextView
                     android:id="@+id/tv_no_sub"
                     android:layout_width="match_parent"
@@ -212,6 +224,19 @@
                     android:text="@string/account_no_subscription"
                     android:textAppearance="@style/TextAppearance.App.Body"
                     android:visibility="gone" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_no_sub_buy"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="@dimen/space_16"
+                    android:text="@string/account_hub_buy"
+                    android:textAllCaps="false"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    app:cornerRadius="26dp"
+                    app:icon="@drawable/ic_acc_upgrade"
+                    app:iconGravity="textStart" />
 
                 <!-- Active state -->
                 <LinearLayout
@@ -354,27 +379,15 @@
                             app:tint="?attr/iconTintBlue" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
                         android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/account_hub_buy"
-                            android:textAppearance="@style/TextAppearance.App.Title" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/account_hub_buy_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
+                        android:text="@string/account_hub_buy"
+                        android:textAppearance="@style/TextAppearance.App.Title"
+                        android:textColor="?attr/colorPrimary" />
 
                     <ImageView
                         android:layout_width="18dp"
@@ -420,27 +433,25 @@
                             app:tint="?attr/iconTintBlue" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
                         android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:text="@string/account_hub_devices"
+                        android:textAppearance="@style/TextAppearance.App.Title" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/account_hub_devices"
-                            android:textAppearance="@style/TextAppearance.App.Title" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/account_hub_devices_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
+                    <!-- GONE trailing value slot; code can fill with e.g. "1 / 3" -->
+                    <TextView
+                        android:id="@+id/tv_row_value_devices"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="@dimen/space_8"
+                        android:gravity="end"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        android:visibility="gone"
+                        tools:text="1 / 3" />
 
                     <ImageView
                         android:layout_width="18dp"
@@ -486,27 +497,25 @@
                             app:tint="?attr/iconTintBlue" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
                         android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:text="@string/account_hub_history"
+                        android:textAppearance="@style/TextAppearance.App.Title" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/account_hub_history"
-                            android:textAppearance="@style/TextAppearance.App.Title" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/account_hub_history_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
+                    <!-- GONE trailing value slot; code can fill with e.g. a last-payment date -->
+                    <TextView
+                        android:id="@+id/tv_row_value_history"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="@dimen/space_8"
+                        android:gravity="end"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        android:visibility="gone"
+                        tools:text="12.06.2026" />
 
                     <ImageView
                         android:layout_width="18dp"

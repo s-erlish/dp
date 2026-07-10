@@ -5,8 +5,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingHorizontal="24dp"
-    android:paddingTop="8dp">
+    android:paddingHorizontal="@dimen/space_24"
+    android:paddingTop="@dimen/space_8">
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/til_top_up"

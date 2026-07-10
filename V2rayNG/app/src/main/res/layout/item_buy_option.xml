@@ -8,32 +8,31 @@
     android:id="@+id/row_option"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginTop="8dp"
+    android:layout_marginTop="@dimen/space_8"
     android:background="@drawable/bg_buy_option"
     android:clickable="true"
     android:focusable="true"
     android:gravity="center_vertical"
     android:minHeight="48dp"
     android:orientation="horizontal"
-    android:paddingHorizontal="14dp"
-    android:paddingVertical="12dp">
+    android:paddingHorizontal="@dimen/space_12"
+    android:paddingVertical="@dimen/space_12">
 
     <TextView
         android:id="@+id/tv_option_duration"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:textColor="?attr/colorOnSurface"
-        android:textSize="14sp"
+        android:textAppearance="@style/TextAppearance.App.Body"
         tools:text="30 дн." />
 
     <TextView
         android:id="@+id/tv_option_price"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
+        android:layout_marginStart="@dimen/space_12"
+        android:textAppearance="@style/TextAppearance.App.Body"
         android:textColor="?attr/colorPrimary"
-        android:textSize="15sp"
         android:textStyle="bold"
         tools:text="299 ₽" />
 </LinearLayout>

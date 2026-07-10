@@ -76,7 +76,7 @@
             android:clickable="true"
             android:contentDescription="@string/connection_test_pending"
             android:focusable="true"
-            android:padding="8dp"
+            android:padding="@dimen/space_8"
             app:srcCompat="@drawable/ic_ping_24dp"
             app:tint="?attr/colorPrimary" />
 
@@ -89,7 +89,7 @@
             android:clickable="true"
             android:contentDescription="@string/title_sub_update"
             android:focusable="true"
-            android:padding="8dp"
+            android:padding="@dimen/space_8"
             app:srcCompat="@drawable/ic_refresh_24dp"
             app:tint="?attr/colorPrimary" />
 
@@ -112,7 +112,7 @@
             android:clickable="true"
             android:contentDescription="@string/sub_pin"
             android:focusable="true"
-            android:padding="8dp"
+            android:padding="@dimen/space_8"
             app:srcCompat="@drawable/ic_pin_24dp"
             app:tint="?attr/colorOnSurfaceVariant" />
 
@@ -144,7 +144,8 @@
             android:layout_gravity="center_horizontal|center_vertical">
 
             <!-- Traffic pill fill: a horizontal ProgressBar whose progressDrawable is a rounded
-                 track + a clipped rounded LEFT->RIGHT white->blue gradient (bg_traffic_gradient). -->
+                 muted track + a clipped rounded FLAT fill in the one accent (colorPrimary, via
+                 bg_traffic_gradient). No decorative gradient — flat pill. -->
             <ProgressBar
                 android:id="@+id/progress_traffic"
                 style="?android:attr/progressBarStyleHorizontal"
@@ -237,7 +238,7 @@
             android:clickable="true"
             android:contentDescription="@string/sub_telegram"
             android:focusable="true"
-            android:padding="8dp"
+            android:padding="@dimen/space_8"
             android:visibility="gone"
             app:srcCompat="@drawable/ic_telegram_24dp"
             app:tint="?attr/colorPrimary"

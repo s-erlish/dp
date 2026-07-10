@@ -26,13 +26,15 @@
         android:paddingEnd="10dp"
         android:paddingBottom="5dp">
 
+        <!-- Selection indicator: the side-stripe is retired (impeccable Absolute Ban:
+             no side-stripe > 1px). Selection is carried by bg_server_row's full blue
+             outline+fill via infoContainer.isSelected. The zero-size, gone node is kept
+             because MainRecyclerAdapter still binds layoutIndicator. -->
         <View
             android:id="@+id/layout_indicator"
-            android:layout_width="3dp"
-            android:layout_height="26dp"
-            android:layout_gravity="center_vertical"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="2dp" />
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/tv_flag"

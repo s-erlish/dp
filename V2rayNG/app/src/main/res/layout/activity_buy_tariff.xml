@@ -1,23 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Buy-subscription screen. Incy design language: dark surface, bright-blue accent,
-  calm premium spacing. Pick a tariff, a duration/price option and extra devices,
-  then tap "Оплатить" to choose a payment method.
+  Buy-subscription screen. Incy design language: pure-dark surface, bright-blue
+  accent, calm premium spacing. Pick a tariff, a duration/price option and extra
+  devices, then tap "Оплатить" to choose a payment method.
+
+  States (driven by BuyTariffActivity): progress_buy + tv_state = loading;
+  tv_state + btn_retry = error; tv_state = empty. iv_state_icon (error/empty glyph)
+  and ll_skeleton (loading placeholders) are wire-ready and gone by default.
 -->
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?android:attr/colorBackground"
     android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="24dp">
+        android:paddingHorizontal="@dimen/screen_gutter"
+        android:paddingTop="@dimen/space_12"
+        android:paddingBottom="@dimen/space_24">
 
         <!-- ============ States ============ -->
         <ProgressBar
@@ -25,8 +30,21 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:layout_marginTop="32dp"
+            android:layout_marginTop="@dimen/space_32"
             android:indeterminateTint="?attr/colorPrimary"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <!-- Error/empty glyph: wire-ready, revealed by the activity alongside tv_state. -->
+        <ImageView
+            android:id="@+id/iv_state_icon"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="@dimen/space_32"
+            android:importantForAccessibility="no"
+            app:srcCompat="@drawable/ic_dl_info"
+            app:tint="?attr/colorOnSurfaceVariant"
             android:visibility="gone"
             tools:visibility="visible" />
 
@@ -34,13 +52,13 @@
             android:id="@+id/tv_state"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:padding="16dp"
+            android:layout_marginTop="@dimen/space_8"
+            android:padding="@dimen/space_16"
             android:textAlignment="center"
+            android:textAppearance="@style/TextAppearance.App.Body"
             android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="14sp"
             android:visibility="gone"
-            tools:text="Загрузка тарифов…"
+            tools:text="Не удалось загрузить тарифы. Проверьте соединение и повторите."
             tools:visibility="visible" />
 
         <!-- Retry affordance for the error state -->
@@ -50,8 +68,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="8dp"
+            android:layout_marginTop="@dimen/space_4"
+            android:layout_marginBottom="@dimen/space_8"
             android:text="@string/buy_retry"
             android:textAllCaps="false"
             app:cornerRadius="22dp"
@@ -63,26 +81,57 @@
             android:id="@+id/tv_pending"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:padding="12dp"
+            android:layout_marginTop="@dimen/space_8"
+            android:padding="@dimen/space_12"
             android:textAlignment="center"
             android:text="@string/buy_pending"
+            android:textAppearance="@style/TextAppearance.App.Body"
             android:textColor="?attr/colorPrimary"
-            android:textSize="14sp"
             android:visibility="gone"
             tools:visibility="visible" />
+
+        <!-- Loading skeleton: wire-ready placeholder tariff cards toggled during load. -->
+        <LinearLayout
+            android:id="@+id/ll_skeleton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="76dp"
+                android:layout_marginBottom="@dimen/space_12"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
+                app:cardCornerRadius="@dimen/radius_card"
+                app:cardElevation="0dp" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="76dp"
+                android:layout_marginBottom="@dimen/space_12"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
+                app:cardCornerRadius="@dimen/radius_card"
+                app:cardElevation="0dp" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="76dp"
+                app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
+                app:cardCornerRadius="@dimen/radius_card"
+                app:cardElevation="0dp" />
+        </LinearLayout>
 
         <!-- ============ 1. Tariffs ============ -->
         <TextView
             android:id="@+id/tv_tariffs_header"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:layout_marginBottom="10dp"
+            android:layout_marginStart="@dimen/space_4"
+            android:layout_marginBottom="@dimen/space_8"
             android:text="@string/buy_pick_tariff"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp"
-            android:textStyle="bold"
+            android:textAppearance="@style/TextAppearance.App.Title"
             android:visibility="gone"
             tools:visibility="visible" />
 
@@ -97,10 +146,10 @@
             android:id="@+id/card_checkout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="@dimen/space_8"
             android:visibility="gone"
             app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
+            app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp"
@@ -110,7 +159,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="@dimen/space_16">
 
                 <!-- Extra devices stepper: icon + label on the left, «− N +» control on the right -->
                 <LinearLayout
@@ -121,13 +170,13 @@
                     android:orientation="horizontal">
 
                     <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:background="@drawable/bg_icon_blue">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_acc_devices"
@@ -137,7 +186,7 @@
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="@dimen/space_12"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -145,16 +194,14 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:text="@string/buy_extra_devices_title"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="14sp" />
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
                         <TextView
                             android:id="@+id/tv_extra_devices_cost"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp"
+                            android:textAppearance="@style/TextAppearance.App.Caption"
                             android:visibility="gone"
                             tools:text="+ 50 ₽"
                             tools:visibility="visible" />
@@ -163,8 +210,8 @@
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_dev_minus"
                         style="@style/Widget.Material3.Button.IconButton"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:contentDescription="@string/buy_extra_devices_minus"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
@@ -183,19 +230,17 @@
                         android:id="@+id/tv_extra_devices_count"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginHorizontal="4dp"
+                        android:layout_marginHorizontal="@dimen/space_4"
                         android:minWidth="28dp"
                         android:gravity="center"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
+                        android:textAppearance="@style/TextAppearance.App.Title"
                         tools:text="1" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_dev_plus"
                         style="@style/Widget.Material3.Button.IconButton"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
                         android:contentDescription="@string/buy_extra_devices_plus"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
@@ -215,14 +260,14 @@
                     android:id="@+id/divider_total"
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="@dimen/space_16"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Total -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="@dimen/space_12"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
@@ -231,16 +276,15 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/buy_total"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="14sp" />
+                        android:textAppearance="@style/TextAppearance.App.Body"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
 
                     <TextView
                         android:id="@+id/tv_total"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:textAppearance="@style/TextAppearance.App.Headline"
                         android:textColor="?attr/colorPrimary"
-                        android:textSize="24sp"
-                        android:textStyle="bold"
                         tools:text="299 ₽" />
                 </LinearLayout>
 
@@ -249,7 +293,7 @@
                     android:id="@+id/btn_pay"
                     android:layout_width="match_parent"
                     android:layout_height="52dp"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="@dimen/space_16"
                     android:text="@string/buy_pay"
                     android:textAllCaps="false"
                     android:textStyle="bold"

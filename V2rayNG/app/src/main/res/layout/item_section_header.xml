@@ -31,19 +31,15 @@
         android:layout_weight="1"
         android:ellipsize="end"
         android:maxLines="1"
-        android:textAllCaps="true"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="12sp"
-        android:textStyle="bold"
+        android:textAppearance="@style/TextAppearance.App.Title"
         tools:text="departament • Premium" />
 
     <TextView
         android:id="@+id/section_count"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="12sp"
+        android:layout_marginStart="@dimen/space_8"
+        android:textAppearance="@style/TextAppearance.App.Subtitle"
         tools:text="15" />
 
 </LinearLayout>

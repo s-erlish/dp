@@ -1,12 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  One payment/order-history row: blue icon tile + description/date, amount and a
+  status chip on the right. The chip's text colour and background tint are driven
+  by PaymentsAdapter (green = оплачено, orange = в обработке, red = ошибка,
+  yellow = отменён) so status carries colour, never colour-only shape.
+-->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="10dp"
+    android:layout_marginBottom="@dimen/space_12"
     app:cardBackgroundColor="?attr/colorSurface"
-    app:cardCornerRadius="18dp"
+    app:cardCornerRadius="@dimen/radius_card"
     app:cardElevation="0dp"
     app:strokeColor="?attr/colorOutlineVariant"
     app:strokeWidth="1dp">
@@ -15,17 +21,18 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
+        android:minHeight="@dimen/row_min_height"
         android:orientation="horizontal"
-        android:padding="14dp">
+        android:padding="@dimen/space_16">
 
         <FrameLayout
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="@dimen/tile_size"
+            android:layout_height="@dimen/tile_size"
             android:background="@drawable/bg_icon_blue">
 
             <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
+                android:layout_width="@dimen/tile_glyph"
+                android:layout_height="@dimen/tile_glyph"
                 android:layout_gravity="center"
                 android:importantForAccessibility="no"
                 app:srcCompat="@drawable/ic_acc_history"
@@ -35,7 +42,7 @@
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="@dimen/space_12"
             android:layout_weight="1"
             android:orientation="vertical">
 
@@ -45,8 +52,7 @@
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="14sp"
+                android:textAppearance="@style/TextAppearance.App.Body"
                 tools:text="Продление подписки" />
 
             <TextView
@@ -56,15 +62,14 @@
                 android:layout_marginTop="2dp"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="12sp"
+                android:textAppearance="@style/TextAppearance.App.Caption"
                 tools:text="01.07.2026" />
         </LinearLayout>
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="@dimen/space_8"
             android:gravity="end"
             android:orientation="vertical">
 
@@ -72,22 +77,21 @@
                 android:id="@+id/tv_payment_amount"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="15sp"
+                android:textAppearance="@style/TextAppearance.App.Body"
                 android:textStyle="bold"
-                tools:text="199 RUB" />
+                tools:text="199 ₽" />
 
             <TextView
                 android:id="@+id/tv_payment_status"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="@dimen/space_4"
                 android:background="@drawable/bg_acc_chip"
-                android:paddingHorizontal="8dp"
+                android:paddingHorizontal="@dimen/space_8"
                 android:paddingVertical="2dp"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                tools:text="Оплачено" />
+                android:textAppearance="@style/TextAppearance.App.Chip"
+                tools:text="Оплачено"
+                tools:textColor="?attr/colorPrimary" />
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

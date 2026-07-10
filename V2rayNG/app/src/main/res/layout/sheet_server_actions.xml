@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Long-press server-actions bottom sheet (Incy "Servers" redesign, S3).
-    Dark rounded surface, colored icon tiles (bg_icon_*), rows styled after
-    layout_setting_row.xml. Row visibility/enabled state is managed in
-    ServerActionsSheet.kt (share/edit/duplicate are hidden for locked profiles).
+    Dark rounded surface, flat rows styled after layout_setting_row.xml: 40dp blue
+    icon tile + 22dp themed glyph + label, tokenised spacing. One blue accent
+    throughout; only Удалить carries the destructive red. Row visibility/enabled
+    state is managed in ServerActionsSheet.kt (share/edit/duplicate are hidden for
+    locked profiles).
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -13,7 +15,7 @@
     android:layout_height="wrap_content"
     android:background="@drawable/bg_sheet_top"
     android:orientation="vertical"
-    android:paddingBottom="12dp">
+    android:paddingBottom="@dimen/space_12">
 
     <!-- Grab handle -->
     <View
@@ -31,12 +33,10 @@
         android:layout_marginTop="10dp"
         android:ellipsize="end"
         android:maxLines="1"
-        android:paddingStart="18dp"
-        android:paddingEnd="18dp"
-        android:paddingBottom="6dp"
-        android:textColor="?attr/colorOnSurface"
-        android:textSize="17sp"
-        android:textStyle="bold"
+        android:paddingStart="@dimen/space_16"
+        android:paddingEnd="@dimen/space_16"
+        android:paddingBottom="@dimen/space_8"
+        android:textAppearance="@style/TextAppearance.App.Title"
         tools:text="🇳🇱 Amsterdam · Fast" />
 
     <!-- Поделиться (QR) -->
@@ -48,20 +48,20 @@
         android:clickable="true"
         android:focusable="true"
         android:gravity="center_vertical"
-        android:minHeight="56dp"
+        android:minHeight="@dimen/row_min_height"
         android:orientation="horizontal"
-        android:paddingStart="18dp"
-        android:paddingEnd="18dp"
-        android:paddingVertical="8dp">
+        android:paddingStart="@dimen/space_16"
+        android:paddingEnd="@dimen/space_16"
+        android:paddingVertical="@dimen/space_12">
 
         <FrameLayout
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="@dimen/tile_size"
+            android:layout_height="@dimen/tile_size"
             android:background="@drawable/bg_icon_blue">
 
             <ImageView
-                android:layout_width="22dp"
-                android:layout_height="22dp"
+                android:layout_width="@dimen/tile_glyph"
+                android:layout_height="@dimen/tile_glyph"
                 android:layout_gravity="center"
                 android:importantForAccessibility="no"
                 app:srcCompat="@drawable/ic_scan_24dp"
@@ -71,11 +71,10 @@
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="14dp"
+            android:layout_marginStart="@dimen/space_16"
             android:layout_weight="1"
             android:text="@string/server_action_share_qr"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp" />
+            android:textAppearance="@style/TextAppearance.App.Body" />
     </LinearLayout>
 
     <!-- Поделиться (буфер) -->
@@ -87,34 +86,33 @@
         android:clickable="true"
         android:focusable="true"
         android:gravity="center_vertical"
-        android:minHeight="56dp"
+        android:minHeight="@dimen/row_min_height"
         android:orientation="horizontal"
-        android:paddingStart="18dp"
-        android:paddingEnd="18dp"
-        android:paddingVertical="8dp">
+        android:paddingStart="@dimen/space_16"
+        android:paddingEnd="@dimen/space_16"
+        android:paddingVertical="@dimen/space_12">
 
         <FrameLayout
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@drawable/bg_icon_green">
+            android:layout_width="@dimen/tile_size"
+            android:layout_height="@dimen/tile_size"
+            android:background="@drawable/bg_icon_blue">
 
             <ImageView
-                android:layout_width="22dp"
-                android:layout_height="22dp"
+                android:layout_width="@dimen/tile_glyph"
+                android:layout_height="@dimen/tile_glyph"
                 android:layout_gravity="center"
                 android:importantForAccessibility="no"
                 app:srcCompat="@drawable/ic_copy"
-                app:tint="?attr/iconTintGreen" />
+                app:tint="?attr/iconTintBlue" />
         </FrameLayout>
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="14dp"
+            android:layout_marginStart="@dimen/space_16"
             android:layout_weight="1"
             android:text="@string/server_action_share_clipboard"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp" />
+            android:textAppearance="@style/TextAppearance.App.Body" />
     </LinearLayout>
 
     <!-- Изменить -->
@@ -126,34 +124,33 @@
         android:clickable="true"
         android:focusable="true"
         android:gravity="center_vertical"
-        android:minHeight="56dp"
+        android:minHeight="@dimen/row_min_height"
         android:orientation="horizontal"
-        android:paddingStart="18dp"
-        android:paddingEnd="18dp"
-        android:paddingVertical="8dp">
+        android:paddingStart="@dimen/space_16"
+        android:paddingEnd="@dimen/space_16"
+        android:paddingVertical="@dimen/space_12">
 
         <FrameLayout
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@drawable/bg_icon_orange">
+            android:layout_width="@dimen/tile_size"
+            android:layout_height="@dimen/tile_size"
+            android:background="@drawable/bg_icon_blue">
 
             <ImageView
-                android:layout_width="22dp"
-                android:layout_height="22dp"
+                android:layout_width="@dimen/tile_glyph"
+                android:layout_height="@dimen/tile_glyph"
                 android:layout_gravity="center"
                 android:importantForAccessibility="no"
                 app:srcCompat="@drawable/ic_edit_24dp"
-                app:tint="?attr/iconTintOrange" />
+                app:tint="?attr/iconTintBlue" />
         </FrameLayout>
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="14dp"
+            android:layout_marginStart="@dimen/space_16"
             android:layout_weight="1"
             android:text="@string/server_action_edit"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp" />
+            android:textAppearance="@style/TextAppearance.App.Body" />
     </LinearLayout>
 
     <!-- Дублировать -->
@@ -165,34 +162,33 @@
         android:clickable="true"
         android:focusable="true"
         android:gravity="center_vertical"
-        android:minHeight="56dp"
+        android:minHeight="@dimen/row_min_height"
         android:orientation="horizontal"
-        android:paddingStart="18dp"
-        android:paddingEnd="18dp"
-        android:paddingVertical="8dp">
+        android:paddingStart="@dimen/space_16"
+        android:paddingEnd="@dimen/space_16"
+        android:paddingVertical="@dimen/space_12">
 
         <FrameLayout
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@drawable/bg_icon_purple">
+            android:layout_width="@dimen/tile_size"
+            android:layout_height="@dimen/tile_size"
+            android:background="@drawable/bg_icon_blue">
 
             <ImageView
-                android:layout_width="22dp"
-                android:layout_height="22dp"
+                android:layout_width="@dimen/tile_glyph"
+                android:layout_height="@dimen/tile_glyph"
                 android:layout_gravity="center"
                 android:importantForAccessibility="no"
                 app:srcCompat="@drawable/ic_add_24dp"
-                app:tint="?attr/iconTintPurple" />
+                app:tint="?attr/iconTintBlue" />
         </FrameLayout>
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="14dp"
+            android:layout_marginStart="@dimen/space_16"
             android:layout_weight="1"
             android:text="@string/server_action_duplicate"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp" />
+            android:textAppearance="@style/TextAppearance.App.Body" />
     </LinearLayout>
 
     <!-- Сделать основным -->
@@ -204,37 +200,36 @@
         android:clickable="true"
         android:focusable="true"
         android:gravity="center_vertical"
-        android:minHeight="56dp"
+        android:minHeight="@dimen/row_min_height"
         android:orientation="horizontal"
-        android:paddingStart="18dp"
-        android:paddingEnd="18dp"
-        android:paddingVertical="8dp">
+        android:paddingStart="@dimen/space_16"
+        android:paddingEnd="@dimen/space_16"
+        android:paddingVertical="@dimen/space_12">
 
         <FrameLayout
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@drawable/bg_icon_yellow">
+            android:layout_width="@dimen/tile_size"
+            android:layout_height="@dimen/tile_size"
+            android:background="@drawable/bg_icon_blue">
 
             <ImageView
-                android:layout_width="22dp"
-                android:layout_height="22dp"
+                android:layout_width="@dimen/tile_glyph"
+                android:layout_height="@dimen/tile_glyph"
                 android:layout_gravity="center"
                 android:importantForAccessibility="no"
                 app:srcCompat="@drawable/ic_pin_24dp"
-                app:tint="?attr/iconTintYellow" />
+                app:tint="?attr/iconTintBlue" />
         </FrameLayout>
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="14dp"
+            android:layout_marginStart="@dimen/space_16"
             android:layout_weight="1"
             android:text="@string/server_action_set_default"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp" />
+            android:textAppearance="@style/TextAppearance.App.Body" />
     </LinearLayout>
 
-    <!-- Удалить -->
+    <!-- Удалить (destructive: keeps the red tile + red label) -->
     <LinearLayout
         android:id="@+id/row_delete"
         android:layout_width="match_parent"
@@ -243,20 +238,20 @@
         android:clickable="true"
         android:focusable="true"
         android:gravity="center_vertical"
-        android:minHeight="56dp"
+        android:minHeight="@dimen/row_min_height"
         android:orientation="horizontal"
-        android:paddingStart="18dp"
-        android:paddingEnd="18dp"
-        android:paddingVertical="8dp">
+        android:paddingStart="@dimen/space_16"
+        android:paddingEnd="@dimen/space_16"
+        android:paddingVertical="@dimen/space_12">
 
         <FrameLayout
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="@dimen/tile_size"
+            android:layout_height="@dimen/tile_size"
             android:background="@drawable/bg_icon_red">
 
             <ImageView
-                android:layout_width="22dp"
-                android:layout_height="22dp"
+                android:layout_width="@dimen/tile_glyph"
+                android:layout_height="@dimen/tile_glyph"
                 android:layout_gravity="center"
                 android:importantForAccessibility="no"
                 app:srcCompat="@drawable/ic_delete_24dp"
@@ -266,11 +261,11 @@
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="14dp"
+            android:layout_marginStart="@dimen/space_16"
             android:layout_weight="1"
             android:text="@string/server_action_delete"
-            android:textColor="?attr/iconTintRed"
-            android:textSize="16sp" />
+            android:textAppearance="@style/TextAppearance.App.Body"
+            android:textColor="?attr/iconTintRed" />
     </LinearLayout>
 
 </LinearLayout>
