@@ -68,6 +68,7 @@ import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
 import com.v2ray.ang.tv.TvReceiveActivity
 import com.v2ray.ang.tv.TvSendActivity
+import com.v2ray.ang.util.AvatarManager
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.MemoryStatsManager
 import com.v2ray.ang.util.Utils
@@ -660,7 +661,8 @@ class MainActivity : HelperBaseActivity() {
             ?: profile.email.takeIf { it.isNotBlank() }
             ?: getString(R.string.auth_account)
         header.tvAccountName.text = name
-        header.tvAvatarInitial.text = name.trimStart('@').firstOrNull()?.uppercase() ?: "?"
+        AvatarManager.setMonogram(header.tvAvatarInitial, name)
+        AvatarManager.applyAvatar(lifecycleScope, this, header.imgAvatar, header.tvAvatarInitial, profile)
         header.tvAccountSub.text = getString(R.string.auth_open_account)
     }
 

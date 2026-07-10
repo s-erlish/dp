@@ -1,5 +1,7 @@
 package com.v2ray.ang.auth.dto
 
+import com.google.gson.annotations.SerializedName
+
 /**
  * Auth endpoints of the Departament backend (JWT, 7-day, NO refresh).
  *
@@ -102,4 +104,11 @@ data class UserProfileDto(
     val trialUsed: Boolean = false,
     val autoRenewEnabled: Boolean = false,
     val totpEnabled: Boolean = false,
+    // Telegram profile photo, if the backend exposes one. Key name varies across backends,
+    // so accept the common spellings; stays null (monogram fallback) when absent.
+    @SerializedName(
+        value = "avatarUrl",
+        alternate = ["photoUrl", "photo_url", "telegramPhotoUrl", "tgPhotoUrl", "telegramAvatarUrl", "avatar", "photo"],
+    )
+    val avatarUrl: String? = null,
 )

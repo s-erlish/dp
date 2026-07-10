@@ -74,4 +74,11 @@
     <string name="account_error_timeout">Превышено время ожидания</string>
     <string name="account_error_generic">Что-то пошло не так</string>
     <string name="account_checkout_no_browser">Не удалось открыть страницу оплаты</string>
+
+    <!-- Avatar -->
+    <string name="account_change_avatar">Сменить фото</string>
+    <string name="account_avatar_gallery">Выбрать из галереи</string>
+    <string name="account_avatar_remove">Убрать фото</string>
+    <string name="account_avatar_updated">Аватар обновлён</string>
+    <string name="account_avatar_error">Не удалось загрузить фото</string>
 </resources>

@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.View
 import android.widget.EditText
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.browser.customtabs.CustomTabsIntent
@@ -34,6 +35,7 @@ import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.ui.adapter.AccountSubscriptionsAdapter
 import com.v2ray.ang.ui.adapter.PaymentsAdapter
 import com.v2ray.ang.ui.adapter.TariffAdapter
+import com.v2ray.ang.util.AvatarManager
 import com.v2ray.ang.viewmodel.AccountViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -65,6 +67,11 @@ class AccountActivity : BaseActivity() {
 
     private var pendingPayment = false
     private var pollJob: Job? = null
+
+    // Gallery picker for a custom avatar. GetContent grants a one-shot read grant, which is
+    // enough since we copy the bytes into app storage immediately.
+    private val pickAvatar =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri -> onAvatarPicked(uri) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -101,6 +108,8 @@ class AccountActivity : BaseActivity() {
         binding.btnAddDevices.setOnClickListener { doAddDevices() }
         binding.btnCheckPromo.setOnClickListener { doCheckPromo() }
         binding.btnTrial.setOnClickListener { doActivateTrial() }
+        binding.avatarContainer.setOnClickListener { showAvatarOptions() }
+        binding.imgAvatarEdit.setOnClickListener { showAvatarOptions() }
     }
 
     private fun loadAll() {
@@ -135,15 +144,21 @@ class AccountActivity : BaseActivity() {
             binding.tvBalance.text = formatMoney(0.0, "")
             binding.tvReferral.visibility = View.GONE
             binding.btnTrial.visibility = View.GONE
+            AvatarManager.setMonogram(binding.tvAvatarInitial, null)
+            AvatarManager.applyAvatar(lifecycleScope, this, binding.imgAvatar, binding.tvAvatarInitial, null)
             return
         }
-        binding.tvEmail.text = profile.email
-        val tg = profile.telegramUsername
-        if (!tg.isNullOrBlank()) {
-            binding.tvTelegram.text = getString(R.string.account_telegram, tg)
-        } else {
-            binding.tvTelegram.setText(R.string.account_no_telegram)
+        // Primary line = Telegram @nick when linked, otherwise the account e-mail.
+        val uname = profile.telegramUsername?.takeIf { it.isNotBlank() }
+        val primary = uname?.let { "@$it" } ?: profile.email
+        binding.tvEmail.text = primary
+        binding.tvTelegram.text = when {
+            uname != null && profile.email.isNotBlank() -> profile.email
+            uname != null -> getString(R.string.account_telegram, uname)
+            else -> getString(R.string.account_no_telegram)
         }
+        AvatarManager.setMonogram(binding.tvAvatarInitial, primary)
+        AvatarManager.applyAvatar(lifecycleScope, this, binding.imgAvatar, binding.tvAvatarInitial, profile)
         binding.tvBalance.text = formatMoney(profile.balance, profile.currency)
         if (profile.referralCode.isNotBlank()) {
             binding.tvReferral.visibility = View.VISIBLE
@@ -277,6 +292,51 @@ class AccountActivity : BaseActivity() {
         clipboard.setPrimaryClip(ClipData.newPlainText("referral", code))
         toast(R.string.account_referral_copied)
     }
+
+    // region avatar
+
+    private fun showAvatarOptions() {
+        val hasCustom = AvatarManager.hasCustomAvatar(this)
+        val items = if (hasCustom) {
+            arrayOf(getString(R.string.account_avatar_gallery), getString(R.string.account_avatar_remove))
+        } else {
+            arrayOf(getString(R.string.account_avatar_gallery))
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.account_change_avatar)
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> launchAvatarPicker()
+                    1 -> {
+                        AvatarManager.clearCustomAvatar(this)
+                        AvatarManager.applyAvatar(lifecycleScope, this, binding.imgAvatar, binding.tvAvatarInitial, latestProfile)
+                        toast(R.string.account_avatar_updated)
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun launchAvatarPicker() {
+        try {
+            pickAvatar.launch("image/*")
+        } catch (e: ActivityNotFoundException) {
+            toastError(R.string.account_avatar_error)
+        }
+    }
+
+    private fun onAvatarPicked(uri: Uri?) {
+        if (uri == null) return
+        if (AvatarManager.saveCustomAvatar(this, uri)) {
+            AvatarManager.applyAvatar(lifecycleScope, this, binding.imgAvatar, binding.tvAvatarInitial, latestProfile)
+            toast(R.string.account_avatar_updated)
+        } else {
+            toastError(R.string.account_avatar_error)
+        }
+    }
+
+    // endregion
 
     private fun showUpgradeDialog() {
         val active = activeSub

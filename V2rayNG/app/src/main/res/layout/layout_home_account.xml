@@ -123,7 +123,7 @@
         <FrameLayout
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:background="@drawable/bg_icon_blue">
+            android:background="@drawable/bg_avatar_circle">
 
             <TextView
                 android:id="@+id/tv_avatar_initial"
@@ -134,6 +134,15 @@
                 android:textColor="@color/icon_blue"
                 android:textSize="16sp"
                 android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/img_avatar"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:scaleType="centerCrop"
+                android:visibility="gone" />
         </FrameLayout>
 
         <LinearLayout

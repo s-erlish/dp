@@ -42,17 +42,50 @@
                     android:orientation="horizontal">
 
                     <FrameLayout
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
-                        android:background="@drawable/bg_icon_blue">
+                        android:id="@+id/avatar_container"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:clickable="true"
+                        android:contentDescription="@string/account_change_avatar"
+                        android:focusable="true"
+                        android:foreground="?attr/selectableItemBackgroundBorderless">
+
+                        <View
+                            android:layout_width="52dp"
+                            android:layout_height="52dp"
+                            android:layout_gravity="center"
+                            android:background="@drawable/bg_avatar_circle" />
+
+                        <TextView
+                            android:id="@+id/tv_avatar_initial"
+                            android:layout_width="52dp"
+                            android:layout_height="52dp"
+                            android:layout_gravity="center"
+                            android:gravity="center"
+                            android:text="?"
+                            android:textColor="@color/icon_blue"
+                            android:textSize="22sp"
+                            android:textStyle="bold"
+                            tools:ignore="HardcodedText" />
 
                         <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
+                            android:id="@+id/img_avatar"
+                            android:layout_width="52dp"
+                            android:layout_height="52dp"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_acc_wallet"
-                            app:tint="@color/icon_blue" />
+                            android:scaleType="centerCrop"
+                            android:visibility="gone" />
+
+                        <ImageView
+                            android:id="@+id/img_avatar_edit"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="bottom|end"
+                            android:background="@drawable/bg_avatar_edit"
+                            android:importantForAccessibility="no"
+                            android:padding="4dp"
+                            app:srcCompat="@drawable/ic_acc_camera" />
                     </FrameLayout>
 
                     <LinearLayout
