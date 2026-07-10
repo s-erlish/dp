@@ -42,6 +42,8 @@ object BackendConfig {
         const val me = "/client/auth/me"
 
         // Subscription
+        /** The authoritative ACTIVE (root) subscription summary — richer than the /all root item. */
+        const val subscription = "/client/subscription"
         const val subscriptionAll = "/client/subscription/all"
         const val subscriptionQr = "/client/subscription/qr"
         const val upgradeQuote = "/client/subscriptions/upgrade-quote"

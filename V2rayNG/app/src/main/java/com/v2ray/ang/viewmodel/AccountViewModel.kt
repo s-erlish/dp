@@ -8,6 +8,7 @@ import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.dto.PaymentDto
 import com.v2ray.ang.auth.dto.PaymentInitDto
 import com.v2ray.ang.auth.dto.PaymentRequestDto
+import com.v2ray.ang.auth.dto.PrimarySubscriptionDto
 import com.v2ray.ang.auth.dto.PromoDto
 import com.v2ray.ang.auth.dto.PublicConfigDto
 import com.v2ray.ang.auth.dto.ServerStatusDto
@@ -35,6 +36,12 @@ class AccountViewModel : ViewModel() {
 
     private val _subscriptions = MutableStateFlow<List<SubInfoDto>>(emptyList())
     val subscriptions: StateFlow<List<SubInfoDto>> = _subscriptions.asStateFlow()
+
+    // Cache of the last subscription fetch so we can re-merge the synthesized root when the profile
+    // (which supplies the root's auto-renew flag + remnawave uuid) arrives after the sub list.
+    private var lastPrimary: PrimarySubscriptionDto? = null
+    private var lastAll: List<SubInfoDto> = emptyList()
+    private var hasSubData = false
 
     private val _tariffs = MutableStateFlow<List<TariffGroupDto>>(emptyList())
     val tariffs: StateFlow<List<TariffGroupDto>> = _tariffs.asStateFlow()
@@ -70,14 +77,107 @@ class AccountViewModel : ViewModel() {
 
     fun refreshProfile() = viewModelScope.launch {
         repo.refreshProfile()
-            .onSuccess { _profile.value = it }
+            .onSuccess {
+                _profile.value = it
+                // Re-merge so the active/root sub reflects the profile's auto-renew flag + uuid,
+                // even if the profile finished loading after the subscription list.
+                if (hasSubData) _subscriptions.value = mergeSubscriptions(lastPrimary, lastAll, it)
+            }
             .onFailure { report(it) }
     }
 
+    /**
+     * Loads the account's subscriptions for the Account screen. The `/subscription/all` list does
+     * NOT carry the user's primary/active subscription in every case (an account with only a
+     * primary sub and no secondary subs gets `items: []`), which is why the tab used to show
+     * "нет активной подписки" for a genuinely-active account. We therefore ALSO fetch the
+     * authoritative primary subscription (`/client/subscription`) and merge it in, so the active
+     * sub always renders with its real name/expiry/devices/auto-renew state and connect payload.
+     */
     fun loadSubscriptions() = viewModelScope.launch {
-        repo.loadSubscriptions()
-            .onSuccess { _subscriptions.value = it.items }
-            .onFailure { report(it) }
+        val allResult = repo.loadSubscriptions()
+        val primaryResult = repo.loadPrimarySubscription()
+
+        val all = allResult.getOrNull()?.items ?: emptyList()
+        val primary = primaryResult.getOrNull()
+        val merged = mergeSubscriptions(primary, all, _profile.value)
+
+        if (merged.isNotEmpty() || allResult.isSuccess) {
+            lastPrimary = primary
+            lastAll = all
+            hasSubData = true
+            _subscriptions.value = merged
+        } else {
+            // Both calls failed and we have nothing to show: surface the primary error.
+            allResult.exceptionOrNull()?.let { report(it) }
+                ?: primaryResult.exceptionOrNull()?.let { report(it) }
+        }
+    }
+
+    /**
+     * Builds the list the Account screen consumes: the active/root subscription first (enriched
+     * from the primary payload when present), then the secondary subscriptions from `/all`.
+     */
+    private fun mergeSubscriptions(
+        primary: PrimarySubscriptionDto?,
+        all: List<SubInfoDto>,
+        profile: UserProfileDto?,
+    ): List<SubInfoDto> {
+        val rootFromAll = all.firstOrNull { it.type.equals("root", ignoreCase = true) }
+        val secondaries = all.filter { !it.type.equals("root", ignoreCase = true) }
+
+        val activeRoot: SubInfoDto? = when {
+            primary?.hasActiveSubscription() == true -> buildRootSub(primary, rootFromAll, profile)
+            rootFromAll != null -> rootFromAll
+            else -> null
+        }
+        // Dedup by non-blank id (a synthesized root can have a blank id and must be kept).
+        val ordered = listOfNotNull(activeRoot) + secondaries
+        val seen = HashSet<String>()
+        return ordered.filter { it.id.isBlank() || seen.add(it.id) }
+    }
+
+    /**
+     * Synthesizes/enriches the root [SubInfoDto] from the primary payload. Display + connect data
+     * (tariff name, expiry, device limit, subscription URL) come from the primary's raw remnawave
+     * record; the action ids (subscription id for auto-renew, tariff/price-option for renew) live
+     * only on the `/all` root entry; the root's auto-renew flag and remnawave uuid live on the
+     * profile — mirroring how the web cabinet composes the same card.
+     */
+    private fun buildRootSub(
+        primary: PrimarySubscriptionDto,
+        rootFromAll: SubInfoDto?,
+        profile: UserProfileDto?,
+    ): SubInfoDto {
+        val raw = primary.raw()
+        return SubInfoDto(
+            type = "root",
+            // Auto-renew / renew target the id from /all; blank when /all has no root entry.
+            id = rootFromAll?.id.orEmpty(),
+            remnawaveUuid = profile?.remnawaveUuid?.takeIf { it.isNotBlank() }
+                ?: rootFromAll?.remnawaveUuid.orEmpty(),
+            // Carry the raw record so import (subscriptionUrl) and the unlimited-devices check work.
+            subscription = primary.subscription,
+            tariffDisplayName = primary.tariffDisplayName?.takeIf { it.isNotBlank() }
+                ?: rootFromAll?.tariffDisplayName,
+            displayName = rootFromAll?.displayName,
+            defaultLabel = rootFromAll?.defaultLabel,
+            subscriptionIndex = rootFromAll?.subscriptionIndex,
+            tariffId = rootFromAll?.tariffId,
+            tariffPriceOptionId = rootFromAll?.tariffPriceOptionId,
+            deviceCount = rootFromAll?.deviceCount ?: 0,
+            totalDevices = rootFromAll?.totalDevices
+                ?: raw?.hwidDeviceLimit?.takeIf { it > 0 } ?: 0,
+            connectedDevices = rootFromAll?.connectedDevices ?: 0,
+            // The root sub's auto-renew is exposed on the profile (as in the web cabinet).
+            autoRenewEnabled = profile?.autoRenewEnabled ?: rootFromAll?.autoRenewEnabled ?: false,
+            expireAtIso = raw?.expireAt?.takeIf { it.isNotBlank() } ?: rootFromAll?.expireAtIso,
+            isTrial = rootFromAll?.isTrial ?: false,
+            tariffPrice = rootFromAll?.tariffPrice,
+            tariffCurrency = primary.autoRenewCurrency?.takeIf { it.isNotBlank() }
+                ?: rootFromAll?.tariffCurrency,
+            renewalPrice = primary.autoRenewNextChargeAmount ?: rootFromAll?.renewalPrice,
+        )
     }
 
     fun loadTariffs() = viewModelScope.launch {
@@ -174,6 +274,9 @@ class AccountViewModel : ViewModel() {
         AccountSession.wipe()
         _profile.value = null
         _subscriptions.value = emptyList()
+        lastPrimary = null
+        lastAll = emptyList()
+        hasSubData = false
         _payments.value = emptyList()
         _importedGuids.value = emptyList()
     }

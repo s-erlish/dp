@@ -11,6 +11,7 @@ import com.v2ray.ang.auth.dto.PromoDto
 import com.v2ray.ang.auth.dto.PublicConfigDto
 import com.v2ray.ang.auth.dto.ReferralStatsDto
 import com.v2ray.ang.auth.dto.ServerStatusDto
+import com.v2ray.ang.auth.dto.PrimarySubscriptionDto
 import com.v2ray.ang.auth.dto.SubscriptionAllDto
 import com.v2ray.ang.auth.dto.TariffCatalogDto
 import com.v2ray.ang.auth.dto.TelegramCheckResult
@@ -39,6 +40,7 @@ interface DepartamentApiClient {
     suspend fun getMe(): UserProfileDto
 
     // Subscription
+    suspend fun getPrimarySubscription(): PrimarySubscriptionDto
     suspend fun getSubscriptionAll(): SubscriptionAllDto
     suspend fun renameSubscription(scope: String, id: String, name: String)
     suspend fun getSubscriptionQr(remnawaveUuid: String): ByteArray

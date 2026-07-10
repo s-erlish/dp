@@ -24,6 +24,7 @@ import com.v2ray.ang.auth.dto.PublicConfigDto
 import com.v2ray.ang.auth.dto.ReferralStatsDto
 import com.v2ray.ang.auth.dto.RenameRequestDto
 import com.v2ray.ang.auth.dto.ServerStatusDto
+import com.v2ray.ang.auth.dto.PrimarySubscriptionDto
 import com.v2ray.ang.auth.dto.SubscriptionAllDto
 import com.v2ray.ang.auth.dto.TariffCatalogDto
 import com.v2ray.ang.auth.dto.TelegramCheckResponseDto
@@ -161,6 +162,9 @@ class DepartamentApiClientImpl(
     // endregion
 
     // region subscription
+
+    override suspend fun getPrimarySubscription(): PrimarySubscriptionDto =
+        getJson(BackendConfig.Endpoints.subscription, PrimarySubscriptionDto::class.java)
 
     override suspend fun getSubscriptionAll(): SubscriptionAllDto =
         getJson(BackendConfig.Endpoints.subscriptionAll, SubscriptionAllDto::class.java)

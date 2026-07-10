@@ -70,7 +70,22 @@ data class PrimarySubscriptionDto(
     val autoRenewNextChargeAt: String? = null,
     val autoRenewCurrency: String? = null,
     val message: String? = null,
-)
+) {
+    /** The raw remnawave record for the active subscription, if any. */
+    fun raw(): RawSubDto? = subscription?.raw()
+
+    /**
+     * True when this payload actually carries an active subscription. When the account has none
+     * the backend returns an empty `subscription` and only a [message], so we key off the raw
+     * record having any real content (connect URL / expiry / status) or a tariff name.
+     */
+    fun hasActiveSubscription(): Boolean {
+        val r = raw()
+        val rawHasContent = r != null &&
+            (r.subscriptionUrl.isNotBlank() || !r.expireAt.isNullOrBlank() || !r.status.isNullOrBlank())
+        return rawHasContent || !tariffDisplayName.isNullOrBlank()
+    }
+}
 
 /**
  * Wrapper around the Remnawave subscription payload. The backend nests the raw record under
@@ -93,9 +108,14 @@ data class RawSubDto(
     val subscriptionUrl: String = "",
     val hwidDeviceLimit: Int = 0,
     val trafficLimitBytes: Long? = null,
+    // Some payloads carry the used traffic flat as `trafficUsed` instead of userTraffic.usedTrafficBytes.
+    val trafficUsed: Long? = null,
     val userTraffic: UserTrafficDto = UserTrafficDto(),
     val expireAt: String? = null,
     val status: String? = null,
+    // Friendly names the backend sometimes attaches to the raw record.
+    val productName: String? = null,
+    val subscriptionProductName: String? = null,
 ) {
     /** trafficLimitBytes == null means an unlimited traffic plan. */
     fun isUnlimitedTraffic(): Boolean = trafficLimitBytes == null

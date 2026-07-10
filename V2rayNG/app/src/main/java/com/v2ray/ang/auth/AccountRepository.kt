@@ -5,6 +5,7 @@ import com.v2ray.ang.auth.dto.PaymentInitDto
 import com.v2ray.ang.auth.dto.PaymentRequestDto
 import com.v2ray.ang.auth.dto.PaymentResultDto
 import com.v2ray.ang.auth.dto.PaymentsDto
+import com.v2ray.ang.auth.dto.PrimarySubscriptionDto
 import com.v2ray.ang.auth.dto.PromoDto
 import com.v2ray.ang.auth.dto.PublicConfigDto
 import com.v2ray.ang.auth.dto.ReferralStatsDto
@@ -73,6 +74,8 @@ class AccountRepository(
     }
 
     // Subscriptions
+    /** The authoritative ACTIVE (root) subscription — /all often returns no root item. */
+    suspend fun loadPrimarySubscription(): Result<PrimarySubscriptionDto> = guard { api.getPrimarySubscription() }
     suspend fun loadSubscriptions(): Result<SubscriptionAllDto> = guard { api.getSubscriptionAll() }
 
     /**

@@ -208,6 +208,10 @@ class AccountFragment : Fragment() {
 
         // Auto-renew — set state without firing the click handler for programmatic changes.
         binding.switchAutoRenew.isChecked = sub.autoRenewEnabled
+        // The toggle PATCHes /client/secondary-subscriptions/{id}/auto-renew, so it needs a real
+        // subscription id. A primary sub synthesized purely from /client/subscription (when /all
+        // has no root entry) has no such id — reflect state but disable the toggle in that case.
+        binding.switchAutoRenew.isEnabled = sub.id.isNotBlank()
     }
 
     private fun renderError(error: ApiError?) {
@@ -267,6 +271,11 @@ class AccountFragment : Fragment() {
     // region actions
 
     private fun onAutoRenewToggled(sub: SubInfoDto, checked: Boolean) {
+        if (sub.id.isBlank()) {
+            // No real subscription id to target — revert the visual toggle and bail.
+            binding.switchAutoRenew.isChecked = sub.autoRenewEnabled
+            return
+        }
         viewModel.toggleAutoRenew(sub.id, checked) { viewModel.loadSubscriptions() }
     }
 
