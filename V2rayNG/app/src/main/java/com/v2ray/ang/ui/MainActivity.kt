@@ -2190,9 +2190,11 @@ class MainActivity : HelperBaseActivity() {
         s.rowMode.setOnClickListener { pickMode() }
         s.rowPerApp.setOnClickListener { requestActivityLauncher.launch(Intent(this, PerAppProxyActivity::class.java)) }
         s.rowBypassLan.setOnClickListener { toggleBypassLan() }
+        s.rowIpv6.setOnClickListener { toggleIpv6() }
         s.rowDns.setOnClickListener { editDns() }
         s.rowPingMethod.setOnClickListener { pickPingMethod() }
         s.rowLocalProxy.setOnClickListener { startActivity(Intent(this, LocalProxyActivity::class.java)) }
+        s.rowAlwaysOn.setOnClickListener { openAlwaysOnSettings() }
 
         // ОБХОД БЛОКИРОВОК
         s.rowMux.setOnClickListener { toggleMux() }
@@ -2200,8 +2202,7 @@ class MainActivity : HelperBaseActivity() {
         s.rowFragment.setOnClickListener { toggleFragment() }
 
         // ИНТЕРФЕЙС
-        s.rowThemeDark.setOnClickListener { toggleDarkTheme() }
-        s.rowThemeMono.setOnClickListener { toggleMono() }
+        s.rowAppearance.setOnClickListener { pickAppearance() }
         s.rowLanguage.setOnClickListener { pickLanguage() }
         s.rowBoot.setOnClickListener { toggleStartOnBoot() }
 
@@ -2258,6 +2259,7 @@ class MainActivity : HelperBaseActivity() {
         s.valueSubAutoUpdate.text = currentSubAutoUpdateLabel()
 
         s.switchBypassLan.isChecked = isBypassLanOn()
+        s.switchIpv6.isChecked = MmkvManager.decodeSettingsBool(AppConfig.PREF_IPV6_ENABLED, false)
 
         val muxOn = MmkvManager.decodeSettingsBool(AppConfig.PREF_MUX_ENABLED, false)
         s.switchMux.isChecked = muxOn
@@ -2265,16 +2267,14 @@ class MainActivity : HelperBaseActivity() {
         s.dividerConcurrency.isVisible = muxOn
 
         s.switchFragment.isChecked = MmkvManager.decodeSettingsBool(AppConfig.PREF_FRAGMENT_ENABLED, false)
-        s.switchThemeDark.isChecked = isDarkThemeOn()
-        s.switchThemeMono.isChecked = isMonoOn()
+        s.valueAppearance.text = getString(
+            if (isMonoOn()) R.string.settings_appearance_mono else R.string.settings_appearance_dark
+        )
         s.switchBoot.isChecked = MmkvManager.decodeStartOnBoot()
     }
 
     private fun isBypassLanOn(): Boolean =
         MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_BYPASS_LAN, "1") != "2"
-
-    private fun isDarkThemeOn(): Boolean =
-        MmkvManager.decodeSettingsString(AppConfig.PREF_UI_MODE_NIGHT, "2") != "1"
 
     private fun isMonoOn(): Boolean =
         MmkvManager.decodeSettingsString(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_BLUE) == BaseActivity.THEME_MONO
@@ -2369,6 +2369,28 @@ class MainActivity : HelperBaseActivity() {
         restartIfRunning()
     }
 
+    private fun toggleIpv6() {
+        val enabled = !MmkvManager.decodeSettingsBool(AppConfig.PREF_IPV6_ENABLED, false)
+        MmkvManager.encodeSettings(AppConfig.PREF_IPV6_ENABLED, enabled)
+        binding.groupSettings.switchIpv6.isChecked = enabled
+        restartIfRunning()
+    }
+
+    /**
+     * Deep-links into the system VPN settings screen where the user enables Android's
+     * built-in "Always-on VPN" and "Block connections without VPN" (kill-switch). This is a
+     * system-level toggle — the app only provides the shortcut and a one-line explainer.
+     */
+    private fun openAlwaysOnSettings() {
+        toast(getString(R.string.settings_always_on_hint))
+        try {
+            startActivity(Intent(android.provider.Settings.ACTION_VPN_SETTINGS))
+        } catch (e: Exception) {
+            LogUtil.e(AppConfig.TAG, "Failed to open system VPN settings", e)
+            toastError(R.string.toast_failure)
+        }
+    }
+
     /** Maps a stored DNS value to its friendly preset name, or returns the raw value. */
     private fun dnsLabel(value: String): String {
         val names = resources.getStringArray(R.array.dns_preset_names)
@@ -2396,7 +2418,11 @@ class MainActivity : HelperBaseActivity() {
                 if (which == customIdx) {
                     editDnsCustom(current)
                 } else {
+                    // Write both the tun DNS (PREF_VPN_DNS) and the proxied-lookup DNS
+                    // (PREF_REMOTE_DNS, read by SettingsManager.getRemoteDnsServers), so
+                    // picking a preset like Cloudflare applies to proxied resolution too.
                     MmkvManager.encodeSettings(AppConfig.PREF_VPN_DNS, values[which])
+                    MmkvManager.encodeSettings(AppConfig.PREF_REMOTE_DNS, values[which])
                     bindSettingsState()
                     restartIfRunning()
                 }
@@ -2418,6 +2444,7 @@ class MainActivity : HelperBaseActivity() {
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 val value = input.text.toString().trim().ifEmpty { AppConfig.DNS_VPN }
                 MmkvManager.encodeSettings(AppConfig.PREF_VPN_DNS, value)
+                MmkvManager.encodeSettings(AppConfig.PREF_REMOTE_DNS, value)
                 bindSettingsState()
                 restartIfRunning()
             }
@@ -2461,22 +2488,35 @@ class MainActivity : HelperBaseActivity() {
         restartIfRunning()
     }
 
-    private fun toggleDarkTheme() {
-        val dark = !isDarkThemeOn()
-        MmkvManager.encodeSettings(AppConfig.PREF_UI_MODE_NIGHT, if (dark) "2" else "1")
-        // AppCompat applies the night mode and recreates the activity to reflect it
-        // (same path the legacy settings screen relies on).
-        SettingsManager.setNightMode()
-    }
-
-    private fun toggleMono() {
-        val mono = !isMonoOn()
-        MmkvManager.encodeSettings(
-            AppConfig.PREF_COLOR_THEME,
-            if (mono) BaseActivity.THEME_MONO else BaseActivity.THEME_BLUE
+    /**
+     * "Оформление" picker. Incy is a dark-only interface, so there is no light path: the
+     * night mode is pinned to MODE_NIGHT_YES ("2") and the picker only switches the colour
+     * palette between the blue accent ("Тёмная") and the monochrome overlay ("Чёрно-белая").
+     */
+    private fun pickAppearance() {
+        val entries = arrayOf(
+            getString(R.string.settings_appearance_dark),
+            getString(R.string.settings_appearance_mono),
         )
-        // The mono overlay is applied in BaseActivity.onCreate, so recreate to pick it up.
-        recreate()
+        val idx = if (isMonoOn()) 1 else 0
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_appearance)
+            .setSingleChoiceItems(entries, idx) { dialog, which ->
+                dialog.dismiss()
+                // Never leave the dark path: force MODE_NIGHT_YES regardless of choice.
+                MmkvManager.encodeSettings(AppConfig.PREF_UI_MODE_NIGHT, "2")
+                val mono = which == 1
+                if (mono != isMonoOn()) {
+                    MmkvManager.encodeSettings(
+                        AppConfig.PREF_COLOR_THEME,
+                        if (mono) BaseActivity.THEME_MONO else BaseActivity.THEME_BLUE
+                    )
+                    // The mono overlay is applied in BaseActivity.onCreate, so recreate to pick it up.
+                    recreate()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun pickLanguage() {
@@ -2530,6 +2570,12 @@ class MainActivity : HelperBaseActivity() {
      * takes effect immediately. Minutes are stored so the home meta-bar can read the value.
      */
     private fun pickSubAutoUpdate() {
+        // With no subscriptions the interval has nothing to apply to, so the picker would
+        // silently no-op. Tell the user to add one first instead.
+        if (MmkvManager.decodeSubscriptions().isEmpty()) {
+            toast(getString(R.string.settings_sub_auto_update_empty))
+            return
+        }
         val entries = subAutoUpdateValues.map { subAutoUpdateLabel(it) }.toTypedArray()
         val active = MmkvManager.decodeSubscriptions().firstOrNull { it.subscription.autoUpdate }
         val currentMinutes = if (active == null) 0L else active.subscription.updateInterval
