@@ -9,8 +9,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
-import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.lifecycle.lifecycleScope
@@ -24,7 +24,12 @@ import com.v2ray.ang.auth.dto.PaymentRequestDto
 import com.v2ray.ang.auth.dto.PriceOptionDto
 import com.v2ray.ang.auth.dto.TariffDto
 import com.v2ray.ang.auth.dto.TariffGroupDto
+import com.v2ray.ang.extension.toast
+import com.v2ray.ang.extension.toastError
+import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.viewmodel.AccountViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -55,6 +60,17 @@ class BuyTariffActivity : BaseActivity() {
     // "Ошибка оплаты" diagnostic dialog (with the real backend detail), not be swallowed.
     private var awaitingPaymentError = false
 
+    // True once the catalog request has completed at least once, so an empty list can be
+    // distinguished from "still loading" (otherwise an empty catalog spins forever).
+    private var loaded = false
+
+    // A browser checkout was just launched: on return we re-poll for the webhook-confirmed result.
+    private var pendingPayment = false
+    private var pollJob: Job? = null
+
+    private lateinit var progressBuy: ProgressBar
+    private lateinit var btnRetry: MaterialButton
+    private lateinit var tvPending: TextView
     private lateinit var stateView: TextView
     private lateinit var tariffsHeader: TextView
     private lateinit var tariffsContainer: LinearLayout
@@ -71,6 +87,9 @@ class BuyTariffActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         setContentViewWithToolbar(R.layout.activity_buy_tariff, title = getString(R.string.buy_title))
 
+        progressBuy = findViewById(R.id.progress_buy)
+        btnRetry = findViewById(R.id.btn_retry)
+        tvPending = findViewById(R.id.tv_pending)
         stateView = findViewById(R.id.tv_state)
         tariffsHeader = findViewById(R.id.tv_tariffs_header)
         tariffsContainer = findViewById(R.id.ll_tariffs)
@@ -86,26 +105,30 @@ class BuyTariffActivity : BaseActivity() {
         btnDevMinus.setOnClickListener { changeExtraDevices(-1) }
         btnDevPlus.setOnClickListener { changeExtraDevices(+1) }
         btnPay.setOnClickListener { onPayClicked() }
-
-        showState(getString(R.string.buy_loading))
-
-        viewModel.loadTariffs()
-        viewModel.loadPublicConfig()
-        viewModel.refreshProfile()
+        btnRetry.setOnClickListener { reload() }
 
         observe()
+        reload()
+    }
+
+    /** (Re)fetch the catalog + payment config, showing the loading state until the first result. */
+    private fun reload() {
+        loaded = false
+        viewModel.clearError()
+        showLoading()
+        lifecycleScope.launch {
+            viewModel.loadTariffs().join()
+            loaded = true
+            renderState()
+        }
+        viewModel.loadPublicConfig()
+        viewModel.refreshProfile()
     }
 
     private fun observe() {
         lifecycleScope.launch {
             viewModel.tariffs.combine(viewModel.error) { tariffs, error -> tariffs to error }
-                .collect { (tariffs, error) ->
-                    when {
-                        tariffs.isNotEmpty() -> renderTariffs(tariffs)
-                        error != null -> showState(getString(R.string.buy_error))
-                        else -> showState(getString(R.string.buy_loading))
-                    }
-                }
+                .collect { renderState() }
         }
         // Surface payment failures. Without this the СБП/balance flow "does nothing" on error —
         // the request fails silently in the ViewModel and the user never learns why.
@@ -122,23 +145,60 @@ class BuyTariffActivity : BaseActivity() {
 
     // region rendering
 
-    private fun showState(message: String?) {
-        if (message == null) {
-            stateView.visibility = View.GONE
-        } else {
-            stateView.text = message
-            stateView.visibility = View.VISIBLE
+    /**
+     * Single source of truth for the catalog state. An empty list is only "unavailable" once
+     * [loaded] is set — before the first result completes it still reads as "loading", so an
+     * empty catalog no longer spins forever.
+     */
+    private fun renderState() {
+        val tariffs = viewModel.tariffs.value
+        val error = viewModel.error.value
+        val hasAny = tariffs.any { it.tariffs.isNotEmpty() }
+        when {
+            hasAny -> renderTariffs(tariffs)
+            error != null -> showError()
+            loaded -> showEmpty()
+            else -> showLoading()
         }
+    }
+
+    private fun showLoading() {
+        progressBuy.visibility = View.VISIBLE
+        btnRetry.visibility = View.GONE
+        stateView.text = getString(R.string.buy_loading)
+        stateView.visibility = View.VISIBLE
+        tariffsHeader.visibility = View.GONE
+    }
+
+    private fun showError() {
+        progressBuy.visibility = View.GONE
+        btnRetry.visibility = View.VISIBLE
+        stateView.text = getString(R.string.buy_error)
+        stateView.visibility = View.VISIBLE
+        tariffsHeader.visibility = View.GONE
+    }
+
+    private fun showEmpty() {
+        progressBuy.visibility = View.GONE
+        btnRetry.visibility = View.GONE
+        stateView.text = getString(R.string.buy_empty)
+        stateView.visibility = View.VISIBLE
+        tariffsHeader.visibility = View.GONE
+    }
+
+    private fun hideState() {
+        progressBuy.visibility = View.GONE
+        btnRetry.visibility = View.GONE
+        stateView.visibility = View.GONE
     }
 
     private fun renderTariffs(groups: List<TariffGroupDto>) {
         val hasAny = groups.any { it.tariffs.isNotEmpty() }
         if (!hasAny) {
-            showState(getString(R.string.buy_empty))
-            tariffsHeader.visibility = View.GONE
+            showEmpty()
             return
         }
-        showState(null)
+        hideState()
         tariffsHeader.visibility = View.VISIBLE
 
         // Rebuild once; selection is then mutated in place.
@@ -290,6 +350,12 @@ class BuyTariffActivity : BaseActivity() {
 
     private fun renderExtraDevices(tariff: TariffDto) {
         tvExtraCount.text = getString(R.string.buy_extra_devices_count, extraDevices)
+
+        // Make the stepper bounds visible: dim + disable the button that can't move further.
+        val max = maxOf(0, tariff.maxExtraDevices)
+        setStepperEnabled(btnDevMinus, extraDevices > 0)
+        setStepperEnabled(btnDevPlus, extraDevices < max)
+
         val cost = extraDevices * tariff.pricePerExtraDevice
         if (extraDevices > 0 && cost > 0.0) {
             tvExtraCost.text = getString(
@@ -323,7 +389,7 @@ class BuyTariffActivity : BaseActivity() {
 
         val methods = viewModel.publicConfig.value?.plategaMethods?.map { it.id to it.label } ?: emptyList()
         if (methods.isEmpty()) {
-            toast(getString(R.string.buy_no_methods))
+            toastError(getString(R.string.buy_no_methods))
             return
         }
 
@@ -353,7 +419,7 @@ class BuyTariffActivity : BaseActivity() {
             )
             viewModel.payWithBalance(req) {
                 awaitingPaymentError = false
-                toast(getString(R.string.buy_success))
+                toastSuccess(getString(R.string.buy_success))
                 finish()
             }
         } else {
@@ -406,18 +472,46 @@ class BuyTariffActivity : BaseActivity() {
     private fun openCheckout(init: PaymentInitDto) {
         val url = init.paymentUrl
         if (url.isBlank()) {
-            toast(getString(R.string.buy_no_browser))
+            toastError(getString(R.string.buy_no_browser))
             return
         }
         val uri = Uri.parse(url)
+        pendingPayment = true
         try {
             CustomTabsIntent.Builder().build().launchUrl(this, uri)
+            toast(getString(R.string.buy_checkout_return))
         } catch (e: ActivityNotFoundException) {
             try {
                 startActivity(Intent(Intent.ACTION_VIEW, uri))
+                toast(getString(R.string.buy_checkout_return))
             } catch (e2: ActivityNotFoundException) {
-                toast(getString(R.string.buy_no_browser))
+                pendingPayment = false
+                toastError(getString(R.string.buy_no_browser))
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (pendingPayment) startPaymentPolling()
+    }
+
+    /**
+     * After returning from a browser checkout, re-poll profile/subscriptions a few times over ~40s
+     * while showing a pending hint. The backend only confirms PAID via webhook, so the tab returning
+     * proves nothing — mirrors [AccountFragment.startPaymentPolling].
+     */
+    private fun startPaymentPolling() {
+        if (pollJob?.isActive == true) return
+        tvPending.visibility = View.VISIBLE
+        pollJob = lifecycleScope.launch {
+            repeat(5) {
+                viewModel.refreshProfile()
+                viewModel.loadSubscriptions()
+                delay(8000L)
+            }
+            pendingPayment = false
+            tvPending.visibility = View.GONE
         }
     }
 
@@ -441,8 +535,9 @@ class BuyTariffActivity : BaseActivity() {
     private fun optionKey(option: PriceOptionDto): String =
         option.id.ifBlank { "${option.durationDays}/${option.price}" }
 
-    private fun toast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    private fun setStepperEnabled(button: MaterialButton, enabled: Boolean) {
+        button.isEnabled = enabled
+        button.alpha = if (enabled) 1f else 0.4f
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()

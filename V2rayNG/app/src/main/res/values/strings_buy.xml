@@ -35,8 +35,13 @@
     <string name="buy_loading">Загрузка тарифов…</string>
     <string name="buy_empty">Тарифы недоступны</string>
     <string name="buy_error">Не удалось загрузить тарифы. Проверьте соединение и повторите.</string>
+    <string name="buy_retry">Повторить</string>
     <string name="buy_select_option_first">Выберите срок подписки</string>
     <string name="buy_success">Подписка оплачена</string>
     <string name="buy_no_browser">Не удалось открыть страницу оплаты</string>
     <string name="buy_no_methods">Способы оплаты недоступны</string>
+
+    <!-- Post-checkout feedback -->
+    <string name="buy_checkout_return">Завершите оплату в браузере</string>
+    <string name="buy_pending">Платёж обрабатывается…</string>
 </resources>

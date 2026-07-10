@@ -20,6 +20,16 @@
         android:paddingBottom="24dp">
 
         <!-- ============ States ============ -->
+        <ProgressBar
+            android:id="@+id/progress_buy"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="32dp"
+            android:indeterminateTint="?attr/colorPrimary"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
         <TextView
             android:id="@+id/tv_state"
             android:layout_width="match_parent"
@@ -31,6 +41,35 @@
             android:textSize="14sp"
             android:visibility="gone"
             tools:text="Загрузка тарифов…"
+            tools:visibility="visible" />
+
+        <!-- Retry affordance for the error state -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_retry"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="8dp"
+            android:text="@string/buy_retry"
+            android:textAllCaps="false"
+            app:cornerRadius="22dp"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <!-- Post-checkout pending hint: shown while re-polling after a browser payment -->
+        <TextView
+            android:id="@+id/tv_pending"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:padding="12dp"
+            android:textAlignment="center"
+            android:text="@string/buy_pending"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="14sp"
+            android:visibility="gone"
             tools:visibility="visible" />
 
         <!-- ============ 1. Tariffs ============ -->
@@ -92,7 +131,7 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_acc_devices"
-                            app:tint="@color/icon_blue" />
+                            app:tint="?attr/colorPrimary" />
                     </FrameLayout>
 
                     <LinearLayout
@@ -138,7 +177,7 @@
                         app:iconGravity="textStart"
                         app:iconPadding="0dp"
                         app:iconSize="20dp"
-                        app:iconTint="@color/icon_blue" />
+                        app:iconTint="?attr/colorPrimary" />
 
                     <TextView
                         android:id="@+id/tv_extra_devices_count"
@@ -169,7 +208,7 @@
                         app:iconGravity="textStart"
                         app:iconPadding="0dp"
                         app:iconSize="20dp"
-                        app:iconTint="@color/icon_blue" />
+                        app:iconTint="?attr/colorPrimary" />
                 </LinearLayout>
 
                 <View
@@ -199,7 +238,7 @@
                         android:id="@+id/tv_total"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:textColor="@color/icon_blue"
+                        android:textColor="?attr/colorPrimary"
                         android:textSize="24sp"
                         android:textStyle="bold"
                         tools:text="299 ₽" />
