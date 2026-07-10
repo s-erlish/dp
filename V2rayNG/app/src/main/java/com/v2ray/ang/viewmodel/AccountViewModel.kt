@@ -2,6 +2,7 @@ package com.v2ray.ang.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.v2ray.ang.auth.AccountCache
 import com.v2ray.ang.auth.AccountRepository
 import com.v2ray.ang.auth.AccountSession
 import com.v2ray.ang.auth.ApiError
@@ -15,6 +16,7 @@ import com.v2ray.ang.auth.dto.ServerStatusDto
 import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.auth.dto.TariffGroupDto
 import com.v2ray.ang.auth.dto.UserProfileDto
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,6 +44,11 @@ class AccountViewModel : ViewModel() {
     private var lastPrimary: PrimarySubscriptionDto? = null
     private var lastAll: List<SubInfoDto> = emptyList()
     private var hasSubData = false
+
+    // Single-flight ownership for subscription loads: [loadSubscriptions] is polled every ~8s and
+    // must not race an older in-flight load and publish stale state. Cancel the previous before
+    // launching the next (latest-wins).
+    private var subsJob: Job? = null
 
     private val _tariffs = MutableStateFlow<List<TariffGroupDto>>(emptyList())
     val tariffs: StateFlow<List<TariffGroupDto>> = _tariffs.asStateFlow()
@@ -94,7 +101,20 @@ class AccountViewModel : ViewModel() {
      * authoritative primary subscription (`/client/subscription`) and merge it in, so the active
      * sub always renders with its real name/expiry/devices/auto-renew state and connect payload.
      */
-    fun loadSubscriptions() = viewModelScope.launch {
+    fun loadSubscriptions() {
+        // Latest-wins: cancel any in-flight load before starting a new one so a slow older request
+        // can't finish late and publish stale state over a newer one.
+        subsJob?.cancel()
+        subsJob = viewModelScope.launch { fetchAndApplySubscriptions() }
+    }
+
+    /**
+     * Fetches `/subscription/all` plus the authoritative primary subscription and publishes the
+     * merged list via [applyMerged]. The single code path shared by the polled [loadSubscriptions]
+     * and [autoImportSubscriptions], so both always render the active/primary sub (never the raw
+     * un-merged `/all` list, and never a "нет активной подписки" flash).
+     */
+    private suspend fun fetchAndApplySubscriptions() {
         val allResult = repo.loadSubscriptions()
         val primaryResult = repo.loadPrimarySubscription()
 
@@ -103,15 +123,28 @@ class AccountViewModel : ViewModel() {
         val merged = mergeSubscriptions(primary, all, _profile.value)
 
         if (merged.isNotEmpty() || allResult.isSuccess) {
-            lastPrimary = primary
-            lastAll = all
-            hasSubData = true
-            _subscriptions.value = merged
+            applyMerged(primary, all, _profile.value)
         } else {
             // Both calls failed and we have nothing to show: surface the primary error.
             allResult.exceptionOrNull()?.let { report(it) }
                 ?: primaryResult.exceptionOrNull()?.let { report(it) }
         }
+    }
+
+    /**
+     * The single place that publishes the displayed subscription list: caches the inputs
+     * ([lastPrimary]/[lastAll]/[hasSubData]) so [refreshProfile] can re-merge later, and pushes the
+     * merged list to [subscriptions].
+     */
+    private fun applyMerged(
+        primary: PrimarySubscriptionDto?,
+        all: List<SubInfoDto>,
+        profile: UserProfileDto?,
+    ) {
+        lastPrimary = primary
+        lastAll = all
+        hasSubData = true
+        _subscriptions.value = mergeSubscriptions(primary, all, profile)
     }
 
     /**
@@ -227,7 +260,9 @@ class AccountViewModel : ViewModel() {
                 onImported(it)
             }
             .onFailure { report(it) }
-        repo.loadSubscriptions().onSuccess { _subscriptions.value = it.items }
+        // Publish through the same merge path as loadSubscriptions so the active/primary sub
+        // renders (never the raw un-merged /all list) and lastPrimary/lastAll/hasSubData stay set.
+        fetchAndApplySubscriptions()
         _loading.value = false
     }
 
@@ -304,6 +339,11 @@ class AccountViewModel : ViewModel() {
 
     fun logout() {
         AccountSession.wipe()
+        // Hard reset: clear the in-memory cache eagerly rather than relying only on the lazy
+        // logged-out clear on next read, and stop any in-flight subscription load.
+        AccountCache.invalidateAll()
+        subsJob?.cancel()
+        subsJob = null
         _profile.value = null
         _subscriptions.value = emptyList()
         lastPrimary = null

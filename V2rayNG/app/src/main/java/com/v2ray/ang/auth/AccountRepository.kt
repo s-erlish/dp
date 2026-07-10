@@ -14,6 +14,7 @@ import com.v2ray.ang.auth.dto.SubscriptionAllDto
 import com.v2ray.ang.auth.dto.TariffCatalogDto
 import com.v2ray.ang.auth.dto.UpgradeQuoteDto
 import com.v2ray.ang.auth.dto.UserProfileDto
+import kotlinx.coroutines.CancellationException
 
 /**
  * Coroutine wrapper over [DepartamentApiClient] that returns [Result] instead of throwing, maps
@@ -42,6 +43,10 @@ class AccountRepository(
             Result.success(block())
         } catch (e: ApiError) {
             Result.failure(e)
+        } catch (e: CancellationException) {
+            // Coroutine cancellation (e.g. the screen closed mid-request) is not a real failure —
+            // never convert it to ApiError.Network; rethrow so structured concurrency unwinds.
+            throw e
         } catch (e: Exception) {
             Result.failure(ApiError.Network(e))
         }
@@ -68,6 +73,9 @@ class AccountRepository(
             Result.failure(e)
         } catch (e: ApiError) {
             Result.failure(e)
+        } catch (e: CancellationException) {
+            // Cancellation is not an auth failure — do NOT wipe the session; rethrow to unwind.
+            throw e
         } catch (e: Exception) {
             Result.failure(ApiError.Network(e))
         }
