@@ -24,7 +24,8 @@
         android:paddingStart="6dp"
         android:paddingTop="5dp"
         android:paddingEnd="10dp"
-        android:paddingBottom="5dp">
+        android:paddingBottom="5dp"
+        android:stateListAnimator="@anim/press_scale">
 
         <!-- Selection indicator: the side-stripe is retired (impeccable Absolute Ban:
              no side-stripe > 1px). Selection is carried by bg_server_row's full blue

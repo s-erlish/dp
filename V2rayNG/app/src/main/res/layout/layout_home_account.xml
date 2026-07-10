@@ -42,6 +42,7 @@
             android:paddingTop="@dimen/space_8"
             android:paddingEnd="@dimen/space_4"
             android:paddingBottom="@dimen/space_8"
+            android:stateListAnimator="@anim/press_scale"
             android:visibility="gone">
 
             <ImageView
@@ -88,6 +89,7 @@
         android:paddingTop="@dimen/space_8"
         android:paddingEnd="@dimen/space_12"
         android:paddingBottom="@dimen/space_8"
+        android:stateListAnimator="@anim/press_scale"
         android:visibility="gone">
 
         <FrameLayout

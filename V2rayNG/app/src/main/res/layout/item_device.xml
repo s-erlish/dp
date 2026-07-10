@@ -5,6 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="@dimen/space_8"
+    android:stateListAnimator="@anim/press_scale"
     app:cardBackgroundColor="?attr/colorSurface"
     app:cardCornerRadius="@dimen/radius_card"
     app:cardElevation="0dp"

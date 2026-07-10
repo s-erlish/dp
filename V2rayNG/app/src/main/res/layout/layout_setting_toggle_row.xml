@@ -10,7 +10,8 @@
     android:orientation="horizontal"
     android:paddingStart="@dimen/space_16"
     android:paddingEnd="@dimen/space_16"
-    android:paddingVertical="@dimen/space_12">
+    android:paddingVertical="@dimen/space_12"
+    android:stateListAnimator="@anim/press_scale">
 
     <FrameLayout
         android:id="@+id/setting_icon_bg"

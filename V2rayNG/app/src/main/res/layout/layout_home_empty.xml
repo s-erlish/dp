@@ -41,6 +41,7 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_home_add_qr"
+            android:stateListAnimator="@anim/press_scale"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_24"
@@ -50,6 +51,7 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_home_add_clipboard"
+            android:stateListAnimator="@anim/press_scale"
             style="@style/Widget.Material3.Button.OutlinedButton.Icon"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -63,6 +65,7 @@
              GONE by default so the signed-out onboarding is unchanged. -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_home_buy"
+            android:stateListAnimator="@anim/press_scale"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_24"
@@ -72,6 +75,7 @@
         <!-- Offered alongside the buy CTA only when the account's Telegram is not yet linked. -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_home_link_tg"
+            android:stateListAnimator="@anim/press_scale"
             style="@style/Widget.Material3.Button.OutlinedButton.Icon"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -101,6 +105,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_home_login_tg"
+                android:stateListAnimator="@anim/press_scale"
                 style="@style/Widget.Material3.Button.TonalButton.Icon"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
@@ -117,6 +122,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_home_login_site"
+                android:stateListAnimator="@anim/press_scale"
                 style="@style/Widget.Material3.Button.OutlinedButton.Icon"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

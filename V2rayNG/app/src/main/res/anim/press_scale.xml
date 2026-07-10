@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Universal press feedback for large tappable targets (rows, cards, buttons):
+     NO ripple/glow change. The target scales down slightly under the finger
+     (state_pressed) and eases back to 1.0 on release. Generalizes the bottom-nav
+     nav_press pattern, but 0.96 (subtler) since these targets are large, and uses
+     the shared motion tokens: press-in is quick (motion_press_in), release is a
+     softer settle (motion_press_out), both ease-out only. Reduced motion: when
+     ANIMATOR_DURATION_SCALE == 0 the system runs these at 0ms, so the view snaps
+     to the end scale with no visible animation.
+     Apply via android:stateListAnimator on the primary tappable view. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <set>
+            <objectAnimator
+                android:duration="@integer/motion_press_in"
+                android:interpolator="@interpolator/ease_out_quart"
+                android:propertyName="scaleX"
+                android:valueTo="0.96"
+                android:valueType="floatType" />
+            <objectAnimator
+                android:duration="@integer/motion_press_in"
+                android:interpolator="@interpolator/ease_out_quart"
+                android:propertyName="scaleY"
+                android:valueTo="0.96"
+                android:valueType="floatType" />
+        </set>
+    </item>
+    <item>
+        <set>
+            <objectAnimator
+                android:duration="@integer/motion_press_out"
+                android:interpolator="@interpolator/ease_out_quart"
+                android:propertyName="scaleX"
+                android:valueTo="1.0"
+                android:valueType="floatType" />
+            <objectAnimator
+                android:duration="@integer/motion_press_out"
+                android:interpolator="@interpolator/ease_out_quart"
+                android:propertyName="scaleY"
+                android:valueTo="1.0"
+                android:valueType="floatType" />
+        </set>
+    </item>
+</selector>
