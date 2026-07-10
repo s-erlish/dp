@@ -7,6 +7,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.v2ray.ang.R
+import com.v2ray.ang.auth.AccountCache
 import com.v2ray.ang.auth.AccountRepository
 import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.dto.DeviceDto
@@ -53,7 +54,26 @@ class DeviceManagementActivity : BaseActivity() {
         loadDevices()
     }
 
-    private fun loadDevices() {
+    /**
+     * Loads the device list. Unless [forceRefresh] is set, a fresh (< 1h) list already in
+     * [AccountCache] for the resolved UUID is rendered immediately without any network call, so
+     * re-entering the screen while logged in doesn't re-fetch. [forceRefresh] (used after a delete)
+     * bypasses the cache and repopulates it from the network.
+     */
+    private fun loadDevices(forceRefresh: Boolean = false) {
+        // Fast path: UUID already known (e.g. passed via intent) and a fresh cached list exists —
+        // render from memory, no coroutine, no network.
+        if (!forceRefresh) {
+            val knownUuid = remnawaveUuid
+            if (!knownUuid.isNullOrBlank()) {
+                val cached = AccountCache.getDevices(knownUuid)
+                if (cached != null) {
+                    hideLoading()
+                    render(cached)
+                    return
+                }
+            }
+        }
         showLoading()
         showEmpty(false)
         lifecycleScope.launch {
@@ -68,10 +88,22 @@ class DeviceManagementActivity : BaseActivity() {
                 showEmptyState(getString(R.string.devices_error_no_subscription), isError = true)
                 return@launch
             }
-            remnawaveUuid = uuid
+            val resolvedUuid: String = uuid
+            remnawaveUuid = resolvedUuid
 
-            repo.getDevices(uuid)
+            // UUID was resolved via the network above; re-check the cache before fetching devices.
+            if (!forceRefresh) {
+                val cached = AccountCache.getDevices(resolvedUuid)
+                if (cached != null) {
+                    render(cached)
+                    hideLoading()
+                    return@launch
+                }
+            }
+
+            repo.getDevices(resolvedUuid)
                 .onSuccess { result ->
+                    AccountCache.putDevices(resolvedUuid, result.devices)
                     render(result.devices)
                     // The list parsed empty but the subscription says devices ARE connected:
                     // the /client/devices response shape doesn't match. Surface the raw response
@@ -154,7 +186,10 @@ class DeviceManagementActivity : BaseActivity() {
             repo.deleteDevice(device.hwid, uuid)
                 .onSuccess {
                     toastSuccess(R.string.devices_deleted)
-                    loadDevices()
+                    // The cached list is now stale (one fewer device); drop it and re-fetch,
+                    // bypassing the cache so the UI reflects the deletion immediately.
+                    AccountCache.invalidateDevices(uuid)
+                    loadDevices(forceRefresh = true)
                 }
                 .onFailure {
                     hideLoading()

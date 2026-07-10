@@ -3,12 +3,19 @@ package com.v2ray.ang.auth.dto
 /**
  * Client subscription endpoints of the Departament backend.
  *
- *  GET   /client/subscription/all               -> [SubscriptionAllDto]
+ *  GET   /client/subscription                    -> [PrimarySubscriptionDto]   (the ACTIVE/root sub)
+ *  GET   /client/subscription/all                -> [SubscriptionAllDto]       (root + secondaries)
  *  PATCH /client/subscription/{scope}/{id}/name  (body [RenameRequestDto])
  *  GET   /client/subscription/qr?uuid=…          (PNG bytes)
  *  POST  /client/subscription/{scope}/{id}/add-devices (body [AddDevicesRequestDto])
  *  GET   /client/subscriptions/upgrade-quote?targetTariffId=…  -> [UpgradeQuoteDto]
  *  POST  /client/subscriptions/upgrade            (body [UpgradeRequestDto])
+ *
+ * Field names below were reconciled against the live backend (mirrored from the web cabinet's
+ * API client). The `/client/subscription/all` items carry ONLY the fields marked "in /all";
+ * the connect payload (subscriptionUrl / remnawaveUuid / raw remnawave record) and the friendly
+ * `tariffDisplayName` live on the separate GET /client/subscription summary, so they arrive null
+ * from /all. See [PrimarySubscriptionDto].
  */
 
 /** GET /client/subscription/all */
@@ -18,15 +25,27 @@ data class SubscriptionAllDto(
 
 /** A single subscription (root or secondary). */
 data class SubInfoDto(
-    /** "root" | "secondary" — used as the {scope} path segment. */
+    /** "root" | "secondary" — used as the {scope} path segment. (in /all) */
     val type: String = "root",
+    /** The subscription id — also the id the auto-renew endpoint expects. (in /all) */
     val id: String = "",
+    // NOT present on /all items — only on the GET /client/subscription summary / connect payload.
+    // Kept so the device-management / QR / import paths compile; stays blank/null from /all.
     val remnawaveUuid: String = "",
     val subscription: SubResponseWrapper? = null,
     val tariffDisplayName: String? = null,
+    // in /all — the user-set label, then the backend default label ("Подписка #N").
     val displayName: String? = null,
+    val defaultLabel: String? = null,
+    val subscriptionIndex: Int? = null,
+    // in /all — tariff + selected price-option this sub renews on (used by renew/upgrade/add-devices).
+    val tariffId: String? = null,
+    val tariffPriceOptionId: String? = null,
+    // in /all — deviceCount = EXTRA devices purchased; totalDevices = total device slots.
+    // The live "connected devices" count is NOT in /all (it comes from GET /client/devices -> total).
     val deviceCount: Int = 0,
     val totalDevices: Int = 0,
+    // NOT present on /all — always 0 from this endpoint (see note above). Kept for API compat.
     val connectedDevices: Int = 0,
     val autoRenewEnabled: Boolean = false,
     val expireAtIso: String? = null,
@@ -36,8 +55,36 @@ data class SubInfoDto(
     val renewalPrice: Double? = null,
 )
 
-/** Wrapper around the Remnawave subscription payload. */
+/**
+ * GET /client/subscription — the authoritative ACTIVE (root) subscription summary.
+ *
+ * This is what the web cabinet renders as the primary subscription; it is richer than the root
+ * entry inside /all (it carries the raw remnawave record with the connect URL and the friendly
+ * tariff name). Wire this up in the API client/repository to render the active subscription
+ * reliably even when /all returns no root item.
+ */
+data class PrimarySubscriptionDto(
+    val subscription: SubResponseWrapper? = null,
+    val tariffDisplayName: String? = null,
+    val autoRenewNextChargeAmount: Double? = null,
+    val autoRenewNextChargeAt: String? = null,
+    val autoRenewCurrency: String? = null,
+    val message: String? = null,
+)
+
+/**
+ * Wrapper around the Remnawave subscription payload. The backend nests the raw record under
+ * `response`, or occasionally under `data.response` — mirror the web client's tolerance so both
+ * shapes resolve. [raw] returns whichever is present.
+ */
 data class SubResponseWrapper(
+    val response: RawSubDto? = null,
+    val data: SubDataWrapper? = null,
+) {
+    fun raw(): RawSubDto? = response ?: data?.response
+}
+
+data class SubDataWrapper(
     val response: RawSubDto? = null,
 )
 

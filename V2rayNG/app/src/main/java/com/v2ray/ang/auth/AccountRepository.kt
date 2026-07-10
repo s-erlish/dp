@@ -18,19 +18,28 @@ import com.v2ray.ang.auth.dto.UserProfileDto
  * Coroutine wrapper over [DepartamentApiClient] that returns [Result] instead of throwing, maps
  * every failure to an [ApiError], and performs the higher-level account operations the UI needs.
  *
- * On [ApiError.Unauthorized] the local session is wiped via [AccountSession.wipe] so a stale JWT
- * self-heals into a logged-out state.
+ * The local session is wiped via [AccountSession.wipe] ONLY when the authoritative identity
+ * endpoint ([DepartamentApiClient.getMe], via [refreshProfile]) returns 401 — that is the single
+ * reliable "the 7-day JWT is dead" signal, so a genuinely expired token self-heals into a
+ * logged-out state. A 401/403 on any OTHER endpoint (a per-action permission or scope failure)
+ * surfaces as a plain error and NEVER touches the session; only an explicit user logout does.
  */
 class AccountRepository(
     private val api: DepartamentApiClient = DepartamentApiClientImpl(),
     private val subs: SubscriptionSyncManager = SubscriptionSyncManager(),
 ) {
 
+    /**
+     * Runs an authenticated API call and normalises failures to [Result].
+     *
+     * Deliberately does NOT wipe the session on [ApiError.Unauthorized]: a 401 (or, before the
+     * error-mapping fix, a 403) on an arbitrary endpoint must not destroy a valid login. Only
+     * [refreshProfile] (the identity endpoint) is allowed to wipe — see its dedicated handling.
+     */
     private suspend fun <T> guard(block: suspend () -> T): Result<T> {
         return try {
             Result.success(block())
         } catch (e: ApiError) {
-            if (e is ApiError.Unauthorized) AccountSession.wipe()
             Result.failure(e)
         } catch (e: Exception) {
             Result.failure(ApiError.Network(e))
@@ -43,10 +52,24 @@ class AccountRepository(
     suspend fun loadServerStatus(): Result<List<ServerStatusDto>> = guard { api.getServerStatus() }
 
     // Profile
-    suspend fun refreshProfile(): Result<UserProfileDto> = guard {
-        val profile = api.getMe()
-        AccountSession.updateProfile(profile)
-        profile
+    //
+    // getMe() is the authoritative identity check: it is the ONLY endpoint whose 401 reliably
+    // means the JWT is dead (expired/revoked). A 401 here — and only here — wipes the local
+    // session so an expired 7-day token self-heals into a logged-out state. Every other failure
+    // (network, 403, 5xx, or a 401 on some other endpoint) leaves the session intact.
+    suspend fun refreshProfile(): Result<UserProfileDto> {
+        return try {
+            val profile = api.getMe()
+            AccountSession.updateProfile(profile)
+            Result.success(profile)
+        } catch (e: ApiError.Unauthorized) {
+            AccountSession.wipe()
+            Result.failure(e)
+        } catch (e: ApiError) {
+            Result.failure(e)
+        } catch (e: Exception) {
+            Result.failure(ApiError.Network(e))
+        }
     }
 
     // Subscriptions

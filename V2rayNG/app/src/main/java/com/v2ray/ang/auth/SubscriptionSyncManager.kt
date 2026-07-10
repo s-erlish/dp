@@ -72,7 +72,10 @@ class SubscriptionSyncManager {
         resultGuids
     }
 
-    /** Removes every managed subscription and cancels their auto-update tasks (logout / 401). */
+    /**
+     * Removes every managed subscription and cancels their auto-update tasks. Invoked only from
+     * [AccountSession.wipe] (explicit logout, or a confirmed-dead JWT on the identity endpoint).
+     */
     fun removeAllManaged() {
         val managed = AuthTokenStore.getManagedGuids()
         for ((_, guid) in managed) {

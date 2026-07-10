@@ -45,7 +45,13 @@ object AccountSession {
         if (isLoggedIn()) _state.value = AccountState.LoggedIn(profile)
     }
 
-    /** Clear session + managed subscriptions and flip to LoggedOut (logout / 401). */
+    /**
+     * Clear session + managed subscriptions and flip to LoggedOut.
+     *
+     * Called ONLY on an explicit user logout, or when the identity endpoint (getMe) confirms the
+     * JWT is dead with a 401. It must never be triggered by a 403 or by a 401 on any other
+     * endpoint (e.g. a background subscription-URL fetch or a per-action permission failure).
+     */
     fun wipe() {
         subs.removeAllManaged()
         AuthTokenStore.clear()

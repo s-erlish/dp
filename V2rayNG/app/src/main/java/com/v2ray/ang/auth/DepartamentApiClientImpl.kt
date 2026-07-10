@@ -326,7 +326,11 @@ class DepartamentApiClientImpl(
     }
 
     private fun mapError(code: Int, detail: String? = null): ApiError = when (code) {
-        401, 403 -> ApiError.Unauthorized(detail)
+        // Only 401 means "authentication failed / token expired". 403 (Forbidden) is a permission
+        // outcome on an otherwise-valid session (e.g. an action not allowed for this account/plan)
+        // and must NOT be treated as Unauthorized — otherwise callers would wipe a live session.
+        401 -> ApiError.Unauthorized(detail)
+        403 -> ApiError.Server(403, detail)
         404 -> ApiError.NotFound
         410 -> ApiError.Gone
         429 -> ApiError.RateLimited

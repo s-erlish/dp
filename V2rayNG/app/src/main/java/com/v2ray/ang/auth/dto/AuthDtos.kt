@@ -95,6 +95,9 @@ data class UserProfileDto(
     val id: String = "",
     val email: String = "",
     val balance: Double = 0.0,
+    // The backend exposes the profile currency as `preferredCurrency`; accept `currency` too so
+    // either spelling maps. Stays blank when absent (currencySymbol then defaults to ₽ for RUB).
+    @SerializedName(value = "currency", alternate = ["preferredCurrency"])
     val currency: String = "",
     val telegramLinked: Boolean = false,
     val telegramId: Long? = null,

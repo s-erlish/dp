@@ -71,6 +71,7 @@ import com.v2ray.ang.tv.TvSendActivity
 import com.v2ray.ang.util.AvatarManager
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.MemoryStatsManager
+import com.v2ray.ang.util.SubscriptionOrigin
 import com.v2ray.ang.util.Utils
 import com.v2ray.ang.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
@@ -548,7 +549,7 @@ class MainActivity : HelperBaseActivity() {
             val valid = selectedNavId == R.id.nav_home ||
                 selectedNavId == R.id.nav_servers ||
                 selectedNavId == R.id.nav_settings ||
-                (selectedNavId == R.id.nav_account && AccountSession.isLoggedIn())
+                (selectedNavId == R.id.nav_account && accountAccessAllowed())
             if (!valid) selectNav(R.id.nav_home)
         }
     }
@@ -582,9 +583,12 @@ class MainActivity : HelperBaseActivity() {
         updateServersChrome(subs.size)
         bindHomeMetaBar()
         updateHomeEmptyState()
-        // The "link Telegram" CTA depends on whether any local servers exist, so re-evaluate it
-        // once the list is (re)built.
+        // The "link Telegram" CTA depends on whether a departament subscription is present, so
+        // re-evaluate it once the list is (re)built.
         updateLoginCtaVisibility()
+        // Adding/removing a departament subscription must show/hide the Account tab and the home
+        // account header immediately (the AccountSession collector only fires on login changes).
+        updateAccountGate()
     }
 
     private fun updateServersChrome(providerCount: Int) {
@@ -674,20 +678,15 @@ class MainActivity : HelperBaseActivity() {
      * the Account tab stay hidden when no backend is configured (the no-backend build is unchanged).
      */
     private fun applyAccountState(state: AccountSession.AccountState) {
-        val header = binding.layoutHomeAccount
         if (!BackendConfig.isConfigured()) {
-            header.root.isVisible = false
-            binding.navAccount.isVisible = false
+            updateAccountGate()
             accountLoggedIn = false
             return
         }
         val loggedIn = state is AccountSession.AccountState.LoggedIn
-        header.root.isVisible = true
-        header.groupLogin.isVisible = !loggedIn
-        header.chipAccount.isVisible = loggedIn
-        binding.navAccount.isVisible = loggedIn
-        // Logging out while on the Account tab: the tab is now hidden, so fall back to Home.
-        if (!loggedIn && selectedNavId == R.id.nav_account) selectNav(R.id.nav_home)
+        // Recompute the Account tab / home account header visibility from the access gate
+        // (signed in OR a departament subscription is present).
+        updateAccountGate()
         if (state is AccountSession.AccountState.LoggedIn) {
             bindAccountChip(state.profile)
         } else {
@@ -700,6 +699,39 @@ class MainActivity : HelperBaseActivity() {
         // not on the state replay that happens every time the activity restarts while signed in.
         if (loggedIn && !accountLoggedIn) onLoggedIn()
         accountLoggedIn = loggedIn
+    }
+
+    /**
+     * The account gate: account + payment features are available ONLY when the user is signed in OR
+     * the app holds a genuine "departament" subscription (one of the owner's own VPN subscription
+     * links). A foreign subscription pasted by a user must NOT unlock them, since payment cannot work
+     * for servers that are not part of this VPN.
+     */
+    private fun accountAccessAllowed(): Boolean =
+        AccountSession.isLoggedIn() || SubscriptionOrigin.hasDepartamentSubscription()
+
+    /**
+     * Recomputes the visibility of the Account nav item and the home account header from the access
+     * gate. Called both when the account state changes (login/logout) and when the subscription /
+     * server list changes, so adding a departament subscription reveals the account without an app
+     * restart and removing it hides it again — while a foreign-only subscription never unlocks it.
+     */
+    private fun updateAccountGate() {
+        val header = binding.layoutHomeAccount
+        if (!BackendConfig.isConfigured()) {
+            header.root.isVisible = false
+            binding.navAccount.isVisible = false
+            return
+        }
+        val loggedIn = AccountSession.isLoggedIn()
+        val allowed = accountAccessAllowed()
+        header.root.isVisible = allowed
+        header.groupLogin.isVisible = allowed && !loggedIn
+        header.chipAccount.isVisible = loggedIn
+        binding.navAccount.isVisible = allowed
+        // Access revoked (logged out with no departament subscription) while on the Account tab:
+        // the tab is hidden, so fall back to Home.
+        if (!allowed && selectedNavId == R.id.nav_account) selectNav(R.id.nav_home)
     }
 
     /**
@@ -728,7 +760,10 @@ class MainActivity : HelperBaseActivity() {
     private fun updateLoginCtaVisibility() {
         if (!BackendConfig.isConfigured()) return
         val header = binding.layoutHomeAccount
-        val show = !AccountSession.isLoggedIn() && !ctaDismissed && mainViewModel.serversCache.isNotEmpty()
+        // Account entry point: only for the owner's own (departament) subscription, never a foreign
+        // one — so a pasted foreign subscription cannot surface the "link Telegram" account CTA.
+        val show = !AccountSession.isLoggedIn() && !ctaDismissed &&
+            SubscriptionOrigin.hasDepartamentSubscription()
         header.ctaLinkTelegram.isVisible = show
     }
 
@@ -1402,7 +1437,10 @@ class MainActivity : HelperBaseActivity() {
         super.onResume()
         updateSelectedServer()
         // The account header is repainted reactively by the AccountSession.state collector
-        // (repeatOnLifecycle STARTED), so there is no per-resume refresh here.
+        // (repeatOnLifecycle STARTED); re-evaluate the departament-subscription gate here too, so a
+        // subscription added/removed elsewhere shows/hides the account on return without a restart.
+        updateAccountGate()
+        updateLoginCtaVisibility()
         bindSettingsState()
         timerHandler.removeCallbacks(memoryRunnable)
         timerHandler.post(memoryRunnable)

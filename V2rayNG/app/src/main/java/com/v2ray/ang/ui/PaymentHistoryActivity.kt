@@ -9,6 +9,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.v2ray.ang.R
+import com.v2ray.ang.auth.AccountCache
 import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.dto.PaymentDto
 import com.v2ray.ang.databinding.ActivityPaymentHistoryBinding
@@ -30,6 +31,14 @@ class PaymentHistoryActivity : BaseActivity() {
     /** Distinguishes "still loading, list legitimately empty" from "loaded, nothing to show". */
     private var loaded = false
 
+    /**
+     * True while the list on screen came from [AccountCache] and no network load has run. In this
+     * state the [viewModel]'s payments StateFlow still holds its empty seed, which it replays to the
+     * collector every time the screen returns to STARTED; those empty emissions must not clobber the
+     * cached rows. Pull-to-refresh clears this so a genuinely empty result can render.
+     */
+    private var showingCache = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentViewWithToolbar(
@@ -44,12 +53,27 @@ class PaymentHistoryActivity : BaseActivity() {
         binding.refreshLayout.setColorSchemeColors(resolveThemeColor(R.attr.iconTintBlue))
         binding.refreshLayout.setOnRefreshListener {
             loaded = false
+            // Explicit refresh: leave cache-only mode so a genuinely empty result can render.
+            showingCache = false
             viewModel.loadPayments()
         }
 
         observeState()
-        showHistoryLoading()
-        viewModel.loadPayments()
+
+        // Serve fresh (< 1h) cached payments instantly and skip the initial network load; the
+        // pull-to-refresh above still forces a reload that repopulates the cache.
+        val cached = AccountCache.getPayments()
+        if (cached != null) {
+            loaded = true
+            showingCache = true
+            binding.progressHistory.visibility = View.GONE
+            paymentsAdapter.submit(cached)
+            binding.tvEmpty.text = getString(R.string.history_empty)
+            binding.tvEmpty.visibility = if (cached.isEmpty()) View.VISIBLE else View.GONE
+        } else {
+            showHistoryLoading()
+            viewModel.loadPayments()
+        }
     }
 
     private fun observeState() {
@@ -62,10 +86,15 @@ class PaymentHistoryActivity : BaseActivity() {
     }
 
     private fun renderPayments(list: List<PaymentDto>) {
+        // While showing cached rows (no network load run yet), ignore the ViewModel's empty seed
+        // emission — replayed on every return to STARTED — so it can't wipe the cached list.
+        if (showingCache && list.isEmpty() && !binding.refreshLayout.isRefreshing) return
+        showingCache = false
         loaded = true
         binding.refreshLayout.isRefreshing = false
         binding.progressHistory.visibility = View.GONE
         paymentsAdapter.submit(list)
+        AccountCache.putPayments(list)
         binding.tvEmpty.text = getString(R.string.history_empty)
         binding.tvEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
     }

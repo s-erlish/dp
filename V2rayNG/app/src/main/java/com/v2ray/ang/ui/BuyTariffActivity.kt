@@ -368,11 +368,19 @@ class BuyTariffActivity : BaseActivity() {
         }
     }
 
+    /**
+     * The single source of truth for the price: the option price plus the cost of any extra
+     * devices. This exact value is both shown as «Итого» and sent as the charged `amount`, so the
+     * displayed total and the amount the user is charged can never drift apart. When
+     * [extraDevices] is 0 (or [TariffDto.pricePerExtraDevice] is 0) this is just `option.price`.
+     */
+    private fun currentTotal(tariff: TariffDto, option: PriceOptionDto): Double =
+        option.price + extraDevices * tariff.pricePerExtraDevice
+
     private fun updateTotal() {
         val tariff = selectedTariff ?: return
         val option = selectedOption ?: return
-        val total = option.price + extraDevices * tariff.pricePerExtraDevice
-        tvTotal.text = formatMoney(total, tariff.currency)
+        tvTotal.text = formatMoney(currentTotal(tariff, option), tariff.currency)
     }
 
     // endregion
@@ -409,12 +417,15 @@ class BuyTariffActivity : BaseActivity() {
         awaitingPaymentError = true
         val deviceCount = extraDevices.takeIf { it > 0 }
         val currency = tariff.currency.ifBlank { "RUB" }
+        // Charge exactly the displayed «Итого» (option price + extra devices), never just the
+        // bare option price — otherwise the extra-device cost is silently dropped from checkout.
+        val amount = currentTotal(tariff, option)
         if (methodId == PaymentMethodSheet.ID_BALANCE) {
             val req = PaymentRequestDto(
                 tariffId = tariff.id,
                 tariffPriceOptionId = option.id,
                 deviceCount = deviceCount,
-                amount = option.price,
+                amount = amount,
                 currency = currency,
             )
             viewModel.payWithBalance(req) {
@@ -427,7 +438,7 @@ class BuyTariffActivity : BaseActivity() {
                 tariffId = tariff.id,
                 tariffPriceOptionId = option.id,
                 deviceCount = deviceCount,
-                amount = option.price,
+                amount = amount,
                 currency = currency,
                 paymentMethod = methodId.toIntOrNull(),
             )

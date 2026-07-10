@@ -188,6 +188,7 @@ class AccountFragment : Fragment() {
 
         binding.tvSubName.text = sub.displayName?.takeIf { it.isNotBlank() }
             ?: sub.tariffDisplayName?.takeIf { it.isNotBlank() }
+            ?: sub.defaultLabel?.takeIf { it.isNotBlank() }
             ?: getString(R.string.account_subs_header)
 
         if (sub.expireAtIso.isNullOrBlank()) {
@@ -197,9 +198,13 @@ class AccountFragment : Fragment() {
             binding.tvSubExpiry.text = getString(R.string.account_expires, formatIsoDate(sub.expireAtIso))
         }
 
-        val unlimitedDevices = sub.subscription?.response?.isUnlimitedDevices() == true
+        // /subscription/all carries no live "connected devices" count (that lives on GET
+        // /client/devices -> total) and no raw remnawave record; `connectedDevices` is therefore
+        // always 0 here. Show the subscription's own device figures instead: deviceCount out of the
+        // total slots, with ∞ when the plan is unlimited.
+        val unlimitedDevices = sub.subscription?.raw()?.isUnlimitedDevices() == true
         val totalDevicesStr = if (unlimitedDevices) getString(R.string.account_unlimited) else sub.totalDevices.toString()
-        binding.tvSubDevices.text = getString(R.string.account_devices, sub.connectedDevices.toString(), totalDevicesStr)
+        binding.tvSubDevices.text = getString(R.string.account_devices, sub.deviceCount.toString(), totalDevicesStr)
 
         // Auto-renew — set state without firing the click handler for programmatic changes.
         binding.switchAutoRenew.isChecked = sub.autoRenewEnabled
