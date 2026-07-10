@@ -46,11 +46,14 @@ import com.v2ray.ang.dto.entities.usedTraffic
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.enums.PermissionType
 import com.v2ray.ang.enums.PingMethod
-import android.text.format.DateFormat
 import android.view.View
 import android.view.animation.OvershootInterpolator
-import com.v2ray.ang.auth.AuthTokenStore
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import com.v2ray.ang.auth.AccountRepository
+import com.v2ray.ang.auth.AccountSession
 import com.v2ray.ang.auth.BackendConfig
+import com.v2ray.ang.auth.dto.UserProfileDto
 import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
@@ -87,6 +90,13 @@ class MainActivity : HelperBaseActivity() {
     private lateinit var homeAdapter: MainRecyclerAdapter
     // Home server list collapse state, toggled by the meta-bar chevron.
     private var homeListCollapsed = false
+
+    // Tracks the last observed signed-in state so the post-login auto-import fires only on a real
+    // logged-out -> logged-in transition, not on every state replay. Seeded from the persisted
+    // session so a returning (already signed-in) user is not treated as a fresh login.
+    private var accountLoggedIn = AccountSession.isLoggedIn()
+    // The "link Telegram" home CTA is dismissible for the current session.
+    private var ctaDismissed = false
 
     private val shareMethod: Array<out String> by lazy { resources.getStringArray(R.array.share_method) }
     private val shareMethodMore: Array<out String> by lazy { resources.getStringArray(R.array.share_method_more) }
@@ -248,6 +258,12 @@ class MainActivity : HelperBaseActivity() {
         binding.navHome.setOnClickListener { selectNav(R.id.nav_home) }
         binding.navServers.setOnClickListener { selectNav(R.id.nav_servers) }
         binding.navSettings.setOnClickListener { selectNav(R.id.nav_settings) }
+        // The Account item is an action, not a content tab: it opens AccountActivity and leaves
+        // the currently selected tab in place (re-tinted so the account item doesn't stay lit).
+        binding.navAccount.setOnClickListener {
+            requestActivityLauncher.launch(Intent(this, AccountActivity::class.java))
+            updateNavSelection()
+        }
         selectNav(R.id.nav_home)
     }
 
@@ -269,6 +285,9 @@ class MainActivity : HelperBaseActivity() {
             Triple(R.id.nav_home, binding.navHomeIcon, binding.navHomeLabel),
             Triple(R.id.nav_servers, binding.navServersIcon, binding.navServersLabel),
             Triple(R.id.nav_settings, binding.navSettingsIcon, binding.navSettingsLabel),
+            // Never becomes the selected tab (it launches AccountActivity), so it always
+            // renders in the inactive tint.
+            Triple(R.id.nav_account, binding.navAccountIcon, binding.navAccountLabel),
         )
         items.forEach { (id, icon, label) ->
             val color = if (id == selectedNavId) active else inactive
@@ -515,6 +534,9 @@ class MainActivity : HelperBaseActivity() {
         updateServersChrome(subs.size)
         bindHomeMetaBar()
         updateHomeEmptyState()
+        // The "link Telegram" CTA depends on whether any local servers exist, so re-evaluate it
+        // once the list is (re)built.
+        updateLoginCtaVisibility()
     }
 
     private fun updateServersChrome(providerCount: Int) {
@@ -574,47 +596,94 @@ class MainActivity : HelperBaseActivity() {
     }
 
     /**
-     * Home account header (Telegram login / account chip).
+     * Home account header (login entry points / account chip), driven by [AccountSession.state].
      * Entirely hidden unless a backend is configured, so the no-backend build looks unchanged.
      */
     private fun setupAccountHeader() {
-        val open = View.OnClickListener {
+        val header = binding.layoutHomeAccount
+        val openLogin = View.OnClickListener {
             requestActivityLauncher.launch(Intent(this, LoginActivity::class.java))
         }
-        binding.layoutHomeAccount.btnTelegramLogin.setOnClickListener(open)
-        binding.layoutHomeAccount.chipAccount.setOnClickListener(open)
-        updateAccountHeader()
-    }
-
-    private fun updateAccountHeader() {
-        val header = binding.layoutHomeAccount
-        val configured = BackendConfig.isConfigured()
-        val loggedIn = configured && AuthTokenStore.isLoggedIn()
-        header.root.isVisible = configured
-        header.btnTelegramLogin.isVisible = configured && !loggedIn
-        header.chipAccount.isVisible = loggedIn
-        if (loggedIn) {
-            val user = AuthTokenStore.getUser()
-            val name = user?.displayName?.takeIf { it.isNotBlank() }
-                ?: user?.username?.takeIf { it.isNotBlank() }
-                ?: getString(R.string.auth_account)
-            header.tvAccountName.text = name
-            header.tvAvatarInitial.text = name.firstOrNull()?.uppercase() ?: "?"
-            header.tvAccountSub.text = subscriptionStatusLine()
+        // Signed-out entry points: both buttons and the CTA open the same login screen.
+        header.btnTelegramLogin.setOnClickListener(openLogin)
+        header.btnSiteLogin.setOnClickListener(openLogin)
+        header.ctaLinkTelegram.setOnClickListener(openLogin)
+        header.btnCtaDismiss.setOnClickListener {
+            ctaDismissed = true
+            header.ctaLinkTelegram.isVisible = false
+        }
+        // Signed-in chip opens the account screen.
+        header.chipAccount.setOnClickListener {
+            requestActivityLauncher.launch(Intent(this, AccountActivity::class.java))
+        }
+        // Single source of truth: repaint the header (and the Account nav tab) whenever the
+        // logged-in/out state changes, and auto-import subscriptions on a fresh login.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                AccountSession.state.collect { applyAccountState(it) }
+            }
         }
     }
 
-    /** Subtitle for the signed-in account chip, read from the login-imported subscription. */
-    private fun subscriptionStatusLine(): String {
-        val sub = AuthTokenStore.managedSubGuid()
-            .takeIf { it.isNotEmpty() }
-            ?.let { MmkvManager.decodeSubscription(it) }
-            ?: return getString(R.string.auth_subscription_none)
-        if (!sub.enabled) return getString(R.string.auth_subscription_expired)
-        val expire = sub.expire
-        if (expire <= 0L) return getString(R.string.auth_subscription_active)
-        val date = DateFormat.getDateFormat(this).format(Date(expire * 1000L))
-        return getString(R.string.auth_subscription_active_until, date)
+    /**
+     * Applies the account state to the home header and the Account nav tab. The whole header and
+     * the Account tab stay hidden when no backend is configured (the no-backend build is unchanged).
+     */
+    private fun applyAccountState(state: AccountSession.AccountState) {
+        val header = binding.layoutHomeAccount
+        if (!BackendConfig.isConfigured()) {
+            header.root.isVisible = false
+            binding.navAccount.isVisible = false
+            accountLoggedIn = false
+            return
+        }
+        val loggedIn = state is AccountSession.AccountState.LoggedIn
+        header.root.isVisible = true
+        header.groupLogin.isVisible = !loggedIn
+        header.chipAccount.isVisible = loggedIn
+        binding.navAccount.isVisible = loggedIn
+        if (state is AccountSession.AccountState.LoggedIn) {
+            bindAccountChip(state.profile)
+        } else {
+            updateLoginCtaVisibility()
+        }
+        // Fire the one-shot post-login import only on a genuine logged-out -> logged-in transition,
+        // not on the state replay that happens every time the activity restarts while signed in.
+        if (loggedIn && !accountLoggedIn) onLoggedIn()
+        accountLoggedIn = loggedIn
+    }
+
+    /** Fills the signed-in account chip from the profile (Telegram @handle, else email). */
+    private fun bindAccountChip(profile: UserProfileDto) {
+        val header = binding.layoutHomeAccount
+        val name = profile.telegramUsername?.takeIf { it.isNotBlank() }?.let { "@$it" }
+            ?: profile.email.takeIf { it.isNotBlank() }
+            ?: getString(R.string.auth_account)
+        header.tvAccountName.text = name
+        header.tvAvatarInitial.text = name.trimStart('@').firstOrNull()?.uppercase() ?: "?"
+        header.tvAccountSub.text = getString(R.string.auth_open_account)
+    }
+
+    /**
+     * The "link Telegram" CTA is for users who pasted a subscription but never signed in: shown
+     * only when signed out, there are local servers, and the user hasn't dismissed it this session.
+     */
+    private fun updateLoginCtaVisibility() {
+        if (!BackendConfig.isConfigured()) return
+        val header = binding.layoutHomeAccount
+        val show = !AccountSession.isLoggedIn() && !ctaDismissed && mainViewModel.serversCache.isNotEmpty()
+        header.ctaLinkTelegram.isVisible = show
+    }
+
+    /**
+     * Runs once when the user transitions to signed-in: auto-import their subscriptions, reload the
+     * server list on success, and confirm with the gray status toast.
+     */
+    private fun onLoggedIn() {
+        lifecycleScope.launch {
+            AccountRepository().autoImportSubscriptions().onSuccess { mainViewModel.reloadServerList() }
+        }
+        showStatusToast(getString(R.string.toast_subscription_linked))
     }
 
     /** Subscription shown in the Home meta bar: the selected server's, else the first provider. */
@@ -1238,7 +1307,8 @@ class MainActivity : HelperBaseActivity() {
     override fun onResume() {
         super.onResume()
         updateSelectedServer()
-        updateAccountHeader()
+        // The account header is repainted reactively by the AccountSession.state collector
+        // (repeatOnLifecycle STARTED), so there is no per-resume refresh here.
         bindSettingsState()
         timerHandler.removeCallbacks(memoryRunnable)
         timerHandler.post(memoryRunnable)

@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Home account header. One slot, two mutually-exclusive states:
-    - signed out -> "Войти через Telegram" tonal pill (btn_telegram_login)
+    - signed out -> login entry points (group_login):
+        * "Войти через Telegram" tonal pill (btn_telegram_login)
+        * "Войти через сайт" text button (btn_site_login)
+        * dismissible "link Telegram" CTA banner (cta_link_telegram) for pasted-sub users
     - signed in  -> account chip (chip_account)
   Whole element is GONE unless BackendConfig.isConfigured().
 -->
@@ -14,22 +17,91 @@
     android:layout_marginEnd="12dp"
     android:visibility="gone">
 
-    <!-- Signed out: Telegram login pill -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_telegram_login"
-        style="@style/Widget.Material3.Button.TonalButton.Icon"
+    <!-- Signed out: login entry points -->
+    <LinearLayout
+        android:id="@+id/group_login"
         android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:text="@string/auth_sign_in_telegram"
-        android:textAllCaps="false"
-        android:textColor="?attr/colorOnPrimaryContainer"
-        android:textStyle="bold"
-        android:visibility="gone"
-        app:backgroundTint="?attr/colorPrimaryContainer"
-        app:cornerRadius="26dp"
-        app:icon="@drawable/ic_telegram_24dp"
-        app:iconGravity="textStart"
-        app:iconTint="@null" />
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <!-- Telegram login pill -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_telegram_login"
+            style="@style/Widget.Material3.Button.TonalButton.Icon"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="@string/auth_sign_in_telegram"
+            android:textAllCaps="false"
+            android:textColor="?attr/colorOnPrimaryContainer"
+            android:textStyle="bold"
+            app:backgroundTint="?attr/colorPrimaryContainer"
+            app:cornerRadius="26dp"
+            app:icon="@drawable/ic_telegram_24dp"
+            app:iconGravity="textStart"
+            app:iconTint="@null" />
+
+        <!-- Site (email) login -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_site_login"
+            style="@style/Widget.Material3.Button.TextButton.Icon"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginTop="4dp"
+            android:text="@string/auth_sign_in_site"
+            android:textAllCaps="false"
+            android:textColor="?attr/colorPrimary"
+            app:icon="@drawable/ic_globe_24dp"
+            app:iconGravity="textStart"
+            app:iconTint="?attr/colorPrimary" />
+
+        <!-- Dismissible CTA banner: prompt pasted-sub users to link Telegram -->
+        <LinearLayout
+            android:id="@+id/cta_link_telegram"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_card_incy"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingTop="10dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="10dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_telegram_24dp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="12dp"
+                android:text="@string/auth_link_telegram_cta"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/btn_cta_dismiss"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:contentDescription="@string/auth_link_telegram_cta_dismiss"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="✕"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="16sp" />
+        </LinearLayout>
+    </LinearLayout>
 
     <!-- Signed in: account chip -->
     <LinearLayout
@@ -89,7 +161,7 @@
                 android:layout_marginTop="2dp"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:text="@string/auth_subscription_none"
+                android:text="@string/auth_open_account"
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="12sp" />
         </LinearLayout>

@@ -538,6 +538,40 @@
 
                 </LinearLayout>
 
+                <!-- 4th item: opens the Account screen. Shown only when signed in
+                     (toggled at runtime); a weighted item so it collapses to zero
+                     width while GONE and the 3 remaining items keep equal thirds. -->
+                <LinearLayout
+                    android:id="@+id/nav_account"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:id="@+id/nav_account_icon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:importantForAccessibility="no"
+                        app:srcCompat="@drawable/ic_nav_account"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+
+                    <TextView
+                        android:id="@+id/nav_account_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="@string/bottom_nav_account"
+                        android:textAppearance="@style/BottomNavLabel"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                </LinearLayout>
+
             </LinearLayout>
 
         </FrameLayout>
