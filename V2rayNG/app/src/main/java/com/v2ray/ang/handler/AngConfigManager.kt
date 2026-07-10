@@ -264,7 +264,7 @@ object AngConfigManager {
                     MmkvManager.removeServerViaSubid(subid)
                 }
                 val keyToProfile = batchSaveConfigs(configs, subid)
-                val matchKey = findMatchedProfileKey(keyToProfile, removedSelected)
+                val matchKey = resolveSelectedKey(keyToProfile, removedSelected, subid, append)
                 matchKey?.let { MmkvManager.setSelectServer(it) }
             }
 
@@ -356,8 +356,59 @@ object AngConfigManager {
             isSameText(saved.server, target.server)
         }?.key?.let { return it }
 
-        // If old selected node cannot be matched, fall back to the first imported config.
-        return keyToProfile.keys.firstOrNull()
+        // If the old selected node cannot be matched, fall back to the first subscription server.
+        // keyToProfile is built in REVERSE subscription order (parseBatchConfig reverses the lines
+        // and both batchSaveConfigs and the custom-JSON loop insert each key at the head of the
+        // stored list), so the first subscription server - the one shown at the TOP of the list -
+        // is the LAST inserted key here.
+        return keyToProfile.keys.lastOrNull()
+    }
+
+    /**
+     * Decides which server should be selected (highlighted/active) after an import.
+     *
+     * Behaviour:
+     * - Re-import: if the previously selected server (removedSelected) can be matched in the newly
+     *   imported set, keep selecting it.
+     * - Fresh add: select the FIRST server of the subscription (the top of the displayed list).
+     *   Because keyToProfile is in reverse subscription order (see findMatchedProfileKey), the first
+     *   subscription server is the LAST inserted key.
+     * - Guardrails: never change the selection in append mode, and never hijack a still-valid
+     *   selection that belongs to a DIFFERENT subscription (this protects the user's active server
+     *   during a background update-all refresh, where every subscription is re-imported with
+     *   append = false).
+     *
+     * @param keyToProfile Map of newly saved server keys to their ProfileItem (reverse sub order).
+     * @param removedSelected The previously selected profile of this subscription, if any.
+     * @param subid The subscription ID being imported.
+     * @param append Whether this import is an append (vs. replace).
+     * @return The key to select, or null to leave the current selection unchanged.
+     */
+    private fun resolveSelectedKey(
+        keyToProfile: Map<String, ProfileItem>,
+        removedSelected: ProfileItem?,
+        subid: String,
+        append: Boolean
+    ): String? {
+        if (keyToProfile.isEmpty()) return null
+
+        // Re-import: preserve the matched previous selection (falls back to the first server).
+        if (removedSelected != null) {
+            return findMatchedProfileKey(keyToProfile, removedSelected)
+        }
+
+        // Never touch the selection when appending.
+        if (append) return null
+
+        // Do not steal a still-valid selection that lives in another subscription.
+        val current = MmkvManager.getSelectServer()
+        if (!current.isNullOrBlank()) {
+            val currentSubId = MmkvManager.decodeServerConfig(current)?.subscriptionId
+            if (currentSubId != null && currentSubId != subid) return null
+        }
+
+        // Fresh add: select the first subscription server (top of the list).
+        return keyToProfile.keys.lastOrNull()
     }
 
     /**
@@ -430,7 +481,7 @@ object AngConfigManager {
                         count += 1
                     }
                     if (count > 0) {
-                        val matchKey = findMatchedProfileKey(keyToProfile, removedSelected)
+                        val matchKey = resolveSelectedKey(keyToProfile, removedSelected, subid, append)
                         matchKey?.let { MmkvManager.setSelectServer(it) }
                     }
                     return count
