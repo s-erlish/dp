@@ -32,4 +32,10 @@
     <dimen name="tile_glyph">22dp</dimen>
     <dimen name="row_min_height">56dp</dimen>
     <dimen name="screen_gutter">16dp</dimen>
+
+    <!-- Account hero: subscription carousel + page dots -->
+    <dimen name="sub_card_height">152dp</dimen>
+    <dimen name="dot_size">6dp</dimen>
+    <dimen name="dot_size_active">8dp</dimen>
+    <dimen name="dot_gap">8dp</dimen>
 </resources>
