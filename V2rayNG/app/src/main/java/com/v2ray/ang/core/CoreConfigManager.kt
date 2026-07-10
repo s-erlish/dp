@@ -60,7 +60,7 @@ object CoreConfigManager {
             val configContext = CoreConfigContextBuilder.build(context, guid)
                 ?: return ConfigResult(status = false, guid = guid, errorMessage = "Failed to build config context")
             if (configContext.isCustom) {
-                return buildV2rayCustomConfig(configContext)
+                return buildV2rayCustomConfig4Speedtest(configContext)
             }
             val v2rayConfig = buildUnifiedConfig(configContext)
             postProcessForSpeedtest(v2rayConfig)
@@ -165,6 +165,89 @@ object CoreConfigManager {
         }
 
         return JsonUtil.toJsonPretty(json)?.let { ConfigResult(true, configContext.guid, it) } ?: result
+    }
+
+    /**
+     * Build a minimal, always-measurable configuration for latency testing of CUSTOM
+     * (raw xray-json / locked template) profiles.
+     *
+     * The stored raw config is used for a real connection as-authored, but for a delay test
+     * the full config often cannot be measured by the native `measureOutboundDelay`:
+     *  - Balancer / "Auto" / "Hybrid" (Автовыбор) templates carry an `observatory` +
+     *    `routing.balancers` block with multiple proxy outbounds. The native delay tester
+     *    strips app features and has no observatory probe results, so it cannot pick a
+     *    balancer member and returns -1 (or the request hangs until timeout).
+     *  - xHTTP / Shadowsocks and other single-proxy templates ship with routing/dns/multiple
+     *    outbounds (proxy + direct + block). If the proxy outbound is not first, the test
+     *    request can fall through to `direct`/`freedom` and never exercise the proxy.
+     *
+     * This builder parses the raw config, keeps only `log` + `outbounds`, promotes the first
+     * real proxy outbound to index 0, and drops routing/balancer/observatory/dns/inbounds so a
+     * single measurable proxy remains. The result measures connectivity through the first usable
+     * proxy server inside the config (which is exactly what the user wants for a per-server ping).
+     */
+    private fun buildV2rayCustomConfig4Speedtest(configContext: CoreConfigContext): ConfigResult {
+        val guid = configContext.guid
+        val raw = try {
+            TemplateManager.decodeRuntimeRaw(guid)
+        } catch (e: Exception) {
+            LogUtil.e(AppConfig.TAG, "buildV2rayCustomConfig4Speedtest: template decode failed, using plain raw", e)
+            MmkvManager.decodeServerRaw(guid)
+        } ?: return ConfigResult(status = false, guid = guid, errorMessage = "Custom config is empty")
+
+        val json = JsonUtil.parseString(raw)?.takeIf { it.isJsonObject }?.asJsonObject
+            ?: return ConfigResult(status = false, guid = guid, errorMessage = "Custom config is not a JSON object")
+
+        sanitizeXrayRootKeys(json, guid)
+
+        val outboundsJson = json.get("outbounds")?.takeIf { it.isJsonArray }?.asJsonArray
+        if (outboundsJson == null || outboundsJson.size() == 0) {
+            return ConfigResult(status = false, guid = guid, errorMessage = "Custom config has no outbounds")
+        }
+
+        // Promote the first real proxy outbound (skip freedom/blackhole/dns/loopback) to index 0
+        // so the delay request is routed through it once routing/balancer are removed.
+        val proxyIndex = outboundsJson.indexOfFirst { elem ->
+            val protocol = elem.takeIf { it.isJsonObject }?.asJsonObject
+                ?.get("protocol")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
+                ?.asString ?: return@indexOfFirst false
+            isProxyProtocol(protocol)
+        }
+        if (proxyIndex > 0) {
+            // Rebuild the array with the proxy outbound first, preserving the rest in order.
+            val reordered = JsonArray()
+            reordered.add(outboundsJson.get(proxyIndex))
+            outboundsJson.forEachIndexed { i, elem -> if (i != proxyIndex) reordered.add(elem) }
+            json.add("outbounds", reordered)
+        } else if (proxyIndex < 0) {
+            LogUtil.w(AppConfig.TAG, "Speedtest custom config $guid has no recognizable proxy outbound; measuring first outbound")
+        }
+
+        // Keep only what the delay tester needs: log + outbounds. Everything that can trip up
+        // the native tester (balancer/observatory/routing/dns/inbounds/stats/policy/...) is dropped.
+        val keysToRemove = json.keySet().filter { it != "log" && it != "outbounds" }
+        keysToRemove.forEach { json.remove(it) }
+
+        json.get("outbounds")?.asJsonArray?.forEach { elem ->
+            (elem as? JsonObject)?.remove("mux")
+        }
+
+        val content = JsonUtil.toJsonPretty(json)
+            ?: return ConfigResult(status = false, guid = guid, errorMessage = "Failed to serialize speedtest config")
+        return ConfigResult(status = true, guid = guid, content = content)
+    }
+
+    /**
+     * True when the protocol string names a real proxy outbound (as opposed to
+     * freedom/blackhole/dns/loopback helper outbounds).
+     */
+    private fun isProxyProtocol(protocol: String): Boolean {
+        return EConfigType.entries.any {
+            it != EConfigType.CUSTOM &&
+                it != EConfigType.POLICYGROUP &&
+                it != EConfigType.PROXYCHAIN &&
+                it.name.equals(protocol, ignoreCase = true)
+        }
     }
 
     /**
@@ -461,6 +544,15 @@ object CoreConfigManager {
         v2rayConfig.log.loglevel = MmkvManager.decodeSettingsString(AppConfig.PREF_LOGLEVEL) ?: "warning"
         v2rayConfig.inbounds.clear()
         v2rayConfig.routing.rules.clear()
+        // Balancer/observatory configs (POLICYGROUP "Auto"/Hybrid): the native
+        // measureOutboundDelay strips app features and cannot resolve a balancer that
+        // depends on observatory probe results, so it returns -1. For a latency test we
+        // only need connectivity through one member, so drop the balancer + observatory
+        // and let the request fall through to the first (primary) proxy outbound, which
+        // buildUnifiedConfig always places at index 0.
+        v2rayConfig.routing.balancers = null
+        v2rayConfig.observatory = null
+        v2rayConfig.burstObservatory = null
         v2rayConfig.dns = null
         v2rayConfig.fakedns = null
         v2rayConfig.stats = null
