@@ -20,7 +20,7 @@
 
     <!-- Header / balance -->
     <string name="account_balance">Баланс</string>
-    <string name="account_top_up">Пополнить баланс</string>
+    <string name="account_top_up">Пополнить</string>
     <string name="account_referral">Реф-код %1$s</string>
     <string name="account_telegram">Telegram: \@%1$s</string>
     <string name="account_no_telegram">Telegram не привязан</string>
@@ -31,6 +31,9 @@
     <string name="account_subs_header">Мои подписки</string>
     <string name="account_subs_empty">У вас пока нет подписок</string>
     <string name="account_no_subscription">Пока нет активной подписки. Оформите её, чтобы подключиться.</string>
+    <string name="account_empty_title">Оформите первую подписку</string>
+    <string name="account_error_load_title">Не удалось загрузить</string>
+    <string name="account_retry">Повторить</string>
     <string name="account_expires">Действует до %1$s</string>
     <string name="account_devices">Устройства: %1$s / %2$s</string>
     <string name="account_traffic">Трафик: %1$s / %2$s</string>
