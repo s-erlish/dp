@@ -115,7 +115,7 @@ class BuyTariffActivity : BaseActivity() {
     private fun reload() {
         loaded = false
         viewModel.clearError()
-        showLoading()
+        showBuyLoading()
         lifecycleScope.launch {
             viewModel.loadTariffs().join()
             loaded = true
@@ -158,11 +158,11 @@ class BuyTariffActivity : BaseActivity() {
             hasAny -> renderTariffs(tariffs)
             error != null -> showError()
             loaded -> showEmpty()
-            else -> showLoading()
+            else -> showBuyLoading()
         }
     }
 
-    private fun showLoading() {
+    private fun showBuyLoading() {
         progressBuy.visibility = View.VISIBLE
         btnRetry.visibility = View.GONE
         stateView.text = getString(R.string.buy_loading)
