@@ -51,7 +51,12 @@ class DeviceManagementActivity : BaseActivity() {
         binding.rvDevices.layoutManager = LinearLayoutManager(this)
         binding.rvDevices.adapter = adapter
 
+        // Prefer the UUID passed via intent; otherwise resolve it from the already-loaded
+        // AccountSession profile (no network). This lets the cache-first fast path in [loadDevices]
+        // render the pre-warmed device list instantly and skips the /subscription/all round-trip
+        // that otherwise ran before we could even hit the cache.
         remnawaveUuid = intent.getStringExtra(EXTRA_REMNAWAVE_UUID)?.takeIf { it.isNotBlank() }
+            ?: loggedInProfileUuid()
         loadDevices()
     }
 

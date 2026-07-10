@@ -56,6 +56,14 @@ class AccountViewModel : ViewModel() {
     private val _payments = MutableStateFlow<List<PaymentDto>>(emptyList())
     val payments: StateFlow<List<PaymentDto>> = _payments.asStateFlow()
 
+    // Live connected-device count for the ACTIVE subscription, from GET /client/devices (its
+    // total). /subscription/all reports 0 here, so the account card reads this instead. Null until
+    // first resolved. Latest-wins via [devicesJob].
+    private val _deviceCount = MutableStateFlow<Int?>(null)
+    val deviceCount: StateFlow<Int?> = _deviceCount.asStateFlow()
+
+    private var devicesJob: Job? = null
+
     private val _publicConfig = MutableStateFlow<PublicConfigDto?>(null)
     val publicConfig: StateFlow<PublicConfigDto?> = _publicConfig.asStateFlow()
 
@@ -239,8 +247,39 @@ class AccountViewModel : ViewModel() {
 
     fun loadPayments() = viewModelScope.launch {
         repo.getPayments()
-            .onSuccess { _payments.value = it.items }
+            .onSuccess {
+                _payments.value = it.items
+                // Warm the process-wide cache so PaymentHistoryActivity (a separate ViewModel
+                // instance) renders instantly instead of spinning through a fresh network load.
+                AccountCache.putPayments(it.items)
+            }
             .onFailure { report(it) }
+    }
+
+    /**
+     * Resolves the ACTIVE subscription's connected-device count from GET /client/devices (its
+     * total = list size) and publishes it via [deviceCount]. Cache-first: a fresh (< 1h)
+     * [AccountCache] entry is used immediately with no network call; a miss fetches and repopulates
+     * the cache, so the Devices sub-screen also opens instantly (pre-warm). A device-fetch failure
+     * is swallowed on purpose — the count is secondary and must not pop an error toast on the
+     * Account tab; the sub-screen surfaces its own diagnostics.
+     */
+    fun loadDevices(uuid: String) {
+        if (uuid.isBlank()) return
+        val cached = AccountCache.getDevices(uuid)
+        if (cached != null) {
+            _deviceCount.value = cached.size
+            return
+        }
+        devicesJob?.cancel()
+        devicesJob = viewModelScope.launch {
+            repo.getDevices(uuid)
+                .onSuccess {
+                    AccountCache.putDevices(uuid, it.devices)
+                    _deviceCount.value = it.devices.size
+                }
+                .onFailure { /* secondary data: keep last known count, no error toast */ }
+        }
     }
 
     fun loadPublicConfig() = viewModelScope.launch {
@@ -348,12 +387,15 @@ class AccountViewModel : ViewModel() {
         AccountCache.invalidateAll()
         subsJob?.cancel()
         subsJob = null
+        devicesJob?.cancel()
+        devicesJob = null
         _profile.value = null
         _subscriptions.value = emptyList()
         lastPrimary = null
         lastAll = emptyList()
         hasSubData = false
         _payments.value = emptyList()
+        _deviceCount.value = null
         _importedGuids.value = emptyList()
     }
 

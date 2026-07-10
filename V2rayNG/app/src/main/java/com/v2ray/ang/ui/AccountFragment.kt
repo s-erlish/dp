@@ -144,6 +144,8 @@ class AccountFragment : Fragment() {
                 launch { viewModel.subscriptions.collect { renderSubscriptions(it) } }
                 // Re-render the active sub when the tariff catalog arrives so the badge resolves.
                 launch { viewModel.tariffs.collect { updateActiveSubUi() } }
+                // Re-render the device figures when the real connected-device count resolves.
+                launch { viewModel.deviceCount.collect { updateActiveSubUi() } }
                 launch { viewModel.payments.collect { renderHistoryValue(it) } }
                 launch { viewModel.error.collect { renderError(it) } }
             }
@@ -233,6 +235,9 @@ class AccountFragment : Fragment() {
         val current = activeSub
         activeSub = list.firstOrNull { it.remnawaveUuid == current?.remnawaveUuid } ?: list.firstOrNull()
         updateActiveSubUi()
+        // Fetch the REAL connected-device count for the active sub (the card shows used/limit) and
+        // pre-warm AccountCache so the Devices sub-screen opens instantly. Cache-first inside.
+        activeSub?.remnawaveUuid?.takeIf { it.isNotBlank() }?.let { viewModel.loadDevices(it) }
     }
 
     /** Renders ONE coherent state: the active-sub details, or the "нет активной подписки" empty line. */
@@ -272,16 +277,17 @@ class AccountFragment : Fragment() {
             binding.tvSubExpiry.text = getString(R.string.account_expires, formatIsoDate(sub.expireAtIso))
         }
 
-        // /subscription/all carries no live "connected devices" count (that lives on GET
-        // /client/devices -> total) and no raw remnawave record; `connectedDevices` is therefore
-        // always 0 here. Show the subscription's own device figures instead: deviceCount out of the
-        // total slots, with ∞ when the plan is unlimited.
+        // Used = the REAL connected-device count from GET /client/devices (its total), resolved via
+        // viewModel.loadDevices and cached in AccountCache. /subscription/all reports 0 here, so we
+        // never trust sub.deviceCount for "used"; until the live count arrives we show 0. Limit =
+        // the total device slots, or ∞ when the plan is unlimited.
         val unlimitedDevices = sub.subscription?.raw()?.isUnlimitedDevices() == true
         val totalDevicesStr = if (unlimitedDevices) getString(R.string.account_unlimited) else sub.totalDevices.toString()
-        binding.tvSubDevices.text = getString(R.string.account_devices, sub.deviceCount.toString(), totalDevicesStr)
+        val usedDevices = viewModel.deviceCount.value ?: 0
+        binding.tvSubDevices.text = getString(R.string.account_devices, usedDevices.toString(), totalDevicesStr)
 
         // Devices row's trailing "N / M" slot — bare figures (the row already carries its label).
-        binding.tvRowValueDevices.text = "${sub.deviceCount} / $totalDevicesStr"
+        binding.tvRowValueDevices.text = "$usedDevices / $totalDevicesStr"
         binding.tvRowValueDevices.visibility = View.VISIBLE
 
         // Auto-renew — set state without firing the click handler for programmatic changes.
