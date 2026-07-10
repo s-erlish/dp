@@ -287,7 +287,8 @@
 
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- App memory usage card (Incy-style) -->
+                <!-- App memory usage card (Incy-style). Hidden by default so it never flashes on
+                     first launch before updateMemoryCard() runs; shown only when PREF_SHOW_MEMORY. -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/card_memory"
                     android:layout_width="match_parent"
@@ -295,6 +296,7 @@
                     android:layout_marginStart="12dp"
                     android:layout_marginEnd="12dp"
                     android:layout_marginBottom="12dp"
+                    android:visibility="gone"
                     app:cardBackgroundColor="?attr/colorSurface"
                     app:cardCornerRadius="20dp"
                     app:cardElevation="0dp"

@@ -74,7 +74,13 @@ object AuthTokenStore {
 
     fun getUser(): UserProfileDto? {
         val json = store.decodeString(KEY_USER) ?: return null
-        return JsonUtil.fromJsonSafe(json, UserProfileDto::class.java)
+        // Use the null-tolerant backend Gson so a cached profile with null string fields
+        // (e.g. Telegram-only users without an email) decodes without NPE-prone null fields.
+        return try {
+            ApiGson.instance.fromJson(json, UserProfileDto::class.java)
+        } catch (e: Exception) {
+            null
+        }
     }
 
     fun isLoggedIn(): Boolean = !getToken().isNullOrBlank()

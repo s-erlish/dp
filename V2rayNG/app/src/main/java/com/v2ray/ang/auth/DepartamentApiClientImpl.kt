@@ -55,7 +55,9 @@ import java.util.concurrent.TimeUnit
  * when the backend base URL is blank, so the whole layer is inert until configured.
  */
 class DepartamentApiClientImpl(
-    private val gson: Gson = Gson(),
+    // Null-tolerant Gson: the backend may send JSON null for non-null Kotlin String fields
+    // (e.g. a Telegram-only user has no email). ApiGson maps those to "" to avoid runtime NPEs.
+    private val gson: Gson = ApiGson.instance,
     private val http: OkHttpClient = defaultClient(),
 ) : DepartamentApiClient {
 
