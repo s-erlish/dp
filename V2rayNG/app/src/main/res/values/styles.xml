@@ -13,10 +13,12 @@
         <item name="android:paddingBottom">8dp</item>
     </style>
 
-    <!-- Compact Incy-style bottom navigation -->
+    <!-- Compact Incy-style bottom navigation. Baseline (inactive) weight 500; the
+         selected item is stepped to 700 at runtime in updateNavSelection, so the
+         active tab reads on TWO axes (colorPrimary + heavier weight), not tint alone. -->
     <style name="BottomNavLabel" parent="TextAppearance.Material3.LabelSmall">
         <item name="android:textSize">11sp</item>
-        <item name="android:textStyle">bold</item>
+        <item name="android:textFontWeight">500</item>
     </style>
 
     <style name="BottomNavIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">

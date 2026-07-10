@@ -24,9 +24,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/title_servers"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="22sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.App.Headline" />
 
         <ImageView
             android:id="@+id/btn_collapse_all"
@@ -83,8 +81,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:textSize="13sp"
+        android:textAppearance="@style/TextAppearance.App.Subtitle"
         tools:text="15 серверов · 1 провайдер" />
 
     <!-- Search pill -->

@@ -341,15 +341,46 @@ class MainActivity : HelperBaseActivity() {
         )
         val animate = animationsEnabled() && previousNavId != selectedNavId
         items.forEach { (id, icon, label) ->
-            val target = if (id == selectedNavId) active else inactive
-            val involved = id == selectedNavId || id == previousNavId
+            val selected = id == selectedNavId
+            val target = if (selected) active else inactive
+            val involved = selected || id == previousNavId
             if (animate && involved) {
-                val from = if (id == selectedNavId) inactive else active
+                val from = if (selected) inactive else active
                 tweenNavItemColor(icon, label, from, target)
             } else {
                 icon.setColorFilter(target)
                 label.setTextColor(target)
             }
+            // Second active-state axis (beyond the colour tween): a heavier label and a
+            // short blue pill under the selected item, so the active tab reads on weight
+            // + accent, not tint alone.
+            applyNavLabelWeight(label, selected)
+            // INVISIBLE (not GONE) for inactive items so every column keeps the 3dp pill
+            // slot and nothing shifts vertically as the selection moves.
+            navDot(id)?.visibility = if (selected) View.VISIBLE else View.INVISIBLE
+        }
+    }
+
+    /** The active-tab indicator pill under a nav item (null for an unknown id). */
+    private fun navDot(navId: Int): View? = when (navId) {
+        R.id.nav_home -> binding.navHomeDot
+        R.id.nav_servers -> binding.navServersDot
+        R.id.nav_settings -> binding.navSettingsDot
+        R.id.nav_account -> binding.navAccountDot
+        else -> null
+    }
+
+    /** Steps a nav label to 700 when selected and 500 otherwise (real numeric weight on
+     *  API 28+, bold/normal fallback below that). */
+    private fun applyNavLabelWeight(label: android.widget.TextView, selected: Boolean) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            val family = android.graphics.Typeface.create(label.typeface, android.graphics.Typeface.NORMAL)
+            label.typeface = android.graphics.Typeface.create(family, if (selected) 700 else 500, false)
+        } else {
+            label.setTypeface(
+                label.typeface,
+                if (selected) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL,
+            )
         }
     }
 

@@ -16,11 +16,14 @@
     android:paddingVertical="@dimen/space_12"
     android:stateListAnimator="@anim/press_scale">
 
+    <!-- Neutral tile by default: blue is reserved for promoted rows (accent budget).
+         A row that wants the blue tile overrides setting_icon_bg background +
+         setting_icon tint at bind time. -->
     <FrameLayout
         android:id="@+id/setting_icon_bg"
         android:layout_width="@dimen/tile_size"
         android:layout_height="@dimen/tile_size"
-        android:background="@drawable/bg_icon_blue">
+        android:background="@drawable/bg_icon_neutral">
 
         <ImageView
             android:id="@+id/setting_icon"
@@ -29,7 +32,7 @@
             android:layout_gravity="center"
             android:importantForAccessibility="no"
             app:srcCompat="@drawable/ic_settings_24dp"
-            app:tint="?attr/iconTintBlue" />
+            app:tint="@color/icon_glyph_neutral" />
     </FrameLayout>
 
     <LinearLayout

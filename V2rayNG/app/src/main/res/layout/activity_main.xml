@@ -107,9 +107,10 @@
                                 android:ellipsize="end"
                                 android:maxLines="1"
                                 android:text="@string/speed_zero"
+                                android:textAppearance="@style/TextAppearance.App.Numeric"
                                 android:textColor="?attr/colorOnSurface"
-                                android:textSize="13sp"
-                                android:textStyle="bold" />
+                                android:textFontWeight="700"
+                                android:textSize="13sp" />
                         </LinearLayout>
 
                         <TextView
@@ -118,13 +119,13 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:ellipsize="end"
-                            android:fontFamily="monospace"
                             android:gravity="center"
                             android:maxLines="1"
                             android:text="00:00:00"
+                            android:textAppearance="@style/TextAppearance.App.Numeric"
                             android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="14sp"
-                            android:textStyle="bold" />
+                            android:textFontWeight="700"
+                            android:textSize="14sp" />
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -148,9 +149,10 @@
                                 android:ellipsize="end"
                                 android:maxLines="1"
                                 android:text="@string/speed_zero"
+                                android:textAppearance="@style/TextAppearance.App.Numeric"
                                 android:textColor="?attr/colorOnSurface"
-                                android:textSize="13sp"
-                                android:textStyle="bold" />
+                                android:textFontWeight="700"
+                                android:textSize="13sp" />
                         </LinearLayout>
 
                     </LinearLayout>
@@ -536,6 +538,16 @@
                         android:textAppearance="@style/BottomNavLabel"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
+                    <!-- Active-tab indicator: short blue pill, shown only on the selected item
+                         (toggled in updateNavSelection). Home is the default selected tab. -->
+                    <View
+                        android:id="@+id/nav_home_dot"
+                        android:layout_width="34dp"
+                        android:layout_height="3dp"
+                        android:layout_marginTop="3dp"
+                        android:background="@drawable/bg_nav_dot"
+                        android:importantForAccessibility="no" />
+
                 </LinearLayout>
 
                 <LinearLayout
@@ -567,6 +579,15 @@
                         android:textAppearance="@style/BottomNavLabel"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
+                    <View
+                        android:id="@+id/nav_servers_dot"
+                        android:layout_width="34dp"
+                        android:layout_height="3dp"
+                        android:layout_marginTop="3dp"
+                        android:background="@drawable/bg_nav_dot"
+                        android:importantForAccessibility="no"
+                        android:visibility="invisible" />
+
                 </LinearLayout>
 
                 <LinearLayout
@@ -597,6 +618,15 @@
                         android:text="@string/bottom_nav_settings"
                         android:textAppearance="@style/BottomNavLabel"
                         android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <View
+                        android:id="@+id/nav_settings_dot"
+                        android:layout_width="34dp"
+                        android:layout_height="3dp"
+                        android:layout_marginTop="3dp"
+                        android:background="@drawable/bg_nav_dot"
+                        android:importantForAccessibility="no"
+                        android:visibility="invisible" />
 
                 </LinearLayout>
 
@@ -632,6 +662,15 @@
                         android:text="@string/bottom_nav_account"
                         android:textAppearance="@style/BottomNavLabel"
                         android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <View
+                        android:id="@+id/nav_account_dot"
+                        android:layout_width="34dp"
+                        android:layout_height="3dp"
+                        android:layout_marginTop="3dp"
+                        android:background="@drawable/bg_nav_dot"
+                        android:importantForAccessibility="no"
+                        android:visibility="invisible" />
 
                 </LinearLayout>
 

@@ -1,8 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Dark rounded surface for the server-actions bottom sheet (Incy style): top corners only. -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="?attr/colorSurfaceContainerLow" />
-    <corners
-        android:topLeftRadius="24dp"
-        android:topRightRadius="24dp" />
-</shape>
+<!-- Dark rounded surface for the server-actions bottom sheet (Incy style): top corners only,
+     lifted by a 1dp top rim-light. In light theme the rim color is transparent (no-op). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Base sheet surface -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="?attr/colorSurfaceContainerLow" />
+            <corners
+                android:topLeftRadius="@dimen/radius_sheet"
+                android:topRightRadius="@dimen/radius_sheet" />
+        </shape>
+    </item>
+    <!-- Rim-light: 1dp top edge, inset 2dp from the sides -->
+    <item
+        android:left="2dp"
+        android:right="2dp"
+        android:gravity="top"
+        android:height="1dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/card_edge_highlight" />
+        </shape>
+    </item>
+</layer-list>

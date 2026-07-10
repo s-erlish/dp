@@ -127,7 +127,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_4"
-                    android:textAppearance="@style/TextAppearance.App.Headline"
+                    android:fontFeatureSettings="&quot;tnum&quot; on, &quot;lnum&quot; on"
+                    android:textAppearance="@style/TextAppearance.App.Display"
                     tools:text="1 500 ₽" />
 
                 <!-- Referral: ONE quiet tappable chip, kept well below the balance -->
@@ -422,7 +423,7 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
+                        android:background="@drawable/bg_icon_neutral">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -430,7 +431,7 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_acc_devices"
-                            app:tint="?attr/iconTintBlue" />
+                            app:tint="@color/icon_glyph_neutral" />
                     </FrameLayout>
 
                     <TextView
@@ -449,7 +450,9 @@
                         android:layout_height="wrap_content"
                         android:layout_marginEnd="@dimen/space_8"
                         android:gravity="end"
-                        android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        android:textAppearance="@style/TextAppearance.App.Numeric"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="13sp"
                         android:visibility="gone"
                         tools:text="1 / 3" />
 
@@ -486,7 +489,7 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
+                        android:background="@drawable/bg_icon_neutral">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -494,7 +497,7 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_acc_history"
-                            app:tint="?attr/iconTintBlue" />
+                            app:tint="@color/icon_glyph_neutral" />
                     </FrameLayout>
 
                     <TextView
@@ -513,7 +516,9 @@
                         android:layout_height="wrap_content"
                         android:layout_marginEnd="@dimen/space_8"
                         android:gravity="end"
-                        android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        android:textAppearance="@style/TextAppearance.App.Numeric"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:textSize="13sp"
                         android:visibility="gone"
                         tools:text="12.06.2026" />
 

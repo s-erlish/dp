@@ -165,8 +165,10 @@
                 android:maxLines="1"
                 android:paddingStart="@dimen/space_8"
                 android:paddingEnd="@dimen/space_8"
-                android:textAppearance="@style/TextAppearance.App.Chip"
+                android:textAppearance="@style/TextAppearance.App.Numeric"
                 android:textColor="?attr/colorOnSurface"
+                android:textFontWeight="500"
+                android:textSize="11sp"
                 tools:text="1,7 ТБ / ∞" />
 
         </FrameLayout>

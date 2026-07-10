@@ -39,9 +39,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
                 android:text="@string/servers_empty_title"
-                android:textColor="?attr/colorOnSurface"
-                android:textSize="17sp"
-                android:textStyle="bold" />
+                android:textAppearance="@style/TextAppearance.App.Title" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_import_clipboard"
