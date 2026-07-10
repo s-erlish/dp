@@ -287,13 +287,13 @@ class AccountFragment : Fragment() {
             methods,
         ) { id ->
             if (id == "balance") {
-                viewModel.payWithBalance(PaymentRequestDto(amount = amount, paymentMethod = "balance")) {
+                viewModel.payWithBalance(PaymentRequestDto(amount = amount)) {
                     viewModel.refreshProfile()
                     viewModel.loadSubscriptions()
                 }
             } else {
                 awaitingPaymentError = true
-                viewModel.buy(PaymentRequestDto(amount = amount, paymentMethod = id), ::openCheckout)
+                viewModel.buy(PaymentRequestDto(amount = amount, paymentMethod = id.toIntOrNull()), ::openCheckout)
             }
         }
     }
@@ -406,7 +406,17 @@ class AccountFragment : Fragment() {
 private fun formatMoney(amount: Double, currency: String): String {
     val n = if (amount % 1.0 == 0.0) amount.toLong().toString()
     else String.format(Locale.US, "%.2f", amount)
-    return if (currency.isBlank()) n else "$n $currency"
+    return "$n ${currencySymbol(currency)}"
+}
+
+/** Maps a currency CODE to its display symbol; blank/unknown defaults to the RUB ruble sign. */
+private fun currencySymbol(currency: String): String = when (currency.trim().uppercase(Locale.US)) {
+    "RUB", "" -> "₽"
+    "USD" -> "$"
+    "EUR" -> "€"
+    "KZT" -> "₸"
+    "UAH" -> "₴"
+    else -> currency
 }
 
 private fun formatIsoDate(iso: String?): String {
