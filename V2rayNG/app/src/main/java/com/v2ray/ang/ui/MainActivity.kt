@@ -2268,7 +2268,11 @@ class MainActivity : HelperBaseActivity() {
 
         s.switchFragment.isChecked = MmkvManager.decodeSettingsBool(AppConfig.PREF_FRAGMENT_ENABLED, false)
         s.valueAppearance.text = getString(
-            if (isMonoOn()) R.string.settings_appearance_mono else R.string.settings_appearance_dark
+            when (currentAppearanceIndex()) {
+                0 -> R.string.settings_appearance_light
+                2 -> R.string.settings_appearance_mono
+                else -> R.string.settings_appearance_dark
+            }
         )
         s.switchBoot.isChecked = MmkvManager.decodeStartOnBoot()
     }
@@ -2489,31 +2493,60 @@ class MainActivity : HelperBaseActivity() {
     }
 
     /**
-     * "Оформление" picker. Incy is a dark-only interface, so there is no light path: the
-     * night mode is pinned to MODE_NIGHT_YES ("2") and the picker only switches the colour
-     * palette between the blue accent ("Тёмная") and the monochrome overlay ("Чёрно-белая").
+     * Current "Оформление" selection as a picker index:
+     *   0 = Светлая (light day theme, blue accent)
+     *   1 = Тёмная (dark theme, blue accent)
+     *   2 = Чёрно-белая (monochrome overlay over the current night mode)
+     * Mono wins regardless of night mode; otherwise the light/dark split follows
+     * PREF_UI_MODE_NIGHT ("1" = day, "2" = night; default is Incy dark).
+     */
+    private fun currentAppearanceIndex(): Int = when {
+        isMonoOn() -> 2
+        MmkvManager.decodeSettingsString(AppConfig.PREF_UI_MODE_NIGHT, "2") == "1" -> 0
+        else -> 1
+    }
+
+    /**
+     * "Оформление" picker. Incy is primarily dark, but light is a first-class choice:
+     *   Светлая      -> MODE_NIGHT_NO  ("1") + blue accent  (day resources, dark bar icons)
+     *   Тёмная       -> MODE_NIGHT_YES ("2") + blue accent  (night resources)
+     *   Чёрно-белая  -> monochrome overlay, keeping the current night mode as-is.
+     * Light/dark are applied via AppCompatDelegate (SettingsManager.setNightMode reads
+     * PREF_UI_MODE_NIGHT and calls setDefaultNightMode); the mono overlay is applied in
+     * BaseActivity.onCreate. Either path is picked up with recreate().
      */
     private fun pickAppearance() {
         val entries = arrayOf(
+            getString(R.string.settings_appearance_light),
             getString(R.string.settings_appearance_dark),
             getString(R.string.settings_appearance_mono),
         )
-        val idx = if (isMonoOn()) 1 else 0
+        val idx = currentAppearanceIndex()
         AlertDialog.Builder(this)
             .setTitle(R.string.settings_appearance)
             .setSingleChoiceItems(entries, idx) { dialog, which ->
                 dialog.dismiss()
-                // Never leave the dark path: force MODE_NIGHT_YES regardless of choice.
-                MmkvManager.encodeSettings(AppConfig.PREF_UI_MODE_NIGHT, "2")
-                val mono = which == 1
-                if (mono != isMonoOn()) {
-                    MmkvManager.encodeSettings(
-                        AppConfig.PREF_COLOR_THEME,
-                        if (mono) BaseActivity.THEME_MONO else BaseActivity.THEME_BLUE
-                    )
-                    // The mono overlay is applied in BaseActivity.onCreate, so recreate to pick it up.
-                    recreate()
+                if (which == idx) return@setSingleChoiceItems
+                when (which) {
+                    0 -> {
+                        // Светлая: light day theme + blue accent.
+                        MmkvManager.encodeSettings(AppConfig.PREF_UI_MODE_NIGHT, "1")
+                        MmkvManager.encodeSettings(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_BLUE)
+                        SettingsManager.setNightMode()
+                    }
+                    1 -> {
+                        // Тёмная: dark theme + blue accent.
+                        MmkvManager.encodeSettings(AppConfig.PREF_UI_MODE_NIGHT, "2")
+                        MmkvManager.encodeSettings(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_BLUE)
+                        SettingsManager.setNightMode()
+                    }
+                    else -> {
+                        // Чёрно-белая: mono overlay, keep the current night mode.
+                        MmkvManager.encodeSettings(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_MONO)
+                    }
                 }
+                // The night mode and mono overlay are applied at activity creation, so recreate.
+                recreate()
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()

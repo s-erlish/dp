@@ -11,8 +11,9 @@
     <string name="settings_url_scheme">Схемы URL-адресов</string>
     <string name="settings_url_scheme_sub">Быстрые команды depv://</string>
 
-    <!-- Оформление (выбор темы: тёмная / чёрно-белая) -->
+    <!-- Оформление (выбор темы: светлая / тёмная / чёрно-белая) -->
     <string name="settings_appearance">Оформление</string>
+    <string name="settings_appearance_light">Светлая</string>
     <string name="settings_appearance_dark">Тёмная</string>
     <string name="settings_appearance_mono">Чёрно-белая</string>
 
