@@ -13,9 +13,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="16dp"
-        android:paddingBottom="24dp">
+        android:paddingHorizontal="@dimen/screen_gutter"
+        android:paddingTop="@dimen/space_16"
+        android:paddingBottom="@dimen/space_24">
 
         <!-- ==================== TELEGRAM ==================== -->
         <com.google.android.material.card.MaterialCardView
@@ -23,7 +23,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
+            app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
@@ -32,31 +32,30 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="@dimen/space_16">
 
                 <TextView
                     android:id="@+id/tv_tg_headline"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/auth_tg_headline"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
+                    android:textAppearance="@style/TextAppearance.App.Title"
+                    android:textColor="?attr/colorOnSurface" />
 
                 <TextView
                     android:id="@+id/tv_tg_desc"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="@dimen/space_8"
                     android:text="@string/auth_tg_desc"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="14sp" />
+                    android:textAppearance="@style/TextAppearance.App.Subtitle"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_telegram"
                     android:layout_width="match_parent"
                     android:layout_height="52dp"
-                    android:layout_marginTop="18dp"
+                    android:layout_marginTop="@dimen/space_16"
                     android:text="@string/auth_btn_telegram"
                     android:textAllCaps="false"
                     android:textColor="?attr/colorOnPrimary"
@@ -71,7 +70,7 @@
                     android:id="@+id/layout_awaiting"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="@dimen/space_16"
                     android:gravity="center"
                     android:orientation="vertical"
                     android:visibility="gone"
@@ -88,22 +87,22 @@
                         android:id="@+id/tv_awaiting"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="@dimen/space_12"
                         android:gravity="center"
                         android:text="@string/auth_awaiting"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="14sp" />
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_restart"
                         style="?attr/materialButtonOutlinedStyle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="@dimen/space_12"
                         android:text="@string/auth_restart"
                         android:textAllCaps="false"
                         android:textColor="?attr/colorPrimary"
-                        app:cornerRadius="18dp"
+                        app:cornerRadius="26dp"
                         app:strokeColor="?attr/colorPrimary" />
                 </LinearLayout>
             </LinearLayout>
@@ -114,9 +113,9 @@
             android:id="@+id/card_site"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="@dimen/space_16"
             app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
+            app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
             app:strokeWidth="1dp">
@@ -125,23 +124,22 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="@dimen/space_16">
 
                 <TextView
                     android:id="@+id/tv_site_headline"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/auth_site_headline"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
+                    android:textAppearance="@style/TextAppearance.App.Title"
+                    android:textColor="?attr/colorOnSurface" />
 
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/til_email"
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="@dimen/space_16"
                     android:hint="@string/auth_email_hint"
                     app:boxStrokeColor="?attr/colorPrimary"
                     app:hintTextColor="?attr/colorPrimary">
@@ -161,7 +159,7 @@
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="@dimen/space_12"
                     android:hint="@string/auth_password_hint"
                     app:boxStrokeColor="?attr/colorPrimary"
                     app:endIconMode="password_toggle"
@@ -182,7 +180,7 @@
                     android:id="@+id/btn_site"
                     android:layout_width="match_parent"
                     android:layout_height="52dp"
-                    android:layout_marginTop="18dp"
+                    android:layout_marginTop="@dimen/space_16"
                     android:text="@string/auth_btn_site"
                     android:textAllCaps="false"
                     android:textColor="?attr/colorOnPrimary"
@@ -195,7 +193,7 @@
                     android:id="@+id/layout_2fa"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="@dimen/space_16"
                     android:orientation="vertical"
                     android:visibility="gone"
                     tools:visibility="visible">
@@ -209,17 +207,17 @@
                         android:id="@+id/tv_2fa_desc"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
+                        android:layout_marginTop="@dimen/space_16"
                         android:text="@string/auth_2fa_desc"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="14sp" />
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
 
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/til_code"
                         style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="@dimen/space_12"
                         android:hint="@string/auth_2fa_hint"
                         app:boxStrokeColor="?attr/colorPrimary"
                         app:hintTextColor="?attr/colorPrimary">
@@ -238,7 +236,7 @@
                         android:id="@+id/btn_confirm_2fa"
                         android:layout_width="match_parent"
                         android:layout_height="52dp"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="@dimen/space_12"
                         android:text="@string/auth_btn_2fa"
                         android:textAllCaps="false"
                         android:textColor="?attr/colorOnPrimary"
@@ -252,7 +250,7 @@
                     style="?attr/materialButtonOutlinedStyle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="@dimen/space_12"
                     android:text="@string/auth_register_site"
                     android:textAllCaps="false"
                     android:textColor="?attr/colorPrimary"
@@ -265,10 +263,10 @@
             android:id="@+id/tv_error"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="@dimen/space_16"
             android:gravity="center"
+            android:textAppearance="@style/TextAppearance.App.Subtitle"
             android:textColor="?attr/colorError"
-            android:textSize="14sp"
             android:visibility="gone"
             tools:text="@string/auth_err_generic"
             tools:visibility="visible" />
