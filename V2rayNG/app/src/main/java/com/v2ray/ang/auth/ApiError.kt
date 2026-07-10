@@ -8,21 +8,30 @@ sealed class ApiError(message: String? = null, cause: Throwable? = null) : Excep
     /** Backend not configured (blank base URL) — login should not be offered. */
     object NotConfigured : ApiError("Backend not configured")
 
-    /** Network/IO failure (no connectivity, DNS, TLS, timeout). */
+    /** Network/IO failure (no connectivity, DNS, TLS). */
     class Network(cause: Throwable? = null) : ApiError("Network error", cause)
+
+    /** A request (or the login flow) exceeded its time budget. */
+    object Timeout : ApiError("Request timed out")
 
     /** 401/403 — session invalid or expired. */
     object Unauthorized : ApiError("Unauthorized")
 
+    /** 404 — resource not found (also the "keep polling" signal for telegram-login-check). */
+    object NotFound : ApiError("Not found")
+
+    /** 410 — resource gone / login token expired. */
+    object Gone : ApiError("Gone")
+
     /** 429 — too many requests. */
     object RateLimited : ApiError("Rate limited")
 
-    /** 5xx or unexpected non-2xx. */
+    /** 502/503 — backend temporarily unavailable. */
+    object ServiceUnavailable : ApiError("Service unavailable")
+
+    /** Any other unexpected non-2xx status. */
     class Server(val code: Int) : ApiError("Server error ($code)")
 
     /** Response body could not be parsed into the expected shape. */
     class Parse(cause: Throwable? = null) : ApiError("Failed to parse response", cause)
-
-    /** The login flow ran out of time before the user confirmed in Telegram. */
-    object Timeout : ApiError("Login timed out")
 }

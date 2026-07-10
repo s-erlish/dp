@@ -1,61 +1,105 @@
 package com.v2ray.ang.auth.dto
 
 /**
- * Gson data classes for the Departament backend auth + subscription contract.
- * Field names mirror the design doc; only these need to change if the real backend differs.
+ * Auth endpoints of the Departament backend (JWT, 7-day, NO refresh).
+ *
+ *  POST /client/auth/telegram-login-token  -> [TelegramTokenDto]
+ *  GET  /client/auth/telegram-login-check  -> 404 NotYet / 200 Confirmed / 410 Expired ([TelegramCheckResult])
+ *  POST /client/auth/login                 -> [LoginResult] (Success | Requires2FA)
+ *  POST /client/auth/2fa-login             -> [AuthResult]
+ *  POST /client/auth/google                -> [AuthResult]
+ *  GET  /client/auth/me                    -> [UserProfileDto]
  */
 
-data class AuthStartRequest(
-    val nonce: String,
-    val deviceId: String,
-    val platform: String = "android",
+// region request bodies
+
+data class LoginRequestDto(
+    val email: String,
+    val password: String,
 )
 
-data class AuthStartResponse(
-    val deepLink: String? = null,
-    val botUsername: String? = null,
-    val expiresInSec: Int = 120,
-)
-
-data class AuthPollRequest(
-    val nonce: String,
-    val deviceId: String,
-)
-
-data class AuthCodeRequest(
+data class TwoFaLoginRequestDto(
+    val tempToken: String,
     val code: String,
-    val deviceId: String,
 )
 
-/** status = "pending" | "ready" | "expired" */
-data class AuthPollResponse(
-    val status: String,
+data class GoogleLoginRequestDto(
+    val idToken: String,
+    val referralCode: String? = null,
+)
+
+// endregion
+
+// region raw responses (parsed then mapped to the sealed result types)
+
+/** POST /client/auth/telegram-login-token */
+data class TelegramTokenDto(
+    val token: String = "",
+)
+
+/** Raw 200 body of GET /client/auth/telegram-login-check. */
+data class TelegramCheckResponseDto(
+    val confirmed: Boolean = false,
     val token: String? = null,
-    val refreshToken: String? = null,
-    val expiresAt: Long? = null,
-    val user: UserProfileDto? = null,
-    val subscription: SubscriptionInfoDto? = null,
+    val client: UserProfileDto? = null,
+    val justCreated: Boolean = false,
 )
 
-data class RefreshRequest(
-    val refreshToken: String,
-    val deviceId: String,
+/** Raw body of POST /client/auth/login (either shape). */
+data class LoginResponseDto(
+    val token: String? = null,
+    val client: UserProfileDto? = null,
+    val requires2FA: Boolean = false,
+    val tempToken: String? = null,
 )
 
+// endregion
+
+// region result types consumed by the UI/session layer
+
+/** Outcome of polling GET /client/auth/telegram-login-check. */
+sealed interface TelegramCheckResult {
+    /** 404 — not confirmed yet, keep polling. */
+    object NotYet : TelegramCheckResult
+
+    /** 410 — the login token expired. */
+    object Expired : TelegramCheckResult
+
+    /** 200 — the user confirmed in Telegram; session is ready. */
+    data class Confirmed(
+        val token: String,
+        val client: UserProfileDto,
+        val justCreated: Boolean,
+    ) : TelegramCheckResult
+}
+
+/** Outcome of POST /client/auth/login. */
+sealed interface LoginResult {
+    /** Password accepted, session issued. */
+    data class Success(val token: String, val client: UserProfileDto) : LoginResult
+
+    /** Password accepted but a TOTP code is required; call 2fa-login with [tempToken]. */
+    data class Requires2FA(val tempToken: String) : LoginResult
+}
+
+/** A successful authentication carrying the JWT and profile. */
+data class AuthResult(
+    val token: String = "",
+    val client: UserProfileDto = UserProfileDto(),
+)
+
+/** The authenticated user's profile (GET /client/auth/me and embedded in auth responses). */
 data class UserProfileDto(
-    val id: String,
+    val id: String = "",
+    val email: String = "",
+    val balance: Double = 0.0,
+    val currency: String = "",
+    val telegramLinked: Boolean = false,
     val telegramId: Long? = null,
-    val username: String? = null,
-    val displayName: String? = null,
-    val avatarUrl: String? = null,
-)
-
-data class SubscriptionInfoDto(
-    val subscriptionUrl: String,      // Remnawave-style /api/sub/<shortUuid>
-    val remarks: String? = null,      // group name shown in the app
-    val status: String? = null,       // active | expired | limited
-    val expiresAt: Long? = null,      // epoch millis
-    val trafficUsedBytes: Long? = null,
-    val trafficLimitBytes: Long? = null,
-    val userAgent: String? = null,    // UA the backend wants us to send when fetching
+    val telegramUsername: String? = null,
+    val referralCode: String = "",
+    val remnawaveUuid: String = "",
+    val trialUsed: Boolean = false,
+    val autoRenewEnabled: Boolean = false,
+    val totpEnabled: Boolean = false,
 )

@@ -3,33 +3,56 @@ package com.v2ray.ang.auth
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import com.v2ray.ang.AppConfig
-import com.v2ray.ang.auth.dto.AuthCodeRequest
-import com.v2ray.ang.auth.dto.AuthPollRequest
-import com.v2ray.ang.auth.dto.AuthPollResponse
-import com.v2ray.ang.auth.dto.AuthStartRequest
-import com.v2ray.ang.auth.dto.AuthStartResponse
-import com.v2ray.ang.auth.dto.RefreshRequest
-import com.v2ray.ang.auth.dto.SubscriptionInfoDto
+import com.v2ray.ang.auth.dto.AddDevicesRequestDto
+import com.v2ray.ang.auth.dto.AuthResult
+import com.v2ray.ang.auth.dto.AutoRenewRequestDto
+import com.v2ray.ang.auth.dto.DeleteDeviceRequestDto
+import com.v2ray.ang.auth.dto.DevicesDto
+import com.v2ray.ang.auth.dto.GoogleLoginRequestDto
+import com.v2ray.ang.auth.dto.LoginRequestDto
+import com.v2ray.ang.auth.dto.LoginResponseDto
+import com.v2ray.ang.auth.dto.LoginResult
+import com.v2ray.ang.auth.dto.PaymentInitDto
+import com.v2ray.ang.auth.dto.PaymentRequestDto
+import com.v2ray.ang.auth.dto.PaymentResultDto
+import com.v2ray.ang.auth.dto.PaymentsDto
+import com.v2ray.ang.auth.dto.PromoDto
+import com.v2ray.ang.auth.dto.PromoRequestDto
+import com.v2ray.ang.auth.dto.PublicConfigDto
+import com.v2ray.ang.auth.dto.ReferralStatsDto
+import com.v2ray.ang.auth.dto.RenameRequestDto
+import com.v2ray.ang.auth.dto.ServerStatusDto
+import com.v2ray.ang.auth.dto.SubscriptionAllDto
+import com.v2ray.ang.auth.dto.TariffCatalogDto
+import com.v2ray.ang.auth.dto.TelegramCheckResponseDto
+import com.v2ray.ang.auth.dto.TelegramCheckResult
+import com.v2ray.ang.auth.dto.TelegramTokenDto
+import com.v2ray.ang.auth.dto.TwoFaLoginRequestDto
+import com.v2ray.ang.auth.dto.UpgradeQuoteDto
+import com.v2ray.ang.auth.dto.UpgradeRequestDto
 import com.v2ray.ang.auth.dto.UserProfileDto
 import com.v2ray.ang.handler.SettingsManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import java.io.IOException
+import java.lang.reflect.Type
+import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 
 /**
  * OkHttp + Gson implementation of [DepartamentApiClient].
  *
- * Builds requests against [BackendConfig.baseUrl] + endpoint paths, attaches Bearer auth
- * where required and the negotiated User-Agent for subscription calls. Maps every failure
- * to an [ApiError]; never logs tokens.
- *
- * There is no real backend yet — calls simply fail gracefully (ApiError.NotConfigured when
- * the base URL is blank, ApiError.Network otherwise) until BuildConfig is filled in.
+ * A single request interceptor attaches Accept, User-Agent, the Bearer JWT (from
+ * [AuthTokenStore]) and an optional X-HWID header. Every failure is mapped to an [ApiError];
+ * tokens and subscription URLs are never logged. All calls throw [ApiError.NotConfigured]
+ * when the backend base URL is blank, so the whole layer is inert until configured.
  */
 class DepartamentApiClientImpl(
     private val gson: Gson = Gson(),
@@ -39,88 +62,271 @@ class DepartamentApiClientImpl(
     companion object {
         private val JSON = "application/json; charset=utf-8".toMediaType()
 
+        private val authInterceptor = Interceptor { chain ->
+            val builder = chain.request().newBuilder()
+                .header("Accept", "application/json")
+                .header("User-Agent", BackendConfig.subscriptionUserAgent)
+            AuthTokenStore.getToken()?.takeIf { it.isNotBlank() }?.let {
+                builder.header("Authorization", "Bearer $it")
+            }
+            if (SettingsManager.isSendHwid()) {
+                builder.header(AppConfig.HEADER_HWID, AuthTokenStore.deviceId())
+            }
+            chain.proceed(builder.build())
+        }
+
         private fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
+            .addInterceptor(authInterceptor)
             .build()
     }
 
-    override suspend fun startTelegramAuth(req: AuthStartRequest): AuthStartResponse =
-        post(BackendConfig.endpoints.authStart, gson.toJson(req), token = null, cls = AuthStartResponse::class.java)
+    // region public
 
-    override suspend fun pollTelegramAuth(req: AuthPollRequest): AuthPollResponse =
-        post(BackendConfig.endpoints.authPoll, gson.toJson(req), token = null, cls = AuthPollResponse::class.java)
+    override suspend fun getPublicConfig(): PublicConfigDto =
+        getJson(BackendConfig.Endpoints.publicConfig, PublicConfigDto::class.java)
 
-    override suspend fun submitAuthCode(req: AuthCodeRequest): AuthPollResponse =
-        post(BackendConfig.endpoints.authCode, gson.toJson(req), token = null, cls = AuthPollResponse::class.java)
+    override suspend fun getPublicTariffs(): TariffCatalogDto =
+        getJson(BackendConfig.Endpoints.publicTariffs, TariffCatalogDto::class.java)
 
-    override suspend fun getProfile(token: String): UserProfileDto =
-        get(BackendConfig.endpoints.profile, token = token, cls = UserProfileDto::class.java)
-
-    override suspend fun getSubscription(token: String): SubscriptionInfoDto =
-        get(BackendConfig.endpoints.subscription, token = token, cls = SubscriptionInfoDto::class.java)
-
-    override suspend fun refresh(req: RefreshRequest): AuthPollResponse =
-        post(BackendConfig.endpoints.refresh, gson.toJson(req), token = null, cls = AuthPollResponse::class.java)
-
-    override suspend fun logout(token: String) {
-        // Best-effort: ignore body, only care that the call was attempted.
-        execute(buildRequest(BackendConfig.endpoints.logout, method = "POST", body = "{}", token = token))
+    override suspend fun getServerStatus(): List<ServerStatusDto> {
+        val type = object : com.google.gson.reflect.TypeToken<List<ServerStatusDto>>() {}.type
+        return getJsonType(BackendConfig.Endpoints.serverStatus, type)
     }
+
+    // endregion
+
+    // region auth
+
+    override suspend fun createTelegramLoginToken(): TelegramTokenDto =
+        postJson(BackendConfig.Endpoints.telegramLoginToken, "{}", TelegramTokenDto::class.java)
+
+    override suspend fun checkTelegramLogin(token: String): TelegramCheckResult {
+        ensureConfigured()
+        val url = urlOf(BackendConfig.Endpoints.telegramLoginCheck)
+            .addQueryParameter("token", token)
+            .build()
+        val resp = execute(Request.Builder().url(url).get().build())
+        resp.use {
+            return when (it.code) {
+                404 -> TelegramCheckResult.NotYet
+                410 -> TelegramCheckResult.Expired
+                in 200..299 -> {
+                    val raw = parse(it.body?.string().orEmpty(), TelegramCheckResponseDto::class.java)
+                    val jwt = raw.token
+                    val client = raw.client
+                    if (raw.confirmed && !jwt.isNullOrBlank() && client != null) {
+                        TelegramCheckResult.Confirmed(jwt, client, raw.justCreated)
+                    } else {
+                        TelegramCheckResult.NotYet
+                    }
+                }
+                else -> throw mapError(it.code)
+            }
+        }
+    }
+
+    override suspend fun login(email: String, password: String): LoginResult {
+        val raw = postJson(BackendConfig.Endpoints.login, gson.toJson(LoginRequestDto(email, password)), LoginResponseDto::class.java)
+        val tempToken = raw.tempToken
+        val token = raw.token
+        val client = raw.client
+        return when {
+            raw.requires2FA && !tempToken.isNullOrBlank() -> LoginResult.Requires2FA(tempToken)
+            !token.isNullOrBlank() && client != null -> LoginResult.Success(token, client)
+            else -> throw ApiError.Parse()
+        }
+    }
+
+    override suspend fun login2fa(tempToken: String, code: String): AuthResult =
+        postJson(BackendConfig.Endpoints.twoFaLogin, gson.toJson(TwoFaLoginRequestDto(tempToken, code)), AuthResult::class.java)
+
+    override suspend fun loginGoogle(idToken: String, referralCode: String?): AuthResult =
+        postJson(BackendConfig.Endpoints.googleLogin, gson.toJson(GoogleLoginRequestDto(idToken, referralCode)), AuthResult::class.java)
+
+    override suspend fun getMe(): UserProfileDto =
+        getJson(BackendConfig.Endpoints.me, UserProfileDto::class.java)
+
+    // endregion
+
+    // region subscription
+
+    override suspend fun getSubscriptionAll(): SubscriptionAllDto =
+        getJson(BackendConfig.Endpoints.subscriptionAll, SubscriptionAllDto::class.java)
+
+    override suspend fun renameSubscription(scope: String, id: String, name: String) {
+        ensureConfigured()
+        val body = gson.toJson(RenameRequestDto(name)).toRequestBody(JSON)
+        val req = Request.Builder().url(urlOf(BackendConfig.Endpoints.renameSubscription(scope, id)).build()).patch(body).build()
+        executeVoid(req)
+    }
+
+    override suspend fun getSubscriptionQr(remnawaveUuid: String): ByteArray {
+        ensureConfigured()
+        val url = urlOf(BackendConfig.Endpoints.subscriptionQr).addQueryParameter("uuid", remnawaveUuid).build()
+        val resp = execute(Request.Builder().url(url).get().build())
+        resp.use {
+            if (!it.isSuccessful) throw mapError(it.code)
+            return it.body?.bytes() ?: throw ApiError.Parse()
+        }
+    }
+
+    override suspend fun addDevices(scope: String, id: String, extraDevices: Int, method: String, paymentMethod: String?): PaymentInitDto {
+        val json = gson.toJson(AddDevicesRequestDto(extraDevices, method, paymentMethod))
+        return postJson(BackendConfig.Endpoints.addDevices(scope, id), json, PaymentInitDto::class.java)
+    }
+
+    override suspend fun getUpgradeQuote(targetTariffId: String): UpgradeQuoteDto {
+        ensureConfigured()
+        val url = urlOf(BackendConfig.Endpoints.upgradeQuote).addQueryParameter("targetTariffId", targetTariffId).build()
+        return call(Request.Builder().url(url).get().build(), UpgradeQuoteDto::class.java)
+    }
+
+    override suspend fun upgrade(targetTariffId: String, method: String, paymentMethod: String?, subscriptionUuid: String): PaymentInitDto {
+        val json = gson.toJson(UpgradeRequestDto(targetTariffId, method, paymentMethod, subscriptionUuid))
+        return postJson(BackendConfig.Endpoints.upgrade, json, PaymentInitDto::class.java)
+    }
+
+    // endregion
+
+    // region devices
+
+    override suspend fun getDevices(remnawaveUuid: String): DevicesDto {
+        ensureConfigured()
+        val url = urlOf(BackendConfig.Endpoints.devices).addQueryParameter("uuid", remnawaveUuid).build()
+        return call(Request.Builder().url(url).get().build(), DevicesDto::class.java)
+    }
+
+    override suspend fun deleteDevice(hwid: String, remnawaveUuid: String) {
+        ensureConfigured()
+        val body = gson.toJson(DeleteDeviceRequestDto(hwid, remnawaveUuid)).toRequestBody(JSON)
+        executeVoid(Request.Builder().url(urlOf(BackendConfig.Endpoints.deleteDevice).build()).post(body).build())
+    }
+
+    // endregion
+
+    // region payments
+
+    override suspend fun payPlatega(req: PaymentRequestDto): PaymentInitDto =
+        postJson(BackendConfig.Endpoints.payPlatega, gson.toJson(req), PaymentInitDto::class.java)
+
+    override suspend fun payBalance(req: PaymentRequestDto): PaymentResultDto =
+        postJson(BackendConfig.Endpoints.payBalance, gson.toJson(req), PaymentResultDto::class.java)
+
+    override suspend fun getPayments(): PaymentsDto =
+        getJson(BackendConfig.Endpoints.payments, PaymentsDto::class.java)
+
+    // endregion
+
+    // region promo / trial / referral
+
+    override suspend fun checkPromo(code: String): PromoDto =
+        postJson(BackendConfig.Endpoints.promoCheck, gson.toJson(PromoRequestDto(code)), PromoDto::class.java)
+
+    override suspend fun activatePromo(code: String) {
+        ensureConfigured()
+        val body = gson.toJson(PromoRequestDto(code)).toRequestBody(JSON)
+        executeVoid(Request.Builder().url(urlOf(BackendConfig.Endpoints.promoActivate).build()).post(body).build())
+    }
+
+    override suspend fun activateTrial() {
+        ensureConfigured()
+        val body = "{}".toRequestBody(JSON)
+        executeVoid(Request.Builder().url(urlOf(BackendConfig.Endpoints.trial).build()).post(body).build())
+    }
+
+    override suspend fun setSecondaryAutoRenew(id: String, autoRenew: Boolean) {
+        ensureConfigured()
+        val body = gson.toJson(AutoRenewRequestDto(autoRenew)).toRequestBody(JSON)
+        executeVoid(Request.Builder().url(urlOf(BackendConfig.Endpoints.secondaryAutoRenew(id)).build()).patch(body).build())
+    }
+
+    override suspend fun getReferralStats(): ReferralStatsDto =
+        getJson(BackendConfig.Endpoints.referralStats, ReferralStatsDto::class.java)
+
+    // endregion
 
     // region internals
 
-    private suspend fun <T> post(path: String, json: String, token: String?, cls: Class<T>): T {
-        val body = execute(buildRequest(path, method = "POST", body = json, token = token))
-        return parse(body, cls)
-    }
-
-    private suspend fun <T> get(path: String, token: String?, cls: Class<T>): T {
-        val body = execute(buildRequest(path, method = "GET", body = null, token = token))
-        return parse(body, cls)
-    }
-
-    private fun buildRequest(path: String, method: String, body: String?, token: String?): Request {
+    private fun ensureConfigured() {
         if (!BackendConfig.isConfigured()) throw ApiError.NotConfigured
-        val builder = Request.Builder()
-            .url(BackendConfig.baseUrl + path)
-            .header("Accept", "application/json")
-            .header("User-Agent", BackendConfig.subscriptionUserAgent)
-        if (SettingsManager.isSendHwid()) {
-            builder.header(AppConfig.HEADER_HWID, AuthTokenStore.deviceId())
-        }
-        if (!token.isNullOrBlank()) {
-            builder.header("Authorization", "Bearer $token")
-        }
-        when (method) {
-            "GET" -> builder.get()
-            else -> builder.post((body ?: "").toRequestBody(JSON))
-        }
-        return builder.build()
     }
 
-    /** Executes the call on IO and returns the response body string, mapping failures to ApiError. */
-    private suspend fun execute(request: Request): String = withContext(Dispatchers.IO) {
+    private fun urlOf(path: String) = (BackendConfig.baseUrl + path).toHttpUrl().newBuilder()
+
+    private suspend fun <T> getJson(path: String, cls: Class<T>): T {
+        ensureConfigured()
+        return call(Request.Builder().url(urlOf(path).build()).get().build(), cls)
+    }
+
+    private suspend fun <T> getJsonType(path: String, type: Type): T {
+        ensureConfigured()
+        return callType(Request.Builder().url(urlOf(path).build()).get().build(), type)
+    }
+
+    private suspend fun <T> postJson(path: String, json: String, cls: Class<T>): T {
+        ensureConfigured()
+        val req = Request.Builder().url(urlOf(path).build()).post(json.toRequestBody(JSON)).build()
+        return call(req, cls)
+    }
+
+    private suspend fun <T> call(request: Request, cls: Class<T>): T {
+        val resp = execute(request)
+        resp.use {
+            val body = it.body?.string().orEmpty()
+            if (!it.isSuccessful) throw mapError(it.code)
+            return parse(body, cls)
+        }
+    }
+
+    private suspend fun <T> callType(request: Request, type: Type): T {
+        val resp = execute(request)
+        resp.use {
+            val body = it.body?.string().orEmpty()
+            if (!it.isSuccessful) throw mapError(it.code)
+            return parseType(body, type)
+        }
+    }
+
+    private suspend fun executeVoid(request: Request) {
+        val resp = execute(request)
+        resp.use {
+            if (!it.isSuccessful) throw mapError(it.code)
+        }
+    }
+
+    /** Executes the call on IO, mapping transport failures to [ApiError]. Caller must close. */
+    private suspend fun execute(request: Request): Response = withContext(Dispatchers.IO) {
         try {
-            http.newCall(request).execute().use { response ->
-                val bodyStr = response.body?.string().orEmpty()
-                when {
-                    response.isSuccessful -> bodyStr
-                    response.code == 401 || response.code == 403 -> throw ApiError.Unauthorized
-                    response.code == 429 -> throw ApiError.RateLimited
-                    else -> throw ApiError.Server(response.code)
-                }
-            }
-        } catch (e: ApiError) {
-            throw e
+            http.newCall(request).execute()
+        } catch (e: SocketTimeoutException) {
+            throw ApiError.Timeout
         } catch (e: IOException) {
             throw ApiError.Network(e)
         }
     }
 
+    private fun mapError(code: Int): ApiError = when (code) {
+        401, 403 -> ApiError.Unauthorized
+        404 -> ApiError.NotFound
+        410 -> ApiError.Gone
+        429 -> ApiError.RateLimited
+        502, 503 -> ApiError.ServiceUnavailable
+        else -> ApiError.Server(code)
+    }
+
     private fun <T> parse(body: String, cls: Class<T>): T {
         return try {
             gson.fromJson(body, cls) ?: throw ApiError.Parse()
+        } catch (e: JsonSyntaxException) {
+            throw ApiError.Parse(e)
+        }
+    }
+
+    private fun <T> parseType(body: String, type: Type): T {
+        return try {
+            gson.fromJson<T>(body, type) ?: throw ApiError.Parse()
         } catch (e: JsonSyntaxException) {
             throw ApiError.Parse(e)
         }

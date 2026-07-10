@@ -1,6 +1,6 @@
 package com.v2ray.ang.auth
 
-import com.v2ray.ang.auth.dto.SubscriptionInfoDto
+import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.dto.entities.SubscriptionCache
 import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.handler.AngConfigManager
@@ -11,50 +11,75 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Bridges the backend subscription payload into the app's EXISTING subscription plumbing.
+ * Bridges the backend subscription payloads into the app's EXISTING subscription plumbing.
  *
- * This is the only place that touches existing config code, and it reuses rather than
+ * This is the only place that touches the existing config code, and it reuses rather than
  * duplicates it:
- *  - [MmkvManager.encodeSubscription] / [MmkvManager.decodeSubscription] persist the item
+ *  - [MmkvManager.encodeSubscription] / [MmkvManager.decodeSubscription] persist each item
  *  - [AngConfigManager.updateConfigViaSub] fetches + parses the servers (no new parsing)
  *  - [SubscriptionUpdater.syncOne] / [SubscriptionUpdater.cancelOne] handle periodic refresh
  *
- * The guid we own is stored in [AuthTokenStore]. Because MmkvManager.encodeSubscription does
- * not return the generated guid, we generate a stable one ourselves on first import.
+ * The uuid->guid mapping is owned by [AuthTokenStore]; MmkvManager does not return the guid it
+ * generates, so we generate a stable one ourselves on first import and remember it.
  */
 class SubscriptionSyncManager {
 
     /**
-     * Imports (first time) or updates the managed subscription from [info], then triggers a
-     * synchronous fetch/parse and schedules periodic auto-update.
+     * Imports/updates every subscription in [items], removes locally any managed subscription no
+     * longer present remotely, and returns the local guids of the current managed set (so the UI
+     * can reload its server list).
      */
-    suspend fun importOrUpdate(info: SubscriptionInfoDto) = withContext(Dispatchers.IO) {
-        val existingGuid = AuthTokenStore.managedSubGuid()
-        val guid = existingGuid.ifBlank { Utils.getUuid() }
+    suspend fun importAll(items: List<SubInfoDto>): List<String> = withContext(Dispatchers.IO) {
+        val managed = AuthTokenStore.getManagedGuids()
+        val newMap = HashMap<String, String>()
+        val resultGuids = ArrayList<String>()
 
-        val item = (MmkvManager.decodeSubscription(guid) ?: SubscriptionItem()).apply {
-            remarks = info.remarks?.ifBlank { null } ?: "Departament VPN"
-            url = info.subscriptionUrl
-            enabled = true
-            autoUpdate = true
-            userAgent = info.userAgent ?: BackendConfig.subscriptionUserAgent
+        for (info in items) {
+            val raw = info.subscription?.response ?: continue
+            val url = raw.subscriptionUrl
+            if (url.isBlank()) continue
+
+            val uuid = info.remnawaveUuid.ifBlank { info.id }.ifBlank { url }
+            val guid = managed[uuid]?.ifBlank { null } ?: Utils.getUuid()
+
+            val item = (MmkvManager.decodeSubscription(guid) ?: SubscriptionItem()).apply {
+                remarks = info.displayName?.ifBlank { null }
+                    ?: info.tariffDisplayName?.ifBlank { null }
+                    ?: "Departament VPN"
+                this.url = url
+                enabled = true
+                autoUpdate = true
+                userAgent = BackendConfig.subscriptionUserAgent
+            }
+
+            MmkvManager.encodeSubscription(guid, item)
+            AngConfigManager.updateConfigViaSub(SubscriptionCache(guid, item))
+            SubscriptionUpdater.syncOne(subId = guid)
+
+            newMap[uuid] = guid
+            resultGuids.add(guid)
         }
 
-        MmkvManager.encodeSubscription(guid, item)
-        AuthTokenStore.setManagedSubGuid(guid)
+        // Drop any previously managed subscription that is gone remotely.
+        for ((uuid, guid) in managed) {
+            if (!newMap.containsKey(uuid)) {
+                SubscriptionUpdater.cancelOne(subId = guid)
+                MmkvManager.removeSubscription(guid)
+            }
+        }
 
-        // Fetch + parse the servers using existing machinery.
-        AngConfigManager.updateConfigViaSub(SubscriptionCache(guid, item))
-        // Schedule periodic refresh via WorkManager.
-        SubscriptionUpdater.syncOne(subId = guid)
+        AuthTokenStore.setManagedGuids(newMap)
+        resultGuids
     }
 
-    /** Removes the managed subscription and cancels its auto-update task. */
-    fun removeManagedSubscription() {
-        val guid = AuthTokenStore.managedSubGuid()
-        if (guid.isBlank()) return
-        SubscriptionUpdater.cancelOne(subId = guid)
-        MmkvManager.removeSubscription(guid)
-        AuthTokenStore.setManagedSubGuid("")
+    /** Removes every managed subscription and cancels their auto-update tasks (logout / 401). */
+    fun removeAllManaged() {
+        val managed = AuthTokenStore.getManagedGuids()
+        for ((_, guid) in managed) {
+            if (guid.isBlank()) continue
+            SubscriptionUpdater.cancelOne(subId = guid)
+            MmkvManager.removeSubscription(guid)
+        }
+        AuthTokenStore.setManagedGuids(emptyMap())
     }
 }

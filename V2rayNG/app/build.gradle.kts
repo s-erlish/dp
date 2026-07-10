@@ -162,6 +162,9 @@ dependencies {
     implementation(libs.androidx.viewpager2)
     implementation(libs.androidx.fragment)
 
+    // Custom Tabs (Telegram deep-link / payment checkout hand-off)
+    implementation("androidx.browser:browser:1.8.0")
+
     // UI Libraries
     implementation(libs.material)
     implementation(libs.toasty)
