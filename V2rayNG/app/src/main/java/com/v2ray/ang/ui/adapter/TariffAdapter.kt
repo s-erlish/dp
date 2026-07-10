@@ -1,21 +1,21 @@
 package com.v2ray.ang.ui.adapter
 
-import android.content.Context
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
-import android.widget.LinearLayout
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.button.MaterialButton
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.dto.PriceOptionDto
 import com.v2ray.ang.auth.dto.TariffDto
 import com.v2ray.ang.auth.dto.TariffGroupDto
+import com.v2ray.ang.databinding.ItemPriceOptionBinding
 import com.v2ray.ang.databinding.ItemTariffBinding
 import java.util.Locale
 
 /**
- * Flattens the grouped tariff catalog into one card per tariff. Each duration/price option
- * becomes a tappable button; tapping it starts a purchase for that (tariff, priceOption).
+ * Flattens the grouped tariff catalog into one collapsible card per tariff. Each card shows a
+ * compact header (emoji + name + devices/traffic summary + chevron); tapping it expands the
+ * duration/price options. Options are collapsed by default and the expanded set is tracked here.
  */
 class TariffAdapter(
     private val onBuy: (tariff: TariffDto, priceOption: PriceOptionDto?) -> Unit,
@@ -25,6 +25,9 @@ class TariffAdapter(
     data class Row(val groupName: String, val groupEmoji: String, val tariff: TariffDto)
 
     private val rows = mutableListOf<Row>()
+
+    /** Stable keys of the tariffs whose price options are currently expanded. */
+    private val expandedKeys = mutableSetOf<String>()
 
     fun submit(groups: List<TariffGroupDto>) {
         rows.clear()
@@ -47,78 +50,74 @@ class TariffAdapter(
         val tariff = row.tariff
         val ctx = holder.itemView.context
         val b = holder.binding
+        val key = keyOf(row)
 
-        b.tvGroup.text = listOf(row.groupEmoji, row.groupName)
-            .filter { it.isNotBlank() }
-            .joinToString(" ")
-        b.tvGroup.visibility = if (b.tvGroup.text.isNullOrBlank()) android.view.View.GONE
-        else android.view.View.VISIBLE
+        // Emoji glyph (hidden when the group has none).
+        if (row.groupEmoji.isBlank()) {
+            b.tvGroupEmoji.visibility = View.GONE
+        } else {
+            b.tvGroupEmoji.visibility = View.VISIBLE
+            b.tvGroupEmoji.text = row.groupEmoji
+        }
 
         b.tvTariffName.text = tariff.name
 
-        val trafficStr = if (tariff.isUnlimitedTraffic()) {
+        val limitBytes = tariff.trafficLimitBytes ?: 0L
+        val trafficStr = if (tariff.isUnlimitedTraffic() || limitBytes <= 0L) {
             ctx.getString(R.string.account_unlimited)
         } else {
-            formatBytes(tariff.trafficLimitBytes ?: 0L)
+            formatBytes(limitBytes)
         }
         b.tvTariffInfo.text = ctx.getString(R.string.account_tariff_devices, tariff.includedDevices) +
             " · " + ctx.getString(R.string.account_tariff_traffic, trafficStr)
 
-        // Rebuild the price-option buttons (views are recycled).
+        val isExpanded = expandedKeys.contains(key)
+        b.llPriceOptions.visibility = if (isExpanded) View.VISIBLE else View.GONE
+        b.ivChevron.rotation = if (isExpanded) 90f else 0f
+
+        // Rebuild the price-option rows (views are recycled).
         b.llPriceOptions.removeAllViews()
-        if (tariff.priceOptions.isEmpty()) {
-            addOptionButton(
-                b.llPriceOptions,
-                ctx,
-                tariff.durationDays,
-                tariff.price,
-                tariff.currency,
-            ) { onBuy(tariff, null) }
-        } else {
-            tariff.priceOptions.sortedBy { it.sortOrder }.forEach { option ->
-                addOptionButton(
-                    b.llPriceOptions,
-                    ctx,
-                    option.durationDays,
-                    option.price,
-                    tariff.currency,
-                ) { onBuy(tariff, option) }
+        val options = tariff.priceOptions.sortedBy { it.sortOrder }
+        if (options.isEmpty()) {
+            addOptionRow(b.llPriceOptions, tariff.durationDays, tariff.price, tariff.currency) {
+                onBuy(tariff, null)
             }
+        } else {
+            options.forEach { option ->
+                addOptionRow(b.llPriceOptions, option.durationDays, option.price, tariff.currency) {
+                    onBuy(tariff, option)
+                }
+            }
+        }
+
+        b.headerTariff.setOnClickListener {
+            val pos = holder.bindingAdapterPosition
+            if (pos == RecyclerView.NO_POSITION) return@setOnClickListener
+            if (expandedKeys.contains(key)) expandedKeys.remove(key) else expandedKeys.add(key)
+            notifyItemChanged(pos)
         }
     }
 
-    private fun addOptionButton(
-        container: LinearLayout,
-        ctx: Context,
+    private fun addOptionRow(
+        container: ViewGroup,
         durationDays: Int,
         price: Double,
         currency: String,
         onClick: () -> Unit,
     ) {
-        val button = MaterialButton(ctx).apply {
-            text = ctx.getString(
-                R.string.account_price_option,
-                durationDays,
-                formatMoney(price, currency),
-            )
-            setAllCaps(false)
-            cornerRadius = dp(ctx, 22)
-            val lp = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            )
-            lp.topMargin = dp(ctx, 6)
-            layoutParams = lp
-            setOnClickListener { onClick() }
-        }
-        container.addView(button)
+        val ctx = container.context
+        val ob = ItemPriceOptionBinding.inflate(LayoutInflater.from(ctx), container, false)
+        ob.tvOptionDuration.text = ctx.getString(R.string.account_option_duration, durationDays)
+        ob.tvOptionPrice.text = formatMoney(price, currency)
+        ob.root.setOnClickListener { onClick() }
+        container.addView(ob.root)
     }
+
+    private fun keyOf(row: Row): String =
+        row.tariff.id.ifBlank { row.groupName + "/" + row.tariff.name }
 
     class VH(val binding: ItemTariffBinding) : RecyclerView.ViewHolder(binding.root)
 }
-
-private fun dp(context: Context, value: Int): Int =
-    (value * context.resources.displayMetrics.density).toInt()
 
 private fun formatMoney(amount: Double, currency: String): String {
     val n = if (amount % 1.0 == 0.0) amount.toLong().toString()

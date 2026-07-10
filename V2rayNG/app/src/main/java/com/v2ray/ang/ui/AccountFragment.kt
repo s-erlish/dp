@@ -7,13 +7,10 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.text.InputType
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.EditText
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
@@ -22,8 +19,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.ApiError
+import com.v2ray.ang.auth.dto.PaymentDto
 import com.v2ray.ang.auth.dto.PaymentInitDto
 import com.v2ray.ang.auth.dto.PaymentRequestDto
 import com.v2ray.ang.auth.dto.PriceOptionDto
@@ -33,6 +32,7 @@ import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.auth.dto.TariffDto
 import com.v2ray.ang.auth.dto.UserProfileDto
 import com.v2ray.ang.databinding.ActivityAccountBinding
+import com.v2ray.ang.databinding.DialogTopUpBinding
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
@@ -76,6 +76,14 @@ class AccountFragment : Fragment() {
 
     private var pendingPayment = false
     private var pollJob: Job? = null
+
+    // Payment history is paginated locally: keep the full list, reveal PAGE_SIZE more at a time.
+    private var allPayments: List<PaymentDto> = emptyList()
+    private var paymentsShown = PAGE_SIZE
+
+    // Set right before a purchase/top-up call so the NEXT error emission is surfaced as the real
+    // "Ошибка оплаты" diagnostic dialog instead of the friendly toast. Cleared on success.
+    private var awaitingPaymentError = false
 
     // Gallery picker for a custom avatar. GetContent grants a one-shot read grant, which is
     // enough since we copy the bytes into app storage immediately. Registered at construction
@@ -134,6 +142,7 @@ class AccountFragment : Fragment() {
         binding.btnAddDevices.setOnClickListener { doAddDevices() }
         binding.btnCheckPromo.setOnClickListener { doCheckPromo() }
         binding.btnTrial.setOnClickListener { doActivateTrial() }
+        binding.btnPaymentsMore.setOnClickListener { showMorePayments() }
         binding.avatarContainer.setOnClickListener { showAvatarOptions() }
         binding.imgAvatarEdit.setOnClickListener { showAvatarOptions() }
     }
@@ -178,6 +187,7 @@ class AccountFragment : Fragment() {
         latestProfile = profile
         if (profile == null) {
             binding.tvEmail.text = ""
+            binding.tvTelegram.visibility = View.VISIBLE
             binding.tvTelegram.setText(R.string.account_no_telegram)
             binding.tvBalance.text = formatMoney(0.0, "")
             binding.tvReferral.visibility = View.GONE
@@ -190,16 +200,22 @@ class AccountFragment : Fragment() {
         val uname = profile.telegramUsername?.takeIf { it.isNotBlank() }
         val handle = uname?.let { "@$it" }
         val display = profile.telegramName?.takeIf { it.isNotBlank() }
-        val primary = display ?: handle ?: profile.email
+        val email = profile.email.takeIf { it.isNotBlank() }
+        val primary = display ?: handle ?: email.orEmpty()
         binding.tvEmail.text = primary
-        // Secondary line keeps the @username/email identity. When a real display name is shown
-        // above, put the @handle (or e-mail) beneath it; otherwise this matches the prior behaviour.
-        binding.tvTelegram.text = when {
+        // Secondary line must NOT duplicate the primary: prefer a distinct e-mail, else the @handle
+        // beneath a display name; when there is no Telegram identity at all, hint that it is unlinked.
+        val secondary = when {
+            email != null && email != primary -> email
             display != null && handle != null -> handle
-            display != null && profile.email.isNotBlank() -> profile.email
-            uname != null && profile.email.isNotBlank() -> profile.email
-            uname != null -> getString(R.string.account_telegram, uname)
-            else -> getString(R.string.account_no_telegram)
+            display == null && handle == null -> getString(R.string.account_no_telegram)
+            else -> null
+        }
+        if (secondary != null) {
+            binding.tvTelegram.visibility = View.VISIBLE
+            binding.tvTelegram.text = secondary
+        } else {
+            binding.tvTelegram.visibility = View.GONE
         }
         AvatarManager.setMonogram(binding.tvAvatarInitial, primary)
         AvatarManager.applyAvatar(viewLifecycleOwner.lifecycleScope, requireContext(), binding.imgAvatar, binding.tvAvatarInitial, profile)
@@ -236,17 +252,76 @@ class AccountFragment : Fragment() {
         binding.rvTariffs.visibility = if (empty) View.GONE else View.VISIBLE
     }
 
-    private fun renderPayments(list: List<com.v2ray.ang.auth.dto.PaymentDto>) {
-        paymentsAdapter.submit(list)
-        val empty = list.isEmpty()
-        binding.tvPaymentsEmpty.visibility = if (empty) View.VISIBLE else View.GONE
-        binding.rvPayments.visibility = if (empty) View.GONE else View.VISIBLE
+    private fun renderPayments(list: List<PaymentDto>) {
+        allPayments = list
+        // Hide the whole "История платежей" section when there is nothing to show.
+        if (list.isEmpty()) {
+            binding.tvPaymentsHeader.visibility = View.GONE
+            binding.rvPayments.visibility = View.GONE
+            binding.btnPaymentsMore.visibility = View.GONE
+            paymentsAdapter.submit(emptyList())
+            return
+        }
+        binding.tvPaymentsHeader.visibility = View.VISIBLE
+        binding.rvPayments.visibility = View.VISIBLE
+        updatePaymentsList()
+    }
+
+    /** Applies the current page size: shows [paymentsShown] rows and toggles the "показать ещё" footer. */
+    private fun updatePaymentsList() {
+        val total = allPayments.size
+        if (total == 0) return
+        val shown = paymentsShown.coerceIn(minOf(PAGE_SIZE, total), total)
+        paymentsAdapter.submit(allPayments.take(shown))
+        binding.btnPaymentsMore.visibility = if (shown < total) View.VISIBLE else View.GONE
+    }
+
+    private fun showMorePayments() {
+        paymentsShown = (paymentsShown + PAGE_SIZE).coerceAtMost(allPayments.size)
+        updatePaymentsList()
     }
 
     private fun renderError(error: ApiError?) {
         if (error == null) return
-        toastError(messageFor(error))
+        // A purchase/top-up just failed: show the REAL backend reason so it can be screenshotted.
+        // Everything else keeps the friendly RU toast.
+        if (awaitingPaymentError) {
+            awaitingPaymentError = false
+            showPaymentErrorDialog(error)
+        } else {
+            toastError(messageFor(error))
+        }
         viewModel.clearError()
+    }
+
+    /** Dialog with the raw HTTP code + sanitized backend detail for a failed payment. */
+    private fun showPaymentErrorDialog(error: ApiError) {
+        val code = when (error) {
+            is ApiError.Unauthorized -> "401/403"
+            is ApiError.Server -> error.code.toString()
+            is ApiError.RateLimited -> "429"
+            is ApiError.ServiceUnavailable -> "502/503"
+            is ApiError.NotFound -> "404"
+            is ApiError.Gone -> "410"
+            is ApiError.Timeout -> "timeout"
+            is ApiError.Network -> "network"
+            else -> "—"
+        }
+        val detail = when (error) {
+            is ApiError.Unauthorized -> error.detail
+            is ApiError.Server -> error.detail
+            else -> null
+        }
+        val body = if (detail.isNullOrBlank()) {
+            getString(R.string.account_payment_error_body_nodetail, code)
+        } else {
+            getString(R.string.account_payment_error_body, code, detail)
+        }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.account_payment_error_title)
+            .setMessage(body)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     private fun messageFor(error: ApiError): Int = when (error) {
@@ -310,20 +385,19 @@ class AccountFragment : Fragment() {
             tariffPriceOptionId = option?.id,
             paymentMethod = null,
         )
+        awaitingPaymentError = true
         viewModel.buy(req, ::openCheckout)
     }
 
     private fun showTopUpDialog() {
-        val input = EditText(requireContext()).apply {
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
-            hint = getString(R.string.account_top_up_hint)
-        }
-        AlertDialog.Builder(requireContext())
+        val dialogBinding = DialogTopUpBinding.inflate(layoutInflater)
+        MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.account_top_up_title)
-            .setView(input)
+            .setView(dialogBinding.root)
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                val amount = input.text?.toString()?.trim()?.toDoubleOrNull()
+                val amount = dialogBinding.etTopUp.text?.toString()?.trim()?.toDoubleOrNull()
                 if (amount != null && amount > 0.0) {
+                    awaitingPaymentError = true
                     viewModel.buy(PaymentRequestDto(amount = amount), ::openCheckout)
                 }
             }
@@ -347,7 +421,7 @@ class AccountFragment : Fragment() {
         } else {
             arrayOf(getString(R.string.account_avatar_gallery))
         }
-        AlertDialog.Builder(requireContext())
+        MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.account_change_avatar)
             .setItems(items) { _, which ->
                 when (which) {
@@ -395,10 +469,11 @@ class AccountFragment : Fragment() {
             return
         }
         val labels = tariffs.map { it.name }.toTypedArray()
-        AlertDialog.Builder(requireContext())
+        MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.account_upgrade_title)
             .setItems(labels) { _, which ->
                 val target = tariffs[which]
+                awaitingPaymentError = true
                 viewModel.upgrade(target.id, "platega", active.remnawaveUuid, null, ::openCheckout)
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -417,6 +492,7 @@ class AccountFragment : Fragment() {
             return
         }
         val count = extraDevices.coerceIn(1, max)
+        awaitingPaymentError = true
         viewModel.addDevices(active.type, active.id, count, "platega", null, ::openCheckout)
     }
 
@@ -453,6 +529,8 @@ class AccountFragment : Fragment() {
 
     /** Opens the provider checkout URL. Never logs the URL. */
     private fun openCheckout(init: PaymentInitDto) {
+        // The payment request itself succeeded (a checkout URL was issued): drop the diagnostic arm.
+        awaitingPaymentError = false
         val url = init.paymentUrl
         if (url.isBlank()) {
             toastError(R.string.account_checkout_no_browser)
@@ -497,6 +575,11 @@ class AccountFragment : Fragment() {
     }
 
     // endregion
+
+    private companion object {
+        /** Payment-history page size for the local "показать ещё" pagination. */
+        const val PAGE_SIZE = 5
+    }
 }
 
 private fun formatMoney(amount: Double, currency: String): String {

@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  One tariff, rendered as a compact collapsible card: a tappable header row
+  (emoji + name + devices/traffic summary + chevron) that expands its price options.
+-->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -14,46 +18,75 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="14dp">
+        android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/tv_group"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/icon_blue"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            tools:text="⭐ Премиум" />
-
-        <TextView
-            android:id="@+id/tv_tariff_name"
+        <!-- Header row: tap toggles the price options -->
+        <LinearLayout
+            android:id="@+id/header_tariff"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            tools:text="Стандарт" />
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="16dp">
 
-        <TextView
-            android:id="@+id/tv_tariff_info"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="13sp"
-            tools:text="Устройства: 3 · Трафик: ∞" />
+            <TextView
+                android:id="@+id/tv_group_emoji"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="22sp"
+                tools:ignore="HardcodedText"
+                tools:text="⭐" />
 
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_tariff_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    tools:text="Стандарт" />
+
+                <TextView
+                    android:id="@+id/tv_tariff_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="13sp"
+                    tools:text="Устройства: 3 · Трафик: ∞" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/iv_chevron"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginStart="8dp"
+                android:importantForAccessibility="no"
+                app:srcCompat="@drawable/ic_chevron_right"
+                app:tint="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+
+        <!-- Price options (compact rows); collapsed by default -->
         <LinearLayout
             android:id="@+id/ll_price_options"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:orientation="vertical" />
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="16dp"
+            android:visibility="gone"
+            tools:visibility="visible" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

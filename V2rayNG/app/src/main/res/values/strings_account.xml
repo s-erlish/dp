@@ -30,6 +30,7 @@
     <string name="account_tariffs_header">Тарифы</string>
     <string name="account_tariffs_empty">Тарифы недоступны</string>
     <string name="account_price_option">%1$d дн. — %2$s</string>
+    <string name="account_option_duration">%1$d дн.</string>
     <string name="account_tariff_devices">Устройства: %1$d</string>
     <string name="account_tariff_traffic">Трафик: %1$s</string>
 
@@ -54,6 +55,7 @@
     <!-- Payments history -->
     <string name="account_payments_header">История платежей</string>
     <string name="account_payments_empty">Платежей пока нет</string>
+    <string name="account_payments_more">Показать ещё</string>
     <string name="account_payment_pending">Платёж обрабатывается…</string>
 
     <!-- Top-up dialog -->
@@ -74,6 +76,11 @@
     <string name="account_error_timeout">Превышено время ожидания</string>
     <string name="account_error_generic">Что-то пошло не так</string>
     <string name="account_checkout_no_browser">Не удалось открыть страницу оплаты</string>
+
+    <!-- Payment error diagnostic (shows the real backend HTTP code + reason) -->
+    <string name="account_payment_error_title">Ошибка оплаты</string>
+    <string name="account_payment_error_body">HTTP %1$s\n%2$s</string>
+    <string name="account_payment_error_body_nodetail">HTTP %1$s</string>
 
     <!-- Avatar -->
     <string name="account_change_avatar">Сменить фото</string>

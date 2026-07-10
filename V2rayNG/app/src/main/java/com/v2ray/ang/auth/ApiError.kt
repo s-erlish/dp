@@ -14,8 +14,11 @@ sealed class ApiError(message: String? = null, cause: Throwable? = null) : Excep
     /** A request (or the login flow) exceeded its time budget. */
     object Timeout : ApiError("Request timed out")
 
-    /** 401/403 — session invalid or expired. */
-    object Unauthorized : ApiError("Unauthorized")
+    /**
+     * 401/403 — session invalid or expired. [detail] carries a sanitized snippet of the response
+     * body (payment diagnostics), never a token/URL. Compare with `is ApiError.Unauthorized`.
+     */
+    data class Unauthorized(val detail: String? = null) : ApiError("Unauthorized")
 
     /** 404 — resource not found (also the "keep polling" signal for telegram-login-check). */
     object NotFound : ApiError("Not found")
@@ -29,8 +32,11 @@ sealed class ApiError(message: String? = null, cause: Throwable? = null) : Excep
     /** 502/503 — backend temporarily unavailable. */
     object ServiceUnavailable : ApiError("Service unavailable")
 
-    /** Any other unexpected non-2xx status. */
-    class Server(val code: Int) : ApiError("Server error ($code)")
+    /**
+     * Any other unexpected non-2xx status. [detail] carries a sanitized snippet of the response
+     * body (payment diagnostics), never a token/URL.
+     */
+    class Server(val code: Int, val detail: String? = null) : ApiError("Server error ($code)")
 
     /** Response body could not be parsed into the expected shape. */
     class Parse(cause: Throwable? = null) : ApiError("Failed to parse response", cause)

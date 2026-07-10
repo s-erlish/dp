@@ -85,10 +85,13 @@ class AccountSubscriptionsAdapter(
         if (raw != null) {
             b.tvTraffic.visibility = View.VISIBLE
             val used = formatBytes(raw.userTraffic.usedTrafficBytes)
-            val limit = if (raw.isUnlimitedTraffic()) {
+            // A backend "unlimited" plan can arrive as either a null OR a 0/negative byte limit;
+            // both must render as ∞ (otherwise the row shows the misleading "… / 0 Б").
+            val limitBytes = raw.trafficLimitBytes ?: 0L
+            val limit = if (raw.isUnlimitedTraffic() || limitBytes <= 0L) {
                 ctx.getString(R.string.account_unlimited)
             } else {
-                formatBytes(raw.trafficLimitBytes ?: 0L)
+                formatBytes(limitBytes)
             }
             b.tvTraffic.text = ctx.getString(R.string.account_traffic, used, limit)
         } else {

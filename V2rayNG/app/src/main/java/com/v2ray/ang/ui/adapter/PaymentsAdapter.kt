@@ -1,9 +1,11 @@
 package com.v2ray.ang.ui.adapter
 
+import android.content.res.ColorStateList
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.RecyclerView
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.dto.PaymentDto
@@ -45,12 +47,21 @@ class PaymentsAdapter : RecyclerView.Adapter<PaymentsAdapter.VH>() {
         } else {
             b.tvPaymentStatus.text = item.status
         }
-        val color = if (colorRes != 0) {
-            ContextCompat.getColor(ctx, colorRes)
+        // Subtle status chip: full-strength text over a faint tint of the same hue. Unmapped
+        // statuses fall back to the neutral surface-variant chip.
+        if (colorRes != 0) {
+            val color = ContextCompat.getColor(ctx, colorRes)
+            b.tvPaymentStatus.setTextColor(color)
+            b.tvPaymentStatus.backgroundTintList =
+                ColorStateList.valueOf(ColorUtils.setAlphaComponent(color, 0x24))
         } else {
-            resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant)
+            b.tvPaymentStatus.setTextColor(
+                resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant),
+            )
+            b.tvPaymentStatus.backgroundTintList = ColorStateList.valueOf(
+                resolveThemeColor(ctx, com.google.android.material.R.attr.colorSurfaceVariant),
+            )
         }
-        b.tvPaymentStatus.setTextColor(color)
     }
 
     class VH(val binding: ItemPaymentBinding) : RecyclerView.ViewHolder(binding.root)

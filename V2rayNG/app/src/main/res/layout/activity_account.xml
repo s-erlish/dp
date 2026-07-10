@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Account / Payments screen content. Hosted inside BaseActivity's toolbar container,
-  so this file carries no toolbar of its own. departament dark + blue accent.
+  Account / Payments screen content, hosted in-place as the Account bottom-nav tab.
+  Incy design language: dark surface, bright-blue accent, calm premium spacing.
 -->
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -15,8 +15,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingHorizontal="12dp"
-        android:paddingTop="8dp"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="12dp"
         android:paddingBottom="24dp">
 
         <!-- ============ 1. Header / balance card ============ -->
@@ -33,7 +33,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="18dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -91,7 +91,7 @@
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="14dp"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -103,7 +103,8 @@
                             android:maxLines="1"
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="16sp"
-                            android:textStyle="bold" />
+                            android:textStyle="bold"
+                            tools:text="Erlish" />
 
                         <TextView
                             android:id="@+id/tv_telegram"
@@ -122,7 +123,7 @@
                     android:id="@+id/tv_balance_label"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="18dp"
                     android:text="@string/account_balance"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp" />
@@ -153,7 +154,8 @@
                         android:ellipsize="end"
                         android:maxLines="1"
                         android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="13sp" />
+                        android:textSize="13sp"
+                        tools:text="Реферальный код: ABC123" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_copy_referral"
@@ -162,7 +164,7 @@
                         android:layout_height="wrap_content"
                         android:contentDescription="@string/account_copy_referral"
                         app:icon="@drawable/ic_copy"
-                        app:iconTint="?attr/colorOnSurfaceVariant" />
+                        app:iconTint="@color/icon_blue" />
                 </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
@@ -184,8 +186,8 @@
             android:id="@+id/tv_subs_header"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
             android:layout_marginStart="4dp"
+            android:layout_marginTop="24dp"
             android:text="@string/account_subs_header"
             android:textColor="?attr/colorOnSurface"
             android:textSize="16sp"
@@ -195,7 +197,7 @@
             android:id="@+id/rv_subscriptions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             android:nestedScrollingEnabled="false"
             android:overScrollMode="never" />
 
@@ -203,7 +205,7 @@
             android:id="@+id/tv_subs_empty"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             android:padding="16dp"
             android:text="@string/account_subs_empty"
             android:textColor="?attr/colorOnSurfaceVariant"
@@ -215,8 +217,8 @@
             android:id="@+id/tv_tariffs_header"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
             android:layout_marginStart="4dp"
+            android:layout_marginTop="24dp"
             android:text="@string/account_tariffs_header"
             android:textColor="?attr/colorOnSurface"
             android:textSize="16sp"
@@ -226,7 +228,7 @@
             android:id="@+id/rv_tariffs"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             android:nestedScrollingEnabled="false"
             android:overScrollMode="never" />
 
@@ -234,7 +236,7 @@
             android:id="@+id/tv_tariffs_empty"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             android:padding="16dp"
             android:text="@string/account_tariffs_empty"
             android:textColor="?attr/colorOnSurfaceVariant"
@@ -246,8 +248,8 @@
             android:id="@+id/tv_actions_header"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
             android:layout_marginStart="4dp"
+            android:layout_marginTop="24dp"
             android:text="@string/account_actions_header"
             android:textColor="?attr/colorOnSurface"
             android:textSize="16sp"
@@ -256,7 +258,7 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="20dp"
             app:cardElevation="0dp"
@@ -267,7 +269,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="18dp">
 
                 <TextView
                     android:id="@+id/tv_active_sub"
@@ -279,9 +281,10 @@
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="13sp" />
 
+                <!-- Upgrade: outlined blue (secondary) -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_upgrade"
-                    style="@style/Widget.Material3.Button.TonalButton.Icon"
+                    style="@style/Widget.Material3.Button.OutlinedButton.Icon"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
                     android:layout_marginTop="12dp"
@@ -289,13 +292,15 @@
                     android:textAllCaps="false"
                     app:cornerRadius="24dp"
                     app:icon="@drawable/ic_acc_upgrade"
-                    app:iconGravity="textStart" />
+                    app:iconGravity="textStart"
+                    app:iconTint="?attr/colorPrimary"
+                    app:strokeColor="?attr/colorPrimary" />
 
                 <!-- Add-devices stepper -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="16dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
@@ -325,34 +330,44 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_dev_minus"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="42dp"
-                        android:layout_height="42dp"
+                        style="@style/Widget.Material3.Button.IconButton"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:contentDescription="@string/account_add_devices"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
-                        android:text="−"
-                        android:textSize="20sp"
-                        app:cornerRadius="21dp" />
+                        android:padding="0dp"
+                        app:backgroundTint="?attr/iconTileBgBlue"
+                        app:cornerRadius="20dp"
+                        app:icon="@drawable/ic_remove_24dp"
+                        app:iconPadding="0dp"
+                        app:iconSize="20dp"
+                        app:iconTint="@color/icon_blue" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_dev_plus"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="42dp"
-                        android:layout_height="42dp"
+                        style="@style/Widget.Material3.Button.IconButton"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
                         android:layout_marginStart="8dp"
+                        android:contentDescription="@string/account_add_devices"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
-                        android:text="+"
-                        android:textSize="20sp"
-                        app:cornerRadius="21dp" />
+                        android:padding="0dp"
+                        app:backgroundTint="?attr/iconTileBgBlue"
+                        app:cornerRadius="20dp"
+                        app:icon="@drawable/ic_add_24dp"
+                        app:iconPadding="0dp"
+                        app:iconSize="20dp"
+                        app:iconTint="@color/icon_blue" />
                 </LinearLayout>
 
+                <!-- Add-devices: filled blue (primary purchase CTA) -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_add_devices"
-                    style="@style/Widget.Material3.Button.TonalButton"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="12dp"
                     android:text="@string/account_add_devices"
                     android:textAllCaps="false"
                     app:cornerRadius="24dp" />
@@ -361,7 +376,7 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="16dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
@@ -371,7 +386,9 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:hint="@string/account_promo_hint">
+                        android:hint="@string/account_promo_hint"
+                        app:boxStrokeColor="?attr/colorPrimary"
+                        app:hintTextColor="?attr/colorPrimary">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/et_promo"
@@ -382,15 +399,17 @@
                             android:maxLines="1" />
                     </com.google.android.material.textfield.TextInputLayout>
 
+                    <!-- Check promo: outlined blue (secondary) -->
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_check_promo"
-                        style="@style/Widget.Material3.Button.TonalButton"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
                         android:text="@string/account_promo_check"
                         android:textAllCaps="false"
-                        app:cornerRadius="20dp" />
+                        app:cornerRadius="20dp"
+                        app:strokeColor="?attr/colorPrimary" />
                 </LinearLayout>
 
                 <TextView
@@ -404,12 +423,12 @@
                     tools:text="Скидка 20%"
                     tools:visibility="visible" />
 
-                <!-- Trial -->
+                <!-- Trial: filled blue (promo CTA) -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_trial"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
-                    android:layout_marginTop="14dp"
+                    android:layout_marginTop="16dp"
                     android:text="@string/account_trial"
                     android:textAllCaps="false"
                     android:textStyle="bold"
@@ -425,18 +444,20 @@
             android:id="@+id/tv_payments_header"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
             android:layout_marginStart="4dp"
+            android:layout_marginTop="24dp"
             android:text="@string/account_payments_header"
             android:textColor="?attr/colorOnSurface"
             android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:visibility="gone"
+            tools:visibility="visible" />
 
         <TextView
             android:id="@+id/tv_pending"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             android:background="@drawable/bg_acc_chip"
             android:drawablePadding="8dp"
             android:padding="14dp"
@@ -449,19 +470,25 @@
             android:id="@+id/rv_payments"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             android:nestedScrollingEnabled="false"
-            android:overScrollMode="never" />
+            android:overScrollMode="never"
+            android:visibility="gone"
+            tools:visibility="visible" />
 
-        <TextView
-            android:id="@+id/tv_payments_empty"
+        <!-- "Показать ещё" footer: reveals +5 payments until the list is exhausted -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_payments_more"
+            style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:padding="16dp"
-            android:text="@string/account_payments_empty"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="14sp"
-            android:visibility="gone" />
+            android:layout_marginTop="2dp"
+            android:text="@string/account_payments_more"
+            android:textAllCaps="false"
+            android:textColor="?attr/colorPrimary"
+            android:visibility="gone"
+            app:icon="@drawable/ic_arrow_drop_down"
+            app:iconGravity="textEnd"
+            app:iconTint="?attr/colorPrimary" />
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

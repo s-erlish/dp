@@ -277,7 +277,7 @@ class DepartamentApiClientImpl(
         val resp = execute(request)
         resp.use {
             val body = it.body?.string().orEmpty()
-            if (!it.isSuccessful) throw mapError(it.code)
+            if (!it.isSuccessful) throw mapError(it.code, sanitizeBody(body))
             return parse(body, cls)
         }
     }
@@ -286,7 +286,7 @@ class DepartamentApiClientImpl(
         val resp = execute(request)
         resp.use {
             val body = it.body?.string().orEmpty()
-            if (!it.isSuccessful) throw mapError(it.code)
+            if (!it.isSuccessful) throw mapError(it.code, sanitizeBody(body))
             return parseType(body, type)
         }
     }
@@ -309,13 +309,32 @@ class DepartamentApiClientImpl(
         }
     }
 
-    private fun mapError(code: Int): ApiError = when (code) {
-        401, 403 -> ApiError.Unauthorized
+    private fun mapError(code: Int, detail: String? = null): ApiError = when (code) {
+        401, 403 -> ApiError.Unauthorized(detail)
         404 -> ApiError.NotFound
         410 -> ApiError.Gone
         429 -> ApiError.RateLimited
         502, 503 -> ApiError.ServiceUnavailable
-        else -> ApiError.Server(code)
+        else -> ApiError.Server(code, detail)
+    }
+
+    /**
+     * Reduces an error response body to a short, screenshot-safe diagnostic snippet: drops any
+     * line mentioning a token/authorization header or an http(s) URL, then caps at 300 chars.
+     * Returns null when nothing usable remains.
+     */
+    private fun sanitizeBody(body: String): String? {
+        if (body.isBlank()) return null
+        val cleaned = body.lineSequence()
+            .filterNot { line ->
+                val l = line.lowercase()
+                l.contains("token") || l.contains("authorization") ||
+                    l.contains("http://") || l.contains("https://")
+            }
+            .joinToString("\n")
+            .trim()
+        if (cleaned.isBlank()) return null
+        return if (cleaned.length > 300) cleaned.substring(0, 300) else cleaned
     }
 
     private fun <T> parse(body: String, cls: Class<T>): T {
