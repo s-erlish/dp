@@ -41,8 +41,8 @@ android {
         // Departament VPN backend / Telegram auth configuration.
         // Leave BACKEND_BASE_URL blank to keep login OPTIONAL (app stays fully usable offline).
         // Fill these in (or override per build type/flavor) when the real bot backend lands.
-        buildConfigField("String", "BACKEND_BASE_URL", "\"\"")
-        buildConfigField("String", "BOT_USERNAME", "\"\"")
+        buildConfigField("String", "BACKEND_BASE_URL", "\"https://web.departament.site/api\"")
+        buildConfigField("String", "BOT_USERNAME", "\"departamentvpnbot\"")
         buildConfigField("String", "SUB_USER_AGENT", "\"DepartamentVPN/1.0\"")
     }
 
