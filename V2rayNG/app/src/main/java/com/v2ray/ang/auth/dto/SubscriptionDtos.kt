@@ -1,5 +1,7 @@
 package com.v2ray.ang.auth.dto
 
+import com.google.gson.annotations.SerializedName
+
 /**
  * Client subscription endpoints of the Departament backend.
  *
@@ -56,16 +58,19 @@ data class SubInfoDto(
 ) {
     /**
      * Best-effort tariff badge name ("Base" / "Plus") derived from THIS sub's own fields, used as a
-     * fallback when the tariff catalog can't resolve [tariffId]. Prefers the raw remnawave record's
-     * product name, then its subscriptionProductName, then the friendly [tariffDisplayName] — but
-     * skips the generic service label ("departament vpn") so the badge only ever shows a real tariff.
+     * fallback when the tariff catalog can't resolve [tariffId]. Prefers the authoritative summary
+     * [tariffDisplayName] (which reflects the CURRENT tariff), then the raw remnawave record's
+     * product name / subscriptionProductName — those are fixed at provisioning and go stale after an
+     * upgrade (e.g. still read "Base" after a Base→Plus upgrade), so they must never win over the
+     * summary name. Skips the generic service label ("departament vpn") so the badge only ever shows
+     * a real tariff.
      */
     fun tariffBadgeName(): String? {
         val raw = subscription?.raw()
         return sequenceOf(
+            tariffDisplayName,
             raw?.productName,
             raw?.subscriptionProductName,
-            tariffDisplayName,
         ).firstOrNull { !it.isNullOrBlank() && !isGenericServiceName(it) }
             ?.trim()
     }
@@ -85,6 +90,12 @@ data class SubInfoDto(
 data class PrimarySubscriptionDto(
     val subscription: SubResponseWrapper? = null,
     val tariffDisplayName: String? = null,
+    // The active subscription's tariff id, when the summary exposes it. Lets the badge resolve the
+    // tariff name from the catalog EXACTLY (id → TariffDto.name), independent of the possibly-absent
+    // /all root entry and the stale remnawave product label. Key spelling varies across backends, so
+    // accept the common ones; stays null (fall back to the display name) when absent.
+    @SerializedName(value = "tariffId", alternate = ["tariff_id", "tariffUuid", "tariffID"])
+    val tariffId: String? = null,
     val autoRenewNextChargeAmount: Double? = null,
     val autoRenewNextChargeAt: String? = null,
     val autoRenewCurrency: String? = null,
@@ -92,6 +103,14 @@ data class PrimarySubscriptionDto(
 ) {
     /** The raw remnawave record for the active subscription, if any. */
     fun raw(): RawSubDto? = subscription?.raw()
+
+    /**
+     * The tariff id for the active subscription: the summary's own [tariffId] when present, else the
+     * one the raw remnawave record carries. Blank/null when neither exposes it. Callers match this
+     * against the tariff catalog to render the real tariff badge.
+     */
+    fun activeTariffId(): String? =
+        tariffId?.takeIf { it.isNotBlank() } ?: raw()?.tariffId?.takeIf { it.isNotBlank() }
 
     /**
      * True when this payload actually carries an active subscription. When the account has none
@@ -135,6 +154,10 @@ data class RawSubDto(
     // Friendly names the backend sometimes attaches to the raw record.
     val productName: String? = null,
     val subscriptionProductName: String? = null,
+    // The tariff id, when the backend attaches it to the raw record. Preferred over the product name
+    // for the badge: it resolves the catalog exactly, whereas productName is fixed at provisioning.
+    @SerializedName(value = "tariffId", alternate = ["tariff_id", "tariffUuid", "tariffID"])
+    val tariffId: String? = null,
 ) {
     /** trafficLimitBytes == null means an unlimited traffic plan. */
     fun isUnlimitedTraffic(): Boolean = trafficLimitBytes == null

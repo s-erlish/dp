@@ -196,7 +196,11 @@ class AccountViewModel : ViewModel() {
             displayName = rootFromAll?.displayName,
             defaultLabel = rootFromAll?.defaultLabel,
             subscriptionIndex = rootFromAll?.subscriptionIndex,
-            tariffId = rootFromAll?.tariffId,
+            // Prefer the /all root's tariff id (it also drives renew/upgrade), but fall back to the
+            // PRIMARY payload's own tariff id when /all has no root (a primary-only account). Without
+            // this the badge lost the tariff identity and mis-resolved to a stale product label.
+            tariffId = rootFromAll?.tariffId?.takeIf { it.isNotBlank() }
+                ?: primary.activeTariffId(),
             tariffPriceOptionId = rootFromAll?.tariffPriceOptionId,
             deviceCount = rootFromAll?.deviceCount ?: 0,
             totalDevices = rootFromAll?.totalDevices
