@@ -18,12 +18,6 @@
         <!-- ==================== ПОДКЛЮЧЕНИЕ ==================== -->
         <TextView
             style="@style/SettingsSectionLabel"
-            android:textAppearance="@style/TextAppearance.App.Title"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textAllCaps="false"
-            android:letterSpacing="0"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/settings_section_connection" />
@@ -549,12 +543,6 @@
         <!-- ==================== ОБХОД БЛОКИРОВОК ==================== -->
         <TextView
             style="@style/SettingsSectionLabel"
-            android:textAppearance="@style/TextAppearance.App.Title"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textAllCaps="false"
-            android:letterSpacing="0"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/settings_section_bypass" />
@@ -767,12 +755,6 @@
         <!-- ==================== ИНТЕРФЕЙС ==================== -->
         <TextView
             style="@style/SettingsSectionLabel"
-            android:textAppearance="@style/TextAppearance.App.Title"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textAllCaps="false"
-            android:letterSpacing="0"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/settings_section_interface" />
@@ -979,12 +961,6 @@
         <!-- ==================== ПОДПИСКА ==================== -->
         <TextView
             style="@style/SettingsSectionLabel"
-            android:textAppearance="@style/TextAppearance.App.Title"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textAllCaps="false"
-            android:letterSpacing="0"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/settings_section_subscription" />
@@ -1235,12 +1211,6 @@
         <!-- ==================== УСТРОЙСТВА ==================== -->
         <TextView
             style="@style/SettingsSectionLabel"
-            android:textAppearance="@style/TextAppearance.App.Title"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textAllCaps="false"
-            android:letterSpacing="0"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/settings_section_devices" />
@@ -1367,12 +1337,6 @@
         <!-- ==================== О ПРИЛОЖЕНИИ ==================== -->
         <TextView
             style="@style/SettingsSectionLabel"
-            android:textAppearance="@style/TextAppearance.App.Title"
-            android:textColor="?attr/colorOnSurface"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textAllCaps="false"
-            android:letterSpacing="0"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/settings_section_about" />

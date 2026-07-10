@@ -27,12 +27,6 @@
     <color name="icon_tile_neutral">#20242B</color>
     <color name="icon_glyph_neutral">#9BA1AD</color>
 
-    <!-- Card rim-light / depth (dark-only). ~8% white top-edge highlight lifts
-         near-black cards off the near-black background; hero variant (~10%) for
-         the connect knob. Transparent in light theme. -->
-    <color name="card_edge_highlight">#14FFFFFF</color>
-    <color name="card_edge_highlight_hero">#1AFFFFFF</color>
-
     <!-- Primary - bright blue -->
     <color name="md_theme_primary">#4C8DFF</color>
     <color name="md_theme_onPrimary">#00183A</color>
