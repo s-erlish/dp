@@ -24,7 +24,7 @@
             android:layout_width="36dp"
             android:layout_height="4dp"
             android:layout_gravity="center_horizontal"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="@dimen/space_8"
             android:background="@drawable/bg_sheet_handle" />
 
         <!-- Sheet title -->
@@ -46,6 +46,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingBottom="4dp" />
+            android:paddingBottom="@dimen/space_4" />
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

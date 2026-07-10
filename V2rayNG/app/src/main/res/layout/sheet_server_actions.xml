@@ -22,7 +22,7 @@
         android:layout_width="36dp"
         android:layout_height="4dp"
         android:layout_gravity="center_horizontal"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="@dimen/space_8"
         android:background="@drawable/bg_sheet_handle" />
 
     <!-- Sheet title = server name -->
@@ -30,7 +30,7 @@
         android:id="@+id/tv_sheet_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="@dimen/space_12"
         android:ellipsize="end"
         android:maxLines="1"
         android:paddingStart="@dimen/space_16"

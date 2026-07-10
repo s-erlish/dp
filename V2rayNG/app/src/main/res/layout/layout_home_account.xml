@@ -87,7 +87,7 @@
         android:orientation="horizontal"
         android:paddingStart="@dimen/space_12"
         android:paddingTop="@dimen/space_8"
-        android:paddingEnd="@dimen/space_12"
+        android:paddingEnd="@dimen/screen_gutter"
         android:paddingBottom="@dimen/space_8"
         android:stateListAnimator="@anim/press_scale"
         android:visibility="gone">
@@ -145,8 +145,8 @@
         </LinearLayout>
 
         <ImageView
-            android:layout_width="20dp"
-            android:layout_height="20dp"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
             android:layout_marginStart="@dimen/space_8"
             android:contentDescription="@null"
             android:src="@drawable/ic_chevron_right"
