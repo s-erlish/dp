@@ -30,7 +30,7 @@
     <!-- Subscriptions -->
     <string name="account_subs_header">Мои подписки</string>
     <string name="account_subs_empty">У вас пока нет подписок</string>
-    <string name="account_no_subscription">нет активной подписки</string>
+    <string name="account_no_subscription">Нет активной подписки</string>
     <string name="account_expires">Действует до %1$s</string>
     <string name="account_devices">Устройства: %1$s / %2$s</string>
     <string name="account_traffic">Трафик: %1$s / %2$s</string>

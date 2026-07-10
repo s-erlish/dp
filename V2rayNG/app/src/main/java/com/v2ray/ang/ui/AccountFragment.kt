@@ -287,13 +287,13 @@ class AccountFragment : Fragment() {
             methods,
         ) { id ->
             if (id == "balance") {
-                viewModel.payWithBalance(PaymentRequestDto(amount = amount)) {
+                viewModel.payWithBalance(PaymentRequestDto(amount = amount, currency = "RUB")) {
                     viewModel.refreshProfile()
                     viewModel.loadSubscriptions()
                 }
             } else {
                 awaitingPaymentError = true
-                viewModel.buy(PaymentRequestDto(amount = amount, paymentMethod = id.toIntOrNull()), ::openCheckout)
+                viewModel.buy(PaymentRequestDto(amount = amount, currency = "RUB", paymentMethod = id.toIntOrNull()), ::openCheckout)
             }
         }
     }
