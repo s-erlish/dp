@@ -176,7 +176,10 @@
                     android:id="@+id/layout_home_account"
                     layout="@layout/layout_home_account"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/screen_gutter"
+                    android:layout_marginTop="@dimen/space_8"
+                    android:layout_marginEnd="@dimen/screen_gutter" />
 
                 <!-- Signature connect block. A plain LinearLayout, not a wrapping card:
                      the shield/ring is the ONE hero element, everything else stays quiet

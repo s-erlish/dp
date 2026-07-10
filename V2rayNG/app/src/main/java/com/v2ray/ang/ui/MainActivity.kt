@@ -892,19 +892,18 @@ class MainActivity : HelperBaseActivity() {
     }
 
     /**
-     * The account gate: account + payment features are available ONLY when the user is signed in OR
-     * the app holds a genuine "departament" subscription (one of the owner's own VPN subscription
-     * links). A foreign subscription pasted by a user must NOT unlock them, since payment cannot work
-     * for servers that are not part of this VPN.
+     * The account gate: the account tab and every account-only entry point exist ONLY after the user
+     * has authorized (logged in). A pasted/imported subscription — even a genuine "departament" one —
+     * must NOT unlock the account, since there is no account to load without a login.
      */
     private fun accountAccessAllowed(): Boolean =
-        AccountSession.isLoggedIn() || SubscriptionOrigin.hasDepartamentSubscription()
+        AccountSession.isLoggedIn()
 
     /**
      * Recomputes the visibility of the Account nav item and the home account header from the access
      * gate. Called both when the account state changes (login/logout) and when the subscription /
-     * server list changes, so adding a departament subscription reveals the account without an app
-     * restart and removing it hides it again — while a foreign-only subscription never unlocks it.
+     * server list changes. The Account tab + home account chip exist ONLY while signed in — a pasted
+     * subscription never unlocks them.
      */
     private fun updateAccountGate() {
         val header = binding.layoutHomeAccount
@@ -914,14 +913,14 @@ class MainActivity : HelperBaseActivity() {
             return
         }
         val loggedIn = AccountSession.isLoggedIn()
-        val allowed = accountAccessAllowed()
-        header.root.isVisible = allowed
-        header.groupLogin.isVisible = allowed && !loggedIn
+        header.root.isVisible = loggedIn
+        // The signed-out login group (and its "link Telegram" CTA) is no longer an account entry
+        // point — the header only exists once signed in, where the account chip is shown.
+        header.groupLogin.isVisible = false
         header.chipAccount.isVisible = loggedIn
-        binding.navAccount.isVisible = allowed
-        // Access revoked (logged out with no departament subscription) while on the Account tab:
-        // the tab is hidden, so fall back to Home.
-        if (!allowed && selectedNavId == R.id.nav_account) selectNav(R.id.nav_home)
+        binding.navAccount.isVisible = loggedIn
+        // Signed out while on the Account tab: the tab is hidden, so fall back to Home.
+        if (!loggedIn && selectedNavId == R.id.nav_account) selectNav(R.id.nav_home)
     }
 
     /**
