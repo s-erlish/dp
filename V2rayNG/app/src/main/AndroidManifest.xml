@@ -200,6 +200,18 @@
 
         <!-- departament wave activities (registered here per manifest ownership) -->
         <activity
+            android:name=".ui.DeviceManagementActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+        <activity
+            android:name=".ui.BuyTariffActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+        <activity
+            android:name=".ui.PaymentHistoryActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+        <activity
             android:name=".ui.LocalProxyActivity"
             android:exported="false"
             android:parentActivityName=".ui.MainActivity" />

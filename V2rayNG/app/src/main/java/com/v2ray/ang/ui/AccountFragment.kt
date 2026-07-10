@@ -18,27 +18,17 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.ApiError
-import com.v2ray.ang.auth.dto.PaymentDto
 import com.v2ray.ang.auth.dto.PaymentInitDto
 import com.v2ray.ang.auth.dto.PaymentRequestDto
-import com.v2ray.ang.auth.dto.PriceOptionDto
-import com.v2ray.ang.auth.dto.PromoDto
-import com.v2ray.ang.auth.dto.PublicConfigDto
 import com.v2ray.ang.auth.dto.SubInfoDto
-import com.v2ray.ang.auth.dto.TariffDto
 import com.v2ray.ang.auth.dto.UserProfileDto
 import com.v2ray.ang.databinding.ActivityAccountBinding
 import com.v2ray.ang.databinding.DialogTopUpBinding
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
-import com.v2ray.ang.extension.toastSuccess
-import com.v2ray.ang.ui.adapter.AccountSubscriptionsAdapter
-import com.v2ray.ang.ui.adapter.PaymentsAdapter
-import com.v2ray.ang.ui.adapter.TariffAdapter
 import com.v2ray.ang.util.AvatarManager
 import com.v2ray.ang.viewmodel.AccountViewModel
 import kotlinx.coroutines.Job
@@ -47,11 +37,11 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 
 /**
- * Account / Payments screen for the departament backend, hosted IN-PLACE as the Account bottom-nav
- * tab (no sliding Activity, no toolbar). Shows the profile + balance, subscriptions, the tariff
- * catalog, account actions (upgrade / add-devices / promo / trial) and the payment history.
- * Purchases open a provider checkout in a Custom Tab; a PAID result only ever arrives via webhook,
- * so on return we re-poll rather than assume success.
+ * Account HUB, hosted IN-PLACE as the Account bottom-nav tab (no sliding Activity, no toolbar).
+ * Mirrors the Settings tab: a compact profile card (name / balance / referral / top-up), a single
+ * subscription summary (active sub OR "нет активной подписки", never both), and grouped entry cards
+ * that open the devices / buy / history sub-screens. Purchases open a provider checkout in a Custom
+ * Tab; a PAID result only ever arrives via webhook, so on return we re-poll rather than assume success.
  */
 class AccountFragment : Fragment() {
 
@@ -62,24 +52,12 @@ class AccountFragment : Fragment() {
 
     private val viewModel: AccountViewModel by viewModels()
 
-    private val subsAdapter by lazy {
-        AccountSubscriptionsAdapter(::onSubscriptionSelected, ::onAutoRenewToggled)
-    }
-    private val tariffAdapter by lazy { TariffAdapter(::onBuyTariff) }
-    private val paymentsAdapter = PaymentsAdapter()
-
+    /** The subscription rendered in the summary card (the first/most-relevant one). */
     private var activeSub: SubInfoDto? = null
-    private var extraDevices = 1
     private var latestProfile: UserProfileDto? = null
-    private var latestTariffGroups: List<com.v2ray.ang.auth.dto.TariffGroupDto> = emptyList()
-    private var publicConfig: PublicConfigDto? = null
 
     private var pendingPayment = false
     private var pollJob: Job? = null
-
-    // Payment history is paginated locally: keep the full list, reveal PAGE_SIZE more at a time.
-    private var allPayments: List<PaymentDto> = emptyList()
-    private var paymentsShown = PAGE_SIZE
 
     // Set right before a purchase/top-up call so the NEXT error emission is surfaced as the real
     // "Ошибка оплаты" diagnostic dialog instead of the friendly toast. Cleared on success.
@@ -106,7 +84,6 @@ class AccountFragment : Fragment() {
         // tab has no inset listener of its own like the Home/Servers lists do).
         binding.scrollRoot.clipToPadding = false
         binding.scrollRoot.updatePadding(bottom = (96 * resources.displayMetrics.density).toInt())
-        setupRecyclers()
         wireActions()
         observeState()
         loadAll()
@@ -117,41 +94,27 @@ class AccountFragment : Fragment() {
         _binding = null
     }
 
-    private fun setupRecyclers() {
-        binding.rvSubscriptions.layoutManager = LinearLayoutManager(requireContext())
-        binding.rvSubscriptions.adapter = subsAdapter
-        binding.rvTariffs.layoutManager = LinearLayoutManager(requireContext())
-        binding.rvTariffs.adapter = tariffAdapter
-        binding.rvPayments.layoutManager = LinearLayoutManager(requireContext())
-        binding.rvPayments.adapter = paymentsAdapter
-        updateDeviceStepperUi()
-    }
-
     private fun wireActions() {
         binding.btnTopUp.setOnClickListener { showTopUpDialog() }
         binding.btnCopyReferral.setOnClickListener { copyReferralCode() }
-        binding.btnUpgrade.setOnClickListener { showUpgradeDialog() }
-        binding.btnDevMinus.setOnClickListener {
-            extraDevices -= 1
-            updateDeviceStepperUi()
-        }
-        binding.btnDevPlus.setOnClickListener {
-            extraDevices += 1
-            updateDeviceStepperUi()
-        }
-        binding.btnAddDevices.setOnClickListener { doAddDevices() }
-        binding.btnCheckPromo.setOnClickListener { doCheckPromo() }
-        binding.btnTrial.setOnClickListener { doActivateTrial() }
-        binding.btnPaymentsMore.setOnClickListener { showMorePayments() }
         binding.avatarContainer.setOnClickListener { showAvatarOptions() }
         binding.imgAvatarEdit.setOnClickListener { showAvatarOptions() }
+        binding.switchAutoRenew.setOnClickListener {
+            val sub = activeSub ?: return@setOnClickListener
+            onAutoRenewToggled(sub, binding.switchAutoRenew.isChecked)
+        }
+        binding.rowDevices.setOnClickListener { openSubScreen(DeviceManagementActivity::class.java) }
+        binding.rowBuy.setOnClickListener { openSubScreen(BuyTariffActivity::class.java) }
+        binding.rowHistory.setOnClickListener { openSubScreen(PaymentHistoryActivity::class.java) }
+    }
+
+    private fun openSubScreen(target: Class<*>) {
+        startActivity(Intent(requireContext(), target))
     }
 
     private fun loadAll() {
         viewModel.refreshProfile()
         viewModel.loadSubscriptions()
-        viewModel.loadTariffs()
-        viewModel.loadPayments()
         viewModel.loadPublicConfig()
     }
 
@@ -160,26 +123,14 @@ class AccountFragment : Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.profile.collect { renderProfile(it) } }
                 launch { viewModel.subscriptions.collect { renderSubscriptions(it) } }
-                launch { viewModel.tariffs.collect { renderTariffs(it) } }
-                launch { viewModel.payments.collect { renderPayments(it) } }
-                launch { viewModel.publicConfig.collect { publicConfig = it } }
-                launch { viewModel.loading.collect { if (it) showLoading() else hideLoading() } }
                 launch { viewModel.error.collect { renderError(it) } }
             }
         }
     }
 
-    // The in-place Account tab has no toolbar/app bar, so there is no global spinner surface like
-    // BaseActivity's. Loading stays silent here; the flows are quick and the payment re-poll uses
-    // tv_pending for its own progress hint.
-    private fun showLoading() {}
-
-    private fun hideLoading() {}
-
     // Context-scoped toast helpers so the ported (Context.toast) calls work from a Fragment.
     private fun toast(message: Int) = requireContext().toast(message)
     private fun toastError(message: Int) = requireContext().toastError(message)
-    private fun toastSuccess(message: Int) = requireContext().toastSuccess(message)
 
     // region rendering
 
@@ -187,98 +138,68 @@ class AccountFragment : Fragment() {
         latestProfile = profile
         if (profile == null) {
             binding.tvEmail.text = ""
-            binding.tvTelegram.visibility = View.VISIBLE
-            binding.tvTelegram.setText(R.string.account_no_telegram)
-            binding.tvBalance.text = formatMoney(0.0, "")
+            binding.tvBalance.text = getString(R.string.account_balance_inline, formatMoney(0.0, ""))
             binding.tvReferral.visibility = View.GONE
-            binding.btnTrial.visibility = View.GONE
+            binding.btnCopyReferral.visibility = View.GONE
             AvatarManager.setMonogram(binding.tvAvatarInitial, null)
             AvatarManager.applyAvatar(viewLifecycleOwner.lifecycleScope, requireContext(), binding.imgAvatar, binding.tvAvatarInitial, null)
             return
         }
-        // Primary line prefers the Telegram display name, then the @nick, then the account e-mail.
+        // Name prefers the Telegram display name, then the @nick, then the account e-mail.
         val uname = profile.telegramUsername?.takeIf { it.isNotBlank() }
         val handle = uname?.let { "@$it" }
         val display = profile.telegramName?.takeIf { it.isNotBlank() }
         val email = profile.email.takeIf { it.isNotBlank() }
         val primary = display ?: handle ?: email.orEmpty()
         binding.tvEmail.text = primary
-        // Secondary line must NOT duplicate the primary: prefer a distinct e-mail, else the @handle
-        // beneath a display name; when there is no Telegram identity at all, hint that it is unlinked.
-        val secondary = when {
-            email != null && email != primary -> email
-            display != null && handle != null -> handle
-            display == null && handle == null -> getString(R.string.account_no_telegram)
-            else -> null
-        }
-        if (secondary != null) {
-            binding.tvTelegram.visibility = View.VISIBLE
-            binding.tvTelegram.text = secondary
-        } else {
-            binding.tvTelegram.visibility = View.GONE
-        }
         AvatarManager.setMonogram(binding.tvAvatarInitial, primary)
         AvatarManager.applyAvatar(viewLifecycleOwner.lifecycleScope, requireContext(), binding.imgAvatar, binding.tvAvatarInitial, profile)
-        binding.tvBalance.text = formatMoney(profile.balance, profile.currency)
+        binding.tvBalance.text = getString(R.string.account_balance_inline, formatMoney(profile.balance, profile.currency))
         if (profile.referralCode.isNotBlank()) {
             binding.tvReferral.visibility = View.VISIBLE
+            binding.btnCopyReferral.visibility = View.VISIBLE
             binding.tvReferral.text = getString(R.string.account_referral, profile.referralCode)
         } else {
             binding.tvReferral.visibility = View.GONE
+            binding.btnCopyReferral.visibility = View.GONE
         }
-        binding.btnTrial.visibility = if (!profile.trialUsed) View.VISIBLE else View.GONE
     }
 
     private fun renderSubscriptions(list: List<SubInfoDto>) {
-        subsAdapter.submit(list)
-        val empty = list.isEmpty()
-        binding.tvSubsEmpty.visibility = if (empty) View.VISIBLE else View.GONE
-        binding.rvSubscriptions.visibility = if (empty) View.GONE else View.VISIBLE
-
-        // Keep the active selection if still present; otherwise default to the first sub, which
-        // renders as the most-emphasized (blue-outlined) card at the top of the list.
+        // Keep the active selection if still present; otherwise default to the first sub.
         val current = activeSub
-        val resolved = list.firstOrNull { it.remnawaveUuid == current?.remnawaveUuid } ?: list.firstOrNull()
-        activeSub = resolved
-        subsAdapter.activeUuid = resolved?.remnawaveUuid
+        activeSub = list.firstOrNull { it.remnawaveUuid == current?.remnawaveUuid } ?: list.firstOrNull()
         updateActiveSubUi()
     }
 
-    private fun renderTariffs(list: List<com.v2ray.ang.auth.dto.TariffGroupDto>) {
-        latestTariffGroups = list
-        tariffAdapter.submit(list)
-        val empty = list.isEmpty()
-        binding.tvTariffsEmpty.visibility = if (empty) View.VISIBLE else View.GONE
-        binding.rvTariffs.visibility = if (empty) View.GONE else View.VISIBLE
-    }
-
-    private fun renderPayments(list: List<PaymentDto>) {
-        allPayments = list
-        // Hide the whole "История платежей" section when there is nothing to show.
-        if (list.isEmpty()) {
-            binding.tvPaymentsHeader.visibility = View.GONE
-            binding.rvPayments.visibility = View.GONE
-            binding.btnPaymentsMore.visibility = View.GONE
-            paymentsAdapter.submit(emptyList())
+    /** Renders ONE coherent state: the active-sub details, or the "нет активной подписки" empty line. */
+    private fun updateActiveSubUi() {
+        val sub = activeSub
+        if (sub == null) {
+            binding.groupActiveSub.visibility = View.GONE
+            binding.tvNoSub.visibility = View.VISIBLE
             return
         }
-        binding.tvPaymentsHeader.visibility = View.VISIBLE
-        binding.rvPayments.visibility = View.VISIBLE
-        updatePaymentsList()
-    }
+        binding.tvNoSub.visibility = View.GONE
+        binding.groupActiveSub.visibility = View.VISIBLE
 
-    /** Applies the current page size: shows [paymentsShown] rows and toggles the "показать ещё" footer. */
-    private fun updatePaymentsList() {
-        val total = allPayments.size
-        if (total == 0) return
-        val shown = paymentsShown.coerceIn(minOf(PAGE_SIZE, total), total)
-        paymentsAdapter.submit(allPayments.take(shown))
-        binding.btnPaymentsMore.visibility = if (shown < total) View.VISIBLE else View.GONE
-    }
+        binding.tvSubName.text = sub.displayName?.takeIf { it.isNotBlank() }
+            ?: sub.tariffDisplayName?.takeIf { it.isNotBlank() }
+            ?: getString(R.string.account_subs_header)
 
-    private fun showMorePayments() {
-        paymentsShown = (paymentsShown + PAGE_SIZE).coerceAtMost(allPayments.size)
-        updatePaymentsList()
+        if (sub.expireAtIso.isNullOrBlank()) {
+            binding.tvSubExpiry.visibility = View.GONE
+        } else {
+            binding.tvSubExpiry.visibility = View.VISIBLE
+            binding.tvSubExpiry.text = getString(R.string.account_expires, formatIsoDate(sub.expireAtIso))
+        }
+
+        val unlimitedDevices = sub.subscription?.response?.isUnlimitedDevices() == true
+        val totalDevicesStr = if (unlimitedDevices) getString(R.string.account_unlimited) else sub.totalDevices.toString()
+        binding.tvSubDevices.text = getString(R.string.account_devices, sub.connectedDevices.toString(), totalDevicesStr)
+
+        // Auto-renew — set state without firing the click handler for programmatic changes.
+        binding.switchAutoRenew.isChecked = sub.autoRenewEnabled
     }
 
     private fun renderError(error: ApiError?) {
@@ -335,58 +256,10 @@ class AccountFragment : Fragment() {
 
     // endregion
 
-    // region active subscription + stepper
-
-    private fun onSubscriptionSelected(sub: SubInfoDto) {
-        activeSub = sub
-        subsAdapter.activeUuid = sub.remnawaveUuid
-        updateActiveSubUi()
-    }
-
-    private fun updateActiveSubUi() {
-        val sub = activeSub
-        if (sub == null) {
-            binding.tvActiveSub.setText(R.string.account_active_sub_none)
-        } else {
-            val name = sub.displayName?.takeIf { it.isNotBlank() }
-                ?: sub.tariffDisplayName?.takeIf { it.isNotBlank() }
-                ?: getString(R.string.account_subs_header)
-            binding.tvActiveSub.text = getString(R.string.account_active_sub, name)
-        }
-        updateDeviceStepperUi()
-    }
-
-    /** Max extra devices allowed = 7 total minus the active sub's current total. */
-    private fun maxExtraDevices(): Int {
-        val total = activeSub?.totalDevices ?: return 0
-        return (7 - total).coerceAtLeast(0)
-    }
-
-    private fun updateDeviceStepperUi() {
-        val max = maxExtraDevices()
-        extraDevices = if (max < 1) 0 else extraDevices.coerceIn(1, max)
-        binding.tvAddDevicesCount.text = getString(R.string.account_add_devices_count, extraDevices)
-        binding.btnDevPlus.isEnabled = extraDevices < max
-        binding.btnDevMinus.isEnabled = extraDevices > 1
-        binding.btnAddDevices.isEnabled = max >= 1 && extraDevices >= 1
-    }
-
-    // endregion
-
     // region actions
 
     private fun onAutoRenewToggled(sub: SubInfoDto, checked: Boolean) {
         viewModel.toggleAutoRenew(sub.id, checked) { viewModel.loadSubscriptions() }
-    }
-
-    private fun onBuyTariff(tariff: TariffDto, option: PriceOptionDto?) {
-        val req = PaymentRequestDto(
-            tariffId = tariff.id,
-            tariffPriceOptionId = option?.id,
-            paymentMethod = null,
-        )
-        awaitingPaymentError = true
-        viewModel.buy(req, ::openCheckout)
     }
 
     private fun showTopUpDialog() {
@@ -396,13 +269,33 @@ class AccountFragment : Fragment() {
             .setView(dialogBinding.root)
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 val amount = dialogBinding.etTopUp.text?.toString()?.trim()?.toDoubleOrNull()
-                if (amount != null && amount > 0.0) {
-                    awaitingPaymentError = true
-                    viewModel.buy(PaymentRequestDto(amount = amount), ::openCheckout)
-                }
+                if (amount != null && amount > 0.0) showPaymentMethodSheet(amount)
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    /** Lets the user pick a payment method (balance or a Platega method) for the entered amount. */
+    private fun showPaymentMethodSheet(amount: Double) {
+        val methods = viewModel.publicConfig.value?.plategaMethods?.map { it.id to it.label } ?: emptyList()
+        val profile = latestProfile
+        val balanceLabel = profile?.let { formatMoney(it.balance, it.currency) }
+        PaymentMethodSheet.show(
+            parentFragmentManager,
+            getString(R.string.account_top_up_title),
+            balanceLabel,
+            methods,
+        ) { id ->
+            if (id == "balance") {
+                viewModel.payWithBalance(PaymentRequestDto(amount = amount, paymentMethod = "balance")) {
+                    viewModel.refreshProfile()
+                    viewModel.loadSubscriptions()
+                }
+            } else {
+                awaitingPaymentError = true
+                viewModel.buy(PaymentRequestDto(amount = amount, paymentMethod = id), ::openCheckout)
+            }
+        }
     }
 
     private fun copyReferralCode() {
@@ -457,72 +350,6 @@ class AccountFragment : Fragment() {
 
     // endregion
 
-    private fun showUpgradeDialog() {
-        val active = activeSub
-        if (active == null) {
-            toast(R.string.account_upgrade_no_sub)
-            return
-        }
-        val tariffs = latestTariffGroups.flatMap { it.tariffs }
-        if (tariffs.isEmpty()) {
-            toast(R.string.account_tariffs_empty)
-            return
-        }
-        val labels = tariffs.map { it.name }.toTypedArray()
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.account_upgrade_title)
-            .setItems(labels) { _, which ->
-                val target = tariffs[which]
-                awaitingPaymentError = true
-                viewModel.upgrade(target.id, "platega", active.remnawaveUuid, null, ::openCheckout)
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun doAddDevices() {
-        val active = activeSub
-        if (active == null) {
-            toast(R.string.account_upgrade_no_sub)
-            return
-        }
-        val max = maxExtraDevices()
-        if (max < 1) {
-            toast(R.string.account_add_devices_limit)
-            return
-        }
-        val count = extraDevices.coerceIn(1, max)
-        awaitingPaymentError = true
-        viewModel.addDevices(active.type, active.id, count, "platega", null, ::openCheckout)
-    }
-
-    private fun doCheckPromo() {
-        val code = binding.etPromo.text?.toString()?.trim().orEmpty()
-        if (code.isEmpty()) return
-        viewModel.checkPromo(code) { showPromoResult(it) }
-    }
-
-    private fun showPromoResult(promo: PromoDto) {
-        binding.tvPromoResult.visibility = View.VISIBLE
-        binding.tvPromoResult.text = when {
-            promo.discountPercent != null ->
-                getString(R.string.account_promo_discount, promo.discountPercent.toInt())
-
-            promo.durationDays != null ->
-                getString(R.string.account_promo_free_days, promo.durationDays)
-
-            else -> getString(R.string.account_promo_invalid)
-        }
-    }
-
-    private fun doActivateTrial() {
-        viewModel.activateTrial {
-            toastSuccess(R.string.account_trial_activated)
-            viewModel.refreshProfile()
-            viewModel.loadSubscriptions()
-        }
-    }
-
     // endregion
 
     // region checkout
@@ -556,8 +383,8 @@ class AccountFragment : Fragment() {
     }
 
     /**
-     * After returning from a checkout, re-poll subscriptions/payments/profile a few times over
-     * ~48s. The backend confirms PAID only via webhook — the tab returning proves nothing.
+     * After returning from a checkout, re-poll subscriptions/profile a few times over ~48s. The
+     * backend confirms PAID only via webhook — the tab returning proves nothing.
      */
     private fun startPaymentPolling() {
         if (pollJob?.isActive == true) return
@@ -565,7 +392,6 @@ class AccountFragment : Fragment() {
         pollJob = viewLifecycleOwner.lifecycleScope.launch {
             repeat(6) {
                 viewModel.loadSubscriptions()
-                viewModel.loadPayments()
                 viewModel.refreshProfile()
                 delay(8000L)
             }
@@ -575,15 +401,17 @@ class AccountFragment : Fragment() {
     }
 
     // endregion
-
-    private companion object {
-        /** Payment-history page size for the local "показать ещё" pagination. */
-        const val PAGE_SIZE = 5
-    }
 }
 
 private fun formatMoney(amount: Double, currency: String): String {
     val n = if (amount % 1.0 == 0.0) amount.toLong().toString()
     else String.format(Locale.US, "%.2f", amount)
     return if (currency.isBlank()) n else "$n $currency"
+}
+
+private fun formatIsoDate(iso: String?): String {
+    if (iso.isNullOrBlank()) return ""
+    val datePart = iso.substringBefore('T')
+    val parts = datePart.split('-')
+    return if (parts.size == 3) "${parts[2]}.${parts[1]}.${parts[0]}" else datePart
 }

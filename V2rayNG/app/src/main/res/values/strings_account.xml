@@ -6,6 +6,18 @@
 <resources>
     <string name="account_title">Аккаунт</string>
 
+    <!-- Hub -->
+    <string name="account_profile_title">Ваш профиль</string>
+    <string name="account_balance_inline">Баланс: %1$s</string>
+    <string name="account_sub_summary_title">Ваша подписка</string>
+    <string name="account_manage_title">Управление</string>
+    <string name="account_hub_devices">Устройства</string>
+    <string name="account_hub_devices_sub">Управление устройствами</string>
+    <string name="account_hub_buy">Купить подписку</string>
+    <string name="account_hub_buy_sub">Тарифы и продление</string>
+    <string name="account_hub_history">История платежей</string>
+    <string name="account_hub_history_sub">Все ваши операции</string>
+
     <!-- Header / balance -->
     <string name="account_balance">Баланс</string>
     <string name="account_top_up">Пополнить баланс</string>
