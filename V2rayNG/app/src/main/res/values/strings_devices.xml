@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="devices_title">Устройства</string>
+    <string name="devices_subtitle">Устройства, подключённые к вашей подписке</string>
+    <string name="devices_empty">Нет подключённых устройств</string>
+    <string name="devices_empty_hint">Устройства появятся здесь после первого подключения к VPN.</string>
+    <string name="devices_error_generic">Не удалось загрузить устройства. Попробуйте позже.</string>
+    <string name="devices_error_no_subscription">Активная подписка не найдена.</string>
+    <string name="devices_error_delete">Не удалось удалить устройство. Попробуйте позже.</string>
+    <string name="devices_delete_title">Удалить устройство?</string>
+    <string name="devices_delete_message">Устройство «%1$s» будет отключено от подписки. Продолжить?</string>
+    <string name="devices_delete_confirm">Удалить</string>
+    <string name="devices_delete_cancel">Отмена</string>
+    <string name="devices_delete_cd">Удалить устройство</string>
+    <string name="devices_deleted">Устройство удалено</string>
+    <string name="devices_last_active">Активно: %1$s</string>
+    <string name="devices_unknown_model">Неизвестное устройство</string>
+    <string name="devices_hwid">ID: %1$s</string>
+</resources>
