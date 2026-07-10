@@ -498,7 +498,7 @@ class MainActivity : HelperBaseActivity() {
         binding.layoutHomeEmpty.btnHomeBuy.setOnClickListener {
             startActivity(Intent(this, BuyTariffActivity::class.java))
         }
-        binding.layoutHomeEmpty.btnHomeLinkTg.setOnClickListener { openLoginScreen("telegram") }
+        binding.layoutHomeEmpty.btnHomeLinkTg.setOnClickListener { openTelegramLink() }
     }
 
     /**
@@ -653,8 +653,8 @@ class MainActivity : HelperBaseActivity() {
      */
     private fun setupAccountHeader() {
         val header = binding.layoutHomeAccount
-        // The "link Telegram" CTA banner opens the Telegram login flow.
-        header.ctaLinkTelegram.setOnClickListener { openLoginScreen("telegram") }
+        // The "link Telegram" CTA banner attaches Telegram to the signed-in account.
+        header.ctaLinkTelegram.setOnClickListener { openTelegramLink() }
         header.btnCtaDismiss.setOnClickListener {
             ctaDismissed = true
             header.ctaLinkTelegram.isVisible = false
@@ -774,6 +774,18 @@ class MainActivity : HelperBaseActivity() {
     private fun openLoginScreen(mode: String? = null) {
         val i = Intent(this, LoginActivity::class.java)
         if (mode != null) i.putExtra("login_mode", mode)
+        requestActivityLauncher.launch(i)
+    }
+
+    /**
+     * Opens the Telegram screen in LINK mode: the current (already signed-in) account gets its
+     * Telegram attached, so the bot tracks the subscription. The token request carries the current
+     * JWT, so the backend links Telegram to this account instead of starting a separate login.
+     */
+    private fun openTelegramLink() {
+        val i = Intent(this, LoginActivity::class.java)
+        i.putExtra(LoginActivity.EXTRA_MODE, LoginActivity.MODE_TELEGRAM)
+        i.putExtra(LoginActivity.EXTRA_LINK, true)
         requestActivityLauncher.launch(i)
     }
 

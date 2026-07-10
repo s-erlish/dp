@@ -44,9 +44,17 @@ class LoginActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = getString(R.string.auth_title))
 
-        if (viewModel.isLoggedIn()) {
+        // Режим ПРИВЯЗКИ Telegram к уже вошедшему аккаунту (вход через сайт → привязать Telegram).
+        // Запрос создания токена уходит с текущим JWT (interceptor), поэтому бэкенд привязывает
+        // Telegram к текущему аккаунту, а не логинит отдельный.
+        val linkMode = intent.getBooleanExtra(EXTRA_LINK, false)
+        val title = if (linkMode) getString(R.string.home_link_telegram) else getString(R.string.auth_title)
+        setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = title)
+
+        // Уже вошли — обычный экран входа не нужен и закрывается. Но в режиме привязки НЕ закрываем:
+        // именно залогиненный пользователь привязывает Telegram.
+        if (viewModel.isLoggedIn() && !linkMode) {
             setResult(RESULT_OK)
             finish()
             return
@@ -116,6 +124,12 @@ class LoginActivity : BaseActivity() {
 
         observe()
         showIntro()
+
+        // В режиме привязки пользователь уже нажал «Привязать Telegram» — сразу запускаем флоу и
+        // открываем Telegram, без лишнего повторного тапа. Только при первом создании экрана.
+        if (linkMode && savedInstanceState == null) {
+            viewModel.startTelegramLogin()
+        }
     }
 
     private fun observe() {
@@ -257,6 +271,9 @@ class LoginActivity : BaseActivity() {
 
         /** Показать только карточку входа через Telegram. */
         const val MODE_TELEGRAM = "telegram"
+
+        /** true → режим ПРИВЯЗКИ Telegram к уже вошедшему аккаунту (экран не закрывается). */
+        const val EXTRA_LINK = "link_telegram"
 
         /** Основной сайт для регистрации (не API-хост). */
         private const val REGISTER_URL = "https://departament.site"
