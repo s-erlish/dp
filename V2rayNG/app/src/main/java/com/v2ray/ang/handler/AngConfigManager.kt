@@ -36,6 +36,14 @@ import java.net.URI
 object AngConfigManager {
 
     /**
+     * Generic placeholder used as a subscription's [SubscriptionItem.remarks] when neither the
+     * sub URL `#fragment` nor a provider `profile-title` yields a real name. Kept as a single
+     * constant so import (fallback) and update (the "may I adopt the provider title?" check)
+     * agree on what counts as "still unnamed".
+     */
+    private const val DEFAULT_SUBSCRIPTION_REMARKS = "import sub"
+
+    /**
      * Rich outcome of [importBatchConfig].
      *
      * Kept as a data class whose first two components are (count, countSub) on purpose: existing
@@ -814,6 +822,19 @@ object AngConfigManager {
                 decodeSubDirective(result?.webPageUrl)?.let { v -> it.subscription.webPageUrl = v }
                 // Real subscription title sent by the provider (used as the meta-bar heading).
                 decodeSubDirective(result?.profileTitle)?.let { v -> it.subscription.profileTitle = v }
+                // Adopt that provider title as the Servers group name too, but only while the
+                // subscription is still unnamed (blank or the generic "import sub"/"Default"
+                // placeholder) — a name the user typed in SubEditActivity must never be clobbered.
+                val providerTitle = it.subscription.profileTitle.trim()
+                if (providerTitle.isNotEmpty()) {
+                    val currentRemarks = it.subscription.remarks.trim()
+                    if (currentRemarks.isEmpty()
+                        || currentRemarks.equals(DEFAULT_SUBSCRIPTION_REMARKS, ignoreCase = true)
+                        || currentRemarks.equals("Default", ignoreCase = true)
+                    ) {
+                        it.subscription.remarks = providerTitle
+                    }
+                }
                 it.subscription.lastUpdated = System.currentTimeMillis()
                 MmkvManager.encodeSubscription(it.guid, it.subscription)
                 LogUtil.i(AppConfig.TAG, "Subscription updated: ${it.subscription.remarks}, $count configs")
@@ -880,7 +901,10 @@ object AngConfigManager {
 
         val uri = URI(Utils.fixIllegalUrl(url))
         val subItem = SubscriptionItem()
-        subItem.remarks = uri.fragment ?: "import sub"
+        // Name the group after the URL's #fragment when present; the real provider title
+        // (`profile-title`) is not known until the first fetch, so [updateConfigViaSub] later
+        // upgrades this placeholder to the real name (e.g. "erlish") on the first update.
+        subItem.remarks = uri.fragment?.trim()?.takeIf { it.isNotEmpty() } ?: DEFAULT_SUBSCRIPTION_REMARKS
         subItem.url = url
         val guid = Utils.getUuid()
         MmkvManager.encodeSubscription(guid, subItem)
