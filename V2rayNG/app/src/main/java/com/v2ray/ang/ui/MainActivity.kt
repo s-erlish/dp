@@ -1537,15 +1537,44 @@ class MainActivity : HelperBaseActivity() {
         val input = EditText(this).apply {
             hint = getString(R.string.manual_entry_hint)
         }
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle(R.string.menu_add_manual)
             .setView(input)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                val text = input.text.toString().trim()
-                if (text.isNotEmpty()) importBatchConfig(text)
-            }
+            .setPositiveButton(android.R.string.ok, null)
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .create()
+        // Validate before dismissing so a bad paste shows an inline reason instead of a generic
+        // failure toast after the dialog has already closed.
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val text = input.text.toString().trim()
+                when {
+                    text.isEmpty() ->
+                        input.error = "Вставьте ссылку подписки или конфигурацию сервера"
+                    !looksImportable(text) ->
+                        input.error = "Не похоже на ссылку или конфигурацию. " +
+                                "Пример: https://departament.example/sub или vless://…"
+                    else -> {
+                        dialog.dismiss()
+                        importBatchConfig(text)
+                    }
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    /**
+     * Cheap pre-check for the manual-entry dialog: is the text plausibly a subscription link, a
+     * proxy share-link (possibly base64-wrapped), or a raw config body? Keeps obviously-broken
+     * input from reaching the importer while accepting every format the importer understands.
+     */
+    private fun looksImportable(text: String): Boolean {
+        if (Utils.isValidSubUrl(text)) return true
+        if (text.contains("://")) return true
+        if (Utils.decode(text).contains("://")) return true
+        val trimmed = text.trimStart()
+        return trimmed.startsWith("{") || trimmed.startsWith("[")
     }
 
     /**
@@ -1580,18 +1609,10 @@ class MainActivity : HelperBaseActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val (count, countSub) = AngConfigManager.importBatchConfig(server, mainViewModel.subscriptionId, true)
+                val result = AngConfigManager.importBatchConfig(server, mainViewModel.subscriptionId, true)
                 delay(500L)
                 withContext(Dispatchers.Main) {
-                    when {
-                        count > 0 -> {
-                            toast(getString(R.string.title_import_config_count, count))
-                            mainViewModel.reloadServerList()
-                        }
-
-                        countSub > 0 -> mainViewModel.reloadServerList()
-                        else -> toastError(R.string.toast_failure)
-                    }
+                    showImportResult(result)
                     hideLoading()
                 }
             } catch (e: Exception) {
@@ -1601,6 +1622,35 @@ class MainActivity : HelperBaseActivity() {
                 }
                 LogUtil.e(AppConfig.TAG, "Failed to import batch config", e)
             }
+        }
+    }
+
+    /**
+     * Turns the rich [AngConfigManager.ImportResult] into precise, sentence-case feedback so adding
+     * a server or subscription is never silently successful nor falsely reported as a failure.
+     */
+    private fun showImportResult(result: AngConfigManager.ImportResult) {
+        when {
+            // A subscription was just added: report how many of its servers actually loaded.
+            result.countSub > 0 -> {
+                val loaded = result.subFetch?.configCount ?: 0
+                if (loaded > 0) {
+                    toastSuccess("Серверы добавлены: $loaded")
+                } else {
+                    toastError("Не удалось загрузить серверы подписки")
+                }
+                mainViewModel.reloadServerList()
+            }
+            // One or more individual servers were imported.
+            result.count > 0 -> {
+                toastSuccess(getString(R.string.title_import_config_count, result.count))
+                mainViewModel.reloadServerList()
+            }
+            // The subscription link is valid but was already added.
+            result.subDuplicate -> toast("Подписка уже добавлена")
+            // The subscription link is not from departament.
+            result.subRejected -> toast("Эта ссылка не от departament. Используйте подписку из нашего бота.")
+            else -> toastError(R.string.toast_failure)
         }
     }
 

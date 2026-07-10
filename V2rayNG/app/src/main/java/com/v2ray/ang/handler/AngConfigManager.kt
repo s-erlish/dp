@@ -13,6 +13,7 @@ import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.dto.entities.SubscriptionCache
 import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.enums.EConfigType
+import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.extension.isNotNullEmpty
 import com.v2ray.ang.fmt.CustomFmt
 import com.v2ray.ang.fmt.Hysteria2Fmt
@@ -28,10 +29,44 @@ import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.util.SubscriptionUserInfo
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.QRCodeDecoder
+import com.v2ray.ang.util.SubscriptionGuard
 import com.v2ray.ang.util.Utils
 import java.net.URI
 
 object AngConfigManager {
+
+    /**
+     * Rich outcome of [importBatchConfig].
+     *
+     * Kept as a data class whose first two components are (count, countSub) on purpose: existing
+     * callers that destructure `val (count, countSub) = importBatchConfig(...)` keep compiling and
+     * behaving exactly as before, while the add-server/subscription UIs can read the extra fields to
+     * tell "added nothing because it was a duplicate" apart from "added nothing because it was
+     * invalid", and to surface subscription fetch failures.
+     */
+    data class ImportResult(
+        val count: Int = 0,                  // component1: single-server configs imported
+        val countSub: Int = 0,               // component2: NEW subscriptions added
+        val subDuplicate: Boolean = false,   // a subscription URL was recognised but already present
+        val subRejected: Boolean = false,    // a subscription URL was blocked (not a departament link)
+        val subFetch: SubscriptionUpdateResult? = null  // fetch outcome for the just-added subscription(s)
+    )
+
+    /** Outcome of trying to add a single subscription URL. */
+    private sealed interface SubAddOutcome {
+        data class Added(val guid: String) : SubAddOutcome
+        object Duplicate : SubAddOutcome
+        object Rejected : SubAddOutcome
+    }
+
+    /** Aggregated outcome of parsing every subscription URL found in a pasted/scanned blob. */
+    private data class SubParseResult(
+        val addedGuids: List<String> = emptyList(),
+        val subDuplicate: Boolean = false,
+        val subRejected: Boolean = false
+    ) {
+        val countSub: Int get() = addedGuids.size
+    }
 
     // Parser mapping for different config types (lazy initialized)
     private val configFmtParsers: Map<String, (String) -> ProfileItem?> by lazy {
@@ -179,9 +214,9 @@ object AngConfigManager {
      * @param server The server string.
      * @param subid The subscription ID.
      * @param append Whether to append the configurations.
-     * @return A pair containing the number of configurations and subscriptions imported.
+     * @return An [ImportResult]; its first two components stay (count, countSub) for back-compat.
      */
-    fun importBatchConfig(server: String?, subid: String, append: Boolean): Pair<Int, Int> {
+    fun importBatchConfig(server: String?, subid: String, append: Boolean): ImportResult {
         var count = parseBatchConfig(Utils.decode(server), subid, append)
         if (count <= 0) {
             count = parseBatchConfig(server, subid, append)
@@ -190,42 +225,115 @@ object AngConfigManager {
             count = parseCustomConfigServer(server, subid, append)
         }
 
-        var countSub = parseBatchSubscription(server)
-        if (countSub <= 0) {
-            countSub = parseBatchSubscription(Utils.decode(server))
-        }
-        if (countSub > 0) {
-            updateConfigViaSubAll()
+        // Single-server pastes/QR/manual use append mode, which would otherwise let a re-scanned or
+        // re-pasted link pile up identical rows. Drop fingerprint duplicates within this bucket.
+        if (count > 0) {
+            dedupServersViaSubid(subid)
         }
 
-        return count to countSub
+        var subResult = parseBatchSubscription(server)
+        if (subResult.countSub <= 0 && !subResult.subDuplicate && !subResult.subRejected) {
+            subResult = parseBatchSubscription(Utils.decode(server))
+        }
+
+        // Fetch ONLY the just-added subscription(s) - not every existing one - and schedule their
+        // auto-update now, instead of waiting for the next cold-start WorkManager sync.
+        var subFetch: SubscriptionUpdateResult? = null
+        if (subResult.addedGuids.isNotEmpty()) {
+            var acc = SubscriptionUpdateResult()
+            subResult.addedGuids.forEach { guid ->
+                MmkvManager.decodeSubscription(guid)?.let { item ->
+                    acc += updateConfigViaSub(SubscriptionCache(guid, item))
+                    SubscriptionUpdater.syncOne(subId = guid)
+                }
+            }
+            subFetch = acc
+        }
+
+        return ImportResult(
+            count = count,
+            countSub = subResult.countSub,
+            subDuplicate = subResult.subDuplicate,
+            subRejected = subResult.subRejected,
+            subFetch = subFetch
+        )
+    }
+
+    /**
+     * Removes fingerprint-duplicate servers within a single subscription bucket, so re-scanning or
+     * re-pasting the same link never leaves duplicate rows. Keeps one entry per fingerprint and
+     * always preserves the currently-selected server (if a later duplicate is the selected one, the
+     * earlier copy is dropped instead). Complex profiles (Custom/PolicyGroup/ProxyChain) are left
+     * untouched.
+     *
+     * Fingerprinting reuses [ProfileItem.equals], which compares connection identity
+     * (server/port/credentials/transport) and ignores remarks. A linear scan is used on purpose:
+     * [ProfileItem] overrides equals but not hashCode, so it must never be used as a hash key.
+     *
+     * @param subid The subscription ID whose servers should be de-duplicated.
+     * @return The number of duplicate servers removed.
+     */
+    private fun dedupServersViaSubid(subid: String): Int {
+        try {
+            val serverList = MmkvManager.decodeServerList(subid)
+            if (serverList.size < 2) return 0
+
+            val selected = MmkvManager.getSelectServer()
+            val kept = mutableListOf<Pair<ProfileItem, String>>() // (profile, kept guid)
+            val toRemove = mutableListOf<String>()
+            for (guid in serverList) {
+                val profile = MmkvManager.decodeServerConfig(guid) ?: continue
+                if (profile.configType.isComplexType()) continue
+                val dupIndex = kept.indexOfFirst { it.first == profile }
+                if (dupIndex < 0) {
+                    kept.add(profile to guid)
+                } else if (guid == selected && kept[dupIndex].second != selected) {
+                    // Preserve the selected duplicate; drop the earlier copy instead.
+                    toRemove.add(kept[dupIndex].second)
+                    kept[dupIndex] = profile to guid
+                } else {
+                    toRemove.add(guid)
+                }
+            }
+            toRemove.forEach { MmkvManager.removeServer(it) }
+            return toRemove.size
+        } catch (e: Exception) {
+            LogUtil.e(AppConfig.TAG, "Failed to dedup servers for subid: $subid", e)
+            return 0
+        }
     }
 
     /**
      * Parses a batch of subscriptions.
      *
      * @param servers The servers string.
-     * @return The number of subscriptions parsed.
+     * @return Aggregated outcome: guids added, plus whether any URL was a duplicate or was rejected.
      */
-    private fun parseBatchSubscription(servers: String?): Int {
+    private fun parseBatchSubscription(servers: String?): SubParseResult {
         try {
             if (servers == null) {
-                return 0
+                return SubParseResult()
             }
 
-            var count = 0
+            val added = mutableListOf<String>()
+            var duplicate = false
+            var rejected = false
             servers.lines()
                 .distinct()
                 .forEach { str ->
                     if (Utils.isValidSubUrl(str)) {
-                        count += importUrlAsSubscription(str)
+                        when (val outcome = importUrlAsSubscription(str)) {
+                            is SubAddOutcome.Added -> added.add(outcome.guid)
+                            SubAddOutcome.Duplicate -> duplicate = true
+                            SubAddOutcome.Rejected -> rejected = true
+                        }
                     }
                 }
-            return count
+            return SubParseResult(added, duplicate, rejected)
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to parse batch subscription", e)
         }
-        return 0
+        return SubParseResult()
     }
 
     /**
@@ -745,22 +853,59 @@ object AngConfigManager {
     /**
      * Imports a URL as a subscription.
      *
+     * A departament-only guard is applied here (and not to single-server pastes): subscription
+     * URLs are an account/payment surface, so pasting/scanning/deep-linking a foreign subscription
+     * link is rejected the same way [com.v2ray.ang.ui.SubEditActivity] rejects it. Individual
+     * `vless://`/`vmess://`/... server links are not subscription URLs and stay unguarded so users
+     * can still add one-off servers by hand.
+     *
      * @param url The URL.
-     * @return The number of subscriptions imported.
+     * @return The outcome (added with its new guid, duplicate, or rejected).
      */
-    private fun importUrlAsSubscription(url: String): Int {
+    private fun importUrlAsSubscription(url: String): SubAddOutcome {
+        // Only departament subscription links may be added.
+        if (!SubscriptionGuard.isAllowed(url)) {
+            return SubAddOutcome.Rejected
+        }
+
+        // Normalise before the equality check so trivially-different spellings of the same link
+        // (trailing slash, host/scheme case) are recognised as duplicates rather than re-added.
+        val normalized = normalizeSubUrl(url)
         val subscriptions = MmkvManager.decodeSubscriptions()
         subscriptions.forEach {
-            if (it.subscription.url == url) {
-                return 0
+            if (normalizeSubUrl(it.subscription.url) == normalized) {
+                return SubAddOutcome.Duplicate
             }
         }
+
         val uri = URI(Utils.fixIllegalUrl(url))
         val subItem = SubscriptionItem()
         subItem.remarks = uri.fragment ?: "import sub"
         subItem.url = url
-        MmkvManager.encodeSubscription("", subItem)
-        return 1
+        val guid = Utils.getUuid()
+        MmkvManager.encodeSubscription(guid, subItem)
+        return SubAddOutcome.Added(guid)
+    }
+
+    /**
+     * Normalises a subscription URL for equality comparison: trims, lowercases scheme + host,
+     * drops the fragment, and strips a trailing slash from the path. Falls back to a trimmed,
+     * trailing-slash-stripped string if the URL cannot be parsed.
+     */
+    private fun normalizeSubUrl(raw: String?): String {
+        if (raw.isNullOrBlank()) return ""
+        val trimmed = raw.trim()
+        return try {
+            val uri = URI(Utils.fixIllegalUrl(trimmed))
+            val scheme = uri.scheme?.lowercase() ?: ""
+            val host = uri.host?.lowercase() ?: ""
+            val port = if (uri.port != -1) ":${uri.port}" else ""
+            val path = (uri.path ?: "").trimEnd('/')
+            val query = uri.query?.let { "?$it" } ?: ""
+            "$scheme://$host$port$path$query"
+        } catch (e: Exception) {
+            trimmed.trimEnd('/')
+        }
     }
 
     /** Generates a description for the profile.
