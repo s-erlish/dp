@@ -1,6 +1,7 @@
 package com.v2ray.ang.ui
 
 import android.os.Bundle
+import android.util.TypedValue
 import android.view.View
 import androidx.activity.viewModels
 import androidx.lifecycle.Lifecycle
@@ -40,7 +41,7 @@ class PaymentHistoryActivity : BaseActivity() {
         binding.rvPayments.layoutManager = LinearLayoutManager(this)
         binding.rvPayments.adapter = paymentsAdapter
 
-        binding.refreshLayout.setColorSchemeResources(R.color.icon_blue)
+        binding.refreshLayout.setColorSchemeColors(resolveThemeColor(R.attr.iconTintBlue))
         binding.refreshLayout.setOnRefreshListener {
             loaded = false
             viewModel.loadPayments()
@@ -93,5 +94,12 @@ class PaymentHistoryActivity : BaseActivity() {
         if (loaded) return
         binding.progressHistory.visibility = View.VISIBLE
         binding.tvEmpty.visibility = View.GONE
+    }
+
+    /** Resolves a theme colour attr (e.g. [R.attr.iconTintBlue]) to an ARGB int for the current theme. */
+    private fun resolveThemeColor(attr: Int): Int {
+        val tv = TypedValue()
+        theme.resolveAttribute(attr, tv, true)
+        return tv.data
     }
 }

@@ -1,6 +1,7 @@
 package com.v2ray.ang.ui
 
 import android.os.Bundle
+import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -74,7 +75,8 @@ class PaymentMethodSheet : BottomSheetDialogFragment() {
                 parent = rows,
                 iconRes = R.drawable.ic_pay_wallet,
                 tileBgRes = R.drawable.bg_icon_green,
-                tintColorRes = R.color.icon_green,
+                // Intentional green differentiator for the balance row; not a plain blue accent.
+                tintColor = ContextCompat.getColor(requireContext(), R.color.icon_green),
                 label = getString(R.string.pay_method_from_balance_fmt, label),
                 methodId = ID_BALANCE,
             )
@@ -88,7 +90,8 @@ class PaymentMethodSheet : BottomSheetDialogFragment() {
                 parent = rows,
                 iconRes = if (isSbp) R.drawable.ic_pay_sbp else R.drawable.ic_pay_card,
                 tileBgRes = R.drawable.bg_icon_blue,
-                tintColorRes = R.color.icon_blue,
+                // Mono-safe blue accent: resolves to grey under the monochrome theme.
+                tintColor = resolveThemeColor(R.attr.iconTintBlue),
                 label = label,
                 methodId = id,
             )
@@ -102,7 +105,7 @@ class PaymentMethodSheet : BottomSheetDialogFragment() {
         parent: LinearLayout,
         iconRes: Int,
         tileBgRes: Int,
-        tintColorRes: Int,
+        tintColor: Int,
         label: String,
         methodId: String,
     ) {
@@ -111,12 +114,19 @@ class PaymentMethodSheet : BottomSheetDialogFragment() {
         row.findViewById<FrameLayout>(R.id.fl_pay_tile).setBackgroundResource(tileBgRes)
         val icon = row.findViewById<ImageView>(R.id.iv_pay_icon)
         icon.setImageResource(iconRes)
-        icon.setColorFilter(ContextCompat.getColor(requireContext(), tintColorRes))
+        icon.setColorFilter(tintColor)
         row.setOnClickListener {
             onPicked?.invoke(methodId)
             dismissAllowingStateLoss()
         }
         parent.addView(row)
+    }
+
+    /** Resolves a theme colour attr (e.g. [R.attr.iconTintBlue]) to an ARGB int for the current theme. */
+    private fun resolveThemeColor(attr: Int): Int {
+        val tv = TypedValue()
+        requireContext().theme.resolveAttribute(attr, tv, true)
+        return tv.data
     }
 
     override fun onDestroy() {

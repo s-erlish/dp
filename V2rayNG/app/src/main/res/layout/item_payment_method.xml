@@ -43,7 +43,7 @@
                 android:layout_gravity="center"
                 android:contentDescription="@string/pay_method_icon_cd"
                 app:srcCompat="@drawable/ic_pay_card"
-                app:tint="@color/icon_blue" />
+                app:tint="?attr/iconTintBlue" />
         </FrameLayout>
 
         <TextView

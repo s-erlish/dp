@@ -29,7 +29,7 @@
                 android:layout_gravity="center"
                 android:importantForAccessibility="no"
                 app:srcCompat="@drawable/ic_acc_history"
-                app:tint="@color/icon_blue" />
+                app:tint="?attr/iconTintBlue" />
         </FrameLayout>
 
         <LinearLayout
