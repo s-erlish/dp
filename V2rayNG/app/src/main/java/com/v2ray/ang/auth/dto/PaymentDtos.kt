@@ -14,6 +14,7 @@ package com.v2ray.ang.auth.dto
  */
 data class PaymentRequestDto(
     val amount: Double? = null,
+    val currency: String? = null,
     val tariffId: String? = null,
     val tariffPriceOptionId: String? = null,
     val deviceCount: Int? = null,

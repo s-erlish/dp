@@ -342,11 +342,14 @@ class BuyTariffActivity : BaseActivity() {
         // Arm the diagnostic: whichever request we fire, a failure now becomes a visible dialog.
         awaitingPaymentError = true
         val deviceCount = extraDevices.takeIf { it > 0 }
+        val currency = tariff.currency.ifBlank { "RUB" }
         if (methodId == PaymentMethodSheet.ID_BALANCE) {
             val req = PaymentRequestDto(
                 tariffId = tariff.id,
                 tariffPriceOptionId = option.id,
                 deviceCount = deviceCount,
+                amount = option.price,
+                currency = currency,
             )
             viewModel.payWithBalance(req) {
                 awaitingPaymentError = false
@@ -358,6 +361,8 @@ class BuyTariffActivity : BaseActivity() {
                 tariffId = tariff.id,
                 tariffPriceOptionId = option.id,
                 deviceCount = deviceCount,
+                amount = option.price,
+                currency = currency,
                 paymentMethod = methodId.toIntOrNull(),
             )
             viewModel.buy(req) { init ->
