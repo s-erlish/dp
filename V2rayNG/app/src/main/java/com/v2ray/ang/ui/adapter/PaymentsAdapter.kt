@@ -87,7 +87,16 @@ private fun statusStyle(status: String): Pair<Int, Int> = when (status.lowercase
 private fun formatMoney(amount: Double, currency: String): String {
     val n = if (amount % 1.0 == 0.0) amount.toLong().toString()
     else String.format(Locale.US, "%.2f", amount)
-    return if (currency.isBlank()) n else "$n $currency"
+    if (currency.isBlank()) return n
+    val symbol = when (currency.uppercase(Locale.US)) {
+        "RUB" -> "₽"
+        "USD" -> "$"
+        "EUR" -> "€"
+        "KZT" -> "₸"
+        "UAH" -> "₴"
+        else -> currency
+    }
+    return "$n $symbol"
 }
 
 private fun formatIsoDate(iso: String?): String {

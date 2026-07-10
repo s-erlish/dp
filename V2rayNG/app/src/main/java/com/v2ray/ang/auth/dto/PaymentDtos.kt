@@ -17,7 +17,7 @@ data class PaymentRequestDto(
     val tariffId: String? = null,
     val tariffPriceOptionId: String? = null,
     val deviceCount: Int? = null,
-    val paymentMethod: String? = null,
+    val paymentMethod: Int? = null,
     val promoCode: String? = null,
     val subscriptionUuid: String? = null,
 )
