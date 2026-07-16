@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Hidden host-bound config templates (Module 5). All strings in Russian. -->
+    <string name="template_locked_toast">Это управляемый профиль. Его настройки скрыты и не могут быть просмотрены, изменены или экспортированы.</string>
+    <string name="template_locked_action_remove">Удалить</string>
+</resources>

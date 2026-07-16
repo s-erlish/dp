@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Payment-history screen. Pure-dark screen background; the list is a column of
+  item_payment cards. The centred block doubles as the empty state ("Платежей
+  пока нет" + a wire-ready «Купить подписку» CTA) and the error state — its text
+  and visibility are driven by PaymentHistoryActivity via tv_empty.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?android:attr/colorBackground"
+    tools:context=".ui.PaymentHistoryActivity">
+
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/refresh_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_payments"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingHorizontal="@dimen/screen_gutter"
+            android:paddingTop="@dimen/space_12"
+            android:paddingBottom="@dimen/space_24"
+            android:scrollbars="vertical"
+            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+            tools:listitem="@layout/item_payment" />
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+    <!-- Empty / error onboard block. Icon + line ride tv_empty's visibility (the
+         activity toggles it); btn_history_buy is a wire-ready gone CTA placeholder. -->
+    <LinearLayout
+        android:id="@+id/ll_empty_state"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingHorizontal="@dimen/space_24">
+
+        <TextView
+            android:id="@+id/tv_empty"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:drawablePadding="@dimen/space_12"
+            android:gravity="center"
+            android:textAppearance="@style/TextAppearance.App.Body"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:visibility="gone"
+            app:drawableTint="?attr/colorOnSurfaceVariant"
+            app:drawableTopCompat="@drawable/ic_acc_history"
+            tools:text="@string/history_empty"
+            tools:visibility="visible" />
+
+        <!-- Wire-ready CTA: activity can reveal + wire this to open Buy. -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_history_buy"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_16"
+            android:text="@string/buy_title"
+            android:textAllCaps="false"
+            android:visibility="gone"
+            app:cornerRadius="22dp"
+            tools:visibility="visible" />
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/progress_history"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:indeterminateTint="?attr/iconTintBlue"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
+</FrameLayout>

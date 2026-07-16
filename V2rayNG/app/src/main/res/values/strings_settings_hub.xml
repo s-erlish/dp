@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Строки новых пунктов вкладки настроек -->
+    <string name="settings_local_proxy">Локальный прокси</string>
+    <string name="settings_local_proxy_sub">SOCKS5-авторизация, память, доступ по сети</string>
+
+    <string name="settings_provider">Настройки провайдеров</string>
+    <string name="settings_provider_sub">Автообновление, HWID, User-Agent</string>
+
+    <string name="settings_url_scheme">Схемы URL-адресов</string>
+    <string name="settings_url_scheme_sub">Быстрые команды depv://</string>
+
+    <!-- Оформление (выбор темы: светлая / тёмная / чёрно-белая) -->
+    <string name="settings_appearance">Оформление</string>
+    <string name="settings_appearance_light">Светлая</string>
+    <string name="settings_appearance_dark">Тёмная</string>
+    <string name="settings_appearance_mono">Чёрно-белая</string>
+
+    <!-- IPv6 -->
+    <string name="settings_ipv6">IPv6</string>
+    <string name="settings_ipv6_sub">Включить IPv6-адресацию в туннеле</string>
+
+    <!-- Always-on VPN и блокировка без VPN -->
+    <string name="settings_always_on">Always-on VPN и блокировка</string>
+    <string name="settings_always_on_sub">Постоянное подключение и блокировка без VPN</string>
+    <string name="settings_always_on_hint">Включите постоянный VPN и блокировку без VPN в системных настройках</string>
+
+    <!-- Автообновление подписки: нет подписок -->
+    <string name="settings_sub_auto_update_empty">Сначала добавьте подписку</string>
+
+    <!-- DNS-пресеты -->
+    <string name="settings_dns_custom">Свой…</string>
+
+    <string-array name="dns_preset_names">
+        <item>Cloudflare</item>
+        <item>Google</item>
+        <item>Cloudflare + Google</item>
+        <item>AdGuard</item>
+        <item>Quad9</item>
+        <item>@string/settings_dns_custom</item>
+    </string-array>
+
+    <string-array name="dns_preset_values">
+        <item>1.1.1.1</item>
+        <item>8.8.8.8</item>
+        <item>1.1.1.1,8.8.8.8</item>
+        <item>94.140.14.14</item>
+        <item>9.9.9.9</item>
+        <item></item>
+    </string-array>
+
+</resources>

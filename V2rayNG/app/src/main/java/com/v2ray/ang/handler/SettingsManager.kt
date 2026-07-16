@@ -18,6 +18,7 @@ import com.v2ray.ang.dto.entities.RulesetItem
 import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.enums.Language
+import com.v2ray.ang.enums.PingMethod
 import com.v2ray.ang.enums.RoutingType
 import com.v2ray.ang.enums.VpnInterfaceAddressConfig
 import com.v2ray.ang.handler.MmkvManager.decodeAllServerList
@@ -190,7 +191,14 @@ object SettingsManager {
         val guid = MmkvManager.getSelectServer() ?: return false
         val config = decodeServerConfig(guid) ?: return false
         if (config.configType == EConfigType.CUSTOM) {
-            val raw = MmkvManager.decodeServerRaw(guid) ?: return false
+            // decodeRuntimeRaw transparently decrypts hidden templates; identical to
+            // decodeServerRaw for ordinary custom configs. Defensive fallback to the plain
+            // stored raw so a template/keystore failure can never crash this read.
+            val raw = try {
+                com.v2ray.ang.template.TemplateManager.decodeRuntimeRaw(guid)
+            } catch (e: Exception) {
+                MmkvManager.decodeServerRaw(guid)
+            } ?: return false
             val v2rayConfig = JsonUtil.fromJsonSafe(raw, V2rayConfig::class.java)
             val exist = v2rayConfig?.routing?.rules?.filter { it.outboundTag == TAG_DIRECT }?.any {
                 it.domain?.contains(GEOSITE_PRIVATE) == true || it.ip?.contains(GEOIP_PRIVATE) == true
@@ -314,11 +322,77 @@ object SettingsManager {
     }
 
     /**
+     * Get the SOCKS port used for LAN/hotspot proxy sharing.
+     *
+     * This is a separate, dedicated port from [getSocksPort]: the loopback socks inbound
+     * (used by the local tun bridge) stays bound to 127.0.0.1, while the shared inbound is
+     * bound to 0.0.0.0. Binding 0.0.0.0 would otherwise subsume the loopback bind, so the two
+     * inbounds MUST use different ports.
+     */
+    fun getSocksSharePort(): Int {
+        return Utils.parseInt(
+            MmkvManager.decodeSettingsString(AppConfig.PREF_SOCKS_SHARE_PORT),
+            AppConfig.PORT_SOCKS_SHARE.toInt()
+        )
+    }
+
+    /**
+     * Ensure SOCKS5 credentials exist, generating and persisting them when empty.
+     *
+     * The LAN/hotspot inbound is bound to 0.0.0.0, so it must NEVER be reachable without
+     * authentication (an open relay). When sharing is enabled with empty credentials this
+     * generates a login (dep_ + 6 hex) and password (12 hex) and persists them, mirroring the
+     * generator used by the local proxy screen. Returns the effective (user, pass) pair.
+     */
+    @Synchronized
+    fun ensureSocksShareCredentials(): Pair<String, String> {
+        var user = getSocksUsername()
+        var pass = getSocksPassword()
+        if (user.isNullOrEmpty() || pass.isNullOrEmpty()) {
+            user = "dep_" + randomHex(6)
+            pass = randomHex(12)
+            MmkvManager.encodeSettings(AppConfig.PREF_SOCKS_USERNAME, user)
+            MmkvManager.encodeSettings(AppConfig.PREF_SOCKS_PASSWORD, pass)
+        }
+        return user to pass
+    }
+
+    private fun randomHex(length: Int): String {
+        val chars = "0123456789abcdef"
+        return buildString(length) {
+            repeat(length) { append(chars[Random.nextInt(chars.length)]) }
+        }
+    }
+
+    /**
      * Get the HTTP port.
      * @return The HTTP port.
      */
     fun getHttpPort(): Int {
         return getSocksPort() + if (Utils.isXray()) 0 else 1
+    }
+
+    /**
+     * Whether the stable per-install device id (HWID) is attached to subscription
+     * and backend requests. Default TRUE.
+     */
+    fun isSendHwid(): Boolean {
+        return MmkvManager.decodeSettingsBool(AppConfig.PREF_SEND_HWID, true)
+    }
+
+    /**
+     * Soft memory cap (in megabytes) requested for the core runtime. Default 100.
+     * Only meaningful when [isMemoryLimitEnabled] is true.
+     */
+    fun getMemoryLimit(): Int {
+        return Utils.parseInt(MmkvManager.decodeSettingsString(AppConfig.PREF_MEMORY_LIMIT), 100)
+    }
+
+    /**
+     * Whether the memory limit should be enforced. Default TRUE.
+     */
+    fun isMemoryLimitEnabled(): Boolean {
+        return MmkvManager.decodeSettingsBool(AppConfig.PREF_MEMORY_LIMIT_ENABLED, true)
     }
 
     private fun IsDynamicSocksPort(): Boolean {
@@ -390,7 +464,17 @@ object SettingsManager {
      */
     fun getVpnDnsServers(): List<String> {
         val vpnDns = MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_DNS) ?: AppConfig.DNS_VPN
-        return vpnDns.split(",").filter { Utils.isPureIpAddress(it) }
+        val ret = vpnDns.split(",").filter { Utils.isPureIpAddress(it) }
+        if (ret.isEmpty()) {
+            // Safeguard: never hand the VPN interface an empty DNS list. These values feed
+            // CoreVpnService.addDnsServer(); an empty result (e.g. the blank "custom" DNS
+            // preset, or a DoH URL / bare hostname that isn't a pure IP) would leave the
+            // tunnel with NO resolver, so every domain fails ("no internet") even though
+            // IP-level ping still succeeds. Fall back to the default, mirroring
+            // getRemoteDnsServers()/getDomesticDnsServers().
+            return listOf(AppConfig.DNS_VPN)
+        }
+        return ret
     }
 
     /**
@@ -406,6 +490,12 @@ object SettingsManager {
                 ?: AppConfig.DELAY_TEST_URL
         }
     }
+
+    /**
+     * Returns the user-selected connection-test (ping) method.
+     */
+    fun getPingMethod(): PingMethod =
+        PingMethod.fromPref(MmkvManager.decodeSettingsString(AppConfig.PREF_PING_METHOD))
 
     /**
      * Get real ping concurrency.
@@ -521,6 +611,8 @@ object SettingsManager {
         ensureDefaultValue(AppConfig.PREF_REMOTE_DNS, AppConfig.DNS_PROXY)
         ensureDefaultValue(AppConfig.PREF_DOMESTIC_DNS, AppConfig.DNS_DIRECT)
         ensureDefaultValue(AppConfig.PREF_DELAY_TEST_URL, AppConfig.DELAY_TEST_URL)
+        ensureDefaultValue(AppConfig.PREF_PING_METHOD, PingMethod.PROXIED_REAL_DELAY.prefValue)
+        ensureDefaultValue(AppConfig.PREF_UI_MODE_NIGHT, "2") // Incy-style dark by default
         ensureDefaultValue(AppConfig.PREF_IP_API_URL, AppConfig.IP_API_URL)
         ensureDefaultValue(AppConfig.PREF_HEV_TUNNEL_RW_TIMEOUT, AppConfig.HEVTUN_RW_TIMEOUT)
         ensureDefaultValue(AppConfig.PREF_MUX_CONCURRENCY, "8")

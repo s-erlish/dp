@@ -7,6 +7,7 @@ plugins {
 android {
     namespace = "com.v2ray.ang"
     compileSdk = 37
+    ndkVersion = "28.2.13676358"
 
     defaultConfig {
         applicationId = "com.departamentvpn.app"
@@ -36,6 +37,13 @@ android {
         }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Departament VPN backend / Telegram auth configuration.
+        // Leave BACKEND_BASE_URL blank to keep login OPTIONAL (app stays fully usable offline).
+        // Fill these in (or override per build type/flavor) when the real bot backend lands.
+        buildConfigField("String", "BACKEND_BASE_URL", "\"https://web.departament.site/api\"")
+        buildConfigField("String", "BOT_USERNAME", "\"departamentvpnbot\"")
+        buildConfigField("String", "SUB_USER_AGENT", "\"DepartamentVPN/1.0\"")
     }
 
     buildTypes {
@@ -45,6 +53,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Sign release builds with the debug key so the produced APK is directly installable
+            // for full-app testing (no separate keystore/secrets required in CI).
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
@@ -92,7 +103,7 @@ android {
                 .map { it as com.android.build.gradle.internal.api.ApkVariantOutputImpl }
                 .forEach { output ->
                     val abi = output.getFilter("ABI") ?: "universal"
-                    output.outputFileName = "v2rayNG_${variant.versionName}-fdroid_${abi}.apk"
+                    output.outputFileName = "departament_${variant.versionName}-fdroid_${abi}.apk"
                     if (versionCodes.containsKey(abi)) {
                         output.versionCodeOverride =
                             (100 * variant.versionCode + versionCodes[abi]!!).plus(5000000)
@@ -112,7 +123,7 @@ android {
                     else
                         "universal"
 
-                    output.outputFileName = "v2rayNG_${variant.versionName}_${abi}.apk"
+                    output.outputFileName = "departament_${variant.versionName}_${abi}.apk"
                     if (versionCodes.containsKey(abi)) {
                         output.versionCodeOverride =
                             (1000000 * versionCodes[abi]!!).plus(variant.versionCode)
@@ -150,6 +161,9 @@ dependencies {
     implementation(libs.androidx.swiperefreshlayout)
     implementation(libs.androidx.viewpager2)
     implementation(libs.androidx.fragment)
+
+    // Custom Tabs (Telegram deep-link / payment checkout hand-off)
+    implementation("androidx.browser:browser:1.8.0")
 
     // UI Libraries
     implementation(libs.material)

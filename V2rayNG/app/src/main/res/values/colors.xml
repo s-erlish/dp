@@ -1,30 +1,70 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPing">#009966</color>
-    <color name="colorPingRed">#FF0099</color>
-    <color name="colorConfigType">#f97910</color>
+    <!-- Brand: departament VPN blue (sampled from logo) -->
+    <color name="brand_blue">#1E5FC7</color>
+    <color name="brand_blue_dark">#17469A</color>
+    <color name="brand_cream">#F4F1EA</color>
+
+    <color name="colorPing">#12B76A</color>
+    <color name="colorPingRed">#E5484D</color>
+    <color name="colorConfigType">#1E5FC7</color>
     <color name="colorWhite">#FFFFFF</color>
-    <color name="color_fab_active">#f97910</color>
-    <color name="color_fab_inactive">#9C9C9C</color>
-    <color name="divider_color_light">#E0E0E0</color>
+    <color name="color_fab_active">#1E5FC7</color>
+    <color name="color_fab_inactive">#9AA6B8</color>
+    <color name="color_connected">#12B76A</color>
+    <color name="color_upload">#1E5FC7</color>
+    <color name="color_download">#1E5FC7</color>
+
+    <!-- Colored setting-row icon tints (same in light/dark) -->
+    <color name="icon_blue">#4C8DFF</color>
+    <color name="icon_green">#22C55E</color>
+    <color name="icon_purple">#4C8DFF</color>
+    <color name="icon_yellow">#EAB308</color>
+    <color name="icon_red">#F04452</color>
+    <color name="icon_orange">#FB923C</color>
+    <color name="divider_color_light">#E4E9F2</color>
     <color name="colorIndicator">@color/md_theme_primary</color>
 
-    <!-- Primary colors - main tone: black -->
-    <color name="md_theme_primary">#000000</color>
+    <!-- Themed-attr accent values (Blue theme, light). Mono remaps via ThemeOverlay.Mono. -->
+    <!-- Protocol chip text: darkened blue for >=4.5:1 on colorPrimaryContainer (#D8E4FF) -->
+    <color name="chip_type_text">#14468F</color>
+    <!-- JSON chip: dark amber text on dense pale-gold fill (~5:1 on white card) -->
+    <color name="chip_json_text">#7A5C00</color>
+    <color name="chip_json_bg">#F5E6B0</color>
+    <!-- Latency ping: darkened green for >=4.5:1 on white; red darkened for contrast -->
+    <color name="ping_good">#0B7D4A</color>
+    <color name="ping_bad">#C42B32</color>
+    <!-- Icon-tile background fills (translucent hue, shared light/dark) -->
+    <color name="icon_tile_blue">#334C8DFF</color>
+    <color name="icon_tile_green">#3322C55E</color>
+    <color name="icon_tile_orange">#33FB923C</color>
+    <color name="icon_tile_purple">#334C8DFF</color>
+    <color name="icon_tile_red">#33F04452</color>
+    <color name="icon_tile_yellow">#33EAB308</color>
+
+    <!-- Neutral (non-accent) icon tile: solid surface fill + muted glyph.
+         Spends no accent budget so default/utility rows stay quiet and the
+         blue reads as the only accent. Light = surfaceContainerHighest tone;
+         night overrides in values-night/. -->
+    <color name="icon_tile_neutral">#E3EAF4</color>
+    <color name="icon_glyph_neutral">#54607A</color>
+
+    <!-- Primary colors - main tone: departament blue -->
+    <color name="md_theme_primary">#1E5FC7</color>
     <color name="md_theme_onPrimary">#FFFFFF</color>
-    <color name="md_theme_primaryContainer">#E0E0E0</color>
-    <color name="md_theme_onPrimaryContainer">#000000</color>
+    <color name="md_theme_primaryContainer">#D8E4FF</color>
+    <color name="md_theme_onPrimaryContainer">#001A43</color>
 
-    <!-- Secondary colors - accent color: orange -->
-    <color name="md_theme_secondary">#f97910</color>
+    <!-- Secondary colors - accent: lighter blue -->
+    <color name="md_theme_secondary">#3B6FD0</color>
     <color name="md_theme_onSecondary">#FFFFFF</color>
-    <color name="md_theme_secondaryContainer">#FFE8D6</color>
-    <color name="md_theme_onSecondaryContainer">#2B1700</color>
+    <color name="md_theme_secondaryContainer">#DCE6FF</color>
+    <color name="md_theme_onSecondaryContainer">#0A1F45</color>
 
-    <!-- Tertiary colors - accent color: green -->
-    <color name="md_theme_tertiary">#009966</color>
+    <!-- Tertiary colors - accent: green (connected) -->
+    <color name="md_theme_tertiary">#12B76A</color>
     <color name="md_theme_onTertiary">#FFFFFF</color>
-    <color name="md_theme_tertiaryContainer">#A0F2D0</color>
+    <color name="md_theme_tertiaryContainer">#A8F0CE</color>
     <color name="md_theme_onTertiaryContainer">#00201A</color>
 
     <!-- Error colors -->
@@ -33,25 +73,64 @@
     <color name="md_theme_onError">#FFFFFF</color>
     <color name="md_theme_onErrorContainer">#410002</color>
 
-    <!-- Background colors -->
-    <color name="md_theme_background">#FFFFFF</color>
-    <color name="md_theme_onBackground">#1C1B1F</color>
+    <!-- Background colors - soft white-blue -->
+    <color name="md_theme_background">#F4F7FC</color>
+    <color name="md_theme_onBackground">#111826</color>
 
-    <!-- Surface colors -->
+    <!-- Surface colors - white cards -->
     <color name="md_theme_surface">#FFFFFF</color>
-    <color name="md_theme_onSurface">#1C1B1F</color>
-    <color name="md_theme_surfaceVariant">#E7E0EC</color>
-    <color name="md_theme_onSurfaceVariant">#49454F</color>
-    <color name="md_theme_inverseSurface">#313033</color>
-    <color name="md_theme_inverseOnSurface">#F4EFF4</color>
+    <color name="md_theme_onSurface">#111826</color>
+    <color name="md_theme_surfaceVariant">#E9EEF7</color>
+    <color name="md_theme_onSurfaceVariant">#54607A</color>
+    <color name="md_theme_inverseSurface">#2A3142</color>
+    <color name="md_theme_inverseOnSurface">#F1F4FA</color>
 
     <!-- Outline colors -->
-    <color name="md_theme_outline">#79747E</color>
-    <color name="md_theme_outlineVariant">#CAC4D0</color>
+    <color name="md_theme_outline">#C3CCDC</color>
+    <color name="md_theme_outlineVariant">#DCE3EF</color>
 
     <!-- Other colors -->
-    <color name="md_theme_inversePrimary">#C0C0C0</color>
+    <color name="md_theme_inversePrimary">#AEC7FF</color>
     <color name="md_theme_shadow">#000000</color>
-    <color name="md_theme_surfaceTint">#000000</color>
+    <color name="md_theme_surfaceTint">#1E5FC7</color>
     <color name="md_theme_scrim">#000000</color>
+
+    <!-- ============================================================= -->
+    <!-- MONO theme (black & white) - applied via ThemeOverlay.Mono    -->
+    <!-- ============================================================= -->
+    <color name="mono_primary">#111214</color>
+    <color name="mono_onPrimary">#FFFFFF</color>
+    <color name="mono_primaryContainer">#E6E6E8</color>
+    <color name="mono_onPrimaryContainer">#111214</color>
+    <color name="mono_secondary">#3A3A3D</color>
+    <color name="mono_onSecondary">#FFFFFF</color>
+    <color name="mono_secondaryContainer">#E6E6E8</color>
+    <color name="mono_onSecondaryContainer">#111214</color>
+    <color name="mono_tertiary">#111214</color>
+    <color name="mono_onTertiary">#FFFFFF</color>
+    <color name="mono_background">#FFFFFF</color>
+    <color name="mono_onBackground">#111214</color>
+    <color name="mono_surface">#FFFFFF</color>
+    <color name="mono_onSurface">#111214</color>
+    <color name="mono_surfaceVariant">#F1F1F2</color>
+    <color name="mono_onSurfaceVariant">#5A5A5E</color>
+    <color name="mono_outline">#D2D2D6</color>
+    <color name="mono_outlineVariant">#E6E6E8</color>
+    <color name="mono_fab_active">#111214</color>
+    <color name="mono_fab_inactive">#C7C7CC</color>
+    <color name="mono_connected">#111214</color>
+
+    <!-- Surface container ramp (blue theme, light) - enables layering & glass depth -->
+    <color name="md_theme_surfaceContainerLowest">#FFFFFF</color>
+    <color name="md_theme_surfaceContainerLow">#F7F9FD</color>
+    <color name="md_theme_surfaceContainer">#F1F4FA</color>
+    <color name="md_theme_surfaceContainerHigh">#EAEFF7</color>
+    <color name="md_theme_surfaceContainerHighest">#E3EAF4</color>
+
+    <!-- Surface container ramp (mono theme, light) -->
+    <color name="mono_surfaceContainerLowest">#FFFFFF</color>
+    <color name="mono_surfaceContainerLow">#FAFAFB</color>
+    <color name="mono_surfaceContainer">#F4F4F5</color>
+    <color name="mono_surfaceContainerHigh">#EEEEEF</color>
+    <color name="mono_surfaceContainerHighest">#E7E7E9</color>
 </resources>

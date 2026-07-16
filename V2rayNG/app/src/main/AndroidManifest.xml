@@ -119,6 +119,24 @@
         <activity
             android:name=".ui.SubEditActivity"
             android:exported="false" />
+
+        <activity
+            android:name=".ui.LoginActivity"
+            android:exported="false" />
+
+        <!-- =====================Android TV: QR Wi-Fi subscription transfer===================== -->
+        <!-- TV-side receiver: shows the pairing QR and runs the one-shot LAN listener. -->
+        <activity
+            android:name=".tv.TvReceiveActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            tools:ignore="DiscouragedApi,LockedOrientationActivity" />
+        <!-- Phone-side sender: scans the TV QR and POSTs the selected subscription. -->
+        <activity
+            android:name=".tv.TvSendActivity"
+            android:exported="false" />
+        <!-- =====================Android TV===================== -->
+
         <activity
             android:name=".ui.ScScannerActivity"
             android:exported="false" />
@@ -159,6 +177,16 @@
                 <data android:host="install-config" />
                 <data android:host="install-sub" />
             </intent-filter>
+            <!-- departament deeplinks: connect/open, disconnect/close, toggle,
+                 import/{base64}, add/{url}, routing/add|onadd/{base64} -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.BROWSABLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:scheme="depv" />
+            </intent-filter>
         </activity>
         <activity
             android:name=".ui.CheckUpdateActivity"
@@ -169,6 +197,32 @@
         <activity
             android:name=".ui.AboutActivity"
             android:exported="false" />
+
+        <!-- departament wave activities (registered here per manifest ownership) -->
+        <activity
+            android:name=".ui.DeviceManagementActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+        <activity
+            android:name=".ui.BuyTariffActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+        <activity
+            android:name=".ui.PaymentHistoryActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+        <activity
+            android:name=".ui.LocalProxyActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+        <activity
+            android:name=".ui.ProviderSettingsActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
+        <activity
+            android:name=".ui.UrlSchemeListActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity" />
 
         <service
             android:name=".service.CoreVpnService"

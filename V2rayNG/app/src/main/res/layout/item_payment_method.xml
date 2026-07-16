@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A single payment-method row for PaymentMethodSheet, styled after the
+    server-actions sheet grammar: a flat tappable row (no card-in-a-sheet), with a
+    blue icon tile + label + chevron, separated from the row above by a 1dp
+    outline-variant divider. Icon, label and tile colour are set at runtime in
+    PaymentMethodSheet; the click listener is attached to this root (card_pay_method).
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/card_pay_method"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:orientation="vertical"
+    android:stateListAnimator="@anim/press_scale">
+
+    <!-- Row divider (matches the flat sheet grammar) -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginHorizontal="@dimen/space_16"
+        android:background="?attr/colorOutlineVariant" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="@dimen/row_min_height"
+        android:orientation="horizontal"
+        android:paddingHorizontal="@dimen/space_16"
+        android:paddingVertical="@dimen/space_12">
+
+        <FrameLayout
+            android:id="@+id/fl_pay_tile"
+            android:layout_width="@dimen/tile_size"
+            android:layout_height="@dimen/tile_size"
+            android:background="@drawable/bg_icon_blue">
+
+            <ImageView
+                android:id="@+id/iv_pay_icon"
+                android:layout_width="@dimen/tile_glyph"
+                android:layout_height="@dimen/tile_glyph"
+                android:layout_gravity="center"
+                android:contentDescription="@string/pay_method_icon_cd"
+                app:srcCompat="@drawable/ic_pay_card"
+                app:tint="?attr/iconTintBlue" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/tv_pay_label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_16"
+            android:layout_weight="1"
+            android:textAppearance="@style/TextAppearance.App.Body"
+            tools:text="СБП" />
+
+        <ImageView
+            android:id="@+id/iv_pay_chevron"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:contentDescription="@string/pay_method_chevron_cd"
+            app:srcCompat="@drawable/ic_chevron_right"
+            app:tint="?attr/colorOnSurfaceVariant" />
+    </LinearLayout>
+</LinearLayout>

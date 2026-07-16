@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Home account header. One slot, two mutually-exclusive states:
+    - signed out -> login entry points (group_login):
+        * "Войти через Telegram" tonal pill (btn_telegram_login)
+        * "Войти через сайт" text button (btn_site_login)
+        * dismissible "link Telegram" CTA banner (cta_link_telegram) for pasted-sub users
+    - signed in  -> account chip (chip_account)
+  Whole element is GONE unless BackendConfig.isConfigured().
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="@dimen/screen_gutter"
+    android:layout_marginTop="@dimen/space_8"
+    android:layout_marginEnd="@dimen/screen_gutter"
+    android:visibility="gone">
+
+    <!-- Signed out: the "link Telegram" CTA for pasted-sub users. The primary login buttons
+         now live in the onboarding card (layout_home_empty); this container only carries the CTA. -->
+    <LinearLayout
+        android:id="@+id/group_login"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <!-- Dismissible CTA banner: prompt pasted-sub users to link Telegram -->
+        <LinearLayout
+            android:id="@+id/cta_link_telegram"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_8"
+            android:background="@drawable/bg_card_incy"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/space_12"
+            android:paddingTop="@dimen/space_8"
+            android:paddingEnd="@dimen/space_4"
+            android:paddingBottom="@dimen/space_8"
+            android:stateListAnimator="@anim/press_scale"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="@dimen/tile_glyph"
+                android:layout_height="@dimen/tile_glyph"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_telegram_24dp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="@dimen/space_12"
+                android:text="@string/auth_link_telegram_cta"
+                android:textAppearance="@style/TextAppearance.App.Subtitle" />
+
+            <TextView
+                android:id="@+id/btn_cta_dismiss"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:contentDescription="@string/auth_link_telegram_cta_dismiss"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="✕"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="16sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Signed in: account chip -->
+    <LinearLayout
+        android:id="@+id/chip_account"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_card_incy"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/space_12"
+        android:paddingTop="@dimen/space_8"
+        android:paddingEnd="@dimen/screen_gutter"
+        android:paddingBottom="@dimen/space_8"
+        android:stateListAnimator="@anim/press_scale"
+        android:visibility="gone">
+
+        <FrameLayout
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@drawable/bg_avatar_circle">
+
+            <TextView
+                android:id="@+id/tv_avatar_initial"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="?"
+                android:textColor="?attr/iconTintBlue"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/img_avatar"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:scaleType="centerCrop"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="@dimen/space_12"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_account_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/auth_account"
+                android:textAppearance="@style/TextAppearance.App.Title" />
+
+            <TextView
+                android:id="@+id/tv_account_sub"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_4"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/auth_open_account"
+                android:textAppearance="@style/TextAppearance.App.Caption" />
+        </LinearLayout>
+
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_marginStart="@dimen/space_8"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_chevron_right"
+            app:tint="?attr/colorOnSurfaceVariant" />
+    </LinearLayout>
+</FrameLayout>

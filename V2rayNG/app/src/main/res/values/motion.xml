@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Motion duration tokens (ms). One tempo for the whole app so every surface
+  presses, reveals, and settles on the same clock. Ease-out only, no bounce.
+  Exit is always faster than enter (press_out is the release, but reveals/state
+  exits should reuse the smaller token). Honor reduced motion at the call site:
+  when Settings.Global.ANIMATOR_DURATION_SCALE == 0 the system collapses these
+  to 0 and views jump straight to the end state (see MotionUtils).
+-->
+<resources>
+    <!-- Finger-down press: quick acknowledgement (< 100ms feels instant). -->
+    <integer name="motion_press_in">90</integer>
+    <!-- Release/settle back to rest. Slightly longer than press-in so the
+         rebound reads as a relax, not a snap. -->
+    <integer name="motion_press_out">160</integer>
+    <!-- State changes: selection, enable/disable, color/elevation shifts. -->
+    <integer name="motion_state">220</integer>
+    <!-- Reveal: show/hide, expand, sheet/section entrances. -->
+    <integer name="motion_reveal">300</integer>
+    <!-- Per-item delay for list/grid stagger. Cap the staggered count so the
+         total never exceeds ~400ms. -->
+    <integer name="motion_stagger">40</integer>
+    <!-- Emphasis: the one hero moment (connect sonar / assemble). Longest token
+         in the system; reserve for the single primary action, never chrome. -->
+    <integer name="motion_emphasis">600</integer>
+</resources>

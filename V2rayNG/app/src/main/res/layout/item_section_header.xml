@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/section_header_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/screen_gutter"
+    android:paddingTop="@dimen/space_12"
+    android:paddingEnd="@dimen/screen_gutter"
+    android:paddingBottom="@dimen/space_4">
+
+    <!-- Disclosure chevron: unified 22dp glyph (matches the meta bar collapse chevron).
+         Decorative here — the whole section_header_root row carries the click + the
+         ≥48dp touch target, so this stays a bare glyph flush at the 16dp gutter. -->
+    <ImageView
+        android:id="@+id/section_chevron"
+        android:layout_width="@dimen/tile_glyph"
+        android:layout_height="@dimen/tile_glyph"
+        android:layout_marginEnd="@dimen/space_8"
+        android:importantForAccessibility="no"
+        android:scaleType="fitCenter"
+        app:srcCompat="@drawable/ic_arrow_drop_down"
+        app:tint="?attr/colorOnSurfaceVariant" />
+
+    <TextView
+        android:id="@+id/section_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textAppearance="@style/TextAppearance.App.Title"
+        tools:text="departament • Premium" />
+
+    <TextView
+        android:id="@+id/section_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/space_8"
+        android:textAppearance="@style/TextAppearance.App.Subtitle"
+        tools:text="15" />
+
+</LinearLayout>

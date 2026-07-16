@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Incy settings section header: sentence-case bold, matching the Account hub's
+         App.Title (16sp, Space Grotesk 700, colorOnSurface). NOT a tracked eyebrow. -->
+    <style name="SettingsSectionLabel" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:fontFamily">@font/space_grotesk</item>
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:paddingTop">18dp</item>
+        <item name="android:paddingBottom">8dp</item>
+    </style>
+
+    <!-- Compact Incy-style bottom navigation. Baseline (inactive) weight 500; the
+         selected item is stepped to 700 at runtime in updateNavSelection, so the
+         active tab reads on TWO axes (colorPrimary + heavier weight), not tint alone. -->
+    <style name="BottomNavLabel" parent="TextAppearance.Material3.LabelSmall">
+        <item name="android:textSize">11sp</item>
+        <item name="android:textFontWeight">500</item>
+    </style>
+
+    <style name="BottomNavIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:width">64dp</item>
+        <item name="android:height">34dp</item>
+        <item name="android:color">@color/md_theme_primaryContainer</item>
+        <item name="marginHorizontal">6dp</item>
+    </style>
+
+    <!-- Brand wordmark shown as the toolbar title on the main screen -->
+    <style name="ToolbarBrandTitle" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:fontFamily">@font/space_grotesk</item>
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textColor">?attr/colorOnBackground</item>
+        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:textSize">20sp</item>
+    </style>
+
+    <!-- ============================================================= -->
+    <!-- Incy type scale (dark-theme aware; colors via theme attrs)     -->
+    <!-- ============================================================= -->
+
+    <!--
+        Type ramp — Space Grotesk (variable) for display/titles at REAL weights
+        via android:textFontWeight (700/500), system font for reading sizes.
+        No android:textStyle="bold" on any Space Grotesk style: the variable ttf
+        carries genuine masters, so no synthetic bold. textFontWeight is API 28+;
+        the multi-weight space_grotesk.xml family covers older devices.
+    -->
+
+    <!-- Big hero / balance figure. Brand font, 34sp 700, tight tracking. -->
+    <style name="TextAppearance.App.Display" parent="TextAppearance.Material3.HeadlineMedium">
+        <item name="android:fontFamily">@font/space_grotesk</item>
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textSize">34sp</item>
+        <item name="android:letterSpacing">-0.02</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+
+    <!-- Screen titles / welcome. Brand font, 24sp 700. -->
+    <style name="TextAppearance.App.Headline" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:fontFamily">@font/space_grotesk</item>
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textSize">24sp</item>
+        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+
+    <!-- Section / list titles. Brand font, 16sp 700. -->
+    <style name="TextAppearance.App.Title" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:fontFamily">@font/space_grotesk</item>
+        <item name="android:textFontWeight">700</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:letterSpacing">0.0</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+
+    <!-- Softer section title. Brand font, 16sp 500 (medium master). -->
+    <style name="TextAppearance.App.Title.Medium" parent="TextAppearance.App.Title">
+        <item name="android:textFontWeight">500</item>
+    </style>
+
+    <!-- Primary body copy. System font, 14sp, gentle tracking. -->
+    <style name="TextAppearance.App.Body" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textSize">14sp</item>
+        <item name="android:letterSpacing">0.01</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+
+    <!-- Secondary / supporting text. System font, 13sp muted. -->
+    <style name="TextAppearance.App.Subtitle" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textSize">13sp</item>
+        <item name="android:letterSpacing">0.01</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+    </style>
+
+    <!-- Captions / metadata. System font, 12sp muted. -->
+    <style name="TextAppearance.App.Caption" parent="TextAppearance.Material3.BodySmall">
+        <item name="android:textSize">12sp</item>
+        <item name="android:letterSpacing">0.02</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+    </style>
+
+    <!-- Chip / badge labels. Brand font, 11sp 500, open tracking. -->
+    <style name="TextAppearance.App.Chip" parent="TextAppearance.Material3.LabelSmall">
+        <item name="android:fontFamily">@font/space_grotesk</item>
+        <item name="android:textFontWeight">500</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:letterSpacing">0.04</item>
+    </style>
+
+    <!--
+        Tabular figures for live-updating numbers (traffic counters, ping, balance
+        digits) so glyph widths stay fixed and the value doesn't jitter as it
+        counts. Brand font + tnum/lnum OpenType features, neutral tracking.
+        Apply as textAppearance; pair with a weight-bearing style where needed.
+    -->
+    <style name="TextAppearance.App.Numeric" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:fontFamily">@font/space_grotesk</item>
+        <item name="android:fontFeatureSettings">"tnum" on, "lnum" on</item>
+        <item name="android:letterSpacing">0.0</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+
+    <!--
+        App-wide AlertDialog theming (departament design language).
+
+        Wired to every app theme via `alertDialogTheme` / `android:alertDialogTheme`
+        / `materialAlertDialogTheme`, so EVERY androidx.appcompat AlertDialog
+        (DNS input dialog, "Пинг" single-choice list, etc.) is restyled without
+        touching any Kotlin. All colours are pulled from the current theme via
+        `?attr/...`, so the dialog adapts automatically to the dark, light and
+        (runtime-applied) mono themes.
+    -->
+    <style name="ThemeOverlay.Departament.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <!-- Rounded dark app-surface window (replaces the flat grey box) -->
+        <item name="android:windowBackground">@drawable/bg_dialog</item>
+        <item name="android:dialogCornerRadius">20dp</item>
+        <item name="dialogCornerRadius">20dp</item>
+
+        <!-- Bright-blue accent for action buttons, cursor, radio/checkbox controls -->
+        <item name="colorControlNormal">?attr/colorOnSurfaceVariant</item>
+        <item name="colorControlActivated">?attr/colorPrimary</item>
+        <item name="colorControlHighlight">?attr/colorPrimary</item>
+
+        <!-- On-surface text colours -->
+        <item name="android:textColorPrimary">?attr/colorOnSurface</item>
+        <item name="android:textColorSecondary">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textColorAlertDialogListItem">?attr/colorOnSurface</item>
+
+        <!-- Title / button appearances -->
+        <item name="materialAlertDialogTitleTextStyle">@style/Departament.Dialog.Title</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Departament.Dialog.Button</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Departament.Dialog.Button</item>
+        <item name="buttonBarNeutralButtonStyle">@style/Departament.Dialog.Button</item>
+    </style>
+
+    <!-- Dialog title: on-surface colour so it reads on the dark surface -->
+    <style name="Departament.Dialog.Title" parent="MaterialAlertDialog.Material3.Title.Text">
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+
+    <!-- Dialog action buttons (OK / Отмена): flat text buttons in the blue accent -->
+    <style name="Departament.Dialog.Button" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">?attr/colorPrimary</item>
+        <item name="rippleColor">?attr/colorPrimary</item>
+    </style>
+
+</resources>

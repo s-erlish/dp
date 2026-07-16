@@ -52,12 +52,17 @@ object AppConfig {
     const val PREF_GROUP_ALL_DISPLAY = "pref_group_all_display"
     const val PREF_LANGUAGE = "pref_language"
     const val PREF_UI_MODE_NIGHT = "pref_ui_mode_night"
+    const val PREF_COLOR_THEME = "pref_color_theme"
+    const val PREF_PING_METHOD = "pref_ping_method"
+    const val PREF_AUTO_FALLBACK = "pref_auto_fallback"
+    const val PREF_SHOW_MEMORY = "pref_show_memory"
     const val PREF_IPV6_ENABLED = "pref_ipv6_enabled"
     const val PREF_PREFER_IPV6 = "pref_prefer_ipv6"
     const val PREF_PROXY_SHARING = "pref_proxy_sharing_enabled"
     const val PREF_ALLOW_INSECURE = "pref_allow_insecure"
     const val PREF_ENABLE_LOCAL_PROXY = "pref_enable_local_proxy"
     const val PREF_SOCKS_PORT = "pref_socks_port"
+    const val PREF_SOCKS_SHARE_PORT = "pref_socks_share_port"
     const val PREF_DYNAMIC_SOCKS_PORT = "pref_dynamic_socks_port"
     const val PREF_SOCKS_USERNAME = "pref_socks_username"
     const val PREF_SOCKS_PASSWORD = "pref_socks_password"
@@ -79,6 +84,9 @@ object AppConfig {
     const val PREF_AUTO_REMOVE_INVALID_AFTER_TEST = "pref_auto_remove_invalid_after_test"
     const val PREF_AUTO_SORT_AFTER_TEST = "pref_auto_sort_after_test"
     const val PREF_REAL_PING_CONCURRENCY = "pref_real_ping_concurrency"
+    const val PREF_SEND_HWID = "pref_send_hwid"
+    const val PREF_MEMORY_LIMIT = "pref_memory_limit"
+    const val PREF_MEMORY_LIMIT_ENABLED = "pref_memory_limit_enabled"
 
     /** Cache keys. */
     const val CACHE_SUBSCRIPTION_ID = "cache_subscription_id"
@@ -148,6 +156,7 @@ object AppConfig {
     /** Ports and addresses for various services. */
     const val PORT_LOCAL_DNS = "10853"
     const val PORT_SOCKS = "10808"
+    const val PORT_SOCKS_SHARE = "10810"
     const val WIREGUARD_LOCAL_ADDRESS_V4 = "172.16.0.2/32"
     const val WIREGUARD_LOCAL_ADDRESS_V6 = "2606:4700:110:8f81:d551:a0:532e:a2b3/128"
     const val WIREGUARD_LOCAL_MTU = "1420"
@@ -163,9 +172,11 @@ object AppConfig {
     const val MSG_STATE_START_FAILURE = 32
     const val MSG_STATE_STOP = 4
     const val MSG_STATE_STOP_SUCCESS = 41
+    const val MSG_STATE_SPEED_UPDATE = 51
     const val MSG_STATE_RESTART = 5
     const val MSG_MEASURE_DELAY = 6
     const val MSG_MEASURE_DELAY_SUCCESS = 61
+    const val MSG_STATE_DELAY_RESULT = 62
     const val MSG_MEASURE_CONFIG_START = 7
     const val MSG_MEASURE_CONFIG_CANCEL = 71
     const val MSG_MEASURE_CONFIG_SUCCESS = 72
@@ -173,8 +184,8 @@ object AppConfig {
     const val MSG_MEASURE_CONFIG_FINISH = 74
 
     /** Notification channel IDs and names. */
-    const val RAY_NG_CHANNEL_ID = "RAY_NG_M_CH_ID"
-    const val RAY_NG_CHANNEL_NAME = "v2rayNG Background Service"
+    const val RAY_NG_CHANNEL_ID = "DEPARTAMENT_VPN_CH_ID"
+    const val RAY_NG_CHANNEL_NAME = "departament VPN"
 
     /** Protocols Scheme **/
     const val VMESS = "vmess://"
@@ -220,6 +231,19 @@ object AppConfig {
     const val TLS = "tls"
     const val REALITY = "reality"
     const val HEADER_TYPE_HTTP = "http"
+
+    /** Hardware/device id header sent on subscription & backend requests. */
+    const val HEADER_HWID = "X-HWID"
+
+    /**
+     * Remnawave device-metadata headers sent alongside [HEADER_HWID] on subscription/HWID
+     * requests. Remnawave records/labels the panel device entry from these; without a model
+     * header it falls back to guessing the name from the User-Agent (wrong/empty name). Values
+     * are stable per device (android.os.Build), so they never cause new device-slot entries.
+     */
+    const val HEADER_DEVICE_OS = "x-device-os"
+    const val HEADER_VER_OS = "x-ver-os"
+    const val HEADER_DEVICE_MODEL = "x-device-model"
 
     const val UNIDENTIFIED_PACKAGE = "__unknown_app__"
 

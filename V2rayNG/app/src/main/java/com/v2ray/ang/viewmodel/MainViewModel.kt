@@ -16,12 +16,15 @@ import com.v2ray.ang.R
 import com.v2ray.ang.dto.GroupMapItem
 import com.v2ray.ang.dto.SubscriptionUpdateResult
 import com.v2ray.ang.dto.TestServiceMessage
+import com.v2ray.ang.dto.V2rayConfig
 import com.v2ray.ang.dto.entities.ServersCache
 import com.v2ray.ang.dto.entities.SubscriptionCache
+import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.isComplexType
+import com.v2ray.ang.extension.isGroupType
+import com.v2ray.ang.template.TemplateManager
+import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.extension.matchesPattern
-import com.v2ray.ang.extension.toastError
-import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
@@ -34,6 +37,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import com.v2ray.ang.enums.PingMethod
 import kotlinx.coroutines.withContext
 import java.util.Collections
 import java.util.regex.PatternSyntaxException
@@ -42,10 +48,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var serverList = mutableListOf<String>() // MmkvManager.decodeServerList()
     var subscriptionId: String = MmkvManager.decodeSettingsString(AppConfig.CACHE_SUBSCRIPTION_ID, "").orEmpty()
     var keywordFilter = ""
+
+    // Protocol filter for the Servers tab chips ("Все" = null). Applied in updateCache().
+    var protocolFilter: com.v2ray.ang.enums.EConfigType? = null
     val serversCache = mutableListOf<ServersCache>()
     val isRunning by lazy { MutableLiveData<Boolean>() }
     val updateListAction by lazy { MutableLiveData<Int>() }
     val updateTestResultAction by lazy { MutableLiveData<String>() }
+    val updateSpeedAction by lazy { MutableLiveData<Pair<Long, Long>>() }
+    val delayResultAction by lazy { MutableLiveData<Long>() }
+
+    // Emitted after a "fast connect" test finishes: carries the chosen server guid
+    // (or null when no server produced a valid latency). Guarded as a one-shot event
+    // so the retained value is not replayed (and re-acted on) after recreate/rotation.
+    val fastConnectAction by lazy { MutableLiveData<String?>() }
+    private var pendingFastConnect = false
+    private var fastConnectEventPending = false
+    private var fastConnectExcludeGuid: String? = null
+
+    // Whether the one-shot auto-fallback has already fired for the current user-initiated
+    // session. Lives in the ViewModel so it survives Activity recreate (rotation/theme change)
+    // and is NOT reset by the fallback's own service restart — prevents reconnect loops.
+    var autoFallbackUsed = false
+
+    /**
+     * Returns true exactly once per emitted fast-connect result, so observers ignore
+     * the LiveData value replayed when the Activity is recreated.
+     */
+    fun consumeFastConnectEvent(): Boolean {
+        val v = fastConnectEventPending
+        fastConnectEventPending = false
+        return v
+    }
     private val tcpingTestScope by lazy { CoroutineScope(Dispatchers.IO) }
 
     /**
@@ -127,6 +161,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         for (guid in serverList) {
             val profile = MmkvManager.decodeServerConfig(guid) ?: continue
+            // Protocol filter (Servers tab chips). Null = "Все" (show every protocol).
+            val pf = protocolFilter
+            if (pf != null && profile.configType != pf) continue
             if (kw.isEmpty()) {
                 serversCache.add(ServersCache(guid, profile))
                 continue
@@ -179,6 +216,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Resolves the host:port to ping for a server row.
+     *
+     * Ordinary profiles (vmess/vless/trojan/…) expose [ProfileItem.server] / [ProfileItem.serverPort]
+     * directly. For [EConfigType.CUSTOM] xray-json profiles those fields are empty, so we parse the
+     * stored raw config and read address/port from its first proxy outbound (vnext/servers →
+     * address/port) — otherwise these rows would never get a direct ping. Group entries
+     * (PolicyGroup "Auto"/balancer, ProxyChain) have no single address and return null so they stay
+     * untested (blank) rather than showing a red "-1ms".
+     *
+     * @return host to (port) pair, or null when the row is not directly pingable.
+     */
+    private fun resolvePingHostPort(item: ServersCache): Pair<String, Int>? {
+        val profile = item.profile
+        // Balancer / "Auto" / proxy-chain rows have no single address to ping.
+        if (profile.configType.isGroupType()) return null
+
+        val directHost = profile.server
+        val directPort = profile.serverPort?.toIntOrNull()
+        if (!directHost.isNullOrEmpty() && directPort != null) {
+            return directHost to directPort
+        }
+
+        // CUSTOM xray-json: pull host:port out of the stored outbound.
+        if (profile.configType == EConfigType.CUSTOM) {
+            val raw = try {
+                TemplateManager.decodeRuntimeRaw(item.guid)
+            } catch (e: Exception) {
+                MmkvManager.decodeServerRaw(item.guid)
+            } ?: return null
+            val v2rayConfig = JsonUtil.fromJsonSafe(raw, V2rayConfig::class.java) ?: return null
+            val outbound = v2rayConfig.getProxyOutbound() ?: return null
+            val host = outbound.getServerAddress()
+            val port = outbound.getServerPort()
+            if (!host.isNullOrEmpty() && port != null) {
+                return host to port
+            }
+        }
+        return null
+    }
+
+    /**
      * Tests the TCP ping for all servers.
      */
     fun testAllTcping() {
@@ -188,17 +266,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         val serversCopy = serversCache.toList()
         for (item in serversCopy) {
-            item.profile.let { outbound ->
-                val serverAddress = outbound.server
-                val serverPort = outbound.serverPort
-                if (serverAddress != null && serverPort != null) {
-                    tcpingTestScope.launch {
-                        val testResult = SpeedtestManager.tcping(serverAddress, serverPort.toInt())
-                        launch(Dispatchers.Main) {
-                            MmkvManager.encodeServerTestDelayMillis(item.guid, testResult)
-                            updateListAction.value = getPosition(item.guid)
-                        }
-                    }
+            val (serverAddress, serverPort) = resolvePingHostPort(item) ?: continue
+            tcpingTestScope.launch {
+                val testResult = SpeedtestManager.tcping(serverAddress, serverPort)
+                launch(Dispatchers.Main) {
+                    MmkvManager.encodeServerTestDelayMillis(item.guid, testResult)
+                    updateListAction.value = getPosition(item.guid)
                 }
             }
         }
@@ -238,6 +311,101 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Runs the "test all" using the user's selected ping method (Settings → ping method).
+     */
+    fun testAllServers() {
+        when (SettingsManager.getPingMethod()) {
+            PingMethod.TCP_CONNECT -> testAllTcping()
+            PingMethod.HTTP_URL -> testAllDirectHttp()
+            PingMethod.ICMP -> testAllIcmp()
+            PingMethod.PROXIED_REAL_DELAY -> testAllRealPing()
+        }
+    }
+
+    /**
+     * Direct HTTP/204 latency test across the current server list (bounded concurrency).
+     */
+    fun testAllDirectHttp() {
+        tcpingTestScope.coroutineContext[Job]?.cancelChildren()
+        SpeedtestManager.closeAllTcpSockets()
+        MmkvManager.clearAllTestDelayResults(serversCache.map { it.guid }.toList())
+
+        val serversCopy = serversCache.toList()
+        val semaphore = Semaphore(24)
+        for (item in serversCopy) {
+            val (host, port) = resolvePingHostPort(item) ?: continue
+            val hostPart = if (host.contains(':') && !host.startsWith('[')) "[$host]" else host
+            val url = if (port == 443) "https://$hostPart/" else "https://$hostPart:$port/"
+            tcpingTestScope.launch {
+                semaphore.withPermit {
+                    // Per-node direct reachability: any HTTP response counts as reachable.
+                    val testResult = SpeedtestManager.httpPing(url, expectAny = true)
+                    launch(Dispatchers.Main) {
+                        MmkvManager.encodeServerTestDelayMillis(item.guid, testResult)
+                        updateListAction.value = getPosition(item.guid)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * ICMP latency test across the current server list (bounded concurrency).
+     */
+    fun testAllIcmp() {
+        tcpingTestScope.coroutineContext[Job]?.cancelChildren()
+        SpeedtestManager.closeAllTcpSockets()
+        MmkvManager.clearAllTestDelayResults(serversCache.map { it.guid }.toList())
+
+        val serversCopy = serversCache.toList()
+        val semaphore = Semaphore(12)
+        for (item in serversCopy) {
+            val (host, _) = resolvePingHostPort(item) ?: continue
+            tcpingTestScope.launch {
+                semaphore.withPermit {
+                    val testResult = SpeedtestManager.icmpPing(host)
+                    launch(Dispatchers.Main) {
+                        MmkvManager.encodeServerTestDelayMillis(item.guid, testResult)
+                        updateListAction.value = getPosition(item.guid)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Runs a real-ping test across the current server list and, once finished,
+     * automatically selects the lowest-latency server and signals the UI to connect.
+     * Used by the "fast connect" action.
+     */
+    fun fastConnect(excludeGuid: String? = null) {
+        pendingFastConnect = true
+        fastConnectExcludeGuid = excludeGuid
+        testAllRealPing()
+    }
+
+    /**
+     * Picks the server with the smallest positive latency from the current cache
+     * and marks it as the selected server.
+     *
+     * @return the selected server guid, or null if no server has a valid latency.
+     */
+    private fun selectFastestServer(excludeGuid: String? = null): String? {
+        var bestGuid: String? = null
+        var bestDelay = Long.MAX_VALUE
+        serversCache.forEach { sc ->
+            if (sc.guid == excludeGuid) return@forEach
+            val delay = MmkvManager.decodeServerAffiliationInfo(sc.guid)?.testDelayMillis ?: -1L
+            if (delay in 1 until bestDelay) {
+                bestDelay = delay
+                bestGuid = sc.guid
+            }
+        }
+        bestGuid?.let { MmkvManager.setSelectServer(it) }
+        return bestGuid
+    }
+
+    /**
      * Changes the subscription ID.
      * @param id The new subscription ID.
      */
@@ -271,7 +439,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             )
         }
-        subscriptions.forEach { sub ->
+        // Pinned subscriptions come first (stable sort preserves original order otherwise).
+        subscriptions.sortedByDescending { it.subscription.pinned }.forEach { sub ->
             groups.add(
                 GroupMapItem(
                     id = sub.guid,
@@ -425,6 +594,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         reloadServerList()
     }
 
+    /**
+     * Sets the protocol filter (Servers tab chips) and reloads the list.
+     * @param type The protocol to keep, or null for "Все" (all protocols).
+     */
+    fun applyProtocolFilter(type: com.v2ray.ang.enums.EConfigType?) {
+        if (protocolFilter == type) return
+        protocolFilter = type
+        reloadServerList()
+    }
+
+    /**
+     * Distinct protocol types present in the full (unfiltered) server list,
+     * used to build the Servers tab filter chips. Order follows first appearance.
+     */
+    fun availableProtocols(): List<com.v2ray.ang.enums.EConfigType> {
+        val result = mutableListOf<com.v2ray.ang.enums.EConfigType>()
+        for (guid in serverList) {
+            val type = MmkvManager.decodeServerConfig(guid)?.configType ?: continue
+            if (!result.contains(type)) result.add(type)
+        }
+        return result
+    }
+
+    /**
+     * Real subscription groups (providers), pinned-first, used as section headers
+     * on the Servers tab. Excludes the synthetic "All" pseudo-group.
+     */
+    fun getProviderGroups(): List<GroupMapItem> {
+        return MmkvManager.decodeSubscriptions()
+            .sortedByDescending { it.subscription.pinned }
+            .map { GroupMapItem(id = it.guid, remarks = it.subscription.remarks) }
+    }
+
     fun findSubscriptionIdBySelect(): String? {
         // Get the selected server GUID
         val selectedGuid = MmkvManager.getSelectServer()
@@ -446,8 +648,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 sortByTestResults()
             }
 
+            val fastestGuid = if (pendingFastConnect) selectFastestServer(fastConnectExcludeGuid) else null
+
             withContext(Dispatchers.Main) {
                 reloadServerList()
+                if (pendingFastConnect) {
+                    pendingFastConnect = false
+                    fastConnectExcludeGuid = null
+                    fastConnectEventPending = true
+                    fastConnectAction.value = fastestGuid
+                }
             }
         }
     }
@@ -464,17 +674,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 AppConfig.MSG_STATE_START_SUCCESS -> {
-                    getApplication<AngApplication>().toastSuccess(R.string.toast_services_success)
+                    // No green "Службы успешно запущены" toast: the connect screen now reflects
+                    // the connected state with the neutral gray «Прокси подключён» toast + shield,
+                    // driven by MainActivity's isRunning observer.
                     isRunning.value = true
                 }
 
                 AppConfig.MSG_STATE_START_FAILURE -> {
-                    val errorMessage = intent.getStringExtra("content")
-                    if (!errorMessage.isNullOrBlank()) {
-                        getApplication<AngApplication>().toastError(errorMessage)
-                    } else {
-                        getApplication<AngApplication>().toastError(R.string.toast_services_failure)
-                    }
+                    // No system-style error toast here: MainActivity reports the failure as the
+                    // neutral gray «Не удалось подключиться» toast (via connectInProgress) when
+                    // this flips isRunning to false during an in-progress connect.
                     isRunning.value = false
                 }
 
@@ -484,6 +693,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                 AppConfig.MSG_MEASURE_DELAY_SUCCESS -> {
                     updateTestResultAction.value = intent.getStringExtra("content")
+                }
+
+                AppConfig.MSG_STATE_DELAY_RESULT -> {
+                    (intent.getSerializableExtra("content") as? Long)?.let {
+                        delayResultAction.value = it
+                    }
+                }
+
+                AppConfig.MSG_STATE_SPEED_UPDATE -> {
+                    (intent.getSerializableExtra("content") as? LongArray)?.let {
+                        if (it.size >= 2) updateSpeedAction.value = it[0] to it[1]
+                    }
                 }
 
                 AppConfig.MSG_MEASURE_CONFIG_SUCCESS -> {

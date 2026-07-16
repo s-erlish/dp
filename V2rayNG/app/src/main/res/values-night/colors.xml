@@ -1,52 +1,112 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="color_fab_active">#f97910</color>
-    <color name="color_fab_inactive">#646464</color>
-    <color name="divider_color_light">#424242</color>
+    <!-- Incy-style dark palette: near-black background, bright blue accent -->
+    <color name="brand_blue">#4C8DFF</color>
+    <color name="brand_blue_dark">#3B82F6</color>
+    <color name="brand_cream">#141619</color>
 
-    <!-- Primary colors - main tone: gray -->
-    <color name="md_theme_primary">#C0C0C0</color>
-    <color name="md_theme_onPrimary">#303030</color>
-    <color name="md_theme_primaryContainer">#474747</color>
-    <color name="md_theme_onPrimaryContainer">#E0E0E0</color>
+    <color name="colorPing">#22C55E</color>
+    <color name="colorPingRed">#F04452</color>
+    <color name="colorConfigType">#4C8DFF</color>
+    <color name="color_fab_active">#4C8DFF</color>
+    <color name="color_fab_inactive">#3A3F49</color>
+    <color name="color_connected">#22C55E</color>
+    <color name="color_upload">#4C8DFF</color>
+    <color name="color_download">#4C8DFF</color>
+    <color name="divider_color_light">#20242B</color>
 
-    <!-- Secondary colors - accent color: orange -->
-    <color name="md_theme_secondary">#FFB687</color>
-    <color name="md_theme_onSecondary">#4E2600</color>
-    <color name="md_theme_secondaryContainer">#6F3800</color>
-    <color name="md_theme_onSecondaryContainer">#FFE8D6</color>
+    <!-- Themed-attr accent values (Blue theme, dark). icon_tile_* inherit from values/. -->
+    <color name="chip_type_text">#4C8DFF</color>
+    <color name="chip_json_text">#EAB308</color>
+    <color name="chip_json_bg">#3A2E00</color>
+    <color name="ping_good">#22C55E</color>
+    <color name="ping_bad">#F04452</color>
 
-    <!-- Tertiary colors - tertiary color: green -->
-    <color name="md_theme_tertiary">#83D6B5</color>
-    <color name="md_theme_onTertiary">#00382E</color>
-    <color name="md_theme_tertiaryContainer">#005143</color>
-    <color name="md_theme_onTertiaryContainer">#A0F2D0</color>
+    <!-- Neutral (non-accent) icon tile, dark. Solid surfaceContainerHighest
+         fill (#20242B) + muted onSurfaceVariant glyph — no accent spent. -->
+    <color name="icon_tile_neutral">#20242B</color>
+    <color name="icon_glyph_neutral">#9BA1AD</color>
 
-    <!-- Error colors -->
-    <color name="md_theme_error">#FFB4AB</color>
-    <color name="md_theme_errorContainer">#93000A</color>
-    <color name="md_theme_onError">#690005</color>
-    <color name="md_theme_onErrorContainer">#FFDAD6</color>
+    <!-- Primary - bright blue -->
+    <color name="md_theme_primary">#4C8DFF</color>
+    <color name="md_theme_onPrimary">#00183A</color>
+    <color name="md_theme_primaryContainer">#17325C</color>
+    <color name="md_theme_onPrimaryContainer">#CFE0FF</color>
 
-    <!-- Background colors -->
-    <color name="md_theme_background">#1C1B1F</color>
-    <color name="md_theme_onBackground">#E6E1E5</color>
+    <!-- Secondary - blue accent (de-purpled to the single Incy blue) -->
+    <color name="md_theme_secondary">#7FA8FF</color>
+    <color name="md_theme_onSecondary">#00183A</color>
+    <color name="md_theme_secondaryContainer">#17325C</color>
+    <color name="md_theme_onSecondaryContainer">#CFE0FF</color>
 
-    <!-- Surface colors -->
-    <color name="md_theme_surface">#1C1B1F</color>
-    <color name="md_theme_onSurface">#E6E1E5</color>
-    <color name="md_theme_surfaceVariant">#49454F</color>
-    <color name="md_theme_onSurfaceVariant">#CAC4D0</color>
-    <color name="md_theme_inverseSurface">#E6E1E5</color>
-    <color name="md_theme_inverseOnSurface">#1C1B1F</color>
+    <!-- Tertiary - green -->
+    <color name="md_theme_tertiary">#22C55E</color>
+    <color name="md_theme_onTertiary">#00210F</color>
+    <color name="md_theme_tertiaryContainer">#0C3F22</color>
+    <color name="md_theme_onTertiaryContainer">#A6F2C4</color>
 
-    <!-- Outline colors -->
-    <color name="md_theme_outline">#938F99</color>
-    <color name="md_theme_outlineVariant">#49454F</color>
+    <!-- Error -->
+    <color name="md_theme_error">#F04452</color>
+    <color name="md_theme_errorContainer">#5C1420</color>
+    <color name="md_theme_onError">#FFFFFF</color>
+    <color name="md_theme_onErrorContainer">#FFD9DD</color>
 
-    <!-- Other colors -->
-    <color name="md_theme_inversePrimary">#000000</color>
+    <!-- Background - near black -->
+    <color name="md_theme_background">#0A0B0D</color>
+    <color name="md_theme_onBackground">#F2F4F8</color>
+
+    <!-- Surface - dark cards -->
+    <color name="md_theme_surface">#141619</color>
+    <color name="md_theme_onSurface">#F2F4F8</color>
+    <color name="md_theme_surfaceVariant">#1E2126</color>
+    <!-- Secondary/caption text. Lifted #8A909C -> #9BA1AD: the old value sat at
+         the AA edge for 12-13sp Subtitle/Caption; #9BA1AD clears AA (~7:1 on
+         surface, ~4.9:1 on surfaceContainerHighest) while staying muted. -->
+    <color name="md_theme_onSurfaceVariant">#9BA1AD</color>
+    <color name="md_theme_inverseSurface">#F2F4F8</color>
+    <color name="md_theme_inverseOnSurface">#141619</color>
+
+    <!-- Outline -->
+    <color name="md_theme_outline">#2A2E36</color>
+    <color name="md_theme_outlineVariant">#20242B</color>
+
+    <!-- Other -->
+    <color name="md_theme_inversePrimary">#1E5FC7</color>
     <color name="md_theme_shadow">#000000</color>
-    <color name="md_theme_surfaceTint">#C0C0C0</color>
+    <color name="md_theme_surfaceTint">#4C8DFF</color>
     <color name="md_theme_scrim">#000000</color>
+
+    <!-- Surface container ramp (near-black → dark grey) -->
+    <color name="md_theme_surfaceContainerLowest">#08090B</color>
+    <color name="md_theme_surfaceContainerLow">#111316</color>
+    <color name="md_theme_surfaceContainer">#141619</color>
+    <color name="md_theme_surfaceContainerHigh">#1A1D21</color>
+    <color name="md_theme_surfaceContainerHighest">#20242B</color>
+
+    <!-- MONO theme (white on black) -->
+    <color name="mono_primary">#FFFFFF</color>
+    <color name="mono_onPrimary">#111214</color>
+    <color name="mono_primaryContainer">#2A2A2E</color>
+    <color name="mono_onPrimaryContainer">#FFFFFF</color>
+    <color name="mono_secondary">#C8C8CC</color>
+    <color name="mono_onSecondary">#111214</color>
+    <color name="mono_secondaryContainer">#2A2A2E</color>
+    <color name="mono_onSecondaryContainer">#FFFFFF</color>
+    <color name="mono_tertiary">#FFFFFF</color>
+    <color name="mono_onTertiary">#111214</color>
+    <color name="mono_background">#000000</color>
+    <color name="mono_onBackground">#F4F4F5</color>
+    <color name="mono_surface">#121214</color>
+    <color name="mono_onSurface">#F4F4F5</color>
+    <color name="mono_surfaceVariant">#1E1E20</color>
+    <color name="mono_onSurfaceVariant">#B0B0B4</color>
+    <color name="mono_outline">#38383C</color>
+    <color name="mono_outlineVariant">#28282C</color>
+    <color name="mono_fab_active">#FFFFFF</color>
+    <color name="mono_connected">#FFFFFF</color>
+    <color name="mono_surfaceContainerLowest">#000000</color>
+    <color name="mono_surfaceContainerLow">#0E0E10</color>
+    <color name="mono_surfaceContainer">#141416</color>
+    <color name="mono_surfaceContainerHigh">#1B1B1E</color>
+    <color name="mono_surfaceContainerHighest">#232326</color>
 </resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Subtle neutral pill for the custom status toast (no color/green fill). Theme attrs
+     resolve because the toast view is inflated with the activity's themed inflater, so it
+     adapts to both dark and light. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?attr/colorSurfaceContainerHighest" />
+    <corners android:radius="24dp" />
+    <stroke
+        android:width="1dp"
+        android:color="?attr/colorOutlineVariant" />
+</shape>

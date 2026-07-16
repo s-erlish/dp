@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true"
+    android:background="?android:attr/colorBackground"
     android:orientation="vertical"
     tools:context=".ui.PerAppProxyActivity">
 
@@ -12,55 +12,72 @@
         android:id="@+id/header_view"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="@dimen/padding_spacing_dp16">
+        android:orientation="vertical">
 
-        <LinearLayout
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="8dp"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:orientation="vertical">
 
                 <LinearLayout
                     android:id="@+id/container_per_app_proxy"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_gravity="center"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="horizontal">
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:minHeight="56dp"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="8dp">
 
-                    <androidx.appcompat.widget.SwitchCompat
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/pa_enable"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="16sp" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switch_per_app_proxy"
                         android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:maxLines="2"
-                        android:text="@string/per_app_proxy_settings_enable"
-                        android:textAppearance="@style/TextAppearance.AppCompat.Small"
-                        app:theme="@style/BrandedSwitch" />
+                        android:layout_height="wrap_content" />
 
                 </LinearLayout>
 
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginHorizontal="16dp"
+                    android:background="?attr/colorOutlineVariant" />
+
                 <LinearLayout
                     android:id="@+id/container_bypass_apps"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_gravity="center"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="horizontal">
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:minHeight="56dp"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="8dp">
 
-                    <androidx.appcompat.widget.SwitchCompat
-                        android:id="@+id/switch_bypass_apps"
-                        android:layout_width="wrap_content"
+                    <TextView
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="@string/switch_bypass_apps_mode"
-                        android:textAppearance="@style/TextAppearance.AppCompat.Small"
-                        app:theme="@style/BrandedSwitch" />
+                        android:layout_weight="1"
+                        android:text="@string/pa_bypass_mode"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="16sp" />
 
                     <LinearLayout
                         android:id="@+id/layout_switch_bypass_apps_tips"
@@ -68,7 +85,7 @@
                         android:layout_height="wrap_content"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:clickable="true"
-                        android:contentDescription="@string/switch_bypass_apps_mode"
+                        android:contentDescription="@string/pa_bypass_tips"
                         android:focusable="true"
                         android:gravity="center"
                         android:padding="@dimen/padding_spacing_dp8">
@@ -77,21 +94,32 @@
                             android:layout_width="@dimen/image_size_dp24"
                             android:layout_height="@dimen/image_size_dp24"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_about_24dp" />
+                            app:srcCompat="@drawable/ic_about_24dp"
+                            app:tint="?attr/colorOnSurfaceVariant" />
 
                     </LinearLayout>
 
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switch_bypass_apps"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp" />
+
                 </LinearLayout>
+
             </LinearLayout>
 
+        </com.google.android.material.card.MaterialCardView>
 
-        </LinearLayout>
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingTop="4dp"
+        android:paddingBottom="16dp"
         android:scrollbars="vertical"
         app:layoutManager="androidx.recyclerview.widget.GridLayoutManager" />
 

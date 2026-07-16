@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Departament auth module. New Russian strings only; do NOT merge into strings.xml.
+         Note: auth_sign_in_telegram is defined (in Russian) in strings.xml — do not redefine here. -->
+
+    <string name="auth_title">Вход</string>
+
+    <!-- Telegram section -->
+    <string name="auth_tg_headline">Вход через Telegram</string>
+    <string name="auth_tg_desc">Подключите аккаунт Telegram, чтобы войти в один тап.</string>
+    <string name="auth_btn_telegram">Войти через Telegram</string>
+    <string name="auth_awaiting">Ожидаем подтверждения в Telegram…</string>
+    <string name="auth_restart">Начать заново</string>
+    <string name="auth_telegram_not_installed">Приложение Telegram не установлено</string>
+
+    <!-- Site section -->
+    <string name="auth_site_headline">Вход через сайт</string>
+    <string name="auth_site_desc">Войдите по email и паролю от аккаунта departament.</string>
+    <string name="auth_email_hint">Электронная почта</string>
+    <string name="auth_password_hint">Пароль</string>
+    <string name="auth_btn_site">Войти через сайт</string>
+    <string name="auth_register_site">Регистрация на сайте</string>
+    <string name="auth_fields_required">Заполните все поля</string>
+    <string name="auth_email_invalid">Введите корректный email, например name@example.com</string>
+
+    <!-- Two-factor (TOTP) -->
+    <string name="auth_2fa_desc">Введите 6-значный код из приложения</string>
+    <string name="auth_2fa_hint">6-значный код</string>
+    <string name="auth_btn_2fa">Подтвердить</string>
+    <string name="auth_code_required">Введите код</string>
+    <string name="auth_code_invalid">Код состоит из 6 цифр</string>
+
+    <!-- Result / errors. Terse status lines, sentence-case, no trailing period. -->
+    <string name="auth_success">Вход выполнен</string>
+    <string name="auth_err_credentials">Неверный email или пароль</string>
+    <string name="auth_err_gone">Ссылка устарела, начните заново</string>
+    <string name="auth_err_unavailable">Сервис временно недоступен</string>
+    <string name="auth_err_network">Ошибка сети. Проверьте подключение</string>
+    <string name="auth_err_not_configured">Вход недоступен</string>
+    <string name="auth_err_generic">Что-то пошло не так, попробуйте снова</string>
+
+    <!-- Site-login error diagnostic dialog: shows the real backend reason so it can be screenshotted. -->
+    <string name="auth_err_dialog_title">Ошибка входа</string>
+</resources>

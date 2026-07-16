@@ -1,7 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_widget_name">v2rayNG</string>
-    <string name="app_tile_name">v2rayNG</string>
+    <!-- Servers redesign (S3) -->
+    <string name="title_servers">Сервера</string>
+    <string name="servers_count">%d серверов</string>
+    <string name="providers_count">%d провайдеров</string>
+    <string name="search_hint">Поиск серверов…</string>
+    <string name="servers_empty_title">Нет серверов</string>
+    <string name="servers_add_clipboard">Добавить из буфера</string>
+    <string name="servers_section_local">Локальные</string>
+    <!-- Home empty state (no servers/subscriptions yet) -->
+    <string name="home_empty_title">Пока нет подписок</string>
+    <string name="home_empty_subtitle">Добавьте подписку, чтобы начать пользоваться</string>
+    <string name="home_empty_add_qr">Добавить по QR-коду</string>
+    <string name="home_empty_add_clipboard">Добавить из буфера обмена</string>
+    <!-- Neutral under-shield label when no server is selected/available -->
+    <string name="home_select_server">Выберите сервер</string>
+    <!-- Neutral under-shield label when a server is selected but not connected -->
+    <string name="home_not_connected">Не подключено</string>
+    <!-- Toolbar "+" add menu -->
+    <string name="menu_add_title">Добавить</string>
+    <string name="menu_add_scan_qr">Сканировать QR-код</string>
+    <string name="menu_add_clipboard">Добавить из буфера обмена</string>
+    <string name="menu_add_tv_send">Отправить на TV</string>
+    <string name="menu_add_manual">Ввести вручную</string>
+    <!-- Home meta-bar: delete subscription -->
+    <string name="sub_delete">Удалить подписку</string>
+    <string name="sub_delete_confirm">Удалить подписку и её серверы?</string>
+    <string name="app_widget_name">departament</string>
+    <string name="app_tile_name">departament</string>
     <string name="app_tile_first_use">Первое использование этой функции, пожалуйста, используйте приложение, чтобы добавить профиль</string>
     <string name="navigation_drawer_open">Открыть панель навигации</string>
     <string name="navigation_drawer_close">Закрыть панель навигации</string>
@@ -19,6 +45,12 @@
     <string name="toast_services_stop">Остановка служб</string>
     <string name="toast_services_success">Службы успешно запущены</string>
     <string name="toast_services_failure">Сбой при запуске служб</string>
+
+    <!-- Custom gray status toasts shown on the connect screen (VPN state). -->
+    <string name="toast_status_connecting">Подключение…</string>
+    <string name="toast_status_connected">Прокси подключён</string>
+    <string name="toast_status_disconnected">Отключено</string>
+    <string name="toast_status_failed">Не удалось подключиться</string>
 
     <!--ServerActivity-->
     <string name="title_server">Профиль</string>
@@ -310,6 +342,18 @@
     <string name="sub_setting_pre_profile_tip">Профиль должен быть уникальным</string>
     <string name="toast_invalid_update_interval">Неправильный интервал обновления. Минимум 15 минут.</string>
     <string name="title_sub_update">Обновить подписку</string>
+    <string name="sub_support">Поддержка</string>
+    <string name="sub_website">Сайт</string>
+    <string name="sub_telegram">Telegram</string>
+    <string name="sub_pin">Закрепить подписку</string>
+    <string name="sub_unpin">Открепить подписку</string>
+    <string name="sub_expires">до %1$s</string>
+    <string name="sub_expired">Истекла</string>
+    <string name="sub_meta_updated_never">Никогда</string>
+    <string name="sub_auto_update_label">Автообновление — %1$s</string>
+    <string name="sub_auto_update_off">Выкл</string>
+    <string name="sub_update_interval_hours">%1$d ч.</string>
+    <string name="sub_update_interval_minutes">%1$d мин.</string>
     <string name="title_ping_all_server">Проверить профили</string>
     <string name="title_real_ping_all_server">Проверить задержку профилей</string>
     <string name="title_user_asset_setting">Файлы ресурсов</string>
@@ -363,6 +407,7 @@
     <string name="connection_test_error_status_code">Код ошибки: #%d</string>
     <string name="connection_connected">Соединено, нажмите для проверки</string>
     <string name="connection_not_connected">Нет соединения</string>
+    <string name="connection_connecting">Подключение…</string>
     <string name="connection_runing_task_left">Запущено проверок: %s</string>
 
     <string name="import_subscription_success">Подписка импортирована</string>
@@ -398,6 +443,8 @@
     <string name="title_configuration_share">Поделиться конфигурацией</string>
     <string name="title_webdav_config_setting">Настройки WebDAV</string>
     <string name="title_webdav_config_setting_unknown">Необходимо настроить WebDAV</string>
+    <string name="backup_section_local">Данные</string>
+    <string name="backup_section_cloud">Облачное хранилище</string>
     <string name="title_webdav_url">URL сервера</string>
     <string name="title_webdav_user">Пользователь</string>
     <string name="title_webdav_pass">Пароль</string>
@@ -434,9 +481,9 @@
     </string-array>
 
     <string-array name="preset_rulesets">
-        <item>Белый список Китая</item>
-        <item>Чёрный список Китая</item>
-        <item>Общие</item>
+        <item>Базовый набор</item>
+        <item>Прокси для заблокированного</item>
+        <item>Весь трафик через прокси</item>
         <item>Белый список Ирана</item>
         <item>Белый список России</item>
     </string-array>
@@ -465,4 +512,55 @@
         <item>WebDAV</item>
     </string-array>
 
+    <string name="bottom_nav_home">Главная</string>
+    <string name="bottom_nav_servers">Сервера</string>
+    <string name="bottom_nav_more">Настройки</string>
+
+    <!-- Incy settings tab -->
+    <string name="bottom_nav_settings">Настройки</string>
+    <string name="settings_section_connection">Подключение</string>
+    <string name="settings_section_bypass">Обход блокировок</string>
+    <string name="settings_section_interface">Интерфейс</string>
+    <string name="settings_section_subscription">Подписка</string>
+    <string name="settings_section_devices">Устройства</string>
+    <string name="settings_section_about">О приложении</string>
+    <string name="settings_mode">Режим</string>
+    <string name="settings_mode_vpn">VPN</string>
+    <string name="settings_mode_proxy">Только прокси</string>
+    <string name="settings_per_app">Прокси по приложениям</string>
+    <string name="settings_bypass_lan">Обход локальной сети</string>
+    <string name="settings_bypass_lan_sub">Прямой доступ к устройствам в локальной сети</string>
+    <string name="settings_dns">DNS</string>
+    <string name="settings_dns_hint">Адрес DNS-сервера</string>
+    <string name="settings_ping_method">Пинг</string>
+    <string name="settings_ping_method_real">Реальная задержка (через ядро)</string>
+    <string name="settings_ping_method_tcp">TCP-соединение</string>
+    <string name="settings_ping_method_http">HTTP-запрос</string>
+    <string name="settings_ping_method_icmp">ICMP (системный ping)</string>
+    <string name="settings_mux">Мультиплексирование (Mux)</string>
+    <string name="settings_mux_sub">Объединяет запросы в один канал соединения</string>
+    <string name="settings_mux_concurrency">Число соединений Mux</string>
+    <string name="settings_fragment">Фрагментация пакетов</string>
+    <string name="settings_fragment_sub">Разбивает TLS-рукопожатие против DPI</string>
+    <string name="settings_theme_dark">Тёмная тема</string>
+    <string name="settings_theme_mono">Чёрно-белый режим</string>
+    <string name="settings_language">Язык</string>
+    <string name="settings_language_system">Системный</string>
+    <string name="settings_boot">Запуск при загрузке</string>
+    <string name="settings_boot_sub">Подключаться после перезагрузки устройства</string>
+    <string name="settings_subscriptions">Подписки</string>
+    <string name="settings_sub_auto_update">Автообновление подписки</string>
+    <string name="settings_sub_auto_update_1h">1 час</string>
+    <string name="settings_sub_auto_update_6h">6 часов</string>
+    <string name="settings_sub_auto_update_12h">12 часов</string>
+    <string name="settings_sub_auto_update_24h">24 часа</string>
+    <string name="settings_sub_auto_update_minutes">%1$d мин</string>
+    <string name="settings_routing">Маршрутизация</string>
+    <string name="settings_assets">Файлы ресурсов</string>
+    <string name="settings_tv_send">Перенести подписку на ТВ</string>
+    <string name="settings_tv_receive">Принять подписку</string>
+    <string name="settings_about">О приложении</string>
+    <string name="settings_backup">Резервное копирование</string>
+    <string name="settings_value_on">Вкл</string>
+    <string name="settings_value_off">Выкл</string>
 </resources>

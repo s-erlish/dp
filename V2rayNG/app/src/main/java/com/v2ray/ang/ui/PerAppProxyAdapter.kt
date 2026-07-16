@@ -63,9 +63,17 @@ class PerAppProxyAdapter(
             }
 
             itemBypassBinding.packageName.text = appInfo.packageName
+            // Reflect the persisted selection. The checkbox has no CheckedChangeListener
+            // (it is clickable=false), so setting isChecked here during recycling is safe
+            // and cannot corrupt state.
             itemBypassBinding.checkBox.isChecked = viewModel.contains(appInfo.packageName)
 
-            itemView.setOnClickListener(this)
+            // Attach the click handler to the actually-clickable row container, not to
+            // itemView. The row container (layout_item) is android:clickable="true", so it
+            // consumes touch events and they never bubble up to itemView; a listener on
+            // itemView would therefore never fire. This was the root cause of apps being
+            // impossible to select.
+            itemBypassBinding.layoutItem.setOnClickListener(this)
         }
 
         override fun onClick(v: View?) {

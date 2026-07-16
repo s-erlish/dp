@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Space Grotesk brand family, backed by a single VARIABLE ttf (weight axis
+    300-700). Each entry pins a real master weight on the same file, so 500 and
+    700 are genuine instances — never faux/synthetic bold. Android picks the
+    matching entry from android:textFontWeight / textStyle at render time.
+-->
+<font-family xmlns:android="http://schemas.android.com/apk/res/android">
+    <font
+        android:fontStyle="normal"
+        android:fontWeight="400"
+        android:font="@font/spacegrotesk" />
+    <font
+        android:fontStyle="normal"
+        android:fontWeight="500"
+        android:font="@font/spacegrotesk" />
+    <font
+        android:fontStyle="normal"
+        android:fontWeight="700"
+        android:font="@font/spacegrotesk" />
+</font-family>

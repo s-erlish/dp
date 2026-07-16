@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Экран «Схемы URL-адресов» (deeplinks depv://) -->
+    <string name="url_scheme_list_title">Схемы URL-адресов</string>
+    <string name="url_scheme_note_title">Примечание</string>
+    <string name="url_scheme_note_body">Эти ссылки открывают приложение и выполняют действие. Их можно использовать в автоматизациях, ярлыках и виджетах. Значения в фигурных скобках нужно заменить: {base64} — конфигурация или правила в Base64, {url} — ссылка на подписку или конфигурацию.</string>
+
+    <string name="url_scheme_group_start">Запустить туннель</string>
+    <string name="url_scheme_group_stop">Остановить соединение</string>
+    <string name="url_scheme_group_toggle">Переключить</string>
+    <string name="url_scheme_group_import">Добавить конфигурацию</string>
+    <string name="url_scheme_group_routing">Маршрутизация</string>
+
+    <string name="url_scheme_label_connect">Подключиться</string>
+    <string name="url_scheme_label_open">Открыть</string>
+    <string name="url_scheme_label_disconnect">Отключиться</string>
+    <string name="url_scheme_label_close">Закрыть</string>
+    <string name="url_scheme_label_toggle">Переключить состояние</string>
+    <string name="url_scheme_label_import">Импорт (автоопределение)</string>
+    <string name="url_scheme_label_add">Добавить по URL</string>
+    <string name="url_scheme_label_routing_add">Добавить маршруты</string>
+    <string name="url_scheme_label_routing_onadd">Добавить и применить</string>
+
+    <string name="url_scheme_copied">Скопировано</string>
+</resources>

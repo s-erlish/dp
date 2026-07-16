@@ -8,8 +8,8 @@ import android.view.MenuItem
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityNoneBinding
+import com.v2ray.ang.enums.PermissionType
 import com.v2ray.ang.extension.toast
-import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.QRCodeDecoder
 import io.github.g00fy2.quickie.QRResult
@@ -27,8 +27,15 @@ class ScannerActivity : HelperBaseActivity() {
 
         setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = getString(R.string.menu_item_import_config_qrcode))
 
-        if (MmkvManager.decodeSettingsBool(AppConfig.PREF_START_SCAN_IMMEDIATE)) {
-            launchScan()
+        // Open the live camera preview as soon as the scanner screen is shown.
+        // Previously this was gated behind a preference that is never enabled, so the
+        // screen just stayed blank ("camera doesn't work"). Request the CAMERA
+        // permission first and only start the preview once it is granted. Guarded on
+        // savedInstanceState so a configuration change does not relaunch the scanner.
+        if (savedInstanceState == null) {
+            checkAndRequestPermission(PermissionType.CAMERA) {
+                launchScan()
+            }
         }
     }
 

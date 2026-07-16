@@ -33,11 +33,20 @@
         <item name="colorOnSurfaceVariant">@color/md_theme_onSurfaceVariant</item>
         <item name="colorSurfaceInverse">@color/md_theme_inverseSurface</item>
         <item name="colorOnSurfaceInverse">@color/md_theme_inverseOnSurface</item>
-        <item name="colorSurfaceContainer">@color/md_theme_surface</item>
-        <item name="colorSurfaceContainerHigh">@color/md_theme_surface</item>
-        <item name="colorSurfaceContainerHighest">@color/md_theme_surface</item>
-        <item name="colorSurfaceContainerLow">@color/md_theme_surface</item>
-        <item name="colorSurfaceContainerLowest">@color/md_theme_surface</item>
+        <!-- Tonal surface ramp -> depth layers. Elevation is expressed by tone,
+             not shadow (Material dark-theme rule). Night ramp:
+               L0 base page     = android:colorBackground   #0A0B0D
+               L1 colorSurfaceContainerLow    #111316  (sunken / rows on a card)
+               L2 colorSurfaceContainer       #141619  (the default card surface)
+               L3 colorSurfaceContainerHigh   #1A1D21  (raised: sheets, menus)
+                  colorSurfaceContainerHighest#20242B  (neutral tiles, hover)
+             WP3/WP5: reference ?attr/colorSurfaceContainerLow|…|High(est) —
+             never raw hex — so light/mono resolve automatically. -->
+        <item name="colorSurfaceContainer">@color/md_theme_surfaceContainer</item>
+        <item name="colorSurfaceContainerHigh">@color/md_theme_surfaceContainerHigh</item>
+        <item name="colorSurfaceContainerHighest">@color/md_theme_surfaceContainerHighest</item>
+        <item name="colorSurfaceContainerLow">@color/md_theme_surfaceContainerLow</item>
+        <item name="colorSurfaceContainerLowest">@color/md_theme_surfaceContainerLowest</item>
 
         <!-- Background colors -->
         <item name="android:colorBackground">@color/md_theme_background</item>
@@ -50,9 +59,51 @@
         <!-- Other colors -->
         <item name="colorPrimaryInverse">@color/md_theme_inversePrimary</item>
 
-        <!-- Status bar and navigation bar - system bars -->
-        <item name="android:statusBarColor">@color/md_theme_surface</item>
-        <item name="android:navigationBarColor">@color/md_theme_surface</item>
+        <!-- Edge-to-edge: fully transparent system bars so the home gradient
+             draws underneath them. Disable the auto contrast scrim (API 29+). -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:enforceStatusBarContrast" tools:targetApi="29">false</item>
+        <item name="android:enforceNavigationBarContrast" tools:targetApi="29">false</item>
+
+        <!-- Connect button state colors (blue theme).
+             connectedColor = blue accent so the connected shield matches the
+             blue glow/ring (was green -> mismatched with the blue halo). -->
+        <item name="connectIdleColor">@color/color_fab_inactive</item>
+        <item name="connectActiveColor">@color/color_fab_active</item>
+        <item name="connectedColor">@color/color_fab_active</item>
+
+        <!-- Themed accents (coloured; Mono overlay neutralises these to grey) -->
+        <item name="chipTypeText">@color/chip_type_text</item>
+        <item name="chipJsonText">@color/chip_json_text</item>
+        <item name="chipJsonBg">@color/chip_json_bg</item>
+        <item name="pingGood">@color/ping_good</item>
+        <item name="pingBad">@color/ping_bad</item>
+        <item name="indicatorColor">@color/colorIndicator</item>
+        <!-- Incy: one bright-blue accent. All hues collapse to blue except the
+             red (destructive/delete) treatment, which stays semantically red.
+             Repointed here (not renamed) so every layout referencing these attrs
+             recolours instantly with zero layout edits. -->
+        <item name="iconTintBlue">@color/icon_blue</item>
+        <item name="iconTintGreen">@color/icon_blue</item>
+        <item name="iconTintOrange">@color/icon_blue</item>
+        <item name="iconTintPurple">@color/icon_blue</item>
+        <item name="iconTintRed">@color/icon_red</item>
+        <item name="iconTintYellow">@color/icon_blue</item>
+        <item name="iconTileBgBlue">@color/icon_tile_blue</item>
+        <item name="iconTileBgGreen">@color/icon_tile_blue</item>
+        <item name="iconTileBgOrange">@color/icon_tile_blue</item>
+        <item name="iconTileBgPurple">@color/icon_tile_blue</item>
+        <item name="iconTileBgRed">@color/icon_tile_red</item>
+        <item name="iconTileBgYellow">@color/icon_tile_blue</item>
+
+        <!-- App-wide AlertDialog styling (departament design). Applies to every
+             androidx.appcompat AlertDialog.Builder dialog; adapts per theme via
+             ?attr colours. Inherited by both the light and night AppThemeDayNight. -->
+        <item name="alertDialogTheme">@style/ThemeOverlay.Departament.Dialog</item>
+        <item name="android:alertDialogTheme">@style/ThemeOverlay.Departament.Dialog</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.Departament.Dialog</item>
     </style>
 
     <!-- Day/Night theme: inherit common values and set light-mode-specific items -->
@@ -76,6 +127,70 @@
 
     <style name="BrandedSwitch" parent="AppThemeDayNight">
         <item name="colorPrimary">@color/color_fab_active</item>
+    </style>
+
+    <!-- Mono (black & white) color overlay, applied at runtime in BaseActivity
+         when the user selects the monochrome theme. Only overrides color tokens,
+         so it composes with any base theme variant (NoActionBar / Translucent). -->
+    <style name="ThemeOverlay.Mono" parent="">
+        <item name="colorPrimary">@color/mono_primary</item>
+        <item name="colorOnPrimary">@color/mono_onPrimary</item>
+        <item name="colorPrimaryContainer">@color/mono_primaryContainer</item>
+        <item name="colorOnPrimaryContainer">@color/mono_onPrimaryContainer</item>
+        <item name="colorSecondary">@color/mono_secondary</item>
+        <item name="colorOnSecondary">@color/mono_onSecondary</item>
+        <item name="colorSecondaryContainer">@color/mono_secondaryContainer</item>
+        <item name="colorOnSecondaryContainer">@color/mono_onSecondaryContainer</item>
+        <item name="colorTertiary">@color/mono_tertiary</item>
+        <item name="colorOnTertiary">@color/mono_onTertiary</item>
+        <item name="colorTertiaryContainer">@color/mono_primaryContainer</item>
+        <item name="colorOnTertiaryContainer">@color/mono_onPrimaryContainer</item>
+        <item name="colorSurface">@color/mono_surface</item>
+        <item name="colorOnSurface">@color/mono_onSurface</item>
+        <item name="colorSurfaceVariant">@color/mono_surfaceVariant</item>
+        <item name="colorOnSurfaceVariant">@color/mono_onSurfaceVariant</item>
+        <item name="colorSurfaceContainer">@color/mono_surfaceContainer</item>
+        <item name="colorSurfaceContainerHigh">@color/mono_surfaceContainerHigh</item>
+        <item name="colorSurfaceContainerHighest">@color/mono_surfaceContainerHighest</item>
+        <item name="colorSurfaceContainerLow">@color/mono_surfaceContainerLow</item>
+        <item name="colorSurfaceContainerLowest">@color/mono_surfaceContainerLowest</item>
+        <item name="android:colorBackground">@color/mono_background</item>
+        <item name="colorOnBackground">@color/mono_onBackground</item>
+        <item name="colorOutline">@color/mono_outline</item>
+        <item name="colorOutlineVariant">@color/mono_outlineVariant</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:enforceStatusBarContrast" tools:targetApi="29">false</item>
+        <item name="android:enforceNavigationBarContrast" tools:targetApi="29">false</item>
+        <item name="connectIdleColor">@color/mono_fab_inactive</item>
+        <item name="connectActiveColor">@color/mono_fab_active</item>
+        <item name="connectedColor">@color/mono_connected</item>
+
+        <!-- Accents neutralised to greyscale (mono_* colours vary day/night) -->
+        <item name="chipTypeText">@color/mono_onPrimaryContainer</item>
+        <item name="chipJsonText">@color/mono_onSurface</item>
+        <item name="chipJsonBg">@color/mono_surfaceContainerHighest</item>
+        <item name="pingGood">@color/mono_onSurfaceVariant</item>
+        <item name="pingBad">@color/mono_onSurface</item>
+        <item name="indicatorColor">@color/mono_primary</item>
+        <item name="iconTintBlue">@color/mono_onSurfaceVariant</item>
+        <item name="iconTintGreen">@color/mono_onSurfaceVariant</item>
+        <item name="iconTintOrange">@color/mono_onSurfaceVariant</item>
+        <item name="iconTintPurple">@color/mono_onSurfaceVariant</item>
+        <item name="iconTintRed">@color/mono_onSurfaceVariant</item>
+        <item name="iconTintYellow">@color/mono_onSurfaceVariant</item>
+        <item name="iconTileBgBlue">@color/mono_surfaceContainerHighest</item>
+        <item name="iconTileBgGreen">@color/mono_surfaceContainerHighest</item>
+        <item name="iconTileBgOrange">@color/mono_surfaceContainerHighest</item>
+        <item name="iconTileBgPurple">@color/mono_surfaceContainerHighest</item>
+        <item name="iconTileBgRed">@color/mono_surfaceContainerHighest</item>
+        <item name="iconTileBgYellow">@color/mono_surfaceContainerHighest</item>
+
+        <!-- Keep app-wide dialog styling under the mono overlay too. The overlay's
+             greyscale ?attr colours flow into the same dialog theme automatically. -->
+        <item name="alertDialogTheme">@style/ThemeOverlay.Departament.Dialog</item>
+        <item name="android:alertDialogTheme">@style/ThemeOverlay.Departament.Dialog</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.Departament.Dialog</item>
     </style>
 
 </resources>

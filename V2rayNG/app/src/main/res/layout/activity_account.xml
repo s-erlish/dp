@@ -1,0 +1,560 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Account HUB, hosted in-place as the Account bottom-nav tab.
+  Two zones only: a cohesive HERO (profile card + subscription carousel, read as one
+  unit) and a single "Управление" management list. Incy language: pure dark, ONE blue
+  accent, brand type, token spacing/radii/tiles, sentence-case Russian, 0 elevation,
+  1dp colorOutlineVariant stroke, no nested cards, no gradients. Every state present:
+  skeleton (loading), empty, carousel (active), error.
+-->
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/scroll_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clipToPadding="false"
+    android:fillViewport="true"
+    android:scrollbars="none">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="@dimen/screen_gutter"
+        android:paddingTop="@dimen/space_12"
+        android:paddingBottom="@dimen/space_24">
+
+        <!-- ============ HERO zone: profile card + subscription state ============ -->
+
+        <!-- Profile card -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="@dimen/radius_card"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="@dimen/space_16">
+
+                <!-- Row 1: avatar + handle + top-up pill -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <FrameLayout
+                        android:id="@+id/avatar_container"
+                        android:layout_width="52dp"
+                        android:layout_height="52dp"
+                        android:clickable="true"
+                        android:contentDescription="@string/account_change_avatar"
+                        android:focusable="true"
+                        android:foreground="?attr/selectableItemBackgroundBorderless">
+
+                        <View
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:layout_gravity="center"
+                            android:background="@drawable/bg_avatar_circle" />
+
+                        <TextView
+                            android:id="@+id/tv_avatar_initial"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:layout_gravity="center"
+                            android:gravity="center"
+                            android:text="?"
+                            android:textColor="?attr/iconTintBlue"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            tools:ignore="HardcodedText" />
+
+                        <ImageView
+                            android:id="@+id/img_avatar"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:layout_gravity="center"
+                            android:importantForAccessibility="no"
+                            android:scaleType="centerCrop"
+                            android:visibility="gone" />
+
+                        <ImageView
+                            android:id="@+id/img_avatar_edit"
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="bottom|end"
+                            android:background="@drawable/bg_avatar_edit"
+                            android:importantForAccessibility="no"
+                            android:padding="@dimen/space_4"
+                            app:srcCompat="@drawable/ic_acc_camera" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:id="@+id/tv_username"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_12"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textAppearance="@style/TextAppearance.App.Title"
+                        tools:text="Erlish" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_top_up"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_12"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:paddingStart="@dimen/space_16"
+                        android:paddingTop="@dimen/space_8"
+                        android:paddingEnd="@dimen/space_16"
+                        android:paddingBottom="@dimen/space_8"
+                        android:text="@string/account_top_up"
+                        android:textAllCaps="false"
+                        android:textStyle="bold"
+                        app:cornerRadius="@dimen/radius_pill"
+                        app:icon="@drawable/ic_add_24dp"
+                        app:iconGravity="textStart"
+                        app:iconSize="18dp" />
+                </LinearLayout>
+
+                <!-- Balance: quiet label above the big brand-font figure -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_16"
+                    android:text="@string/account_balance"
+                    android:textAppearance="@style/TextAppearance.App.Caption"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+                <TextView
+                    android:id="@+id/tv_balance"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_4"
+                    android:ellipsize="end"
+                    android:fontFeatureSettings="&quot;tnum&quot; on, &quot;lnum&quot; on"
+                    android:maxLines="1"
+                    android:textAppearance="@style/TextAppearance.App.Display"
+                    tools:text="1 500 ₽" />
+
+                <!-- Referral: whole row taps to copy; code reads on a quiet chip, copy is the trailing glyph -->
+                <LinearLayout
+                    android:id="@+id/row_referral"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_12"
+                    android:clickable="true"
+                    android:contentDescription="@string/account_copy_referral"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tv_referral"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_acc_chip"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:paddingHorizontal="@dimen/space_12"
+                        android:paddingVertical="@dimen/space_8"
+                        android:textAppearance="@style/TextAppearance.App.Caption"
+                        tools:text="Реф-код ABC123" />
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="@dimen/space_8"
+                        android:importantForAccessibility="no"
+                        app:srcCompat="@drawable/ic_copy"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Payment-processing hint (shown while re-polling after a checkout) -->
+        <TextView
+            android:id="@+id/tv_pending"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_12"
+            android:background="@drawable/bg_acc_chip"
+            android:padding="@dimen/space_12"
+            android:text="@string/account_payment_pending"
+            android:textAppearance="@style/TextAppearance.App.Body"
+            android:visibility="gone" />
+
+        <!-- Subscription state slot: four mutually-exclusive children, toggled by the Kotlin WP.
+             Tight space_12 gap keeps it reading as one unit with the profile card above. -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_12">
+
+            <!-- (a) Loading skeleton: a sub-card-shaped silhouette; Kotlin pulses its alpha -->
+            <LinearLayout
+                android:id="@+id/group_sub_skeleton"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/sub_card_height"
+                android:background="@drawable/bg_skeleton"
+                android:orientation="vertical"
+                android:padding="@dimen/space_16">
+
+                <View
+                    android:layout_width="140dp"
+                    android:layout_height="18dp"
+                    android:background="?attr/colorOutlineVariant" />
+
+                <View
+                    android:layout_width="200dp"
+                    android:layout_height="14dp"
+                    android:layout_marginTop="@dimen/space_16"
+                    android:background="?attr/colorOutlineVariant" />
+
+                <View
+                    android:layout_width="120dp"
+                    android:layout_height="14dp"
+                    android:layout_marginTop="@dimen/space_8"
+                    android:background="?attr/colorOutlineVariant" />
+            </LinearLayout>
+
+            <!-- (b) Empty state: card-shaped onboarding block (sibling card, not nested) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/group_sub_empty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                app:cardBackgroundColor="?attr/colorSurface"
+                app:cardCornerRadius="@dimen/radius_card"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp"
+                tools:visibility="visible">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/space_16">
+
+                    <TextView
+                        android:id="@+id/tv_empty_title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/account_empty_title"
+                        android:textAppearance="@style/TextAppearance.App.Title" />
+
+                    <TextView
+                        android:id="@+id/tv_empty_body"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_4"
+                        android:text="@string/account_no_subscription"
+                        android:textAppearance="@style/TextAppearance.App.Body"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_buy_first"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_16"
+                        android:text="@string/account_hub_buy"
+                        android:textAllCaps="false"
+                        android:textStyle="bold"
+                        app:cornerRadius="@dimen/radius_pill"
+                        app:icon="@drawable/ic_acc_upgrade"
+                        app:iconGravity="textStart"
+                        app:iconSize="18dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- (c) Active state: subscription carousel + page dots -->
+            <LinearLayout
+                android:id="@+id/group_sub_carousel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <androidx.viewpager2.widget.ViewPager2
+                    android:id="@+id/vp_subscriptions"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/sub_card_height"
+                    android:clipToPadding="false" />
+
+                <LinearLayout
+                    android:id="@+id/ll_sub_dots"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="@dimen/space_12"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+            </LinearLayout>
+
+            <!-- (d) Error state: card-shaped block with retry -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/group_account_error"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                app:cardBackgroundColor="?attr/colorSurface"
+                app:cardCornerRadius="@dimen/radius_card"
+                app:cardElevation="0dp"
+                app:strokeColor="?attr/colorOutlineVariant"
+                app:strokeWidth="1dp"
+                tools:visibility="visible">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/space_16">
+
+                    <TextView
+                        android:id="@+id/tv_error_title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/account_error_load_title"
+                        android:textAppearance="@style/TextAppearance.App.Title" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_4"
+                        android:text="@string/account_error_generic"
+                        android:textAppearance="@style/TextAppearance.App.Body"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_retry_load"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_16"
+                        android:text="@string/account_retry"
+                        android:textAllCaps="false"
+                        android:textStyle="bold"
+                        app:cornerRadius="@dimen/radius_pill" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+        </FrameLayout>
+
+        <!-- ============ Management zone: the ONE section header on the screen ============ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_24"
+            android:layout_marginBottom="@dimen/space_8"
+            android:text="@string/account_manage_title"
+            android:textAppearance="@style/TextAppearance.App.Title" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="@dimen/radius_card"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Купить подписку (promoted) -->
+                <LinearLayout
+                    android:id="@+id/row_buy"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="@dimen/row_min_height"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/screen_gutter"
+                    android:paddingEnd="@dimen/screen_gutter"
+                    android:paddingVertical="@dimen/space_8">
+
+                    <FrameLayout
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
+                        android:background="@drawable/bg_icon_blue">
+
+                        <ImageView
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
+                            android:layout_gravity="center"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_acc_upgrade"
+                            app:tint="?attr/iconTintBlue" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_8"
+                        android:layout_weight="1"
+                        android:text="@string/account_hub_buy"
+                        android:textAppearance="@style/TextAppearance.App.Title"
+                        android:textColor="?attr/colorPrimary" />
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="@dimen/space_4"
+                        android:importantForAccessibility="no"
+                        app:srcCompat="@drawable/ic_chevron_right"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="72dp"
+                    android:background="?attr/colorOutlineVariant" />
+
+                <!-- Устройства -->
+                <LinearLayout
+                    android:id="@+id/row_devices"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="@dimen/row_min_height"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/screen_gutter"
+                    android:paddingEnd="@dimen/screen_gutter"
+                    android:paddingVertical="@dimen/space_8">
+
+                    <FrameLayout
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
+                        android:background="@drawable/bg_icon_neutral">
+
+                        <ImageView
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
+                            android:layout_gravity="center"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_acc_devices"
+                            app:tint="@color/icon_glyph_neutral" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_8"
+                        android:layout_weight="1"
+                        android:text="@string/account_hub_devices"
+                        android:textAppearance="@style/TextAppearance.App.Title" />
+
+                    <TextView
+                        android:id="@+id/tv_row_value_devices"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="@dimen/space_8"
+                        android:gravity="end"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        android:visibility="gone"
+                        tools:text="1 / 3" />
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="@dimen/space_4"
+                        android:importantForAccessibility="no"
+                        app:srcCompat="@drawable/ic_chevron_right"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="72dp"
+                    android:background="?attr/colorOutlineVariant" />
+
+                <!-- История платежей -->
+                <LinearLayout
+                    android:id="@+id/row_history"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="@dimen/row_min_height"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/screen_gutter"
+                    android:paddingEnd="@dimen/screen_gutter"
+                    android:paddingVertical="@dimen/space_8">
+
+                    <FrameLayout
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
+                        android:background="@drawable/bg_icon_neutral">
+
+                        <ImageView
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
+                            android:layout_gravity="center"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_acc_history"
+                            app:tint="@color/icon_glyph_neutral" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_8"
+                        android:layout_weight="1"
+                        android:text="@string/account_hub_history"
+                        android:textAppearance="@style/TextAppearance.App.Title" />
+
+                    <TextView
+                        android:id="@+id/tv_row_value_history"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="@dimen/space_8"
+                        android:gravity="end"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        android:visibility="gone"
+                        tools:text="12.06.2026" />
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="@dimen/space_4"
+                        android:importantForAccessibility="no"
+                        app:srcCompat="@drawable/ic_chevron_right"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

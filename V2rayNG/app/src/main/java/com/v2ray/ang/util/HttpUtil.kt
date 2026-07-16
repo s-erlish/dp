@@ -1,5 +1,6 @@
 package com.v2ray.ang.util
 
+import android.os.Build
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.LOOPBACK
 import com.v2ray.ang.BuildConfig
@@ -152,7 +153,7 @@ object HttpUtil {
             if (currentUrl == null) continue
             val client = buildOkHttpClient(request.timeout, request.httpPort, request.proxyUsername, request.proxyPassword, followRedirects = false)
             val finalUserAgent = if (request.userAgent.isNullOrBlank()) {
-                "v2rayNG/${BuildConfig.VERSION_NAME}"
+                "departament/${BuildConfig.VERSION_NAME}"
             } else {
                 request.userAgent
             }
@@ -161,6 +162,8 @@ object HttpUtil {
                 .get()
                 .header("User-agent", finalUserAgent)
                 .header("Connection", "close")
+
+            attachDeviceHeaders(request, requestBuilder)
 
             applyEmbeddedBasicAuthHeader(currentUrl, requestBuilder)
 
@@ -193,6 +196,113 @@ object HttpUtil {
             }
         }
         throw IOException("Too many redirects")
+    }
+
+    /**
+     * Body plus selected response headers of a subscription fetch.
+     * announce/supportUrl/webPageUrl are raw header values (may be `base64:`-prefixed).
+     */
+    data class UrlContentResult(
+        val body: String,
+        val subscriptionUserInfo: String?,
+        val announce: String? = null,
+        val supportUrl: String? = null,
+        val webPageUrl: String? = null,
+        val profileTitle: String? = null,
+        // Operator signal that this is a managed/hidden template subscription.
+        val hidden: String? = null,
+    )
+
+    /**
+     * Same as [getUrlContentWithUserAgent] but also returns the `subscription-userinfo`
+     * response header (used for traffic/expiry metadata), which the plain variant discards.
+     */
+    fun getUrlContentWithUserAgentEx(request: UrlContentRequest): UrlContentResult {
+        var currentUrl = request.url
+        var redirects = 0
+        val maxRedirects = 3
+
+        while (redirects++ < maxRedirects) {
+            if (currentUrl == null) continue
+            val client = buildOkHttpClient(request.timeout, request.httpPort, request.proxyUsername, request.proxyPassword, followRedirects = false)
+            // Subscription fetch: panels (Remnawave/3x-ui) key the response format
+            // (XRAY_JSON template vs base64 link list) off a recognised client User-Agent.
+            // The caller-supplied value can be a branding string (BackendConfig fallback
+            // "DepartamentVPN/1.0") or the provider-screen display field, neither of which
+            // the panel recognises -> it returns the wrong format. Force a v2rayNG-family
+            // UA whenever the supplied value is missing or not v2rayNG-family, so the panel
+            // always returns the managed JSON servers, independent of the display field.
+            val defaultSubUserAgent = "v2rayNG/${BuildConfig.VERSION_NAME}"
+            val requestedUserAgent = request.userAgent?.trim()
+            val finalUserAgent = if (!requestedUserAgent.isNullOrBlank()
+                && requestedUserAgent.contains("v2rayng", ignoreCase = true)
+            ) {
+                requestedUserAgent
+            } else {
+                defaultSubUserAgent
+            }
+            val requestBuilder = Request.Builder()
+                .url(currentUrl)
+                .get()
+                .header("User-agent", finalUserAgent)
+                .header("Connection", "close")
+
+            attachDeviceHeaders(request, requestBuilder)
+
+            applyEmbeddedBasicAuthHeader(currentUrl, requestBuilder)
+
+            if (request.httpPort != 0 && !request.proxyUsername.isNullOrBlank() && !request.proxyPassword.isNullOrBlank()) {
+                requestBuilder.header("Proxy-Authorization", Credentials.basic(request.proxyUsername, request.proxyPassword))
+            }
+
+            client.newCall(requestBuilder.build()).execute().use { response ->
+                when {
+                    response.isRedirect -> {
+                        val location = response.header("Location")
+                        if (location.isNullOrEmpty()) {
+                            throw IOException("Redirect location not found")
+                        }
+                        currentUrl = resolveLocation(currentUrl, location)
+                        if (currentUrl.isNullOrEmpty()) {
+                            throw IOException("Failed to resolve redirect location")
+                        }
+                        return@use
+                    }
+
+                    response.isSuccessful -> {
+                        return UrlContentResult(
+                            body = response.body?.string() ?: "",
+                            subscriptionUserInfo = response.header("subscription-userinfo"),
+                            announce = response.header("announce"),
+                            supportUrl = response.header("support-url"),
+                            webPageUrl = response.header("profile-web-page-url"),
+                            profileTitle = response.header("profile-title"),
+                            hidden = response.header("profile-hidden") ?: response.header("hidden"),
+                        )
+                    }
+
+                    else -> {
+                        throw IOException("Request failed with status code ${response.code}")
+                    }
+                }
+            }
+        }
+        throw IOException("Too many redirects")
+    }
+
+    /**
+     * Attaches the stable Remnawave device identity to a subscription request: the persisted
+     * per-install HWID plus device OS/version/model. Remnawave keys the panel device entry off
+     * [AppConfig.HEADER_HWID] (stable -> one entry per device, no slot pollution) and labels it
+     * from [AppConfig.HEADER_DEVICE_MODEL] (the real model, not a User-Agent guess). All values
+     * are stable across calls, so they never register new device entries.
+     */
+    private fun attachDeviceHeaders(request: UrlContentRequest, requestBuilder: Request.Builder) {
+        val hwid = request.hwid?.takeIf { it.isNotBlank() } ?: return
+        requestBuilder.addHeader(AppConfig.HEADER_HWID, hwid)
+        requestBuilder.addHeader(AppConfig.HEADER_DEVICE_OS, "android")
+        requestBuilder.addHeader(AppConfig.HEADER_VER_OS, Build.VERSION.RELEASE ?: "")
+        requestBuilder.addHeader(AppConfig.HEADER_DEVICE_MODEL, Utils.getDeviceName())
     }
 
     private fun applyEmbeddedBasicAuthHeader(rawUrl: String, requestBuilder: Request.Builder) {

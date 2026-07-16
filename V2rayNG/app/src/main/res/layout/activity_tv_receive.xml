@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  TV-side "Receive subscription" screen.
+  Overscan-safe outer padding (~5%) so no control is clipped on TVs that crop edges.
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingLeft="48dp"
+    android:paddingRight="48dp"
+    android:paddingTop="27dp"
+    android:paddingBottom="27dp"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tv_instructions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:gravity="center"
+            android:textSize="18sp"
+            android:text="@string/tv_receive_instructions" />
+
+        <ImageView
+            android:id="@+id/iv_qrcode"
+            android:layout_width="320dp"
+            android:layout_height="320dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="16dp"
+            android:background="@android:color/white"
+            android:contentDescription="@string/tv_pairing_qr_desc"
+            android:scaleType="fitXY" />
+
+        <TextView
+            android:id="@+id/tv_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:gravity="center"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btn_regenerate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:focusable="true"
+            android:text="@string/tv_receive_regenerate" />
+
+    </LinearLayout>
+
+</ScrollView>

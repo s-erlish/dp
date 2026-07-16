@@ -2,6 +2,12 @@ name: Build Debug APK
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - claude/vpn-client-happ-design-mq51pv
+    paths:
+      - 'V2rayNG/**'
+      - '.github/workflows/debug.yml'
 
 jobs:
   build:
@@ -22,6 +28,17 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install NDK
+        run: |
+          echo "y" | sdkmanager --install "ndk;28.2.13676358" >/dev/null
+          echo "NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> $GITHUB_ENV
+
+      - name: Build libhev-socks5-tunnel (tun2socks native lib)
+        run: bash compile-hevtun.sh
+
+      - name: Copy libhev-socks5-tunnel into app
+        run: cp -r "${{ github.workspace }}/libs" "${{ github.workspace }}/V2rayNG/app"
+
       - name: Fetch AndroidLibXrayLite tag
         run: |
           pushd AndroidLibXrayLite
@@ -41,12 +58,12 @@ jobs:
         working-directory: V2rayNG
         run: chmod +x ./gradlew
 
-      - name: Build debug APK
+      - name: Build debug APK (arm64-v8a, playstore only)
         working-directory: V2rayNG
-        run: ./gradlew assembleDebug
+        run: ./gradlew assemblePlaystoreDebug -PABI_FILTERS=arm64-v8a
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: departament-debug-apk
-          path: V2rayNG/app/build/outputs/apk/**/*.apk
+          path: V2rayNG/app/build/outputs/apk/**/*arm64-v8a*.apk

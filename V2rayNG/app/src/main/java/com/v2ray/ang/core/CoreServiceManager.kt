@@ -163,7 +163,10 @@ object CoreServiceManager {
         if (MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING)) {
             context.toast(R.string.toast_warning_pref_proxysharing_short)
         } else {
-            context.toast(R.string.toast_services_start)
+            // The old system-style «Запуск служб» toast is suppressed here (mirrors the already
+            // commented stop toast above): the connect screen now shows a single custom neutral
+            // gray «Подключение…» toast from MainActivity instead. Proxy-sharing warning kept.
+            //context.toast(R.string.toast_services_start)
         }
 
         val isVpnMode = SettingsManager.isVpnMode()
@@ -251,6 +254,14 @@ object CoreServiceManager {
 
         NotificationManager.showNotification(currentConfig)
         CoreNativeManager.reconcileBrowserDialer(dialerAddr)
+
+        // Memory limit: SettingsManager.isMemoryLimitEnabled()/getMemoryLimit() (MB) hold the
+        // user's requested soft cap. Enforcement WOULD be applied here, right before the core
+        // loop starts (e.g. a Go-side runtime/debug.SetMemoryLimit or a GOMEMLIMIT env read at
+        // core init). The prebuilt libv2ray/AndroidLibXrayLite binding currently exposes no such
+        // setter, so no cap can be applied from Kotlin. Wiring it up requires a core-lib change
+        // (add an exported setter to libv2ray, then call it here with getMemoryLimit()*1024*1024
+        // when isMemoryLimitEnabled() is true, or leave unbounded when disabled).
         coreController.startLoop(result.content, tunFd)
 
         if (!coreController.isRunning) {
@@ -376,6 +387,8 @@ object CoreServiceManager {
                 service.getString(R.string.connection_test_error, errorStr)
             }
             MessageUtil.sendMsg2UI(service, AppConfig.MSG_MEASURE_DELAY_SUCCESS, result)
+            // Numeric result for the auto-fallback health check (ms, or -1 on failure).
+            MessageUtil.sendMsg2UI(service, AppConfig.MSG_STATE_DELAY_RESULT, time)
 
             // Only fetch IP info if the delay test was successful
             if (time >= 0) {

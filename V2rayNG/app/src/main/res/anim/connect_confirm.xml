@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One-shot sonar pulse fired when the tunnel confirms: a single ring scales out
+     from 1.0 to 1.6 while fading from opaque to nothing, ease-out only, over the
+     shared emphasis tempo (@integer/motion_emphasis). Fires ONCE — never loops, no
+     second ring. The caller hides the view on end; reduced motion skips it entirely
+     (the pulse view stays invisible), while the confirm haptic still fires. -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="@integer/motion_emphasis"
+    android:fillAfter="false"
+    android:interpolator="@interpolator/ease_out_quint">
+
+    <scale
+        android:fromXScale="1.0"
+        android:fromYScale="1.0"
+        android:toXScale="1.6"
+        android:toYScale="1.6"
+        android:pivotX="50%"
+        android:pivotY="50%" />
+
+    <alpha
+        android:fromAlpha="1.0"
+        android:toAlpha="0.0" />
+
+</set>

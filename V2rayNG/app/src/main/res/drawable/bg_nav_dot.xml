@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bottom-nav active-item indicator: a short blue pill (34x3) under the selected
+     label. The ONE accent, used to mark the active tab. Toggled visible per tab in
+     MainActivity.updateNavSelection alongside the icon/label colour tween. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="?attr/colorPrimary" />
+    <corners android:radius="2dp" />
+</shape>

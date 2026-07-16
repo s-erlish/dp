@@ -3,6 +3,7 @@ package com.v2ray.ang.core
 import android.content.Context
 import android.text.TextUtils
 import com.google.gson.JsonArray
+import com.google.gson.JsonObject
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.dto.ConfigResult
 import com.v2ray.ang.dto.CoreConfigContext
@@ -15,6 +16,7 @@ import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.isNotNullEmpty
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
+import com.v2ray.ang.template.TemplateManager
 import com.v2ray.ang.util.HttpUtil
 import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.util.LogUtil
@@ -58,7 +60,7 @@ object CoreConfigManager {
             val configContext = CoreConfigContextBuilder.build(context, guid)
                 ?: return ConfigResult(status = false, guid = guid, errorMessage = "Failed to build config context")
             if (configContext.isCustom) {
-                return buildV2rayCustomConfig(configContext)
+                return buildV2rayCustomConfig4Speedtest(configContext)
             }
             val v2rayConfig = buildUnifiedConfig(configContext)
             postProcessForSpeedtest(v2rayConfig)
@@ -79,14 +81,48 @@ object CoreConfigManager {
      */
     private fun buildV2rayCustomConfig(configContext: CoreConfigContext): ConfigResult {
         val context = configContext.context
-        val raw = MmkvManager.decodeServerRaw(configContext.guid)
-            ?: return ConfigResult(status = false, guid = configContext.guid, errorMessage = "Custom config is empty")
-        val result = ConfigResult(true, configContext.guid, raw)
+        // Hidden/locked templates are stored encrypted; decodeRuntimeRaw transparently
+        // decrypts them and returns non-locked raw configs unchanged. All the template's
+        // routing/DNS/obfuscation rules are applied as-authored from this point on.
+        // Defensive: if template/keystore decoding ever throws (rare OEM Keystore breakage,
+        // corrupt payload), fall back to the plain stored raw so an ordinary/custom config can
+        // never be blocked from connecting by the template layer.
+        val raw = try {
+            TemplateManager.decodeRuntimeRaw(configContext.guid)
+        } catch (e: Exception) {
+            LogUtil.e(AppConfig.TAG, "buildV2rayCustomConfig: template decode failed, using plain raw", e)
+            MmkvManager.decodeServerRaw(configContext.guid)
+        } ?: return ConfigResult(status = false, guid = configContext.guid, errorMessage = "Custom config is empty")
+        // Parse once up-front so we can sanitize/validate even when tun is not needed.
+        // A malformed or non-Xray payload must never reach the native core (an unrecoverable
+        // native panic there kills the whole app process — the "снова произошёл сбой" dialog).
+        val json = JsonUtil.parseString(raw)?.takeIf { it.isJsonObject }?.asJsonObject
+            ?: return ConfigResult(
+                status = false,
+                guid = configContext.guid,
+                errorMessage = "Custom config is not a JSON object"
+            )
+
+        // Remnawave XRAY_JSON templates carry a root-level "remnawave" metadata object (and
+        // may carry other non-Xray keys). libv2ray/Xray can choke on unexpected top-level
+        // keys, so keep only valid Xray root keys before handing the config to the core.
+        sanitizeXrayRootKeys(json, configContext.guid)
+
+        // A config with no outbounds can crash the core on start; fail cleanly instead.
+        val outboundsJson = json.get("outbounds")?.takeIf { it.isJsonArray }?.asJsonArray
+        if (outboundsJson == null || outboundsJson.size() == 0) {
+            return ConfigResult(
+                status = false,
+                guid = configContext.guid,
+                errorMessage = "Custom config has no outbounds"
+            )
+        }
+
+        val result = JsonUtil.toJsonPretty(json)?.let { ConfigResult(true, configContext.guid, it) }
+            ?: ConfigResult(true, configContext.guid, raw)
         if (!needTun()) {
             return result
         }
-
-        val json = JsonUtil.parseString(raw)?.takeIf { it.isJsonObject }?.asJsonObject ?: return result
 
         // Check whether package names need to be replaced with UIDs
         if (SettingsManager.canUseProcessRouting()) {
@@ -120,11 +156,125 @@ object CoreConfigManager {
             val templateConfig = initV2rayConfig(configContext)
             templateConfig.inbounds.firstOrNull { it.tag == "tun" }?.let { inboundTun ->
                 inboundTun.settings?.mtu = SettingsManager.getVpnMtu()
-                inboundsJson.add(JsonUtil.parseString(JsonUtil.toJson(inboundTun)))
+                // Only append a well-formed inbound object; a null element here would be handed
+                // to the native core as `null` inside the inbounds array and can crash it.
+                JsonUtil.parseString(JsonUtil.toJson(inboundTun))
+                    ?.takeIf { it.isJsonObject }
+                    ?.let { inboundsJson.add(it) }
             }
         }
 
         return JsonUtil.toJsonPretty(json)?.let { ConfigResult(true, configContext.guid, it) } ?: result
+    }
+
+    /**
+     * Build a minimal, always-measurable configuration for latency testing of CUSTOM
+     * (raw xray-json / locked template) profiles.
+     *
+     * The stored raw config is used for a real connection as-authored, but for a delay test
+     * the full config often cannot be measured by the native `measureOutboundDelay`:
+     *  - Balancer / "Auto" / "Hybrid" (Автовыбор) templates carry an `observatory` +
+     *    `routing.balancers` block with multiple proxy outbounds. The native delay tester
+     *    strips app features and has no observatory probe results, so it cannot pick a
+     *    balancer member and returns -1 (or the request hangs until timeout).
+     *  - xHTTP / Shadowsocks and other single-proxy templates ship with routing/dns/multiple
+     *    outbounds (proxy + direct + block). If the proxy outbound is not first, the test
+     *    request can fall through to `direct`/`freedom` and never exercise the proxy.
+     *
+     * This builder parses the raw config, keeps only `log` + `outbounds`, promotes the first
+     * real proxy outbound to index 0, and drops routing/balancer/observatory/dns/inbounds so a
+     * single measurable proxy remains. The result measures connectivity through the first usable
+     * proxy server inside the config (which is exactly what the user wants for a per-server ping).
+     */
+    private fun buildV2rayCustomConfig4Speedtest(configContext: CoreConfigContext): ConfigResult {
+        val guid = configContext.guid
+        val raw = try {
+            TemplateManager.decodeRuntimeRaw(guid)
+        } catch (e: Exception) {
+            LogUtil.e(AppConfig.TAG, "buildV2rayCustomConfig4Speedtest: template decode failed, using plain raw", e)
+            MmkvManager.decodeServerRaw(guid)
+        } ?: return ConfigResult(status = false, guid = guid, errorMessage = "Custom config is empty")
+
+        val json = JsonUtil.parseString(raw)?.takeIf { it.isJsonObject }?.asJsonObject
+            ?: return ConfigResult(status = false, guid = guid, errorMessage = "Custom config is not a JSON object")
+
+        sanitizeXrayRootKeys(json, guid)
+
+        val outboundsJson = json.get("outbounds")?.takeIf { it.isJsonArray }?.asJsonArray
+        if (outboundsJson == null || outboundsJson.size() == 0) {
+            return ConfigResult(status = false, guid = guid, errorMessage = "Custom config has no outbounds")
+        }
+
+        // Promote the first real proxy outbound (skip freedom/blackhole/dns/loopback) to index 0
+        // so the delay request is routed through it once routing/balancer are removed.
+        val proxyIndex = outboundsJson.indexOfFirst { elem ->
+            val protocol = elem.takeIf { it.isJsonObject }?.asJsonObject
+                ?.get("protocol")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
+                ?.asString ?: return@indexOfFirst false
+            isProxyProtocol(protocol)
+        }
+        if (proxyIndex > 0) {
+            // Rebuild the array with the proxy outbound first, preserving the rest in order.
+            val reordered = JsonArray()
+            reordered.add(outboundsJson.get(proxyIndex))
+            outboundsJson.forEachIndexed { i, elem -> if (i != proxyIndex) reordered.add(elem) }
+            json.add("outbounds", reordered)
+        } else if (proxyIndex < 0) {
+            LogUtil.w(AppConfig.TAG, "Speedtest custom config $guid has no recognizable proxy outbound; measuring first outbound")
+        }
+
+        // Keep only what the delay tester needs: log + outbounds. Everything that can trip up
+        // the native tester (balancer/observatory/routing/dns/inbounds/stats/policy/...) is dropped.
+        val keysToRemove = json.keySet().filter { it != "log" && it != "outbounds" }
+        keysToRemove.forEach { json.remove(it) }
+
+        json.get("outbounds")?.asJsonArray?.forEach { elem ->
+            (elem as? JsonObject)?.remove("mux")
+        }
+
+        val content = JsonUtil.toJsonPretty(json)
+            ?: return ConfigResult(status = false, guid = guid, errorMessage = "Failed to serialize speedtest config")
+        return ConfigResult(status = true, guid = guid, content = content)
+    }
+
+    /**
+     * True when the protocol string names a real proxy outbound (as opposed to
+     * freedom/blackhole/dns/loopback helper outbounds).
+     */
+    private fun isProxyProtocol(protocol: String): Boolean {
+        return EConfigType.entries.any {
+            it != EConfigType.CUSTOM &&
+                it != EConfigType.POLICYGROUP &&
+                it != EConfigType.PROXYCHAIN &&
+                it.name.equals(protocol, ignoreCase = true)
+        }
+    }
+
+    /**
+     * Valid Xray top-level configuration keys. Anything else (e.g. Remnawave's root-level
+     * "remnawave" metadata object) is stripped before the config reaches the native core.
+     */
+    private val XRAY_ROOT_KEYS = setOf(
+        "log", "dns", "inbounds", "outbounds", "routing", "policy",
+        "api", "stats", "reverse", "observatory", "burstObservatory",
+        "fakedns", "metrics"
+    )
+
+    /**
+     * Remove non-Xray root keys from a parsed custom config in place.
+     *
+     * Remnawave XRAY_JSON subscriptions embed a root-level "remnawave" object (and possibly
+     * other panel metadata). libv2ray/Xray may reject or mishandle unknown top-level keys,
+     * which manifests as a process-killing native crash on start. Keeping only the known-good
+     * Xray keys makes these templates safe to load. Ordinary/self-authored custom configs only
+     * contain valid Xray keys, so this is a no-op for them.
+     */
+    private fun sanitizeXrayRootKeys(json: JsonObject, guid: String) {
+        val unknownKeys = json.keySet().filter { it !in XRAY_ROOT_KEYS }
+        if (unknownKeys.isNotEmpty()) {
+            LogUtil.w(AppConfig.TAG, "Stripping non-Xray root keys from custom config $guid: $unknownKeys")
+            unknownKeys.forEach { json.remove(it) }
+        }
     }
 
     /**
@@ -394,6 +544,15 @@ object CoreConfigManager {
         v2rayConfig.log.loglevel = MmkvManager.decodeSettingsString(AppConfig.PREF_LOGLEVEL) ?: "warning"
         v2rayConfig.inbounds.clear()
         v2rayConfig.routing.rules.clear()
+        // Balancer/observatory configs (POLICYGROUP "Auto"/Hybrid): the native
+        // measureOutboundDelay strips app features and cannot resolve a balancer that
+        // depends on observatory probe results, so it returns -1. For a latency test we
+        // only need connectivity through one member, so drop the balancer + observatory
+        // and let the request fall through to the first (primary) proxy outbound, which
+        // buildUnifiedConfig always places at index 0.
+        v2rayConfig.routing.balancers = null
+        v2rayConfig.observatory = null
+        v2rayConfig.burstObservatory = null
         v2rayConfig.dns = null
         v2rayConfig.fakedns = null
         v2rayConfig.stats = null
@@ -456,30 +615,28 @@ object CoreConfigManager {
         val enableLocalProxy = forcedByHev || MmkvManager.decodeSettingsBool(AppConfig.PREF_ENABLE_LOCAL_PROXY, true)
 
         val socksPort = SettingsManager.getSocksPort()
-        val socksUsername = SettingsManager.getSocksUsername()
-        val socksPassword = SettingsManager.getSocksPassword()
+        // Two-inbound topology for LAN/hotspot sharing:
+        //  - inbound1 ("socks") is ALWAYS bound to 127.0.0.1 (loopback) and ALWAYS "noauth".
+        //    The local tun bridge (hev-socks5-tunnel) and internal okhttp connect to this SAME
+        //    inbound on 127.0.0.1 with NO credentials, so requiring auth here (or rebinding it to
+        //    0.0.0.0) rejected the local tunnel and killed the phone's VPN. It must never change.
+        //  - When PREF_PROXY_SHARING is ON a SEPARATE authenticated "socks-lan" inbound is added
+        //    below, bound to 0.0.0.0 on a dedicated share port, so tethered devices can point
+        //    their SOCKS5 client at the phone and ride its VPN without exposing an open relay.
+        val proxySharing = MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING) == true
         val inbound1 = v2rayConfig.inbounds[0]
         if (inbound1.settings == null) {
             inbound1.settings = V2rayConfig.InboundBean.InSettingsBean()
         }
 
-        if (MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING) != true) {
-            inbound1.listen = AppConfig.LOOPBACK
-        }
+        // Loopback-only, unconditionally: never rebind the local inbound to 0.0.0.0.
+        inbound1.listen = AppConfig.LOOPBACK
         inbound1.port = socksPort
         inbound1.settings?.udp = MmkvManager.decodeSettingsBool(AppConfig.PREF_SOCKS_ENABLE_UDP, true)
-        if (socksUsername != null && socksPassword != null) {
-            inbound1.settings?.auth = "password"
-            inbound1.settings?.accounts = listOf(
-                V2rayConfig.InboundBean.InSettingsBean.SocksAccountBean(
-                    user = socksUsername,
-                    pass = socksPassword
-                )
-            )
-        } else {
-            inbound1.settings?.auth = "noauth"
-            inbound1.settings?.accounts = null
-        }
+        // Always noauth so the loopback tun bridge is never locked out; LAN sharing uses the
+        // separate authenticated "socks-lan" inbound instead of ever weakening this one.
+        inbound1.settings?.auth = "noauth"
+        inbound1.settings?.accounts = null
         val fakedns = MmkvManager.decodeSettingsBool(AppConfig.PREF_FAKE_DNS_ENABLED) == true
         val sniffAllTlsAndHttp =
             MmkvManager.decodeSettingsBool(AppConfig.PREF_SNIFFING_ENABLED, true) != false
@@ -497,11 +654,40 @@ object CoreConfigManager {
             val inbound2 = JsonUtil.fromJson(JsonUtil.toJson(inbound1), V2rayConfig.InboundBean::class.java)
                 ?: error("Failed to clone inbound template")
             inbound2.tag = EConfigType.HTTP.name.lowercase()
+            // HTTP is cleartext: keep it loopback-only, never expose it on the LAN.
+            inbound2.listen = AppConfig.LOOPBACK
             inbound2.port = SettingsManager.getHttpPort()
             inbound2.protocol = EConfigType.HTTP.name.lowercase()
             inbound2.settings?.auth = null
             inbound2.settings?.udp = null
             v2rayConfig.inbounds.add(inbound2)
+        }
+
+        // Authenticated LAN/hotspot SOCKS5 inbound. Added only when sharing is enabled AND the
+        // local proxy is active. Bound to 0.0.0.0 on a dedicated port, ALWAYS password-authed:
+        // credentials are auto-generated + persisted first when empty, so this can never become
+        // an open relay. Routing/outbounds key off the outbound tag (not the inbound), so this
+        // inbound rides the same VPN as the loopback one.
+        if (proxySharing && enableLocalProxy) {
+            val (shareUser, sharePass) = SettingsManager.ensureSocksShareCredentials()
+            val lanInbound = JsonUtil.fromJson(JsonUtil.toJson(inbound1), V2rayConfig.InboundBean::class.java)
+            if (lanInbound != null) {
+                lanInbound.tag = "socks-lan"
+                lanInbound.protocol = EConfigType.SOCKS.name.lowercase()
+                lanInbound.listen = "0.0.0.0"
+                lanInbound.port = SettingsManager.getSocksSharePort()
+                if (lanInbound.settings == null) {
+                    lanInbound.settings = V2rayConfig.InboundBean.InSettingsBean()
+                }
+                lanInbound.settings?.auth = "password"
+                lanInbound.settings?.udp = inbound1.settings?.udp
+                lanInbound.settings?.accounts = listOf(
+                    V2rayConfig.InboundBean.InSettingsBean.SocksAccountBean(shareUser, sharePass)
+                )
+                v2rayConfig.inbounds.add(lanInbound)
+            } else {
+                LogUtil.w(AppConfig.TAG, "Failed to clone socks-lan inbound; LAN sharing inbound not added")
+            }
         }
 
         if (!enableLocalProxy) {

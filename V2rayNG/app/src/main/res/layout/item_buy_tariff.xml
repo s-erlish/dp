@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One selectable tariff card for the Buy screen: name + devices/traffic summary.
+  Name and price carry the card; selection is shown by the blue stroke + check.
+  tv_group_emoji is kept only for binding compatibility (BuyTariffActivity) and
+  stays gone — no emoji as chrome. If the server still sends a glyph the activity
+  flips it visible; the space_12 gap then lives on the glyph, not the label.
+-->
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/card_tariff"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="@dimen/space_12"
+    android:checkable="false"
+    android:stateListAnimator="@anim/press_scale"
+    app:cardBackgroundColor="?attr/colorSurface"
+    app:cardCornerRadius="@dimen/radius_card"
+    app:cardElevation="0dp"
+    app:strokeColor="?attr/colorOutlineVariant"
+    app:strokeWidth="1dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Header row: tap selects the tariff -->
+        <LinearLayout
+            android:id="@+id/header_tariff"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:minHeight="@dimen/row_min_height"
+            android:orientation="horizontal"
+            android:padding="@dimen/space_16">
+
+            <!-- Legacy server glyph slot: gone by default (no emoji as chrome). -->
+            <TextView
+                android:id="@+id/tv_group_emoji"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="@dimen/space_12"
+                android:textSize="22sp"
+                android:visibility="gone"
+                tools:ignore="HardcodedText" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_tariff_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textAppearance="@style/TextAppearance.App.Title"
+                    tools:text="Стандарт" />
+
+                <TextView
+                    android:id="@+id/tv_tariff_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textAppearance="@style/TextAppearance.App.Subtitle"
+                    tools:text="Устройства: 3 · Трафик: ∞" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/iv_check"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginStart="@dimen/space_8"
+                android:importantForAccessibility="no"
+                android:visibility="invisible"
+                app:srcCompat="@drawable/ic_action_done"
+                app:tint="?attr/colorPrimary"
+                tools:visibility="visible" />
+        </LinearLayout>
+
+        <!-- Duration/price options; revealed only when this tariff is selected -->
+        <LinearLayout
+            android:id="@+id/ll_price_options"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="@dimen/space_16"
+            android:paddingBottom="@dimen/space_16"
+            android:visibility="gone"
+            tools:visibility="visible" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

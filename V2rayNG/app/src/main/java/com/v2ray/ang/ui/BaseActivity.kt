@@ -15,7 +15,9 @@ import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.progressindicator.LinearProgressIndicator
+import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
+import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.helper.CustomDividerItemDecoration
 import com.v2ray.ang.util.MyContextWrapper
@@ -34,10 +36,20 @@ import com.v2ray.ang.util.Utils
  * - Wrap base context according to user locale settings.
  */
 abstract class BaseActivity : AppCompatActivity() {
+    companion object {
+        const val THEME_BLUE = "blue"
+        const val THEME_MONO = "mono"
+    }
+
     // Progress indicator that sits at the bottom of the toolbar
     private var progressBar: LinearProgressIndicator? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Apply the monochrome color overlay before the view hierarchy is created,
+        // so the whole activity picks up the black & white palette when selected.
+        if (MmkvManager.decodeSettingsString(AppConfig.PREF_COLOR_THEME, THEME_BLUE) == THEME_MONO) {
+            theme.applyStyle(R.style.ThemeOverlay_Mono, true)
+        }
         super.onCreate(savedInstanceState)
 
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
@@ -188,7 +200,7 @@ abstract class BaseActivity : AppCompatActivity() {
      * be posted to the UI thread via [runOnUiThread]. If the base layout was not set yet
      * (progressBar == null) the call is a no-op.
      */
-    protected fun showLoading() {
+    protected open fun showLoading() {
         runOnUiThread {
             progressBar?.visibility = View.VISIBLE
         }
@@ -199,7 +211,7 @@ abstract class BaseActivity : AppCompatActivity() {
      *
      * Safe to call from background threads. No-op if the progress bar hasn't been cached.
      */
-    protected fun hideLoading() {
+    protected open fun hideLoading() {
         runOnUiThread {
             progressBar?.visibility = View.GONE
         }

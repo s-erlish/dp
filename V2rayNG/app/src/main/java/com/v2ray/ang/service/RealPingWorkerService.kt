@@ -1,10 +1,12 @@
 package com.v2ray.ang.service
 
 import android.content.Context
+import com.v2ray.ang.AppConfig
 import com.v2ray.ang.core.CoreConfigManager
 import com.v2ray.ang.core.CoreNativeManager
 import com.v2ray.ang.dto.RealPingEvent
 import com.v2ray.ang.handler.SettingsManager
+import com.v2ray.ang.util.LogUtil
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -78,8 +80,18 @@ class RealPingWorkerService(
         val retFailure = -1L
         val configResult = CoreConfigManager.getV2rayConfig4Speedtest(context, guid)
         if (!configResult.status) {
+            // Surface *why* the test config could not be built (unsupported transport,
+            // empty outbounds, template decode failure, ...) instead of a blind -1.
+            LogUtil.w(
+                AppConfig.TAG,
+                "Real-ping skipped for $guid: ${configResult.errorMessage.ifBlank { "test config build failed" }}"
+            )
             return retFailure
         }
-        return CoreNativeManager.measureOutboundDelay(configResult.content, SettingsManager.getDelayTestUrl())
+        val delay = CoreNativeManager.measureOutboundDelay(configResult.content, SettingsManager.getDelayTestUrl())
+        if (delay < 0) {
+            LogUtil.w(AppConfig.TAG, "Real-ping got no latency for $guid (native measureOutboundDelay returned $delay)")
+        }
+        return delay
     }
 }

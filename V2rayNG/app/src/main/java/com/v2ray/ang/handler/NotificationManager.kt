@@ -11,27 +11,27 @@ import android.graphics.Color
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.core.CoreServiceManager
 import com.v2ray.ang.dto.entities.ProfileItem
-import com.v2ray.ang.extension.toSpeedString
 import com.v2ray.ang.ui.MainActivity
+import com.v2ray.ang.util.FlagUtil
 import com.v2ray.ang.util.LogUtil
+import com.v2ray.ang.util.MessageUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlin.math.min
 
 object NotificationManager {
     private const val NOTIFICATION_ID = 1
     private const val NOTIFICATION_PENDING_INTENT_CONTENT = 0
     private const val NOTIFICATION_PENDING_INTENT_STOP_V2RAY = 1
     private const val NOTIFICATION_PENDING_INTENT_RESTART_V2RAY = 2
-    private const val NOTIFICATION_ICON_THRESHOLD = 3000
     private const val QUERY_INTERVAL_MS = 3000L
 
     private var lastQueryTime = 0L
@@ -58,15 +58,69 @@ object NotificationManager {
     }
 
     /**
-     * Shows the notification.
+     * Shows the notification and promotes the service to the foreground.
+     *
+     * A foreground service MUST call startForeground() within ~5s with a valid notification or
+     * the system kills the process (which strands the UI on "Подключение…" and shows an app
+     * crash). This method is therefore hardened so it can NEVER throw: if building the rich
+     * notification (flag title, chronometer, actions) fails for any reason, it falls back to a
+     * minimal valid notification, and startForeground() itself is guarded. Missing/invalid
+     * drawables, a cleared service reference, PendingIntent issues, or a foreground-service
+     * policy exception can no longer take down the VPN process.
+     *
      * @param currentConfig The current profile configuration.
+     * @return true if the service was promoted to the foreground, false otherwise.
      */
-    fun showNotification(currentConfig: ProfileItem?) {
-        val service = getService() ?: return
+    fun showNotification(currentConfig: ProfileItem?): Boolean {
+        val service = getService() ?: run {
+            LogUtil.e(AppConfig.TAG, "showNotification: service reference is null; cannot start foreground")
+            return false
+        }
 
         // Reset last query time to avoid querying stats too soon after showing the notification
         lastQueryTime = System.currentTimeMillis()
 
+        val channelId =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                try {
+                    createNotificationChannel()
+                } catch (e: Exception) {
+                    LogUtil.e(AppConfig.TAG, "showNotification: failed to create channel", e)
+                    AppConfig.RAY_NG_CHANNEL_ID
+                }
+            } else {
+                // If earlier version channel ID is not used
+                // https://developer.android.com/reference/android/support/v4/app/NotificationCompat.Builder.html#NotificationCompat.Builder(android.content.Context)
+                ""
+            }
+
+        val notification = try {
+            buildRichNotification(service, channelId, currentConfig)
+        } catch (e: Exception) {
+            // Any failure while assembling the rich notification must not prevent the mandatory
+            // startForeground() call. Fall back to a minimal, always-valid notification.
+            LogUtil.e(AppConfig.TAG, "showNotification: rich notification build failed, using fallback", e)
+            mBuilder = null
+            buildFallbackNotification(service, channelId)
+        }
+
+        return try {
+            service.startForeground(NOTIFICATION_ID, notification)
+            true
+        } catch (e: Exception) {
+            // startForeground can throw ForegroundServiceStartNotAllowedException / SecurityException /
+            // InvalidForegroundServiceTypeException on newer Android. Swallow so the caller can decide
+            // how to recover instead of crashing the whole service process.
+            LogUtil.e(AppConfig.TAG, "showNotification: startForeground failed", e)
+            false
+        }
+    }
+
+    /**
+     * Builds the rich ongoing notification (flag + server name title, live uptime chronometer,
+     * stop/restart actions) and caches its builder in [mBuilder] for later speed updates.
+     */
+    private fun buildRichNotification(service: Service, channelId: String, currentConfig: ProfileItem?): Notification {
         val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
 
         val startMainIntent = Intent(service, MainActivity::class.java)
@@ -82,37 +136,55 @@ object NotificationManager {
         restartV2RayIntent.putExtra("key", AppConfig.MSG_STATE_RESTART)
         val restartV2RayPendingIntent = PendingIntent.getBroadcast(service, NOTIFICATION_PENDING_INTENT_RESTART_V2RAY, restartV2RayIntent, flags)
 
-        val channelId =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                createNotificationChannel()
-            } else {
-                // If earlier version channel ID is not used
-                // https://developer.android.com/reference/android/support/v4/app/NotificationCompat.Builder.html#NotificationCompat.Builder(android.content.Context)
-                ""
+        // Resolving the flag/name is pure string work but is defensively guarded so a malformed
+        // remark can never abort the notification build.
+        val title = currentConfig?.let { cfg ->
+            try {
+                "${FlagUtil.resolveFlag(cfg)} ${FlagUtil.stripLeadingFlag(cfg.remarks)}"
+            } catch (e: Exception) {
+                cfg.remarks
             }
-
-        mBuilder = NotificationCompat.Builder(service, channelId)
+        }
+        val builder = NotificationCompat.Builder(service, channelId)
             .setSmallIcon(R.drawable.ic_stat_name)
-            .setContentTitle(currentConfig?.remarks)
-            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setColor(ContextCompat.getColor(service, R.color.icon_blue))
+            .setContentTitle(title)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
-            .setShowWhen(false)
+            // System-rendered live uptime stopwatch (no per-second push, battery-free).
+            .setWhen(System.currentTimeMillis())
+            .setUsesChronometer(true)
+            .setShowWhen(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(contentPendingIntent)
             .addAction(
-                R.drawable.ic_delete_24dp,
+                R.drawable.ic_notif_stop,
                 service.getString(R.string.notification_action_stop_v2ray),
                 stopV2RayPendingIntent
             )
             .addAction(
-                R.drawable.ic_delete_24dp,
+                R.drawable.ic_notif_restart,
                 service.getString(R.string.title_service_restart),
                 restartV2RayPendingIntent
             )
 
-        //mBuilder?.setDefaults(NotificationCompat.FLAG_ONLY_ALERT_ONCE)
+        mBuilder = builder
+        return builder.build()
+    }
 
-        service.startForeground(NOTIFICATION_ID, mBuilder?.build())
+    /**
+     * Minimal, always-valid foreground notification used when the rich build fails. It only
+     * needs a small icon and a title to satisfy the foreground-service requirement.
+     */
+    private fun buildFallbackNotification(service: Service, channelId: String): Notification {
+        return NotificationCompat.Builder(service, channelId)
+            .setSmallIcon(R.drawable.ic_stat_name)
+            .setColor(ContextCompat.getColor(service, R.color.icon_blue))
+            .setContentTitle(service.getString(R.string.app_name))
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .build()
     }
 
     /**
@@ -147,12 +219,14 @@ object NotificationManager {
     private fun createNotificationChannel(): String {
         val channelId = AppConfig.RAY_NG_CHANNEL_ID
         val channelName = AppConfig.RAY_NG_CHANNEL_NAME
+        // IMPORTANCE_LOW keeps the ongoing notification pinned and visible (with the live
+        // uptime chronometer) while staying silent.
         val chan = NotificationChannel(
             channelId,
-            channelName, NotificationManager.IMPORTANCE_HIGH
+            channelName, NotificationManager.IMPORTANCE_LOW
         )
         chan.lightColor = Color.DKGRAY
-        chan.importance = NotificationManager.IMPORTANCE_NONE
+        chan.setShowBadge(false)
         chan.lockscreenVisibility = Notification.VISIBILITY_PRIVATE
         getNotificationManager()?.createNotificationChannel(chan)
         return channelId
@@ -166,13 +240,6 @@ object NotificationManager {
      */
     private fun updateNotification(contentText: String?, proxyTraffic: Long, directTraffic: Long) {
         if (mBuilder != null) {
-            if (proxyTraffic < NOTIFICATION_ICON_THRESHOLD && directTraffic < NOTIFICATION_ICON_THRESHOLD) {
-                mBuilder?.setSmallIcon(R.drawable.ic_stat_name)
-            } else if (proxyTraffic > directTraffic) {
-                mBuilder?.setSmallIcon(R.drawable.ic_stat_proxy)
-            } else {
-                mBuilder?.setSmallIcon(R.drawable.ic_stat_direct)
-            }
             mBuilder?.setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
             mBuilder?.setContentText(contentText)
             getNotificationManager()?.notify(NOTIFICATION_ID, mBuilder?.build())
@@ -189,23 +256,6 @@ object NotificationManager {
             mNotificationManager = service.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         }
         return mNotificationManager
-    }
-
-    /**
-     * Appends the speed string to the given text.
-     * @param text The text to append to.
-     * @param name The name of the tag.
-     * @param up The uplink speed.
-     * @param down The downlink speed.
-     */
-    private fun appendSpeedString(text: StringBuilder, name: String?, up: Double, down: Double) {
-        var n = name ?: "no tag"
-        n = n.take(min(n.length, 6))
-        text.append(n)
-        for (i in n.length..6 step 2) {
-            text.append("\t")
-        }
-        text.append("•  ${up.toLong().toSpeedString()}↑  ${down.toLong().toSpeedString()}↓\n")
     }
 
     /**
@@ -252,21 +302,17 @@ object NotificationManager {
         val proxyTotal = proxyUplink + proxyDownlink
         val directTotal = directUplink + directDownlink
         val zeroSpeed = proxyTotal + directTotal == 0L
-        if (!zeroSpeed || !lastZeroSpeed) {
-            val text = StringBuilder()
-            appendSpeedString(
-                text, AppConfig.TAG_PROXY,
-                proxyUplink / sinceLastQueryInSeconds,
-                proxyDownlink / sinceLastQueryInSeconds
-            )
 
-            appendSpeedString(
-                text, AppConfig.TAG_DIRECT,
-                directUplink / sinceLastQueryInSeconds,
-                directDownlink / sinceLastQueryInSeconds
-            )
-            updateNotification(text.toString(), proxyTotal, directTotal)
+        // Push the live proxy speed to the main screen hero panel (bytes/second). This is the
+        // ONLY consumer of the speed job now: the ongoing notification deliberately shows just the
+        // server name + live uptime chronometer (no per-second speed lines), so we never write
+        // speed text back into the notification here.
+        getService()?.let { svc ->
+            val downPerSec = (proxyDownlink / sinceLastQueryInSeconds).toLong()
+            val upPerSec = (proxyUplink / sinceLastQueryInSeconds).toLong()
+            MessageUtil.sendMsg2UI(svc, AppConfig.MSG_STATE_SPEED_UPDATE, longArrayOf(downPerSec, upPerSec))
         }
+
         lastQueryTime = queryTime
         return zeroSpeed
     }

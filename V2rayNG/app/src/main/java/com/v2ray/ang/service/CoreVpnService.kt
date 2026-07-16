@@ -25,6 +25,7 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.NotificationManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.util.LogUtil
+import com.v2ray.ang.util.MessageUtil
 import com.v2ray.ang.util.MyContextWrapper
 import com.v2ray.ang.util.Utils
 import java.lang.ref.SoftReference
@@ -113,11 +114,38 @@ class CoreVpnService : VpnService(), ServiceControl {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         LogUtil.i(AppConfig.TAG, "StartCore-VPN: Service command received")
-        NotificationManager.showNotification(null)
-        setupVpnService()
-        startService()
+        try {
+            // Promote to foreground first (mandatory within ~5s). showNotification is hardened to
+            // never throw and returns false if the system refused the foreground promotion.
+            if (!NotificationManager.showNotification(null)) {
+                LogUtil.e(AppConfig.TAG, "StartCore-VPN: Failed to enter foreground; aborting start")
+                reportStartFailure("Foreground service could not start")
+                stopAllService()
+                return START_NOT_STICKY
+            }
+            setupVpnService()
+            startService()
+        } catch (e: Exception) {
+            // Any uncaught failure here would kill the :RunSoLibV2RayDaemon process, leaving the
+            // UI stuck on "Подключение…" with no state broadcast. Convert it into a reported
+            // failure + clean stop so the UI can recover to idle.
+            LogUtil.e(AppConfig.TAG, "StartCore-VPN: Unexpected failure during start", e)
+            reportStartFailure(e.message?.takeUnless { it.isBlank() } ?: e.javaClass.simpleName)
+            stopAllService()
+        }
         return START_STICKY
         //return super.onStartCommand(intent, flags, startId)
+    }
+
+    /**
+     * Notifies the UI that starting the VPN failed so it can reset from the "connecting" state.
+     */
+    private fun reportStartFailure(message: String) {
+        try {
+            MessageUtil.sendMsg2UI(this, AppConfig.MSG_STATE_START_FAILURE, message)
+        } catch (e: Exception) {
+            LogUtil.e(AppConfig.TAG, "StartCore-VPN: Failed to report start failure", e)
+        }
     }
 
     override fun getService(): Service {

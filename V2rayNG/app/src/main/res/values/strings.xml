@@ -1,6 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">departament</string>
+    <!-- Servers redesign (S3) -->
+    <string name="title_servers">Сервера</string>
+    <string name="servers_count">%d серверов</string>
+    <string name="providers_count">%d провайдеров</string>
+    <string name="search_hint">Поиск серверов…</string>
+    <string name="servers_empty_title">Нет серверов</string>
+    <string name="servers_add_clipboard">Добавить из буфера</string>
+    <string name="servers_section_local">Локальные</string>
+    <!-- Home empty state (no servers/subscriptions yet) -->
+    <string name="home_welcome_title">Приветствуем!</string>
+    <string name="home_empty_title">У вас пока не добавлены подписки.</string>
+    <string name="home_empty_subtitle">Добавьте подписку, чтобы начать пользоваться</string>
+    <string name="home_empty_add_qr">Добавить по QR-коду</string>
+    <string name="home_empty_add_clipboard">Добавить из буфера обмена</string>
+    <string name="home_or_sign_in">Или войдите в свой аккаунт</string>
+    <!-- Signed-in + no-subscription home state -->
+    <string name="home_buy_subscription">Купить подписку</string>
+    <string name="home_link_telegram">Привязать Telegram</string>
+    <!-- Neutral under-shield label when no server is selected/available -->
+    <string name="home_select_server">Выберите сервер</string>
+    <!-- Neutral under-shield label when a server is selected but not connected -->
+    <string name="home_not_connected">Не подключено</string>
+    <!-- Toolbar "+" add menu -->
+    <string name="menu_add_title">Добавить</string>
+    <string name="menu_add_scan_qr">Сканировать QR-код</string>
+    <string name="menu_add_clipboard">Добавить из буфера обмена</string>
+    <string name="menu_add_tv_send">Отправить на TV</string>
+    <string name="menu_add_manual">Ввести вручную</string>
+    <!-- Home meta-bar: delete subscription -->
+    <string name="sub_delete">Удалить подписку</string>
+    <string name="sub_delete_confirm">Удалить подписку и её серверы?</string>
     <string name="app_widget_name">Switch</string>
     <string name="app_tile_name">Switch</string>
     <string name="app_tile_first_use">First use of this feature, please use the app to add server</string>
@@ -20,6 +51,12 @@
     <string name="toast_services_stop">Stop Services</string>
     <string name="toast_services_success">Start Services Success</string>
     <string name="toast_services_failure">Start Services Failure</string>
+
+    <!-- Custom gray status toasts shown on the connect screen (VPN state). -->
+    <string name="toast_status_connecting">Connecting…</string>
+    <string name="toast_status_connected">Proxy connected</string>
+    <string name="toast_status_disconnected">Disconnected</string>
+    <string name="toast_status_failed">Couldn\'t connect</string>
 
     <!--ServerActivity-->
     <string name="title_server">Config</string>
@@ -285,6 +322,45 @@
     <string name="title_language">Language</string>
     <string name="title_ui_settings">UI settings</string>
     <string name="title_pref_ui_mode_night">UI mode settings</string>
+    <string name="title_pref_color_theme">Color theme</string>
+    <string name="title_pref_ping_method">Ping method</string>
+    <string name="ping_method_real">Proxied real delay (through tunnel)</string>
+    <string name="ping_method_http">HTTP GET /generate_204 (direct)</string>
+    <string name="ping_method_tcp">TCP connect (tcping)</string>
+    <string name="ping_method_icmp">ICMP ping (many nodes filter it)</string>
+    <string name="title_pref_auto_fallback">Auto-fallback on failure</string>
+    <string name="summary_pref_auto_fallback">After connecting, verify the tunnel actually passes traffic and automatically switch to the fastest working server if it does not</string>
+    <string name="auto_fallback_switching">Connection not responding — switching to the fastest working server…</string>
+    <string name="speed_zero" translatable="false">0 KB/s</string>
+    <string name="menu_item_fast_connect">Fast connect (fastest server)</string>
+    <string name="bottom_nav_home">Home</string>
+    <string name="bottom_nav_servers">Servers</string>
+    <string name="bottom_nav_more">More</string>
+    <string name="sub_traffic_used" translatable="false">%1$s / %2$s</string>
+    <string name="sub_traffic_unlimited" translatable="false">%1$s / ∞</string>
+    <string name="sub_expires">Until %1$s</string>
+    <string name="sub_expired">Expired</string>
+    <string name="sub_days_left" translatable="false">%1$s · %2$dd</string>
+    <string name="sub_infinity" translatable="false">∞</string>
+    <string name="sub_meta_updated_never">Never</string>
+    <string name="sub_auto_update_label">Auto-update — %1$s</string>
+    <string name="sub_auto_update_off">Off</string>
+    <string name="sub_update_interval_hours">%1$d h</string>
+    <string name="sub_update_interval_minutes">%1$d min</string>
+    <string name="sub_pin">Pin subscription</string>
+    <string name="sub_unpin">Unpin subscription</string>
+    <string name="sub_support">Support</string>
+    <string name="sub_website">Website</string>
+    <string name="sub_telegram">Telegram</string>
+    <string name="memory_app_usage">App memory</string>
+    <string name="memory_value" translatable="false">%1$d MB · %2$s</string>
+    <string name="memory_normal">Normal</string>
+    <string name="memory_elevated">Elevated</string>
+    <string name="memory_high">High</string>
+    <string name="title_pref_show_memory">Show memory usage on home</string>
+    <string name="summary_pref_show_memory">Display this app\'s live memory usage (MB) on the home screen</string>
+    <string name="color_theme_blue">Blue (departament)</string>
+    <string name="color_theme_mono">Black &amp; white</string>
     <string name="title_pref_use_hev_tunnel">Enable Hev TUN Feature</string>
     <string name="summary_pref_use_hev_tunnel">When enabled, TUN will use hev-socks5-tunnel; otherwise, it will use xray-core.</string>
     <string name="title_pref_hev_tunnel_loglevel">Hev Tun Log Level</string>
@@ -366,6 +442,7 @@
     <string name="connection_test_error_status_code">Error code: #%d</string>
     <string name="connection_connected">Connected, tap to check connection</string>
     <string name="connection_not_connected">Not connected</string>
+    <string name="connection_connecting">Connecting…</string>
     <string name="connection_runing_task_left">Number of running test tasks: %s</string>
 
     <string name="import_subscription_success">Subscription imported Successfully</string>
@@ -401,6 +478,8 @@
     <string name="title_configuration_share">Share config</string>
     <string name="title_webdav_config_setting">WebDAV Settings</string>
     <string name="title_webdav_config_setting_unknown">Please configure WebDAV first.</string>
+    <string name="backup_section_local">Данные</string>
+    <string name="backup_section_cloud">Облачное хранилище</string>
     <string name="title_webdav_url">WebDAV server URL</string>
     <string name="title_webdav_user">Username</string>
     <string name="title_webdav_pass">Password</string>
@@ -443,11 +522,11 @@
     </string-array>
 
     <string-array name="preset_rulesets">
-        <item>China Whitelist</item>
-        <item>China Blacklist</item>
-        <item>Global</item>
-        <item>Iran Whitelist</item>
-        <item>Russia Whitelist</item>
+        <item>Базовый набор</item>
+        <item>Прокси для заблокированного</item>
+        <item>Весь трафик через прокси</item>
+        <item>Белый список Ирана</item>
+        <item>Белый список России</item>
     </string-array>
 
     <string-array name="vpn_bypass_lan">
@@ -473,5 +552,61 @@
         <item>Local</item>
         <item>WebDAV</item>
     </string-array>
+
+    <!-- Telegram authorization / account header -->
+    <string name="auth_sign_in_telegram">Войти через Telegram</string>
+    <string name="auth_account">Аккаунт</string>
+    <string name="auth_subscription_active">Подписка активна</string>
+    <string name="auth_subscription_active_until">Подписка активна · до %1$s</string>
+    <string name="auth_subscription_expired">Подписка не активна</string>
+    <string name="auth_subscription_none">Подписка не подключена</string>
+
+    <!-- Incy settings tab -->
+    <string name="bottom_nav_settings">Настройки</string>
+    <string name="settings_section_connection">Подключение</string>
+    <string name="settings_section_bypass">Обход блокировок</string>
+    <string name="settings_section_interface">Интерфейс</string>
+    <string name="settings_section_subscription">Подписка</string>
+    <string name="settings_section_devices">Устройства</string>
+    <string name="settings_section_about">О приложении</string>
+    <string name="settings_mode">Режим</string>
+    <string name="settings_mode_vpn">VPN</string>
+    <string name="settings_mode_proxy">Только прокси</string>
+    <string name="settings_per_app">Прокси по приложениям</string>
+    <string name="settings_bypass_lan">Обход локальной сети</string>
+    <string name="settings_bypass_lan_sub">Прямой доступ к устройствам в локальной сети</string>
+    <string name="settings_dns">DNS</string>
+    <string name="settings_dns_hint">Адрес DNS-сервера</string>
+    <string name="settings_ping_method">Пинг</string>
+    <string name="settings_ping_method_real">Реальная задержка (через ядро)</string>
+    <string name="settings_ping_method_tcp">TCP-соединение</string>
+    <string name="settings_ping_method_http">HTTP-запрос</string>
+    <string name="settings_ping_method_icmp">ICMP (системный ping)</string>
+    <string name="settings_mux">Мультиплексирование (Mux)</string>
+    <string name="settings_mux_sub">Объединяет запросы в один канал соединения</string>
+    <string name="settings_mux_concurrency">Число соединений Mux</string>
+    <string name="settings_fragment">Фрагментация пакетов</string>
+    <string name="settings_fragment_sub">Разбивает TLS-рукопожатие против DPI</string>
+    <string name="settings_theme_dark">Тёмная тема</string>
+    <string name="settings_theme_mono">Чёрно-белый режим</string>
+    <string name="settings_language">Язык</string>
+    <string name="settings_language_system">Системный</string>
+    <string name="settings_boot">Запуск при загрузке</string>
+    <string name="settings_boot_sub">Подключаться после перезагрузки устройства</string>
+    <string name="settings_subscriptions">Подписки</string>
+    <string name="settings_sub_auto_update">Автообновление подписки</string>
+    <string name="settings_sub_auto_update_1h">1 час</string>
+    <string name="settings_sub_auto_update_6h">6 часов</string>
+    <string name="settings_sub_auto_update_12h">12 часов</string>
+    <string name="settings_sub_auto_update_24h">24 часа</string>
+    <string name="settings_sub_auto_update_minutes">%1$d мин</string>
+    <string name="settings_routing">Маршрутизация</string>
+    <string name="settings_assets">Файлы ресурсов</string>
+    <string name="settings_tv_send">Перенести подписку на ТВ</string>
+    <string name="settings_tv_receive">Принять подписку</string>
+    <string name="settings_about">О приложении</string>
+    <string name="settings_backup">Резервное копирование</string>
+    <string name="settings_value_on">Вкл</string>
+    <string name="settings_value_off">Выкл</string>
 
 </resources>
