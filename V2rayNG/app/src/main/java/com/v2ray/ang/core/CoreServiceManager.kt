@@ -293,6 +293,12 @@ object CoreServiceManager {
     fun stopCoreLoop(): Boolean {
         val service = getService() ?: return false
 
+        // MSG_STATE_STOP_SUCCESS is what tells the UI the tunnel is down, and the UI starts the next
+        // core as soon as it arrives. So it must not be sent while stopLoop() is still running — that
+        // made switching servers a race the new core could lose: startCoreLoop() would find the old
+        // core still running and either tear the tunnel down entirely (VPN mode) or, because
+        // CoreProxyOnlyService ignored the result, silently keep the PREVIOUS server up while the UI
+        // showed the new one. Announce the stop only once it has actually happened.
         if (coreController.isRunning) {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
@@ -300,7 +306,10 @@ object CoreServiceManager {
                 } catch (e: Exception) {
                     LogUtil.e(AppConfig.TAG, "StartCore-Manager: Failed to stop V2Ray loop", e)
                 }
+                MessageUtil.sendMsg2UI(service, AppConfig.MSG_STATE_STOP_SUCCESS, "")
             }
+        } else {
+            MessageUtil.sendMsg2UI(service, AppConfig.MSG_STATE_STOP_SUCCESS, "")
         }
 
         // Close existing browser dialer
@@ -310,7 +319,6 @@ object CoreServiceManager {
             browserDialer = null
         }
 
-        MessageUtil.sendMsg2UI(service, AppConfig.MSG_STATE_STOP_SUCCESS, "")
         NotificationManager.cancelNotification()
 
         try {
