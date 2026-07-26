@@ -50,6 +50,14 @@
 
     <!-- ==================== Act on the whole list ==================== -->
     <group android:id="@+id/group_server_list">
+        <!-- Carries the same check glyph the list paints on the selected row, so the item and
+             the thing it finds are visibly the same fact. prepareMenu() hides it when there is
+             no selected server left to find. -->
+        <item
+            android:id="@+id/servers_locate"
+            android:icon="@drawable/ic_action_done"
+            android:title="@string/menu_actions_locate"
+            app:showAsAction="never" />
         <item
             android:id="@+id/servers_sort"
             android:icon="@drawable/ic_ps_sort"

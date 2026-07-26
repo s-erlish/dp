@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icon-button glyph, default tone. onSurfaceVariant #9BA1AD = 6.99:1 on surface. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:alpha="0.38"
+        android:color="?attr/colorOnSurfaceVariant"
+        android:state_enabled="false" />
+    <item android:color="?attr/colorOnSurfaceVariant" />
+</selector>

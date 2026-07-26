@@ -706,10 +706,10 @@ class MainActivity : HelperBaseActivity() {
         val header = binding.layoutServersHeader
         header.btnCollapseAll.setOnClickListener { serversAdapter.toggleCollapseAll() }
         header.btnRefreshAll.setOnClickListener { importConfigViaSub() }
-        header.btnSpeedtestAll.setOnClickListener {
-            mainViewModel.testAllServers()
-            markAllServersTesting()
-        }
+        // 10.7: the layout ships «Проверить соединение» here, which is the name of the live-tunnel
+        // check, not of a pass over the whole list. Named for what it does.
+        header.btnSpeedtestAll.contentDescription = getString(R.string.menu_actions_ping_cd)
+        header.btnSpeedtestAll.setOnClickListener { startLatencyCheckAll() }
         // The Servers tab's single trailing control carries BOTH the add actions and the
         // whole-list actions (32-master-plan-android.md 12.3 gives this header one trailing
         // action holding exactly that set), so its accessible name is the menu it opens, not
@@ -744,6 +744,8 @@ class MainActivity : HelperBaseActivity() {
      *   when the surface does not own list actions;
      * - «Экспортировать в буфер» is disabled when every server is operator-locked, because
      *   `AngConfigManager.shareConfig()` refuses to emit a link for those by design;
+     * - «Найти выбранный сервер» is hidden unless a selected server actually exists in the store,
+     *   because with none the item could only ever announce its own uselessness;
      * - the three deletions are painted in `colorError` (1.4.1: red is destructive only) and sit
      *   behind the group divider, so the destructive half of the menu is legible before a tap.
      */
@@ -756,6 +758,13 @@ class MainActivity : HelperBaseActivity() {
 
         val exportable = mainViewModel.serversCache.any { !TemplateManager.isLocked(it.profile) }
         menu.findItem(R.id.servers_export)?.isEnabled = exportable
+
+        // Read the store, not `serversCache`: the cache is narrowed by the search field, and a
+        // selection the search happens to hide is exactly the case «Найти выбранный сервер» is
+        // for. Runs after setGroupVisible, which writes every item in the group.
+        val selectedGuid = MmkvManager.getSelectServer()
+        val hasSelection = !selectedGuid.isNullOrEmpty() && MmkvManager.decodeServerConfig(selectedGuid) != null
+        menu.findItem(R.id.servers_locate)?.isVisible = withListActions && hasServers && hasSelection
 
         for (i in 0 until menu.size()) {
             val item = menu.getItem(i)
@@ -945,10 +954,7 @@ class MainActivity : HelperBaseActivity() {
         homeMetaAdapter = HomeMetaPagerAdapter(
             bindPage = { meta, sub -> bindMetaBar(meta, sub) },
             onToggleList = { toggleHomeServerList() },
-            onPingAll = {
-                mainViewModel.testAllServers()
-                markAllServersTesting()
-            },
+            onPingAll = { startLatencyCheckAll() },
             onRefreshAll = { refreshHomeSub() },
             onTogglePin = { subId -> toggleHomePin(subId) },
             onDeleteSub = { subId -> confirmDeleteSubscription(subId) },
@@ -2185,6 +2191,11 @@ class MainActivity : HelperBaseActivity() {
             true
         }
 
+        R.id.servers_locate -> {
+            locateSelectedServer()
+            true
+        }
+
         R.id.servers_sort -> {
             sortByTestResults()
             true
@@ -2692,8 +2703,38 @@ class MainActivity : HelperBaseActivity() {
         }
     }
 
-    /** Runs the latency check over the whole list and puts every row into its testing state. */
+    /**
+     * Runs the latency check over the whole list and puts every row into its testing state.
+     *
+     * Every «Проверить задержку» route lands here: the Серверы header control, the Home meta bar
+     * and the recovery actions on the sort / «Удалить недоступные» snackbars.
+     *
+     * With nothing to measure, none of the four methods behind [MainViewModel.testAllServers]
+     * leaves a trace - three iterate an empty list and the real-ping one returns early inside its
+     * coroutine ([MainViewModel.testAllRealPing]) - so the control would read as broken. An empty
+     * list and a search that matched nothing are different problems, so they get different
+     * recoveries. The measurement itself needs no tunnel: real ping runs in `CoreTestService`,
+     * which builds a throwaway core per server at `SettingsManager.getRealPingConcurrency()` at a
+     * time, reports progress in its own notification and is cancellable, so a long list is slow
+     * but never unbounded.
+     */
     private fun startLatencyCheckAll() {
+        if (mainViewModel.serversCache.isEmpty()) {
+            if (mainViewModel.keywordFilter.isNotEmpty()) {
+                showActionSnackbar(
+                    getString(R.string.menu_actions_ping_filtered),
+                    getString(R.string.menu_actions_reset_search),
+                ) { binding.layoutServersHeader.etSearch.setText("") }
+            } else {
+                val onServers = selectedNavId == R.id.nav_servers
+                val anchor = if (onServers) binding.layoutServersHeader.btnAdd else binding.btnHomeAdd
+                showActionSnackbar(
+                    getString(R.string.menu_actions_ping_empty),
+                    getString(R.string.menu_actions_add),
+                ) { showImportMenu(anchor, withListActions = onServers) }
+            }
+            return
+        }
         mainViewModel.testAllServers()
         markAllServersTesting()
     }
@@ -2754,27 +2795,64 @@ class MainActivity : HelperBaseActivity() {
     }
 
     /**
-     * Locates and scrolls to the currently selected server in the flat Servers list.
+     * «Найти выбранный сервер»: scrolls the Серверы list to the server the next connect would use.
+     *
+     * Two states hide that row without it being gone, and the old code reported both as «не
+     * найден»: an active search narrows `serversCache` to the matches, and a collapsed provider
+     * group drops its rows out of the adapter's flat list entirely
+     * ([MainRecyclerAdapter.positionOfGuid] answers -1 in both cases). Telling the user a server
+     * is missing while it sits one tap away reads as a bug rather than as a state, so both are
+     * undone before the action is allowed to fail.
+     *
+     * The two old `toast()` calls also pointed at the wrong strings: `title_file_chooser`
+     * («Выберите профиль») and `toast_server_not_found_in_group` both say «профиль», which
+     * 00-rules.md 9.3 locks to «сервер», and both were Toasts for something the user can act on
+     * (1.4.8).
      */
     private fun locateSelectedServer() {
         val selectedGuid = MmkvManager.getSelectServer()
         if (selectedGuid.isNullOrEmpty()) {
-            toast(R.string.title_file_chooser)
+            // prepareMenu() hides the item in this state; this still guards the window between
+            // opening the menu and tapping it.
+            showActionSnackbar(getString(R.string.menu_actions_locate_none))
             return
         }
-        // Ensure we are on the Servers tab so the list is visible.
-        if (selectedNavId != R.id.nav_servers) {
-            selectNav(R.id.nav_servers)
+        // Only the Серверы menu offers this today, so this is a no-op there; it keeps the action
+        // correct if a second surface ever calls it.
+        if (selectedNavId != R.id.nav_servers) selectNav(R.id.nav_servers)
+
+        // Clearing the field runs the existing text watcher, so MainViewModel.filterConfig()
+        // reloads the cache and posts updateListAction synchronously and the adapter is already
+        // rebuilt when this returns.
+        if (mainViewModel.keywordFilter.isNotEmpty() && serversAdapter.positionOfGuid(selectedGuid) < 0) {
+            binding.layoutServersHeader.etSearch.setText("")
         }
-        val position = serversAdapter.positionOfGuid(selectedGuid)
+        // toggleCollapseAll() expands everything only when everything is already collapsed;
+        // otherwise it collapses first, so reaching the fully expanded state can take two calls.
+        // Both land before the next frame, so the list does not flicker through the intermediate
+        // state. It returns early when the list has no group headers at all, and then the two
+        // attempts simply cost nothing.
+        var position = serversAdapter.positionOfGuid(selectedGuid)
+        var attempt = 0
+        while (position < 0 && attempt < 2) {
+            serversAdapter.toggleCollapseAll()
+            position = serversAdapter.positionOfGuid(selectedGuid)
+            attempt++
+        }
         if (position < 0) {
-            toast(R.string.toast_server_not_found_in_group)
+            showActionSnackbar(getString(R.string.menu_actions_locate_missing))
             return
         }
+        val target = position
         binding.rvServers.post {
-            (binding.rvServers.layoutManager as? LinearLayoutManager)
-                ?.scrollToPositionWithOffset(position, binding.rvServers.height / 3)
-                ?: binding.rvServers.smoothScrollToPosition(position)
+            val manager = binding.rvServers.layoutManager as? LinearLayoutManager
+            if (manager != null) {
+                // A third of the way down rather than flush to the top: the row lands where the
+                // eye already is, with its neighbours for context.
+                manager.scrollToPositionWithOffset(target, binding.rvServers.height / 3)
+            } else {
+                binding.rvServers.smoothScrollToPosition(target)
+            }
         }
     }
 

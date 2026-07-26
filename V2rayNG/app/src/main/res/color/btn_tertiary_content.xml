@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Tertiary (text) button label + icon: the accent on a transparent container.
+  5.66:1 on surface, 6.64:1 on background. 00-rules.md 3.6 caps this at two visible
+  tertiary buttons per screen — the accent is a budget, not a decoration.
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:alpha="0.38"
+        android:color="?attr/colorPrimary"
+        android:state_enabled="false" />
+    <item android:color="?attr/colorPrimary" />
+</selector>

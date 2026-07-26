@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Destructive button label + icon: white on #F04452 = 3.71:1. That clears the >=3:1
+  large-text floor ONLY because the label is 16sp/700 (22-components.md 2.5).
+  A destructive label never drops below 16sp/700, which is why this style pins
+  TextAppearance.App.Title and no layout may override it.
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:alpha="0.38"
+        android:color="?attr/colorOnError"
+        android:state_enabled="false" />
+    <item android:color="?attr/colorOnError" />
+</selector>
