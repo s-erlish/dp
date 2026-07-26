@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ============================================================================
+  SURFACE A — THE GATE.  14-auth.md §5.
+  ============================================================================
+
+  Two anchors and nothing between them. The intro is top-anchored because it is
+  the screen's heading and must start where every other screen's first line
+  starts; the actions are bottom-anchored because the scene is one hand on a
+  moving train and a CTA floating 250dp down a 6.7-inch phone is out of thumb
+  reach. The space between them is the composition, not left-over room:
+  fillViewport + weight=1 on @id/gate_spacer means a short viewport (landscape,
+  split screen, font scale 200%) collapses the spacer to its 32dp floor and the
+  whole column scrolls. Nothing is ever clipped and nothing overlaps.
+
+  ONE FILLED ACCENT SURFACE, and it is @id/btn_gate_telegram. The Telegram glyph
+  is tinted colorOnPrimary, NEVER Telegram's own blue — a second brand hue on the
+  product's one accent is banned (00-rules.md 1.4.1).
+
+  ZERO CARDS. 03-direction.md 10.1: the sign-in form is not an object floating on
+  a surface, it is the screen.
+
+  THE WAIT IS A LEDGER ROW (5.3). 40dp leading slot, 12dp gap, text origin 68dp —
+  identical to every list row in the app, so the most unusual moment in the
+  product is built from its most ordinary part. That is why the awaiting state is
+  not a centred hero spinner with a paragraph under it.
+
+  THE ERROR LINE SITS ABOVE THE ACTION SLOT so that a growing error eats the
+  spacer and the buttons do not move under the thumb. Start-aligned at the
+  gutter, like every other line here; the old centred grey-red line at the bottom
+  of a scroll is deleted.
+-->
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/gate_scroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clipToPadding="false"
+    android:fillViewport="true"
+    android:paddingStart="@dimen/screen_gutter"
+    android:paddingEnd="@dimen/screen_gutter"
+    android:scrollbars="none">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/gate_intro"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_32"
+            android:orientation="vertical">
+
+            <!-- «Вход в departament». The Latin token is re-set in the brand face
+                 at bind time (D-14.1); that span is the whole brand moment on this
+                 screen and is why there is no logo, no shield tile and no wordmark
+                 lockup above it. -->
+            <TextView
+                android:id="@+id/gate_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:accessibilityHeading="true"
+                android:maxLines="2"
+                android:text="@string/auth_gate_title"
+                android:textAppearance="@style/TextAppearance.App.Headline"
+                android:textColor="?attr/colorOnSurface" />
+
+            <TextView
+                android:id="@+id/gate_body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_8"
+                android:maxLines="3"
+                android:text="@string/auth_gate_body"
+                android:textAppearance="@style/TextAppearance.App.Body"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+
+        <Space
+            android:id="@+id/gate_spacer"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:minHeight="@dimen/space_32" />
+
+        <LinearLayout
+            android:id="@+id/gate_actions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="@dimen/space_32"
+            android:orientation="vertical">
+
+            <!-- Screen-level error: Body 14/400 in the error TEXT red (6.15:1),
+                 not the 4.88:1 fill red. Field errors are Caption 12 (D-14.3). -->
+            <TextView
+                android:id="@+id/gate_error"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/space_12"
+                android:accessibilityLiveRegion="polite"
+                android:textAppearance="@style/TextAppearance.App.Body"
+                android:textColor="@color/color_destructive_text"
+                android:visibility="gone"
+                tools:text="@string/auth_err_network"
+                tools:visibility="visible" />
+
+            <!-- The crossfade host: exactly one stack is on screen at a time. -->
+            <FrameLayout
+                android:id="@+id/gate_action_slot"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <LinearLayout
+                    android:id="@+id/gate_stack_idle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- The button and its loading arc share a frame so R8 can hide
+                         the label without the control changing width: the button is
+                         match_parent, so the width is pinned by the layout itself. -->
+                    <FrameLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_gate_telegram"
+                            style="@style/Widget.Departament.Button.Primary.Tall"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/auth_btn_telegram"
+                            app:icon="@drawable/ic_telegram_24dp" />
+
+                        <com.google.android.material.progressindicator.CircularProgressIndicator
+                            android:id="@+id/pb_gate_telegram"
+                            style="@style/Widget.Departament.Progress.Circular.Inline.OnAccent"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center"
+                            android:visibility="gone"
+                            tools:visibility="visible" />
+                    </FrameLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_gate_email"
+                        style="@style/Widget.Departament.Button.Tertiary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_12"
+                        android:text="@string/auth_btn_email" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/gate_stack_awaiting"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    tools:visibility="visible">
+
+                    <!-- The universal 56dp row: 40 slot, 12 gap, text at 68 from the
+                         screen edge (16 gutter on the scroll + 40 + 12). Read as one
+                         node by TalkBack and announced politely when it appears. -->
+                    <LinearLayout
+                        android:id="@+id/gate_awaiting_row"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:accessibilityLiveRegion="polite"
+                        android:baselineAligned="false"
+                        android:gravity="center_vertical"
+                        android:minHeight="@dimen/row_min_height"
+                        android:orientation="horizontal">
+
+                        <FrameLayout
+                            android:id="@+id/gate_ring"
+                            android:layout_width="@dimen/tile_size"
+                            android:layout_height="@dimen/tile_size">
+
+                            <com.google.android.material.progressindicator.CircularProgressIndicator
+                                android:id="@+id/gate_ring_arc"
+                                style="@style/Widget.Departament.Progress.Circular.Inline"
+                                android:layout_width="@dimen/tile_size"
+                                android:layout_height="@dimen/tile_size"
+                                app:indicatorSize="@dimen/tile_size"
+                                app:trackColor="?attr/colorOutlineVariant" />
+
+                            <!-- The success beat's terminal frame: the arc fades out,
+                                 the check fades and scales in, 120ms hold, done. -->
+                            <ImageView
+                                android:id="@+id/gate_ring_check"
+                                android:layout_width="@dimen/glyph_20"
+                                android:layout_height="@dimen/glyph_20"
+                                android:layout_gravity="center"
+                                android:alpha="0"
+                                android:importantForAccessibility="no"
+                                android:src="@drawable/ic_fab_check"
+                                app:tint="?attr/colorPrimary" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_12"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/gate_awaiting_title"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:maxLines="2"
+                                android:text="@string/auth_awaiting_title"
+                                android:textAppearance="@style/TextAppearance.App.Title"
+                                android:textColor="?attr/colorOnSurface" />
+
+                            <TextView
+                                android:id="@+id/gate_awaiting_body"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/space_4"
+                                android:maxLines="2"
+                                android:text="@string/auth_awaiting_body"
+                                android:textAppearance="@style/TextAppearance.App.Subtitle"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- Two tertiaries is the cap (R14.6) and this stack is exactly
+                         at it. There is no «Начать заново»: restarting is what the
+                         primary CTA does, and the timeout state puts that CTA back
+                         on screen by itself. Cancel is system Back. -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_gate_open_telegram"
+                        style="@style/Widget.Departament.Button.Tertiary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_12"
+                        android:text="@string/auth_open_telegram" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_gate_email_alt"
+                        style="@style/Widget.Departament.Button.Tertiary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_12"
+                        android:text="@string/auth_btn_email" />
+                </LinearLayout>
+            </FrameLayout>
+        </LinearLayout>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

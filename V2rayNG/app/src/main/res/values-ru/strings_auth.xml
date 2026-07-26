@@ -1,34 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   ============================================================================
-  AUTH COPY — 14-auth.md §11.
+  AUTH COPY — русская локаль. Зеркало values/strings_auth.xml.
   ============================================================================
 
-  Russian, because every other module in this tree ships its Russian copy in
-  values/ and the app's default locale is AUTO (SettingsManager.getLocale()):
-  making this ONE file English-by-default would leave a non-ru phone with a
-  Russian app and an English sign-in screen. values-ru/strings_auth.xml carries
-  the identical set so an explicit ru locale resolves here too.
+  Копия ключ-в-ключ с values/strings_auth.xml: там русский лежит как значение по
+  умолчанию (так устроены все модули этого дерева, а локаль приложения по
+  умолчанию — AUTO), здесь — как явная ru-локаль. Меняются ОБА файла сразу;
+  расхождение между ними — дефект.
 
-  COPY LAW (00-rules.md 9.2, 9.4): sentence case, no ALL-CAPS, no em/en dash, no
-  three-dot sequence, «ёлочки», no final period on a label or a button, full
-  stops only inside error sentences and body copy. Every error names the cause
-  AND the fix, and never carries an HTTP code or a response body.
-
-  The old file's keys went with the screen that used them: auth_title,
-  auth_tg_headline, auth_tg_desc, auth_site_headline, auth_site_desc,
-  auth_btn_site, auth_register_site, auth_awaiting, auth_restart,
-  auth_fields_required (the CTA is disabled until the form is valid, so it could
-  never fire) and auth_err_dialog_title (the debug diagnostic dialog is deleted,
-  not release-gated — 14-auth.md 13.3). Verified 2026-07-26: nothing outside
-  LoginActivity + activity_login.xml referenced any of them.
+  Правила копирайта (00-rules.md 9.2, 9.4): предложение с заглавной, без КАПСА,
+  без тире, без трёх точек, «ёлочки», точка только в предложениях-ошибках и в
+  body-тексте. Каждая ошибка называет причину И способ исправить, без кодов HTTP
+  и без тела ответа.
 -->
 <resources>
 
-    <!-- ===================== A · the gate ===================== -->
-    <!-- The Latin token «departament» is set in the brand face by LoginActivity
-         (14-auth.md 5.1, D-14.1). Keep the word spelled exactly like this or the
-         span will not find it and the heading silently loses the brand moment. -->
+    <!-- ===================== A · экран входа ===================== -->
+    <!-- Латинский токен «departament» LoginActivity рисует брендовым шрифтом
+         (14-auth.md 5.1, D-14.1). Слово пишется ровно так, иначе span его не
+         найдёт и заголовок молча потеряет брендовый акцент. -->
     <string name="auth_gate_title">Вход в departament</string>
     <string name="auth_gate_body">Здесь будут подписка, устройства и платежи.</string>
     <string name="auth_btn_telegram">Войти через Telegram</string>
@@ -37,7 +28,7 @@
     <string name="auth_awaiting_body">Подтвердите вход в открывшемся приложении</string>
     <string name="auth_open_telegram">Открыть Telegram</string>
 
-    <!-- E · the same flow, run by an account that is already signed in. -->
+    <!-- E · тот же поток, но его запускает уже вошедший аккаунт. -->
     <string name="auth_link_tg_title">Привязать Telegram</string>
     <string name="auth_link_tg_body">Подтвердите привязку в Telegram. Аккаунт останется тем же.</string>
     <string name="auth_link_awaiting_body">Подтвердите привязку в открывшемся приложении</string>
@@ -49,10 +40,9 @@
     <string name="auth_password_label">Пароль</string>
     <string name="auth_btn_signin">Войти</string>
 
-    <!-- The two account errands the app cannot finish itself: the backend client
-         carries no register / password-reset call, so both are honest browser
-         hand-offs and the subtitle says where they land. A label promising an
-         in-app form would be a lie (00-rules.md 9.1). -->
+    <!-- Два дела, которые приложение не умеет доделать само: в клиенте бэкенда нет
+         ни регистрации, ни сброса пароля, поэтому обе строки — честная передача в
+         браузер, и подпись говорит, куда именно. -->
     <string name="auth_row_register">Создать аккаунт</string>
     <string name="auth_row_register_sub">Регистрация на departament.site</string>
     <string name="auth_row_reset">Восстановить пароль</string>
@@ -65,7 +55,7 @@
     <string name="auth_cancel">Отмена</string>
     <string name="auth_2fa_wrong">Неверный код. Проверьте приложение-аутентификатор.</string>
 
-    <!-- ===================== errors (14-auth.md 13.1) ===================== -->
+    <!-- ===================== ошибки (14-auth.md 13.1) ===================== -->
     <string name="auth_email_invalid">Введите корректный email, например name@example.com</string>
     <string name="auth_err_credentials">Неверная почта или пароль. Проверьте и повторите.</string>
     <string name="auth_err_gone">Ссылка устарела. Начните вход заново.</string>
@@ -79,10 +69,6 @@
     <string name="auth_err_telegram_missing">Telegram не установлен. Войдите по почте.</string>
     <string name="auth_err_browser_missing">Не нашли браузер, чтобы открыть сайт.</string>
 
-    <!-- ===================== a11y ===================== -->
-    <!-- R8: a loading control keeps its width, drops its label and announces
-         itself as «<подпись>, загрузка». 22-components.md 20.1 wants a shared
-         @string/state_loading; values/strings.xml belongs to another wave, so the
-         auth module carries its own wording until that key lands. -->
+    <!-- ===================== доступность ===================== -->
     <string name="auth_loading_cd">%1$s, загрузка</string>
 </resources>

@@ -1,314 +1,64 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<!--
+  ============================================================================
+  THE SIGN-IN HOST.  14-auth.md §3.
+  ============================================================================
+
+  What this replaces: two stacked MaterialCardViews, two filled accent buttons of
+  identical weight, a 26dp radius that exists nowhere else in the product,
+  synthetic bold on a variable font, three fixed 52dp button heights that clip at
+  font scale 200%, a 2FA block hidden inside the second card, and a centred grey
+  error line at the bottom of a scroll. There was no hierarchy and no state
+  machine: the awaiting block and the 2FA block could be visible at once.
+
+  Now: ONE surface at a time inside @id/auth_pages, and the toolbar says which.
+
+      A · the gate       layout_auth_gate   Telegram (the one filled accent)
+                                             + «Войти по почте»
+      B · вход по почте  layout_auth_email  email + password, the 2FA step, and
+                                             the two browser errands as rows
+
+  Surface B is a page in this host rather than a pushed Activity because the
+  manifest belongs to another wave; it enters and leaves on the sub-page motion
+  and system Back pops it back to the gate, so it behaves as the level-1 sub-page
+  the spec describes. See LoginActivity.showPage().
+
+  The header is the seamless view_toolbar (00-rules.md 4.8) — page background, no
+  elevation, no divider, and a hairline that appears only once content has
+  scrolled under it. On the gate its title is empty on purpose: «Вход в
+  departament» is the page's heading, and a bar repeating it would be the product
+  naming itself twice on one screen.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/login_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/transparent"
-    android:fillViewport="true"
-    android:scrollbars="none"
+    android:background="?android:attr/colorBackground"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical"
     tools:context=".ui.LoginActivity">
 
-    <LinearLayout
+    <include
+        android:id="@+id/toolbar"
+        layout="@layout/view_toolbar" />
+
+    <FrameLayout
+        android:id="@+id/auth_pages"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingHorizontal="@dimen/screen_gutter"
-        android:paddingTop="@dimen/space_16"
-        android:paddingBottom="@dimen/space_24">
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
-        <!-- ==================== TELEGRAM ==================== -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/card_telegram"
+        <include
+            android:id="@+id/gate"
+            layout="@layout/layout_auth_gate"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="@dimen/radius_card"
-            app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            android:layout_height="match_parent" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="@dimen/space_16">
-
-                <TextView
-                    android:id="@+id/tv_tg_headline"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/auth_tg_headline"
-                    android:textAppearance="@style/TextAppearance.App.Title"
-                    android:textColor="?attr/colorOnSurface" />
-
-                <TextView
-                    android:id="@+id/tv_tg_desc"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_8"
-                    android:text="@string/auth_tg_desc"
-                    android:textAppearance="@style/TextAppearance.App.Subtitle"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_telegram"
-                    android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:layout_marginTop="@dimen/space_16"
-                    android:text="@string/auth_btn_telegram"
-                    android:textAllCaps="false"
-                    android:textColor="?attr/colorOnPrimary"
-                    android:textStyle="bold"
-                    app:backgroundTint="?attr/colorPrimary"
-                    app:cornerRadius="26dp"
-                    app:icon="@drawable/ic_telegram_24dp"
-                    app:iconGravity="textStart"
-                    app:iconTint="?attr/colorOnPrimary" />
-
-                <LinearLayout
-                    android:id="@+id/layout_awaiting"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_16"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:visibility="gone"
-                    tools:visibility="visible">
-
-                    <ProgressBar
-                        android:id="@+id/pb_awaiting"
-                        style="?android:attr/progressBarStyle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:indeterminateTint="?attr/colorPrimary" />
-
-                    <TextView
-                        android:id="@+id/tv_awaiting"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_12"
-                        android:gravity="center"
-                        android:text="@string/auth_awaiting"
-                        android:textAppearance="@style/TextAppearance.App.Subtitle"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_restart"
-                        style="?attr/materialButtonOutlinedStyle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_12"
-                        android:text="@string/auth_restart"
-                        android:textAllCaps="false"
-                        android:textColor="?attr/colorPrimary"
-                        app:cornerRadius="26dp"
-                        app:strokeColor="?attr/colorPrimary" />
-                </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- ==================== САЙТ ==================== -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/card_site"
+        <include
+            android:id="@+id/mail"
+            layout="@layout/layout_auth_email"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_16"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="@dimen/radius_card"
-            app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="@dimen/space_16">
-
-                <TextView
-                    android:id="@+id/tv_site_headline"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/auth_site_headline"
-                    android:textAppearance="@style/TextAppearance.App.Title"
-                    android:textColor="?attr/colorOnSurface" />
-
-                <TextView
-                    android:id="@+id/tv_site_desc"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_8"
-                    android:text="@string/auth_site_desc"
-                    android:textAppearance="@style/TextAppearance.App.Subtitle"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
-
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/til_email"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_16"
-                    android:hint="@string/auth_email_hint"
-                    app:boxStrokeColor="?attr/colorPrimary"
-                    app:hintTextColor="?attr/colorPrimary">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/et_email"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:autofillHints="emailAddress"
-                        android:imeOptions="actionNext"
-                        android:inputType="textEmailAddress"
-                        android:maxLines="1" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/til_password"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_12"
-                    android:hint="@string/auth_password_hint"
-                    app:boxStrokeColor="?attr/colorPrimary"
-                    app:endIconMode="password_toggle"
-                    app:endIconTint="?attr/colorOnSurfaceVariant"
-                    app:hintTextColor="?attr/colorPrimary">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/et_password"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:autofillHints="password"
-                        android:imeOptions="actionDone"
-                        android:inputType="textPassword"
-                        android:maxLines="1" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <FrameLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_16">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_site"
-                        android:layout_width="match_parent"
-                        android:layout_height="52dp"
-                        android:text="@string/auth_btn_site"
-                        android:textAllCaps="false"
-                        android:textColor="?attr/colorOnPrimary"
-                        android:textStyle="bold"
-                        app:backgroundTint="?attr/colorPrimary"
-                        app:cornerRadius="26dp" />
-
-                    <ProgressBar
-                        android:id="@+id/pb_site"
-                        style="?android:attr/progressBarStyleSmall"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_gravity="center"
-                        android:indeterminateTint="?attr/colorOnPrimary"
-                        android:visibility="gone"
-                        tools:visibility="visible" />
-                </FrameLayout>
-
-                <!-- Двухфакторный код (TOTP) -->
-                <LinearLayout
-                    android:id="@+id/layout_2fa"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_16"
-                    android:orientation="vertical"
-                    android:visibility="gone"
-                    tools:visibility="visible">
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="?attr/colorOutlineVariant" />
-
-                    <TextView
-                        android:id="@+id/tv_2fa_desc"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_16"
-                        android:text="@string/auth_2fa_desc"
-                        android:textAppearance="@style/TextAppearance.App.Subtitle"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/til_code"
-                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_12"
-                        android:hint="@string/auth_2fa_hint"
-                        app:boxStrokeColor="?attr/colorPrimary"
-                        app:hintTextColor="?attr/colorPrimary">
-
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/et_code"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:imeOptions="actionDone"
-                            android:inputType="number"
-                            android:maxLength="6"
-                            android:maxLines="1" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <FrameLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_12">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btn_confirm_2fa"
-                            android:layout_width="match_parent"
-                            android:layout_height="52dp"
-                            android:text="@string/auth_btn_2fa"
-                            android:textAllCaps="false"
-                            android:textColor="?attr/colorOnPrimary"
-                            android:textStyle="bold"
-                            app:backgroundTint="?attr/colorPrimary"
-                            app:cornerRadius="26dp" />
-
-                        <ProgressBar
-                            android:id="@+id/pb_confirm_2fa"
-                            style="?android:attr/progressBarStyleSmall"
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:layout_gravity="center"
-                            android:indeterminateTint="?attr/colorOnPrimary"
-                            android:visibility="gone"
-                            tools:visibility="visible" />
-                    </FrameLayout>
-                </LinearLayout>
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_register_site"
-                    style="?attr/materialButtonOutlinedStyle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_12"
-                    android:text="@string/auth_register_site"
-                    android:textAllCaps="false"
-                    android:textColor="?attr/colorPrimary"
-                    app:cornerRadius="26dp"
-                    app:strokeColor="?attr/colorPrimary" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <TextView
-            android:id="@+id/tv_error"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_16"
-            android:gravity="center"
-            android:textAppearance="@style/TextAppearance.App.Subtitle"
-            android:textColor="?attr/colorError"
-            android:visibility="gone"
-            tools:text="@string/auth_err_generic"
-            tools:visibility="visible" />
-
-    </LinearLayout>
-</androidx.core.widget.NestedScrollView>
+            android:layout_height="match_parent" />
+    </FrameLayout>
+</LinearLayout>

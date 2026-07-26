@@ -1,21 +1,18 @@
 package com.v2ray.ang.ui
 
-import android.animation.Animator
 import android.animation.ArgbEvaluator
-import android.animation.ObjectAnimator
-import android.animation.PropertyValuesHolder
 import android.animation.ValueAnimator
 import android.content.Intent
 import android.net.Uri
-import android.net.VpnService
 import android.os.Bundle
-import android.os.SystemClock
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import android.view.animation.AnimationUtils
 import android.widget.EditText
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,8 +20,6 @@ import androidx.activity.viewModels
 import androidx.annotation.IdRes
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
-import androidx.core.content.ContextCompat
-import androidx.fragment.app.Fragment
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.MenuCompat
 import androidx.core.view.ViewCompat
@@ -32,73 +27,40 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
+import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.snackbar.Snackbar
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
-import com.v2ray.ang.contracts.MainAdapterListener
-import com.v2ray.ang.core.CoreServiceManager
-import com.v2ray.ang.databinding.ActivityMainBinding
-import com.v2ray.ang.databinding.ItemQrcodeBinding
-import com.v2ray.ang.databinding.LayoutSubscriptionMetaBarBinding
-import com.v2ray.ang.dto.entities.ProfileItem
-import com.v2ray.ang.dto.entities.SubscriptionItem
-import com.v2ray.ang.dto.entities.hasExpiry
-import com.v2ray.ang.dto.entities.hasUserInfo
-import com.v2ray.ang.dto.entities.isExpired
-import com.v2ray.ang.dto.entities.isUnlimited
-import com.v2ray.ang.dto.entities.trafficFraction
-import com.v2ray.ang.dto.entities.usedTraffic
-import com.v2ray.ang.enums.EConfigType
-import com.v2ray.ang.enums.PermissionType
-import android.view.HapticFeedbackConstants
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.view.animation.AnimationUtils
-import androidx.core.view.doOnPreDraw
-import androidx.viewpager2.widget.CompositePageTransformer
-import androidx.viewpager2.widget.MarginPageTransformer
-import androidx.viewpager2.widget.ViewPager2
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.repeatOnLifecycle
-import com.v2ray.ang.auth.AccountRepository
 import com.v2ray.ang.auth.AccountSession
 import com.v2ray.ang.auth.BackendConfig
-import com.v2ray.ang.auth.dto.UserProfileDto
+import com.v2ray.ang.contracts.MainAdapterListener
+import com.v2ray.ang.databinding.ActivityMainBinding
+import com.v2ray.ang.databinding.ItemQrcodeBinding
+import com.v2ray.ang.dto.entities.ProfileItem
+import com.v2ray.ang.enums.EConfigType
+import com.v2ray.ang.enums.PermissionType
 import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
-import com.v2ray.ang.extension.toSpeedString
-import com.v2ray.ang.extension.toTrafficString
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.MmkvManager
-import com.v2ray.ang.template.TemplateManager
 import com.v2ray.ang.handler.SettingsChangeManager
-import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
+import com.v2ray.ang.template.TemplateManager
 import com.v2ray.ang.tv.TvSendActivity
-import com.v2ray.ang.util.AvatarManager
 import com.v2ray.ang.util.FlagUtil
 import com.v2ray.ang.util.LogUtil
-import com.v2ray.ang.util.MemoryStatsManager
-import com.v2ray.ang.util.SubscriptionOrigin
 import com.v2ray.ang.util.Utils
 import com.v2ray.ang.util.animationsEnabled
-import com.v2ray.ang.util.pressHaptic
-import com.v2ray.ang.util.reducedMotion
 import com.v2ray.ang.util.tickHaptic
 import com.v2ray.ang.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * The four bottom-navigation destinations, in bar order.
@@ -108,9 +70,8 @@ import java.util.Locale
  * the `FragmentManager` tag the tab's fragment is added under, which is how a restored instance is
  * found again on recreate instead of being rebuilt from scratch.
  *
- * A tab is a fragment as soon as its stage of the shell split lands. Until then it is still one of
- * the sibling view groups in `activity_main.xml`; both forms are selected through the same
- * [MainHost.selectTab] call, so a caller never has to know which.
+ * Every tab is a fragment in the one `tab_host` container now; `activity_main.xml` holds no tab
+ * content of its own.
  */
 enum class MainTab(@get:IdRes val navId: Int) {
     HOME(R.id.nav_home),
@@ -132,11 +93,16 @@ enum class MainTab(@get:IdRes val navId: Int) {
 /**
  * What a tab fragment is allowed to ask of the shell.
  *
- * [MainActivity] keeps the window, the insets, the bottom bar, the connect state machine and the
- * service binding; a tab owns its own content and reaches the shell only through this interface —
- * never by casting to `MainActivity` and calling into its internals. Shared *state* does not come
- * through here: every tab reads the one `MainViewModel` scoped to the activity
+ * [MainActivity] keeps the window, the insets, the bottom bar, the tab switch, the selected server
+ * and the import/whole-list actions; a tab owns its own content and reaches the shell only through
+ * this interface — never by casting to `MainActivity` and calling into its internals. Shared *state*
+ * does not come through here: every tab reads the one `MainViewModel` scoped to the activity
  * (`BaseFragment.mainViewModel`).
+ *
+ * The three connection calls below are the exception that proves the rule: the connect state
+ * machine lives in [HomeFragment], and the shell forwards to it. That is why Главная is attached
+ * from launch rather than on first visit (see [MainActivity.syncTabFragments]) — a forward that
+ * could land on a fragment that does not exist yet would silently drop a tunnel restart.
  *
  * When a later stage needs something the shell owns and this interface does not expose, add it
  * here rather than widening the cast.
@@ -146,7 +112,7 @@ interface MainHost {
     /** The tab currently on screen. */
     val selectedTab: MainTab
 
-    /** Switches tabs, exactly as tapping the bar item does (repaint, fade-through, haptic). */
+    /** Switches tabs, exactly as tapping the bar item does (repaint, haptic). */
     fun selectTab(tab: MainTab)
 
     /**
@@ -157,12 +123,20 @@ interface MainHost {
 
     /**
      * Stops the running tunnel and starts it again on the currently selected server. Waits for a
-     * real stopped state rather than a fixed delay; see `MainActivity.restartV2Ray`.
+     * real stopped state rather than a fixed delay; see `HomeFragment.restartV2Ray`.
      */
     fun restartConnection()
 
-    /** The shell's transient status pill («Подключение…», «Отключено», …). */
+    /** The transient status pill («Подключение…», «Отключено», …). */
     fun showStatus(text: CharSequence)
+
+    /**
+     * Recomputes the bottom bar's own gates: whether the Аккаунт item exists (signed in only) and
+     * whether the whole bar exists (hidden in the pure onboarding state — signed out AND no
+     * servers). Both read shell state only, so the bar stays the shell's alone; a tab calls this
+     * after doing something that can change either input.
+     */
+    fun refreshNavGates()
 
     /**
      * Bottom padding a tab's scrolling list needs so its last row clears the overlaid bottom nav:
@@ -211,6 +185,17 @@ interface MainHost {
      * and the tab hands it an intent.
      */
     fun launchSettingsScreen(intent: Intent)
+
+    /**
+     * Opens the sign-in / link-Telegram screen through that SAME launcher, so a login that changes
+     * the theme, the core config or the server groups is applied on the way back exactly as a
+     * settings sub-screen is.
+     *
+     * Named apart from [launchSettingsScreen] because it is not a settings sub-screen — the two
+     * share one launcher deliberately, and a later stage that can touch both callers may collapse
+     * them into one honestly-named call.
+     */
+    fun launchAuthScreen(intent: Intent)
 }
 
 class MainActivity : HelperBaseActivity(), MainHost {
@@ -219,13 +204,19 @@ class MainActivity : HelperBaseActivity(), MainHost {
     }
 
     val mainViewModel: MainViewModel by viewModels()
-    private lateinit var homeAdapter: MainRecyclerAdapter
 
     /**
-     * The Серверы tab's fragment, or null until that tab has been opened for the first time — tab
-     * fragments are added lazily (see [syncTabFragments]). Looked up by tag on every access rather
-     * than cached in a field, so the instance the FragmentManager restores after a theme/language
-     * recreate is found too.
+     * The Главная tab's fragment. Attached from launch (see [syncTabFragments]), so this is null
+     * only before `onCreate` has wired the bar and after the activity is gone. Looked up by tag on
+     * every access rather than cached in a field, so the instance the FragmentManager restores
+     * after a theme/language recreate is found too.
+     */
+    private val homeFragment: HomeFragment?
+        get() = supportFragmentManager.findFragmentByTag(MainTab.HOME.tag) as? HomeFragment
+
+    /**
+     * The Серверы tab's fragment, or null until that tab has been opened for the first time — every
+     * tab but Главная is added lazily (see [syncTabFragments]).
      */
     private val serversFragment: ServersFragment?
         get() = supportFragmentManager.findFragmentByTag(MainTab.SERVERS.tag) as? ServersFragment
@@ -233,9 +224,9 @@ class MainActivity : HelperBaseActivity(), MainHost {
     /**
      * The Серверы tab's adapter, or null while that tab has no view.
      *
-     * The shell still owns the selected server, because Главная renders the same servers from
-     * [homeAdapter] and one selection has to reach both lists. That is the only reason this reaches
-     * into a tab at all; when Главная moves to its own fragment the two adapters go with it.
+     * The shell owns the selected server, because Главная renders the same servers from a second
+     * adapter and one selection has to reach both lists. This is the Серверы half of that mirror;
+     * the Главная half is reached through [HomeFragment.onSelectedServerChanged].
      */
     private val serversAdapter: MainRecyclerAdapter?
         get() = serversFragment?.listAdapter
@@ -247,138 +238,27 @@ class MainActivity : HelperBaseActivity(), MainHost {
 
     /** Last computed bottom-nav padding for a tab's scrolling list; see [MainHost.listBottomInset]. */
     private var navListPadding = 0
-    // Home server list collapse state, toggled by the meta-bar chevron.
-    private var homeListCollapsed = false
-
-    // Home provider meta-bar carousel: one page per subscription.
-    private lateinit var homeMetaAdapter: HomeMetaPagerAdapter
-    private var homeMetaSubIds: List<String> = emptyList()
-    private var homeMetaPage = 0
-
-    // Tracks the last observed signed-in state so the post-login auto-import fires only on a real
-    // logged-out -> logged-in transition, not on every state replay. Seeded from the persisted
-    // session so a returning (already signed-in) user is not treated as a fresh login.
-    private var accountLoggedIn = AccountSession.isLoggedIn()
-    // The "link Telegram" home CTA is dismissible for the current session.
-    private var ctaDismissed = false
 
     private val shareMethod: Array<out String> by lazy { resources.getStringArray(R.array.share_method) }
     private val shareMethodMore: Array<out String> by lazy { resources.getStringArray(R.array.share_method_more) }
 
-    private val timerHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private var connectionStartTime = 0L
-
-    // Custom gray status toast (VPN state). Kept so a new one can cancel the previous
-    // instead of queueing behind it.
-    private var statusToast: android.widget.Toast? = null
-    // Tracks the last delivered running state so status toasts only fire on a real
-    // transition (not on the LiveData value replay after a rotation/theme recreate).
-    private var lastRunningState: Boolean? = null
-    // True between a connect tap and the definitive running/failed result, so a start that
-    // ends in "not running" is reported as a failure rather than a silent revert.
-    private var connectInProgress = false
-
-    // Gentle breathing pulse on the shield while the tunnel is establishing.
-    private var connectPulse: Animator? = null
-    // The rotating connect arc is shared by the "connecting" state and subscription
-    // loading; these track who currently wants it visible so neither hides the other's.
-    private var connectArcConnecting = false
-    private var connectArcSubLoads = 0
-
-    // Cached easing curves (loaded once) so the imperative hero/nav motion rides the same
-    // ease-out tempo as the declarative res/interpolator + res/anim resources. No bounce.
-    private val easeOutQuart by lazy { AnimationUtils.loadInterpolator(this, R.interpolator.ease_out_quart) }
-    private val easeOutQuint by lazy { AnimationUtils.loadInterpolator(this, R.interpolator.ease_out_quint) }
+    // Cached easing curve (loaded once) so the imperative nav motion rides the same ease-out tempo
+    // as the declarative res/interpolator + res/anim resources. No bounce.
     private val easeStandard by lazy { AnimationUtils.loadInterpolator(this, R.interpolator.ease_standard) }
 
-    // Shared motion durations (ms), read from the res/values/motion.xml tempo tokens.
-    private val durPressIn get() = resources.getInteger(R.integer.motion_press_in).toLong()
-    private val durPressOut get() = resources.getInteger(R.integer.motion_press_out).toLong()
-    private val durState get() = resources.getInteger(R.integer.motion_state).toLong()
-    private val durReveal get() = resources.getInteger(R.integer.motion_reveal).toLong()
-    private val durStagger get() = resources.getInteger(R.integer.motion_stagger).toLong()
-
-    // The reveal stagger plays once per list, on first populated bind — never again on
-    // scroll or a later notify (see revealListStagger). The Серверы tab keeps its own flag,
-    // next to the list it belongs to.
-    private var homeListRevealed = false
-
-    // Auto-fallback: one-shot post-connect health check that switches to the fastest
-    // working server if the current tunnel doesn't actually pass traffic.
-    // The "already fired this session" flag lives in the ViewModel (autoFallbackUsed).
-    private var healthCheckPending = false
-    // True while the confirmation re-probe is armed or in flight. A single negative probe is not
-    // evidence that the tunnel is dead — one dropped packet on a fine connection would otherwise
-    // tear the user off a working server — so the fallback needs two consecutive failures.
-    private var healthCheckConfirming = false
-    private val healthCheckRunnable = Runnable {
-        if (mainViewModel.isRunning.value == true) {
-            healthCheckPending = true
-            mainViewModel.testCurrentServerRealPing()
-        }
-    }
-    // The confirmation probe. Re-checks the same conditions as the first one, so a tunnel the user
-    // stopped meanwhile — or a fallback that already fired — cannot be probed back into action.
-    private val healthRecheckRunnable = Runnable {
-        if (mainViewModel.isRunning.value == true && !mainViewModel.autoFallbackUsed) {
-            healthCheckPending = true
-            mainViewModel.testCurrentServerRealPing()
-        }
-    }
-
-    // Connect watchdog: if a start neither succeeds nor reports a failure within the timeout
-    // (e.g. the core/daemon process crashed without broadcasting any state), recover the UI to
-    // idle instead of hanging forever on "Подключение…".
-    private val connectWatchdogRunnable = Runnable {
-        if (mainViewModel.isRunning.value != true) {
-            // Render idle through the existing state path and tell the user the start failed.
-            connectInProgress = false
-            applyRunningState(isLoading = false, isRunning = false)
-            showStatusToast(getString(R.string.toast_status_failed))
-        }
-    }
-
-    // Live app-memory card (home), refreshed every 2s while the activity is visible.
-    private val memoryRunnable = object : Runnable {
-        override fun run() {
-            updateMemoryCard()
-            timerHandler.postDelayed(this, 2000L)
-        }
-    }
-
     private companion object {
-        const val KEY_CONNECTION_START = "cache_connection_start_time"
-        const val HEALTH_CHECK_DELAY_MS = 7000L
-        // Gap before the confirmation re-probe: long enough for a momentary DNS/test-URL hiccup
-        // to pass, short enough that a genuinely dead tunnel is not endured.
-        const val HEALTH_CHECK_RECHECK_MS = 2000L
-        // Upper bound for a connect attempt before the UI gives up and returns to idle.
-        const val CONNECT_TIMEOUT_MS = 20000L
-        // A restart must not start the new core until the daemon process reports the old one
-        // stopped; these bound that wait.
-        const val RESTART_STOP_TIMEOUT_MS = 6000L
-        const val RESTART_STOP_POLL_MS = 50L
         // Remembers which bottom-nav tab was selected so it survives an activity
         // recreate (theme/language change) instead of snapping back to Home.
         const val KEY_SELECTED_NAV = "selected_bottom_nav"
-
-        // The cold-start shield "assemble" plays once per process, not on every
-        // theme/language recreate. Static so it survives the activity instance.
-        private var heroAssembled = false
     }
 
-    private val requestVpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        if (it.resultCode == RESULT_OK) {
-            startV2Ray()
-        }
-    }
     private val requestActivityLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (SettingsChangeManager.consumeRecreateUi()) {
             recreate()
             return@registerForActivityResult
         }
         if (SettingsChangeManager.consumeRestartService() && mainViewModel.isRunning.value == true) {
-            restartV2Ray()
+            restartConnection()
         }
         if (SettingsChangeManager.consumeSetupGroupTab()) {
             mainViewModel.reloadServerList()
@@ -396,10 +276,10 @@ class MainActivity : HelperBaseActivity(), MainHost {
      */
     private val createServerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (SettingsChangeManager.consumeRestartService() && mainViewModel.isRunning.value == true) {
-            restartV2Ray()
+            restartConnection()
         }
         mainViewModel.reloadServerList()
-        updateSelectedServer()
+        homeFragment?.refreshSelectedServer()
     }
 
 
@@ -409,20 +289,20 @@ class MainActivity : HelperBaseActivity(), MainHost {
         applyThemeDecorations()
         setupEdgeToEdge()
 
-        // The redesigned Home always shows the inline up/down speed row, so the traffic-stats
-        // pipeline must be on: without this the core config omits the stats outbound and the
-        // speed-notification loop never runs, so the row is stuck on «0 KB/s». Enabling it here
-        // (before any connect) makes real speed flow through updateSpeedAction while connected.
+        // Главная always shows the inline up/down speed row, so the traffic-stats pipeline must be
+        // on: without this the core config omits the stats outbound and the speed-notification loop
+        // never runs, so the row is stuck on «0 KB/s». Enabled here, in the shell, because it has to
+        // be true before ANY connect — including one started from the quick-settings tile, which
+        // never opens a tab.
         MmkvManager.encodeSettings(AppConfig.PREF_SPEED_ENABLED, true)
 
         // All servers are shown in one flat, provider-grouped list (no subscription tabs).
         mainViewModel.subscriptionId = ""
-        setupHomeServerList()
 
         // Keep the user on the tab they were on when the activity is recreated (e.g. after a theme
         // or language change) instead of jumping back to Home. Handed to setupBottomNav so the
         // restored tab is the FIRST one painted: selecting Home and then correcting it would run
-        // two fragment transactions and a fade-through the user never asked for.
+        // two fragment transactions and a tab swap the user never asked for.
         setupBottomNav(savedInstanceState?.getInt(KEY_SELECTED_NAV, R.id.nav_home) ?: R.id.nav_home)
         // The one BACK handler in the shell: any other tab goes to Главная first, and Главная
         // minimises. See onKeyDown for why nothing else may handle the key.
@@ -439,39 +319,11 @@ class MainActivity : HelperBaseActivity(), MainHost {
             }
         })
 
-        binding.cardConnect.setOnClickListener {
-            animateConnectPress()
-            handleFabAction()
-        }
-
-        // Scrolling Home "+" opens the same add menu the toolbar "+" used (menu_main via PopupMenu).
-        binding.btnHomeAdd.setOnClickListener { showImportMenu(it) }
-
-        setupHomeMetaPager()
-        setupHomeEmptyState()
-        setupAccountHeader()
         setupViewModel()
         SubscriptionUpdater.sync()
         mainViewModel.reloadServerList()
 
-        playColdStartAssemble()
-
         checkAndRequestPermission(PermissionType.POST_NOTIFICATIONS) {
-        }
-    }
-
-    /**
-     * Cold-start "assemble": the connect hero scales up from 0.9 and fades in (~400ms, ease-out)
-     * as the screen settles — once per process, guarded by a static flag so a theme/language
-     * recreate doesn't replay it. Reduced motion / animations-off: the hero stays at its rest
-     * state, nothing plays.
-     */
-    private fun playColdStartAssemble() {
-        if (heroAssembled) return
-        heroAssembled = true
-        if (binding.heroFrame.reducedMotion()) return
-        binding.heroFrame.doOnPreDraw {
-            it.startAnimation(AnimationUtils.loadAnimation(this, R.anim.shield_assemble))
         }
     }
 
@@ -482,9 +334,8 @@ class MainActivity : HelperBaseActivity(), MainHost {
     }
 
     /**
-     * Wires the bottom navigation and paints [initialNav] as the first tab on screen: Главная shows
-     * the connect hero from its sibling view group, and Серверы, Аккаунт and Настройки are
-     * fragments in the shared container.
+     * Wires the bottom navigation and paints [initialNav] as the first tab on screen. Every tab is
+     * a fragment in the shared container; Главная is attached here whichever tab is showing.
      */
     private fun setupBottomNav(initialNav: Int) {
         // The custom bar is a plain LinearLayout with no fitsSystemWindows behaviour, so it never
@@ -498,14 +349,14 @@ class MainActivity : HelperBaseActivity(), MainHost {
         binding.navAccount.setOnClickListener { selectNav(R.id.nav_account) }
         // Аккаунт exists only while signed in, so a restored selection of it is honoured only if
         // that is still true — otherwise the tab would be attached (and would start loading) for a
-        // user updateAccountGate is about to move off it anyway.
+        // user refreshNavGates is about to move off it anyway.
         val start = if (initialNav == R.id.nav_account && !accountAccessAllowed()) {
             R.id.nav_home
         } else {
             initialNav
         }
-        // Not selectNav: the first paint has nothing to fade FROM, so it takes showTab's instant
-        // path (previous == tab) and lands on the restored tab in one transaction.
+        // Not selectNav: the first paint is not a tab CHANGE, so it takes showTab's previous == tab
+        // path (no haptic) and lands on the restored tab in one transaction.
         selectedNavId = start
         updateNavSelection(start)
         showTab(start, start)
@@ -529,11 +380,29 @@ class MainActivity : HelperBaseActivity(), MainHost {
 
     override fun selectTab(tab: MainTab) = selectNav(tab.navId)
 
-    override fun toggleConnection() = handleFabAction()
+    // The connect state machine lives in Главная (HomeFragment), which is attached from launch, so
+    // these three forwards always land — see MainHost's own note.
+    override fun toggleConnection() {
+        homeFragment?.toggleConnection()
+    }
 
-    override fun restartConnection() = restartV2Ray()
+    override fun restartConnection() {
+        homeFragment?.restartConnection()
+    }
 
-    override fun showStatus(text: CharSequence) = showStatusToast(text)
+    override fun showStatus(text: CharSequence) {
+        homeFragment?.showStatus(text)
+    }
+
+    /**
+     * The Аккаунт item exists only while signed in, and the whole bar only once there is something
+     * to navigate to. Both inputs are shell state, so both are computed here; see [updateAccountNav]
+     * and [updateBottomNavVisibility].
+     */
+    override fun refreshNavGates() {
+        updateAccountNav()
+        updateBottomNavVisibility()
+    }
 
     override val listBottomInset: Int
         get() = navListPadding
@@ -558,6 +427,23 @@ class MainActivity : HelperBaseActivity(), MainHost {
 
     override fun launchSettingsScreen(intent: Intent) {
         requestActivityLauncher.launch(intent)
+    }
+
+    override fun launchAuthScreen(intent: Intent) {
+        requestActivityLauncher.launch(intent)
+    }
+
+    /**
+     * Routes subscription add/refresh progress onto Главная's connect circle (the shared rotating
+     * arc) instead of a top progress bar — the shell's own imports and bulk actions report through
+     * the same indicator the tab uses. Overrides the BaseActivity top-bar spinner.
+     */
+    override fun showLoading() {
+        runOnUiThread { homeFragment?.showConnectArc() }
+    }
+
+    override fun hideLoading() {
+        runOnUiThread { homeFragment?.hideConnectArc() }
     }
 
     /**
@@ -641,29 +527,20 @@ class MainActivity : HelperBaseActivity(), MainHost {
     }
 
     /**
-     * The fragment that owns [tab], or null while that tab is still one of the sibling view groups
-     * in `activity_main.xml`.
+     * The fragment that owns [tab].
      *
      * Called ONLY when the FragmentManager has no instance under [MainTab.tag] — a tab is built
      * once per process and then kept, so this is not a place to pass per-open arguments.
      *
-     * Аккаунт, Серверы and Настройки have moved. Moving Главная is four steps, in this order:
-     * 1. write the fragment as a `BaseFragment<VB>` (it gets `mainViewModel` and `mainHost` from
-     *    there — it does not cast the activity, and it does not own a second `MainViewModel`),
-     * 2. add its branch here,
-     * 3. point that tab's [tabGroup] entry at `binding.tabHost`, and
-     * 4. delete its sibling group from `activity_main.xml` and its entry from [tabGroups], which
-     *    is the list [settleTabs] treats as the complete set of tab-content views.
-     *
-     * Anything the moved screen needs from the shell — the connect actions, the status pill, the
-     * list inset, the row actions, the settings result launcher — is added to [MainHost], not
-     * reached for by casting.
+     * Every tab is a fragment now. Anything a tab needs from the shell — the connection actions,
+     * the status pill, the nav gates, the list inset, the row actions, the result launchers — is on
+     * [MainHost], never reached for by casting.
      */
-    private fun createTabFragment(tab: MainTab): Fragment? = when (tab) {
+    private fun createTabFragment(tab: MainTab): Fragment = when (tab) {
+        MainTab.HOME -> HomeFragment()
         MainTab.ACCOUNT -> AccountFragment()
         MainTab.SERVERS -> ServersFragment()
         MainTab.SETTINGS -> SettingsTabFragment()
-        MainTab.HOME -> null
     }
 
     /**
@@ -674,20 +551,20 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * rebuilt on the way back, which throws away scroll position, a half-typed field and any
      * request still in flight; hide/show leaves the view hierarchy and the fragment's lifecycle
      * state untouched, so returning to a tab returns to it exactly as it was left. Hidden
-     * fragments stay RESUMED, which is also what the previous "toggle the container's visibility"
-     * code did, so nothing that was running keeps running any differently.
+     * fragments stay RESUMED, so nothing that was running keeps running any differently.
+     *
+     * **Главная is the exception to lazy attachment**: it is added on the very first call whatever
+     * tab is selected, hidden if that tab is not it. It carries the connect state machine — the
+     * tunnel observer, the status pill, the health check and the restart the Настройки tab asks for
+     * after a core-config change — and none of that may wait for the user to visit the tab. A
+     * theme/language recreate that restores a non-Главная tab would otherwise leave the app with no
+     * state machine at all.
      *
      * On a theme/language recreate the FragmentManager restores each tab's fragment (and its
      * hidden flag) under the same tag before this runs, so the lookup finds the restored instance
      * and [createTabFragment] is never called for it.
-     *
-     * [keepShown] spares one tab's fragment from being hidden. `hide()` puts the fragment's view at
-     * GONE inside this very `commitNow`, so hiding the tab the user is LEAVING before its fade-out
-     * has played empties the container instantly and leaves 150 ms of bare background fading out
-     * where its content should still be. [showTab] therefore defers that one hide to the end of the
-     * fade ([hideTabFragment]); every other tab is still hidden here and now.
      */
-    private fun syncTabFragments(navId: Int, keepShown: Int? = null) {
+    private fun syncTabFragments(navId: Int) {
         val fm = supportFragmentManager
         // After onSaveInstanceState a commit is illegal; the restored activity will re-run this
         // from its own onCreate, so there is nothing to lose by skipping it.
@@ -698,151 +575,68 @@ class MainActivity : HelperBaseActivity(), MainHost {
             val existing = fm.findFragmentByTag(candidate.tag)
             if (candidate.navId == navId) {
                 if (existing == null) {
-                    val fragment = createTabFragment(candidate) ?: continue
-                    tx.add(R.id.tab_host, fragment, candidate.tag)
+                    tx.add(R.id.tab_host, createTabFragment(candidate), candidate.tag)
                     changed = true
                 } else if (existing.isHidden) {
                     tx.show(existing)
                     changed = true
                 }
-            } else if (existing != null && !existing.isHidden && candidate.navId != keepShown) {
+            } else if (existing == null) {
+                // Only Главная is attached without being selected; every other tab waits for its
+                // first visit. Added and hidden in this same transaction, so it is never on screen.
+                if (candidate != MainTab.HOME) continue
+                val fragment = createTabFragment(candidate)
+                tx.add(R.id.tab_host, fragment, candidate.tag)
+                tx.hide(fragment)
+                changed = true
+            } else if (!existing.isHidden) {
                 tx.hide(existing)
                 changed = true
             }
         }
-        // commitNow, not commit: the tab swap below reads and animates the container in this same
-        // frame, and a posted transaction would show it empty for one frame first.
+        // commitNow, not commit: the tab swap below reads the container in this same frame, and a
+        // posted transaction would show it empty for one frame first.
         if (changed) tx.commitNow()
     }
 
     /**
-     * Hides the fragment of the tab that has just finished fading out — the half of
-     * [syncTabFragments] that [showTab] deferred so the fade had something to fade.
-     *
-     * Skipped when [navId] is the selected tab again: a swap back inside the 150 ms leaves that tab
-     * on screen, and hiding it here would blank the tab the user is now looking at. Hiding an
-     * already-hidden fragment (a newer swap got there first) is a no-op rather than a second
-     * transaction.
-     */
-    private fun hideTabFragment(navId: Int) {
-        if (navId == selectedNavId) return
-        val fm = supportFragmentManager
-        if (fm.isStateSaved) return
-        val fragment = MainTab.fromNavId(navId)?.let { fm.findFragmentByTag(it.tag) } ?: return
-        if (fragment.isHidden) return
-        fm.beginTransaction().hide(fragment).commitNow()
-    }
-
-    /**
-     * The tab-content view for a nav id (null for an unknown id): either the tab's own sibling
-     * group, or the shared fragment container for a tab that has already been moved to a fragment.
+     * The tab-content view for a nav id (null for an unknown id). All four tabs are fragments in
+     * the one container, so this answers the same view for each — it stays a lookup because
+     * [showTab] must still tell a real tab id from an unknown one.
      */
     private fun tabGroup(navId: Int): View? = when (navId) {
-        R.id.nav_home -> binding.groupHome
-        R.id.nav_servers -> binding.tabHost
-        R.id.nav_settings -> binding.tabHost
-        R.id.nav_account -> binding.tabHost
+        R.id.nav_home, R.id.nav_servers, R.id.nav_settings, R.id.nav_account -> binding.tabHost
         else -> null
     }
 
     /** Every tab-content view the shell can show, so exactly one is left visible. */
-    private fun tabGroups(): List<View> = listOf(
-        binding.groupHome,
-        binding.tabHost,
-    )
+    private fun tabGroups(): List<View> = listOf(binding.tabHost)
 
     /**
-     * Id of the tab swap currently in flight, bumped by every swap and by every instant settle.
-     *
-     * A swap started while an earlier one is still fading SUPERSEDES it, and the earlier swap's
-     * end action must not then paint the tab the user has already moved on from. `withEndAction`
-     * cannot be relied on for that: it does not run at all when its animator is cancelled, and the
-     * newer swap's fade-in cancels the older one by touching the same property on the same view.
-     * So the older action still runs and has to recognise, from this counter, that it is stale.
-     */
-    private var tabSwapId = 0
-
-    /**
-     * Takes one tab group off screen and clears whatever a superseded swap left on it — the
-     * running animator, a part-way alpha, the 8dp entrance offset.
-     */
-    private fun hideTabGroup(group: View) {
-        group.animate().cancel()
-        group.alpha = 1f
-        group.translationY = 0f
-        group.isVisible = false
-    }
-
-    /**
-     * The single authority on which tab group is on screen: [visible] is shown at rest and every
-     * other group is hidden and reset. Bumping [tabSwapId] here is what stops an in-flight swap's
-     * end action from repainting over this.
+     * The single authority on which tab group is on screen: [visible] is shown and every other
+     * group is hidden.
      */
     private fun settleTabs(visible: View?) {
-        tabSwapId++
-        tabGroups().forEach { group ->
-            if (group === visible) {
-                group.animate().cancel()
-                group.alpha = 1f
-                group.translationY = 0f
-                group.isVisible = true
-            } else {
-                hideTabGroup(group)
-            }
-        }
+        tabGroups().forEach { it.isVisible = it === visible }
     }
 
+    /**
+     * Swaps the tab content: the incoming tab's fragment is added or shown and every other one is
+     * hidden, in a single transaction.
+     *
+     * There is no crossfade left to run. With all four tabs inside `tab_host` the outgoing and
+     * incoming views are the same container, so the old group-level fade had nothing to fade
+     * between; the pair of fragments inside it can be crossfaded instead, but that is a motion
+     * change and belongs to the stage that owns motion (32-master-plan-android.md 9.3 asks for a
+     * simultaneous 220 ms crossfade for every tab switch). The tick haptic that marked a switch is
+     * kept, so the change is still felt.
+     */
     private fun showTab(tab: Int, previous: Int = tab) {
-        // Which views take part is decided from the id map alone, so it is known BEFORE the
-        // fragment transaction — and the transaction needs the answer (see keepShown below).
         val incoming = tabGroup(tab)
-        // Two tabs that live in the same fragment container share one view: syncTabFragments
-        // swaps the content inside it, so there is nothing to fade BETWEEN and fading the
-        // container out and back in would just blink the new tab.
-        val outgoing = tabGroup(previous)?.takeIf { previous != tab && it !== incoming }
-
-        // Instant swap on the initial paint, a same-tab reselect, or reduced motion. Nothing fades,
-        // so nothing is held back: the outgoing fragment is hidden in the same transaction as the
-        // incoming one is shown, which is what keeps two tabs that share the fragment container
-        // (any move among Серверы / Аккаунт / Настройки) from being on screen at once.
-        if (incoming == null || outgoing == null || binding.homeRoot.reducedMotion()) {
-            syncTabFragments(tab)
-            settleTabs(incoming)
-            maybeRevealServersTab(tab)
-            return
-        }
-
-        // A real fade-through: attach/show the incoming tab now, but leave the outgoing tab's
-        // fragment shown until its fade-out has played (see syncTabFragments / hideTabFragment).
-        syncTabFragments(tab, keepShown = previous)
-
-        // Every group that takes no part in THIS swap is settled now, whatever a superseded swap
-        // left it at. Without this a fast A -> B -> C leaves B composited over C for good.
-        tabGroups().forEach { if (it !== incoming && it !== outgoing) hideTabGroup(it) }
-
-        // Fade-through: the outgoing group fades out (150ms), then the incoming group fades in
-        // while rising 8dp (200ms). A light tick marks the change.
-        binding.bottomNav.tickHaptic()
-        val dy = 8f * resources.displayMetrics.density
-        val swap = ++tabSwapId
-        outgoing.animate().cancel()
-        outgoing.animate().alpha(0f).setDuration(150).setInterpolator(easeStandard).withEndAction {
-            // The outgoing group is leaving either way — this swap is taking it off screen, and a
-            // newer one is not bringing it back as an incoming without showing it itself.
-            hideTabGroup(outgoing)
-            // The fade is over, so the hide that syncTabFragments held back can land now. Cheap and
-            // guarded: a no-op unless the tab being left is a fragment that is still shown.
-            hideTabFragment(previous)
-            // Superseded: a later swap owns what is on screen, and painting this one's incoming
-            // now would show the tab the user has already moved off.
-            if (swap != tabSwapId) return@withEndAction
-            incoming.alpha = 0f
-            incoming.translationY = dy
-            incoming.isVisible = true
-            incoming.animate().alpha(1f).translationY(0f)
-                .setDuration(200).setInterpolator(easeOutQuint).start()
-            maybeRevealServersTab(tab)
-        }.start()
+        syncTabFragments(tab)
+        settleTabs(incoming)
+        if (previous != tab) binding.bottomNav.tickHaptic()
+        maybeRevealServersTab(tab)
     }
 
     /**
@@ -866,10 +660,9 @@ class MainActivity : HelperBaseActivity(), MainHost {
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             // There is no app bar: every tab draws its own header, so each tab's content clears the
             // status bar itself — the Home scroll header, and the Settings first section, both start
-            // just below the clock with no empty band above them.
-            binding.groupHome.updatePadding(top = bars.top)
-            // The fragment container is padded once, here, on behalf of every tab it hosts — a tab
-            // fragment does not repeat the top inset for itself.
+            // just below the clock with no empty band above them. The fragment container is padded
+            // once, here, on behalf of every tab it hosts — a tab fragment does not repeat the top
+            // inset for itself.
             binding.tabHost.updatePadding(top = bars.top)
             // Pad the custom bar by the FULL bottom inset so its icons/labels sit ABOVE whatever the
             // system draws: the ~48dp of Android 3-button navigation, or the ~24dp gesture pill. The
@@ -883,121 +676,34 @@ class MainActivity : HelperBaseActivity(), MainHost {
             val navHeightPx = (56 * density).toInt()
             val breathingPx = (16 * density).toInt()
             val navPad = bars.bottom + navHeightPx + breathingPx
-            binding.rvHomeServers.updatePadding(bottom = navPad)
             // Published for the tabs that own their own lists (see MainHost.listBottomInset) and
-            // pushed straight into the one that is already on screen — insets are not re-dispatched
-            // just because a fragment was added, and a fragment added later reads the field itself.
+            // pushed straight into the ones already attached — insets are not re-dispatched just
+            // because a fragment was added, and a fragment added later reads the field itself.
             navListPadding = navPad
+            homeFragment?.applyListInsets()
             serversFragment?.applyListInsets()
             insets
         }
     }
 
+    /**
+     * The shell's own ViewModel wiring: the service broadcast listener, the bundled assets, and the
+     * one list signal that has to reach TWO tabs. Everything a single tab cares about — the speed
+     * feed, the tunnel state, the latency results — is observed by that tab.
+     */
     private fun setupViewModel() {
-        mainViewModel.updateListAction.observe(this) { index -> refreshServerLists(index ?: -1) }
-        mainViewModel.updateSpeedAction.observe(this) { (down, up) ->
-            binding.tvDownloadSpeed.text = down.toSpeedString()
-            binding.tvUploadSpeed.text = up.toSpeedString()
-        }
-        mainViewModel.fastConnectAction.observe(this) { guid ->
-            // One-shot event: ignore the retained value replayed on recreate/rotation.
-            if (!mainViewModel.consumeFastConnectEvent()) return@observe
-            if (guid == null) {
-                // No candidate, so no restart follows — the fallback attempt is over.
-                mainViewModel.fallbackInProgress = false
-                connectInProgress = false
-                showStatusToast(getString(R.string.toast_status_failed))
-                return@observe
-            }
-            updateSelectedServer()
-            if (mainViewModel.isRunning.value == true) {
-                restartV2Ray()
-            } else {
-                // The tunnel went down while the fallback was still testing, so there is no
-                // internal stop left for the disconnect handler to protect.
-                mainViewModel.fallbackInProgress = false
-                // Mark the attempt so a failed fast-connect is reported as «Не удалось подключиться».
-                connectInProgress = true
-                applyRunningState(isLoading = true, isRunning = false)
-                scheduleConnectWatchdog()
-                startVpnWithPermission()
-            }
-        }
-        mainViewModel.isRunning.observe(this) { isRunning ->
-            // A definitive running/stopped state arrived (success or failure): the connect
-            // attempt is over, so the watchdog is no longer needed.
-            cancelConnectWatchdog()
-            // Play the signature confirm/reverse ONLY on a genuine live transition — a connect the
-            // user just triggered (connectInProgress), or a real running-state flip. Never on the
-            // LiveData replay at launch (prev == null, no connect in progress), which jumps to end.
-            val prevRunning = lastRunningState
-            val liveTransition = connectInProgress || (prevRunning != null && prevRunning != isRunning)
-            applyRunningState(false, isRunning, animate = liveTransition)
-            if (isRunning) scheduleHealthCheckIfEnabled() else cancelHealthCheck()
-
-            // Subtle gray status toast, fired only on a genuine transition. LiveData replays
-            // its last value on rotation/theme recreate, and the state present at launch must
-            // not toast, so a connected/disconnected toast needs a known prior state (or an
-            // in-progress connect for the "connected"/"failed" cases).
-            val prev = lastRunningState
-            if (isRunning) {
-                if (connectInProgress || prev == false) {
-                    showStatusToast(getString(R.string.toast_status_connected))
-                }
-            } else {
-                when {
-                    connectInProgress -> showStatusToast(getString(R.string.toast_status_failed))
-                    prev == true -> showStatusToast(getString(R.string.toast_status_disconnected))
-                }
-            }
-            connectInProgress = false
-            lastRunningState = isRunning
-        }
-        mainViewModel.delayResultAction.observe(this) { time ->
-            if (!healthCheckPending) return@observe
-            healthCheckPending = false
-            if (!MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_FALLBACK, true)) return@observe
-            if (mainViewModel.autoFallbackUsed || mainViewModel.isRunning.value != true) return@observe
-            if (time >= 0) {
-                // The tunnel answered: whatever the earlier probe hit was transient.
-                healthCheckConfirming = false
-                return@observe
-            }
-            if (!healthCheckConfirming) {
-                // First failure only asks again — a working server must not be abandoned on one blip.
-                healthCheckConfirming = true
-                timerHandler.postDelayed(healthRecheckRunnable, HEALTH_CHECK_RECHECK_MS)
-                return@observe
-            }
-            // Second consecutive failure: the tunnel really isn't passing traffic.
-            healthCheckConfirming = false
-            // Mark used BEFORE restarting so the restart's own START_SUCCESS doesn't re-arm.
-            mainViewModel.autoFallbackUsed = true
-            // The stop→start that follows is ours, not a user disconnect.
-            mainViewModel.fallbackInProgress = true
-            toast(getString(R.string.auto_fallback_switching))
-            // Exclude the server that just failed so we don't switch back to it.
-            mainViewModel.fastConnect(excludeGuid = MmkvManager.getSelectServer())
+        mainViewModel.updateListAction.observe(this) { index ->
+            val position = index ?: -1
+            // Both server lists are driven by the one cache; each tab rebinds its own, and a tab
+            // that has no view yet paints itself from the same cache when it gets one.
+            serversFragment?.bindList(position)
+            homeFragment?.bindList(position)
+            // Adding or removing a subscription can change whether there is anything to navigate
+            // to, and (with a departament subscription) whether the Аккаунт item belongs there.
+            refreshNavGates()
         }
         mainViewModel.startListenBroadcast()
         mainViewModel.initAssets(assets)
-    }
-
-    /**
-     * Creates the Home server list (flat, no section headers), driven by the same all-servers cache
-     * as the Серверы tab. That tab's list is created by [ServersFragment]; both are wired to the
-     * one [adapterListener], so a row behaves identically wherever it is shown.
-     */
-    private fun setupHomeServerList() {
-        homeAdapter = MainRecyclerAdapter(mainViewModel, adapterListener)
-        binding.rvHomeServers.setHasFixedSize(false)
-        binding.rvHomeServers.layoutManager = LinearLayoutManager(this)
-        binding.rvHomeServers.isNestedScrollingEnabled = false
-        addCustomDividerToRecyclerView(binding.rvHomeServers, this, R.drawable.custom_divider)
-        binding.rvHomeServers.adapter = homeAdapter
-
-        // Long-press a server row -> Incy server-actions bottom sheet (S3 moved inline actions here).
-        homeAdapter.onItemLongClick = { guid -> showServerActions(guid) }
     }
 
     /**
@@ -1101,51 +807,6 @@ class MainActivity : HelperBaseActivity(), MainHost {
     }
 
     /**
-     * Home empty state (shown when no subscriptions/servers exist yet). The Серверы tab's empty
-     * state is wired by [ServersFragment].
-     */
-    private fun setupHomeEmptyState() {
-        binding.layoutHomeEmpty.btnHomeAddQr.setOnClickListener { importQRcode() }
-        binding.layoutHomeEmpty.btnHomeAddClipboard.setOnClickListener { importClipboard() }
-        // Signed-in + no-subscription CTAs: buy a subscription (bound to the account) / link Telegram.
-        binding.layoutHomeEmpty.btnHomeBuy.setOnClickListener {
-            startActivity(Intent(this, BuyTariffActivity::class.java))
-        }
-        binding.layoutHomeEmpty.btnHomeLinkTg.setOnClickListener { openTelegramLink() }
-    }
-
-    /**
-     * On Home, when there are no servers show ONLY the empty-state card (two add buttons)
-     * and hide both the provider meta bar and the server list; otherwise show the list
-     * (respecting the chevron collapse state) and let [bindMetaBar] own the meta bar.
-     */
-    private fun updateHomeEmptyState() {
-        val empty = mainViewModel.serversCache.isEmpty()
-        binding.layoutHomeEmpty.homeEmptyRoot.isVisible = empty
-        // The big connect shield only makes sense once there's a subscription to connect to.
-        binding.cardHero.isVisible = !empty
-        // Empty onboarding state: show the welcome heading and center the block with the two
-        // weighted spacers; hide the top stats row (↑/timer/↓ + "+") since nothing is running.
-        // Servers present: heading + spacers gone -> content restores its normal top alignment.
-        binding.tvHomeWelcome.isVisible = empty
-        binding.homeEmptySpacerTop.isVisible = empty
-        binding.homeEmptySpacerBottom.isVisible = empty
-        binding.homeStatsRow.isVisible = !empty
-        updateOnboardingLogin()
-        updateBottomNavVisibility()
-        if (empty) {
-            binding.groupHomeMeta.isVisible = false
-            binding.rvHomeServers.isVisible = false
-            // Nothing selectable: neutral under-shield label, not a stale server name.
-            if (mainViewModel.isRunning.value != true) {
-                binding.tvConnectionStatus.text = getString(R.string.home_select_server)
-            }
-        } else {
-            applyHomeListVisibility()
-        }
-    }
-
-    /**
      * Hides the whole bottom nav (bar + scrim) in the pure onboarding state — signed out AND no
      * servers — so the sign-in screen reads as a clean solid background with no tab buttons. It
      * returns as soon as EITHER is true (logged in OR at least one server). The nav is an overlay
@@ -1163,285 +824,8 @@ class MainActivity : HelperBaseActivity(), MainHost {
                 selectedNavId == R.id.nav_servers ||
                 selectedNavId == R.id.nav_settings ||
                 (selectedNavId == R.id.nav_account && accountAccessAllowed())
-            if (!valid) selectNav(R.id.nav_home)
+            if (!valid) selectTabWhenIdle(R.id.nav_home)
         }
-    }
-
-    /** Applies the Home server-list visibility and chevron rotation from the collapse flag. */
-    private fun applyHomeListVisibility() {
-        val hasServers = mainViewModel.serversCache.isNotEmpty()
-        binding.groupHomeMeta.isVisible = hasServers
-        binding.rvHomeServers.isVisible = hasServers && !homeListCollapsed
-        // The chevron lives on each carousel page; re-bind the visible one to reflect the state.
-        if (::homeMetaAdapter.isInitialized && homeMetaAdapter.itemCount > 0) {
-            homeMetaAdapter.notifyItemChanged(homeMetaPage)
-        }
-    }
-
-    /**
-     * Rebuilds both lists from the current cache and refreshes the Servers-tab chrome
-     * (subtitle counts, protocol chips, empty-state visibility) plus the Home meta bar.
-     */
-    private fun refreshServerLists(index: Int) {
-        val subs = mainViewModel.getProviderGroups()
-        // The Серверы tab rebinds (and refreshes its own header counts / empty state) from the same
-        // cache; it is silent while its tab has never been opened and binds itself when it is.
-        serversFragment?.bindList(index)
-        homeAdapter.setSections(mainViewModel.serversCache, subs, showHeaders = false, index = index)
-        rebuildHomeMeta()
-        updateHomeEmptyState()
-        // The "link Telegram" CTA depends on whether a departament subscription is present, so
-        // re-evaluate it once the list is (re)built.
-        updateLoginCtaVisibility()
-        // Adding/removing a departament subscription must show/hide the Account tab and the home
-        // account header immediately (the AccountSession collector only fires on login changes).
-        updateAccountGate()
-        // First populated bind of the visible Home list plays the reveal stagger (once only).
-        if (!homeListRevealed && binding.rvHomeServers.isVisible && mainViewModel.serversCache.isNotEmpty()) {
-            homeListRevealed = true
-            revealListStagger(binding.rvHomeServers)
-        }
-    }
-
-    /**
-     * Reveal stagger for a freshly bound list: each of the first rows rises 12dp and fades in,
-     * offset by index * motion_stagger. CAPPED at 8 rows (beyond that rows appear instantly, at
-     * rest) so the whole reveal never runs long. Runs once per list (the caller guards with a
-     * flag), never on scroll or a later notify. Reduced motion / animations-off: no-op — rows are
-     * already at their rest state, so the list simply appears.
-     *
-     * Only the Главная list is left here; [ServersFragment] carries the same routine for its own
-     * list. The copy dies with this one when Главная moves to its own fragment.
-     */
-    private fun revealListStagger(rv: androidx.recyclerview.widget.RecyclerView) {
-        if (rv.reducedMotion()) return
-        val dy = 12f * resources.displayMetrics.density
-        rv.doOnPreDraw {
-            val count = minOf(rv.childCount, 8)
-            for (i in 0 until count) {
-                val child = rv.getChildAt(i)
-                child.translationY = dy
-                child.alpha = 0f
-                child.animate()
-                    .translationY(0f).alpha(1f)
-                    .setStartDelay(i * durStagger)
-                    .setDuration(durReveal)
-                    .setInterpolator(easeOutQuint)
-                    .start()
-            }
-        }
-    }
-
-    /**
-     * Sets up the Home provider meta-bar carousel: a ViewPager2 with one page per subscription. A
-     * single subscription reads as one static card (identical to before); multiple subscriptions
-     * become separate swipeable cards with page dots. Per-page buttons act on that page's own
-     * subscription; collapse / ping / refresh are list-wide.
-     */
-    private fun setupHomeMetaPager() {
-        homeMetaAdapter = HomeMetaPagerAdapter(
-            bindPage = { meta, sub -> bindMetaBar(meta, sub) },
-            onToggleList = { toggleHomeServerList() },
-            onPingAll = { startLatencyCheckAll() },
-            onRefreshAll = { refreshHomeSub() },
-            onTogglePin = { subId -> toggleHomePin(subId) },
-            onDeleteSub = { subId -> confirmDeleteSubscription(subId) },
-            onOpenSupport = { subId -> openSubUrl(MmkvManager.decodeSubscription(subId)?.supportUrl) },
-            onOpenTelegram = { subId -> openSubUrl(MmkvManager.decodeSubscription(subId)?.supportUrl) },
-            collapsed = { homeListCollapsed },
-        )
-        binding.vpHomeMeta.apply {
-            adapter = homeMetaAdapter
-            offscreenPageLimit = 1
-            clipToPadding = false
-            registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
-                private var dragged = false
-                override fun onPageScrollStateChanged(state: Int) {
-                    if (state == ViewPager2.SCROLL_STATE_DRAGGING) dragged = true
-                }
-
-                override fun onPageSelected(position: Int) {
-                    homeMetaPage = position
-                    updateHomeMetaDots(position)
-                    if (dragged) {
-                        binding.vpHomeMeta.tickHaptic()
-                        dragged = false
-                    }
-                }
-            })
-        }
-        rebuildHomeMeta()
-    }
-
-    /**
-     * Rebuilds the meta-bar carousel from the current provider groups, keeping the user on the same
-     * subscription across list rebuilds (pin reorders, refresh, deletes) by restoring the page by its
-     * subscription id. Page dots + the inter-page gap appear only when there is more than one card.
-     */
-    private fun rebuildHomeMeta() {
-        val ids = mainViewModel.getProviderGroups().map { it.id }
-        val keepSubId = homeMetaSubIds.getOrNull(homeMetaPage)
-        homeMetaSubIds = ids
-        homeMetaAdapter.submit(ids)
-        val count = ids.size
-        val many = count > 1
-        // Neighbour cards peek past the 16dp gutter; a 12dp gap keeps them from touching.
-        binding.vpHomeMeta.setPageTransformer(
-            if (many) CompositePageTransformer().apply {
-                addTransformer(MarginPageTransformer(resources.getDimensionPixelSize(R.dimen.space_12)))
-            } else null
-        )
-        val restore = keepSubId?.let { ids.indexOf(it) }?.takeIf { it >= 0 } ?: 0
-        homeMetaPage = restore.coerceIn(0, (count - 1).coerceAtLeast(0))
-        if (count > 0) binding.vpHomeMeta.setCurrentItem(homeMetaPage, false)
-        buildHomeMetaDots(count)
-        updateHomeMetaDots(homeMetaPage)
-        binding.llHomeMetaDots.isVisible = many
-        measureHomeMetaHeight()
-    }
-
-    /**
-     * ViewPager2 cannot wrap_content, so fix its height to the tallest page. Each page's height
-     * varies (traffic row, announce banner), so measure every subscription's meta bar at the page
-     * width and take the max — one stable height so peeking neighbours stay aligned.
-     */
-    private fun measureHomeMetaHeight() {
-        if (homeMetaSubIds.isEmpty()) return
-        binding.vpHomeMeta.doOnPreDraw {
-            val innerWidth = binding.vpHomeMeta.width -
-                binding.vpHomeMeta.paddingStart - binding.vpHomeMeta.paddingEnd
-            if (innerWidth <= 0) return@doOnPreDraw
-            val widthSpec = View.MeasureSpec.makeMeasureSpec(innerWidth, View.MeasureSpec.EXACTLY)
-            val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-            val inflater = LayoutInflater.from(this)
-            var maxH = 0
-            for (id in homeMetaSubIds) {
-                val sub = MmkvManager.decodeSubscription(id) ?: continue
-                val probe = LayoutSubscriptionMetaBarBinding.inflate(inflater, binding.vpHomeMeta, false)
-                (probe.root.layoutParams as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
-                bindMetaBar(probe, sub)
-                probe.root.measure(widthSpec, heightSpec)
-                maxH = maxOf(maxH, probe.root.measuredHeight)
-            }
-            if (maxH > 0 && binding.vpHomeMeta.layoutParams.height != maxH) {
-                binding.vpHomeMeta.layoutParams = binding.vpHomeMeta.layoutParams.apply { height = maxH }
-            }
-        }
-    }
-
-    /** Rebuilds the meta-bar page dots to match [count] pages (nothing shown for 0/1 page). */
-    private fun buildHomeMetaDots(count: Int) {
-        val container = binding.llHomeMetaDots
-        container.removeAllViews()
-        if (count <= 1) return
-        val size = resources.getDimensionPixelSize(R.dimen.dot_size)
-        val activeSize = resources.getDimensionPixelSize(R.dimen.dot_size_active)
-        val gap = resources.getDimensionPixelSize(R.dimen.space_4)
-        for (i in 0 until count) {
-            val selected = i == homeMetaPage
-            val dim = if (selected) activeSize else size
-            val dot = View(this).apply {
-                layoutParams = android.widget.LinearLayout.LayoutParams(dim, dim).apply {
-                    if (i > 0) marginStart = gap
-                }
-                setBackgroundResource(if (selected) R.drawable.dot_active else R.drawable.dot_inactive)
-            }
-            container.addView(dot)
-        }
-    }
-
-    /** Swaps the dot backgrounds/sizes so only [position]'s dot reads as active. */
-    private fun updateHomeMetaDots(position: Int) {
-        val container = binding.llHomeMetaDots
-        val size = resources.getDimensionPixelSize(R.dimen.dot_size)
-        val activeSize = resources.getDimensionPixelSize(R.dimen.dot_size_active)
-        for (i in 0 until container.childCount) {
-            val dot = container.getChildAt(i)
-            val selected = i == position
-            dot.setBackgroundResource(if (selected) R.drawable.dot_active else R.drawable.dot_inactive)
-            val dim = if (selected) activeSize else size
-            dot.layoutParams = dot.layoutParams.apply {
-                width = dim
-                height = dim
-            }
-        }
-    }
-
-    /** Long-press the Home subscription card to delete the subscription and its servers. */
-    private fun confirmDeleteSubscription(subId: String) {
-        if (subId.isEmpty()) return
-        AlertDialog.Builder(this)
-            .setTitle(R.string.sub_delete)
-            .setMessage(R.string.sub_delete_confirm)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                MmkvManager.removeSubscription(subId)
-                mainViewModel.reloadServerList()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    /**
-     * The meta-bar chevron now shows/hides the Home SERVER LIST (not the meta-bar body,
-     * which stays permanently visible). Rotates the chevron to reflect the list state.
-     */
-    private fun toggleHomeServerList() {
-        homeListCollapsed = !homeListCollapsed
-        applyHomeListVisibility()
-    }
-
-    /**
-     * Home account header (login entry points / account chip), driven by [AccountSession.state].
-     * Entirely hidden unless a backend is configured, so the no-backend build looks unchanged.
-     */
-    private fun setupAccountHeader() {
-        val header = binding.layoutHomeAccount
-        // The "link Telegram" CTA banner attaches Telegram to the signed-in account.
-        header.ctaLinkTelegram.setOnClickListener { openTelegramLink() }
-        header.btnCtaDismiss.setOnClickListener {
-            ctaDismissed = true
-            header.ctaLinkTelegram.isVisible = false
-        }
-        // Signed-in chip selects the in-place Account tab.
-        header.chipAccount.setOnClickListener { selectNav(R.id.nav_account) }
-        // Onboarding-card sign-in buttons open the login screen preselecting their method.
-        binding.layoutHomeEmpty.btnHomeLoginTg.setOnClickListener { openLoginScreen("telegram") }
-        binding.layoutHomeEmpty.btnHomeLoginSite.setOnClickListener { openLoginScreen("site") }
-        // Single source of truth: repaint the header (and the Account nav tab) whenever the
-        // logged-in/out state changes, and auto-import subscriptions on a fresh login.
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                AccountSession.state.collect { applyAccountState(it) }
-            }
-        }
-    }
-
-    /**
-     * Applies the account state to the home header and the Account nav tab. The whole header and
-     * the Account tab stay hidden when no backend is configured (the no-backend build is unchanged).
-     */
-    private fun applyAccountState(state: AccountSession.AccountState) {
-        if (!BackendConfig.isConfigured()) {
-            updateAccountGate()
-            accountLoggedIn = false
-            return
-        }
-        val loggedIn = state is AccountSession.AccountState.LoggedIn
-        // Recompute the Account tab / home account header visibility from the access gate
-        // (signed in OR a departament subscription is present).
-        updateAccountGate()
-        if (state is AccountSession.AccountState.LoggedIn) {
-            bindAccountChip(state.profile)
-        } else {
-            updateLoginCtaVisibility()
-        }
-        updateOnboardingLogin()
-        // Login state feeds the onboarding-nav gate: signing in reveals the bar even with no servers.
-        updateBottomNavVisibility()
-        // Fire the one-shot post-login import only on a genuine logged-out -> logged-in transition,
-        // not on the state replay that happens every time the activity restarts while signed in.
-        if (loggedIn && !accountLoggedIn) onLoggedIn()
-        accountLoggedIn = loggedIn
     }
 
     /**
@@ -1453,285 +837,37 @@ class MainActivity : HelperBaseActivity(), MainHost {
         AccountSession.isLoggedIn()
 
     /**
-     * Recomputes the visibility of the Account nav item and the home account header from the access
-     * gate. Called both when the account state changes (login/logout) and when the subscription /
-     * server list changes. The Account tab + home account chip exist ONLY while signed in — a pasted
-     * subscription never unlocks them.
+     * Recomputes the visibility of the Аккаунт nav item from that gate. Called whenever the account
+     * state changes (login/logout) and whenever the subscription / server list changes — a pasted
+     * subscription never unlocks the tab. Главная applies the same gate to its account chip
+     * (`HomeFragment.applyAccountHeaderGate`); the bar itself is the shell's.
      */
-    private fun updateAccountGate() {
-        val header = binding.layoutHomeAccount
+    private fun updateAccountNav() {
         if (!BackendConfig.isConfigured()) {
-            header.root.isVisible = false
             binding.navAccount.isVisible = false
             return
         }
         val loggedIn = AccountSession.isLoggedIn()
-        header.root.isVisible = loggedIn
-        // The signed-out login group (and its "link Telegram" CTA) is no longer an account entry
-        // point — the header only exists once signed in, where the account chip is shown.
-        header.groupLogin.isVisible = false
-        header.chipAccount.isVisible = loggedIn
         binding.navAccount.isVisible = loggedIn
         // Signed out while on the Account tab: the tab is hidden, so fall back to Home.
-        if (!loggedIn && selectedNavId == R.id.nav_account) selectNav(R.id.nav_home)
+        if (!loggedIn && selectedNavId == R.id.nav_account) selectTabWhenIdle(R.id.nav_home)
     }
 
     /**
-     * Fills the signed-in account chip from the profile. Primary line prefers the Telegram display
-     * name, then the @handle, then the e-mail; when a real display name is shown, the @handle/email
-     * identity moves to the secondary line (otherwise it keeps the neutral "open account" hint, so
-     * there is no visible change when the backend sends no display name).
+     * Selects [navId] on the next loop, not inline.
+     *
+     * The two gates above run from a tab fragment's own lifecycle callbacks (`onViewCreated`,
+     * `onResume`), and those run INSIDE the FragmentManager's dispatch, where committing another
+     * transaction throws «FragmentManager is already executing transactions». The correction is a
+     * frame later, which no one can see, and it is a no-op if the tab is already right by then.
      */
-    private fun bindAccountChip(profile: UserProfileDto) {
-        val header = binding.layoutHomeAccount
-        val handle = profile.telegramUsername?.takeIf { it.isNotBlank() }?.let { "@$it" }
-        val identity = handle ?: profile.email.takeIf { it.isNotBlank() }
-        val display = profile.telegramName?.takeIf { it.isNotBlank() }
-        val primary = display ?: identity ?: getString(R.string.auth_account)
-        header.tvAccountName.text = primary
-        AvatarManager.setMonogram(header.tvAvatarInitial, primary)
-        AvatarManager.applyAvatar(lifecycleScope, this, header.imgAvatar, header.tvAvatarInitial, profile)
-        header.tvAccountSub.text = if (display != null && identity != null) identity
-            else getString(R.string.auth_open_account)
-    }
-
-    /**
-     * The "link Telegram" CTA is for users who pasted a subscription but never signed in: shown
-     * only when signed out, there are local servers, and the user hasn't dismissed it this session.
-     */
-    private fun updateLoginCtaVisibility() {
-        if (!BackendConfig.isConfigured()) return
-        val header = binding.layoutHomeAccount
-        // Account entry point: only for the owner's own (departament) subscription, never a foreign
-        // one — so a pasted foreign subscription cannot surface the "link Telegram" account CTA.
-        val show = !AccountSession.isLoggedIn() && !ctaDismissed &&
-            SubscriptionOrigin.hasDepartamentSubscription()
-        header.ctaLinkTelegram.isVisible = show
-    }
-
-    /**
-     * Opens the in-app login screen (Telegram + site). An optional [mode] ("telegram"/"site") is
-     * passed through as the "login_mode" intent extra so the login screen can preselect a method.
-     */
-    private fun openLoginScreen(mode: String? = null) {
-        val i = Intent(this, LoginActivity::class.java)
-        if (mode != null) i.putExtra("login_mode", mode)
-        requestActivityLauncher.launch(i)
-    }
-
-    /**
-     * Opens the Telegram screen in LINK mode: the current (already signed-in) account gets its
-     * Telegram attached, so the bot tracks the subscription. The token request carries the current
-     * JWT, so the backend links Telegram to this account instead of starting a separate login.
-     */
-    private fun openTelegramLink() {
-        val i = Intent(this, LoginActivity::class.java)
-        i.putExtra(LoginActivity.EXTRA_MODE, LoginActivity.MODE_TELEGRAM)
-        i.putExtra(LoginActivity.EXTRA_LINK, true)
-        requestActivityLauncher.launch(i)
-    }
-
-    /**
-     * Configures the empty-state onboarding card for the current auth state. Two shapes, driven by
-     * whether the user is signed in (the card itself is only on screen while there are no servers):
-     *   - signed out: paste-a-subscription buttons (QR/clipboard) + the Telegram/site login block.
-     *   - signed in : the "Купить подписку" CTA (a subscription is bought and bound to the account,
-     *     not pasted), plus "Привязать Telegram" only when the profile's Telegram isn't linked yet.
-     *     The QR/clipboard buttons and the login block are hidden so no dead space is left below.
-     * When no backend is configured, login is meaningless, so the signed-out onboarding is shown
-     * unchanged.
-     */
-    private fun updateOnboardingLogin() {
-        val empty = binding.layoutHomeEmpty
-        val configured = BackendConfig.isConfigured()
-        val loggedIn = AccountSession.isLoggedIn()
-        val buyState = configured && loggedIn
-        val telegramLinked =
-            (AccountSession.state.value as? AccountSession.AccountState.LoggedIn)?.profile?.telegramLinked == true
-        // Signed-out login block (Telegram/site): only when a backend is configured and signed out.
-        empty.groupHomeLogin.isVisible = configured && !loggedIn
-        // Paste-a-subscription buttons: signed-in users buy instead, so hide them in the buy state.
-        empty.btnHomeAddQr.isVisible = !buyState
-        empty.btnHomeAddClipboard.isVisible = !buyState
-        // Buy CTA (+ optional link-Telegram) only in the signed-in, no-subscription state.
-        empty.btnHomeBuy.isVisible = buyState
-        empty.btnHomeLinkTg.isVisible = buyState && !telegramLinked
-    }
-
-    /**
-     * Runs once when the user transitions to signed-in: auto-import their subscriptions, reload the
-     * server list on success, and confirm with the gray status toast.
-     */
-    private fun onLoggedIn() {
-        lifecycleScope.launch {
-            AccountRepository().autoImportSubscriptions().onSuccess { mainViewModel.reloadServerList() }
-        }
-        showStatusToast(getString(R.string.toast_subscription_linked))
-    }
-
-    /** Subscription currently shown in the Home meta-bar carousel: the paged one, else the selected
-     *  server's, else the first provider. */
-    private fun currentMetaSubId(): String {
-        homeMetaSubIds.getOrNull(homeMetaPage)?.takeIf { it.isNotEmpty() }?.let { return it }
-        mainViewModel.findSubscriptionIdBySelect()?.takeIf { it.isNotEmpty() }?.let { return it }
-        return mainViewModel.getProviderGroups().firstOrNull()?.id.orEmpty()
-    }
-
-    private fun toggleHomePin(subId: String) {
-        val sub = MmkvManager.decodeSubscription(subId) ?: return
-        sub.pinned = !sub.pinned
-        MmkvManager.encodeSubscription(subId, sub)
-        homeMetaAdapter.notifyItemChanged(homeMetaPage)
-        mainViewModel.reloadServerList()
-    }
-
-    private fun refreshHomeSub() {
-        // Progress shows on the connect circle (shared rotating arc), not a top bar.
-        showLoading()
-        lifecycleScope.launch(Dispatchers.IO) {
-            val result = mainViewModel.updateConfigViaSubAll()
-            launch(Dispatchers.Main) {
-                if (result.configCount > 0) mainViewModel.reloadServerList()
-                rebuildHomeMeta()
-                hideLoading()
-                if (result.successCount > 0) {
-                    // Route subscription-update completion through the app's custom gray status
-                    // toast («Обновлено») instead of the default green success toast.
-                    showStatusToast(getString(R.string.toast_updated))
-                } else if (result.failureCount > 0) {
-                    toastError(R.string.toast_failure)
-                }
-            }
+    private fun selectTabWhenIdle(@IdRes navId: Int) {
+        binding.bottomNav.post {
+            if (isFinishing || isDestroyed) return@post
+            if (selectedNavId != navId) selectNav(navId)
         }
     }
 
-    private fun openSubUrl(url: String?) {
-        if (url.isNullOrBlank()) return
-        try {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-        } catch (e: Exception) {
-            toastError(R.string.toast_failure)
-        }
-    }
-
-    /**
-     * Display heading for the meta bar: the provider-sent `profile-title` first, then the
-     * subscription remarks, and finally the app name - never the raw "Default" placeholder.
-     */
-    private fun metaTitle(sub: SubscriptionItem): String {
-        sub.profileTitle.takeIf { it.isNotBlank() }?.let { return it }
-        val remarks = sub.remarks.trim()
-        return if (remarks.isNotEmpty() && !remarks.equals("Default", ignoreCase = true)) {
-            remarks
-        } else {
-            getString(R.string.app_name)
-        }
-    }
-
-    /**
-     * Small subtitle shown under the meta-bar title: the last successful update timestamp and the
-     * auto-update interval, e.g. "09.07.2026 07:08 · Автообновление — 1 ч." (Выкл when auto-update
-     * is off). [SubscriptionItem.lastUpdated] is epoch millis (-1 == never); [updateInterval] is
-     * minutes.
-     */
-    private fun metaSubtitle(sub: SubscriptionItem): String {
-        val last = if (sub.lastUpdated > 0L) {
-            SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(sub.lastUpdated))
-        } else {
-            getString(R.string.sub_meta_updated_never)
-        }
-        val interval = if (!sub.autoUpdate) {
-            getString(R.string.sub_auto_update_off)
-        } else {
-            val minutes = sub.updateInterval
-            if (minutes >= 60L && minutes % 60L == 0L) {
-                getString(R.string.sub_update_interval_hours, (minutes / 60L).toInt())
-            } else {
-                getString(R.string.sub_update_interval_minutes, minutes.toInt())
-            }
-        }
-        return "$last · " + getString(R.string.sub_auto_update_label, interval)
-    }
-
-    /**
-     * Repaints the meta bar from persisted subscription metadata (moved from GroupServerFragment).
-     * Traffic is drawn Happ-style as a rounded pill (the [progressTraffic] track) with the usage
-     * label centered on it; the expiry marker shows the infinity glyph when there is no (or an
-     * effectively unlimited) expiry, otherwise the real date.
-     */
-    private fun bindMetaBar(meta: LayoutSubscriptionMetaBarBinding, sub: SubscriptionItem?) {
-        if (sub == null) {
-            meta.root.visibility = android.view.View.GONE
-            return
-        }
-        meta.root.visibility = android.view.View.VISIBLE
-        meta.tvSubTitle.text = metaTitle(sub)
-        meta.tvMetaSubtitle.text = metaSubtitle(sub)
-        meta.tvMetaSubtitle.visibility = android.view.View.VISIBLE
-
-        val primaryColor = MaterialColors.getColor(meta.btnPin, androidx.appcompat.R.attr.colorPrimary)
-        val onVariant = MaterialColors.getColor(meta.btnPin, com.google.android.material.R.attr.colorOnSurfaceVariant)
-        meta.btnPin.setColorFilter(if (sub.pinned) primaryColor else onVariant)
-        meta.btnPin.contentDescription = getString(if (sub.pinned) R.string.sub_unpin else R.string.sub_pin)
-
-        if (sub.announce.isNotBlank()) {
-            meta.tvAnnounce.visibility = android.view.View.VISIBLE
-            meta.tvAnnounce.text = sub.announce
-        } else {
-            meta.tvAnnounce.visibility = android.view.View.GONE
-        }
-        meta.btnSupport.visibility = if (sub.supportUrl.isNotBlank()) android.view.View.VISIBLE else android.view.View.GONE
-        // Compact Telegram shortcut in the collapsed header, shown only when a support URL exists.
-        meta.btnTelegram.visibility = if (sub.supportUrl.isNotBlank()) android.view.View.VISIBLE else android.view.View.GONE
-
-        if (!sub.hasUserInfo) {
-            meta.layoutTraffic.visibility = android.view.View.GONE
-            return
-        }
-        meta.layoutTraffic.visibility = android.view.View.VISIBLE
-
-        val onSurfaceColor = MaterialColors.getColor(meta.tvTraffic, com.google.android.material.R.attr.colorOnSurface)
-        val variantColor = MaterialColors.getColor(meta.tvExpiry, com.google.android.material.R.attr.colorOnSurfaceVariant)
-        val redColor = ContextCompat.getColor(this, R.color.colorPingRed)
-
-        // Traffic pill: "usedTraffic / total-or-∞" centered on the rounded track.
-        meta.tvTraffic.text = if (sub.isUnlimited) {
-            getString(R.string.sub_traffic_unlimited, sub.usedTraffic.toTrafficString())
-        } else {
-            getString(
-                R.string.sub_traffic_used,
-                sub.usedTraffic.toTrafficString(),
-                sub.totalTraffic.toTrafficString()
-            )
-        }
-        meta.tvTraffic.setTextColor(onSurfaceColor)
-        // Unlimited traffic keeps an empty rounded track behind the label instead of a filled bar.
-        // The pill fill is a white->blue gradient (bg_traffic_gradient). A horizontal ProgressBar
-        // takes an Int progress against max=1000, so the fill fraction is unchanged.
-        val fillFraction = if (sub.isUnlimited) 0f else sub.trafficFraction
-        meta.progressTraffic.progress = (fillFraction * 1000).toInt()
-
-        // Expiry: ∞ when absent or effectively unlimited (panels sometimes send a huge timestamp
-        // ~year 2088+ instead of 0), otherwise the real "до <date>".
-        val unlimitedExpireThreshold = 3_723_840_000L // ~2088-01-01 in epoch seconds
-        val expiryUnlimited = sub.expire <= 0L || sub.expire >= unlimitedExpireThreshold
-        when {
-            expiryUnlimited -> {
-                meta.tvExpiry.text = getString(R.string.sub_infinity)
-                meta.tvExpiry.setTextColor(variantColor)
-            }
-            sub.isExpired -> {
-                meta.tvExpiry.text = getString(R.string.sub_expired)
-                meta.tvExpiry.setTextColor(redColor)
-            }
-            else -> {
-                val date = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(sub.expire * 1000))
-                meta.tvExpiry.text = getString(R.string.sub_expires, date)
-                meta.tvExpiry.setTextColor(variantColor)
-            }
-        }
-        meta.tvExpiry.visibility = android.view.View.VISIBLE
-    }
 
     // ---- Per-server actions (moved from GroupServerFragment) ----
 
@@ -1811,7 +947,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
     private fun removeServerSub(guid: String, position: Int) {
         mainViewModel.removeServer(guid)
         serversAdapter?.removeServerSub(guid, position)
-        homeAdapter.removeServerSub(guid, position)
+        homeFragment?.removeServerRow(guid, position)
         serversFragment?.refreshChrome()
     }
 
@@ -1828,16 +964,9 @@ class MainActivity : HelperBaseActivity(), MainHost {
 
         MmkvManager.setSelectServer(guid)
         serversAdapter?.setSelectServer(selected, guid)
-        homeAdapter.setSelectServer(selected, guid)
-        updateSelectedServer()
-        // Surface the selected server's subscription card in the carousel.
-        mainViewModel.findSubscriptionIdBySelect()?.let { selectedSubId ->
-            val idx = homeMetaSubIds.indexOf(selectedSubId)
-            if (idx >= 0 && idx != homeMetaPage) {
-                homeMetaPage = idx
-                binding.vpHomeMeta.setCurrentItem(idx, true)
-            }
-        }
+        // The Главная half of the same mirror: its list row, its under-shield label and the
+        // subscription card its carousel is showing.
+        homeFragment?.onSelectedServerChanged(selected, guid)
         if (mainViewModel.isRunning.value == true) {
             promptApplySelectedServer(guid)
         }
@@ -1856,11 +985,10 @@ class MainActivity : HelperBaseActivity(), MainHost {
         }
         Snackbar.make(binding.mainContent, message, Snackbar.LENGTH_LONG)
             .setAnchorView(binding.bottomNav)
+            // The restart runs through the connect state machine, so a stalled one is reported like
+            // any other failed start rather than leaving the hero on the old server.
             .setAction(R.string.server_selected_reconnect_action) {
-                connectInProgress = true
-                applyRunningState(isLoading = true, isRunning = true)
-                scheduleConnectWatchdog()
-                restartV2Ray()
+                homeFragment?.applySelectionToRunningTunnel()
             }
             .show()
     }
@@ -1893,548 +1021,34 @@ class MainActivity : HelperBaseActivity(), MainHost {
         }
     }
 
-    private fun handleFabAction() {
-        // A manual connect/disconnect starts a fresh session: allow auto-fallback again, and end
-        // any fallback restart still considered in flight (the user's tap supersedes it).
-        mainViewModel.autoFallbackUsed = false
-        mainViewModel.fallbackInProgress = false
-        healthCheckPending = false
-        healthCheckConfirming = false
-        timerHandler.removeCallbacks(healthCheckRunnable)
-        timerHandler.removeCallbacks(healthRecheckRunnable)
-
-        if (mainViewModel.isRunning.value == true) {
-            // Stop: no "connecting" visual, the isRunning observer will settle the idle state
-            // and show the «Отключено» toast.
-            connectInProgress = false
-            cancelConnectWatchdog()
-            CoreServiceManager.stopVService(this)
-        } else {
-            // Start: show the subtle blue "connecting" state (pulsing ring), never a bright fill.
-            connectInProgress = true
-            showStatusToast(getString(R.string.toast_status_connecting))
-            applyRunningState(isLoading = true, isRunning = false)
-            scheduleConnectWatchdog()
-            startVpnWithPermission()
-        }
-    }
-
-    /**
-     * Starts the VPN, requesting the system VPN permission first when needed.
-     */
-    private fun startVpnWithPermission() {
-        if (SettingsManager.isVpnMode()) {
-            val intent = VpnService.prepare(this)
-            if (intent == null) {
-                startV2Ray()
-            } else {
-                requestVpnPermission.launch(intent)
-            }
-        } else {
-            startV2Ray()
-        }
-    }
-
-    private fun startV2Ray() {
-        if (MmkvManager.getSelectServer().isNullOrEmpty()) {
-            toast(R.string.title_file_chooser)
-            return
-        }
-        CoreServiceManager.startVService(this)
-    }
-
-    /**
-     * Stops the running tunnel and starts it again on the currently selected server.
-     *
-     * The core runs in its own process (`:RunSoLibV2RayDaemon`), so stopping is asynchronous and the
-     * only truthful signal in this process is [MainViewModel.isRunning], driven by the daemon's
-     * broadcasts. Waiting a fixed delay here used to lose that race: the new start would arrive
-     * while the old core was still up, `startContextService()` would see `coreController.isRunning`
-     * and return silently, and the tunnel would keep running the PREVIOUS server while the UI
-     * showed the new one. So wait for a real stopped state, and report failure rather than
-     * pretending to have switched.
-     */
-    fun restartV2Ray() {
-        if (mainViewModel.isRunning.value != true) {
-            startV2Ray()
-            return
-        }
-        CoreServiceManager.stopVService(this)
-        lifecycleScope.launch {
-            val deadline = SystemClock.elapsedRealtime() + RESTART_STOP_TIMEOUT_MS
-            while (mainViewModel.isRunning.value == true && SystemClock.elapsedRealtime() < deadline) {
-                delay(RESTART_STOP_POLL_MS)
-            }
-            if (mainViewModel.isRunning.value == true) {
-                connectInProgress = false
-                // Nothing restarted, so an auto-fallback restart is no longer in flight — leaving
-                // the flag set would make the next real disconnect look internal.
-                mainViewModel.fallbackInProgress = false
-                showStatusToast(getString(R.string.toast_status_failed))
-                applyRunningState(isLoading = false, isRunning = true)
-                return@launch
-            }
-            // The stop landed and the new start is going out now, so an auto-fallback restart is
-            // no longer in flight. Released here, after the stop the disconnect handler had to
-            // read as internal — releasing it any earlier hands that stop to the user-disconnect
-            // branch of cancelHealthCheck() and re-opens the switch/restart loop.
-            mainViewModel.fallbackInProgress = false
-            startV2Ray()
-        }
-    }
-
     /**
      * The blue/light and blue/dark backgrounds are theme-qualified drawables, but the mono
      * overlay is a runtime style overlay (not a resource qualifier), so the decorative home
-     * gradient, glow and ring must be swapped to neutral grey variants here when mono is active.
+     * gradient must be swapped to its neutral grey variant here when mono is active. (The hero's
+     * glow and ring live in Главная; `HomeFragment.applyThemeDecorations` swaps those.)
      */
     private fun applyThemeDecorations() {
         val mono = MmkvManager.decodeSettingsString(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_BLUE) == BaseActivity.THEME_MONO
         if (!mono) return
         binding.homeRoot.setBackgroundResource(R.drawable.bg_home_gradient_mono)
-        binding.viewConnectGlow.setBackgroundResource(R.drawable.bg_connect_glow_mono)
-        binding.viewConnectRing.setBackgroundResource(R.drawable.bg_connect_ring_mono)
-        // The sonar pulse reuses the ring drawable, so keep it in the mono variant too.
-        binding.viewConnectPulse.setBackgroundResource(R.drawable.bg_connect_ring_mono)
-    }
-
-    /**
-     * Applies the connect visual for a state. [animate] is true ONLY on a genuine live transition
-     * (a real connect/disconnect the user just triggered), so the signature confirmation and its
-     * reverse play then — not on the LiveData replay after a rotation/theme recreate, which jumps
-     * straight to the end state. Under reduced motion / animations-off every branch also jumps to
-     * its end state (the confirm haptic still fires).
-     */
-    private fun applyRunningState(isLoading: Boolean, isRunning: Boolean, animate: Boolean = false) {
-        // Connecting: a thin rotating arc sweeps the ring + the glow breathes softly, blue
-        // outline shield at full opacity (no solid fill yet).
-        if (isLoading) {
-            val active = themeColor(R.attr.connectActiveColor)
-            binding.imgConnectFilled.alpha = 0f
-            binding.imgConnect.alpha = 1f
-            startConnectingAnim()
-            binding.imgConnect.setColorFilter(active)
-            binding.tvConnectionStatus.setTextColor(active)
-            binding.tvConnectionStatus.text = getString(R.string.connection_connecting)
-            return
-        }
-
-        if (isRunning) {
-            applyConnectedState(animate)
-        } else {
-            applyIdleState(animate)
-        }
-    }
-
-    /**
-     * Connected visual. On a live transition ([animate]) the signature confirmation plays: the
-     * outline shield crossfades to the solid one while its tint warms grey→blue (over motion_state),
-     * the halo glow reveals (0→1 over motion_reveal), and ONE sonar ring pulses out once
-     * (connect_confirm.xml over motion_emphasis) — with a CONFIRM haptic on the fill beat. Otherwise
-     * (replay / reduced motion) it jumps straight to the connected end state; the haptic still fires
-     * on a live transition.
-     */
-    private fun applyConnectedState(animate: Boolean) {
-        val connected = themeColor(R.attr.connectedColor)
-        stopConnectingAnim()
-        binding.tvConnectionStatus.setTextColor(connected)
-        binding.cardConnect.contentDescription = getString(R.string.action_stop_service)
-        binding.tvConnectionStatus.text = selectedServerName()
-        binding.imgConnect.setColorFilter(connected)
-        binding.imgConnect.alpha = 1f
-        startConnectionTimer()
-
-        // The fill-beat haptic fires on every live confirm, even under reduced motion.
-        if (animate) binding.cardConnect.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-
-        if (!animate || binding.cardConnect.reducedMotion()) {
-            // Jump to the connected end state: solid shield shown, outline hidden, glow on.
-            binding.imgConnectFilled.setColorFilter(connected)
-            binding.imgConnectFilled.alpha = 1f
-            binding.imgConnect.alpha = 0f
-            binding.viewConnectGlow.alpha = 1f
-            binding.viewConnectGlow.visibility = android.view.View.VISIBLE
-            return
-        }
-
-        // Crossfade outline -> filled, tint warming grey -> blue over the fill.
-        val grey = themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
-        binding.imgConnectFilled.setColorFilter(grey)
-        binding.imgConnectFilled.alpha = 0f
-        ValueAnimator.ofObject(ArgbEvaluator(), grey, connected).apply {
-            duration = durState
-            interpolator = easeStandard
-            addUpdateListener { binding.imgConnectFilled.setColorFilter(it.animatedValue as Int) }
-            start()
-        }
-        binding.imgConnectFilled.animate().cancel()
-        binding.imgConnectFilled.animate().alpha(1f).setDuration(durState).setInterpolator(easeStandard).start()
-        binding.imgConnect.animate().cancel()
-        binding.imgConnect.animate().alpha(0f).setDuration(durState).setInterpolator(easeStandard).start()
-
-        // Halo glow reveals from nothing.
-        binding.viewConnectGlow.animate().cancel()
-        binding.viewConnectGlow.alpha = 0f
-        binding.viewConnectGlow.visibility = android.view.View.VISIBLE
-        binding.viewConnectGlow.animate().alpha(1f).setDuration(durReveal).setInterpolator(easeOutQuint).start()
-
-        // ONE sonar ring pulse.
-        val pulse = binding.viewConnectPulse
-        pulse.animate().cancel()
-        pulse.alpha = 1f
-        pulse.scaleX = 1f
-        pulse.scaleY = 1f
-        pulse.visibility = android.view.View.VISIBLE
-        val anim = AnimationUtils.loadAnimation(this, R.anim.connect_confirm)
-        anim.setAnimationListener(object : android.view.animation.Animation.AnimationListener {
-            override fun onAnimationStart(a: android.view.animation.Animation?) {}
-            override fun onAnimationRepeat(a: android.view.animation.Animation?) {}
-            override fun onAnimationEnd(a: android.view.animation.Animation?) {
-                pulse.visibility = android.view.View.INVISIBLE
-            }
-        })
-        pulse.startAnimation(anim)
-    }
-
-    /**
-     * Idle visual. On a live disconnect ([animate]) the confirmation reverses at ~75% duration —
-     * the solid shield fades back to the outline (tint cooling blue→grey) and the glow fades out.
-     * Otherwise (replay / reduced motion) it jumps straight to the idle end state.
-     */
-    private fun applyIdleState(animate: Boolean) {
-        stopConnectingAnim()
-        val grey = themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
-        binding.imgConnect.setColorFilter(grey)
-        binding.tvConnectionStatus.setTextColor(themeColor(com.google.android.material.R.attr.colorOnSurface))
-        binding.cardConnect.contentDescription = getString(R.string.tasker_start_service)
-        binding.tvConnectionStatus.text = idleStatusText()
-        stopConnectionTimer()
-        binding.tvDownloadSpeed.text = getString(R.string.speed_zero)
-        binding.tvUploadSpeed.text = getString(R.string.speed_zero)
-
-        // Disabled-knob affordance: a selectable server is required to connect. With none
-        // selected the shield dims to 0.38 so the knob reads as unavailable, not idle.
-        val hasServer = !MmkvManager.getSelectServer().isNullOrEmpty()
-        val restAlpha = if (hasServer) 1f else 0.38f
-
-        binding.viewConnectPulse.animate().cancel()
-        binding.viewConnectPulse.visibility = android.view.View.INVISIBLE
-
-        if (!animate || binding.cardConnect.reducedMotion()) {
-            binding.imgConnectFilled.alpha = 0f
-            binding.imgConnect.alpha = restAlpha
-            binding.viewConnectGlow.alpha = 1f
-            binding.viewConnectGlow.visibility = android.view.View.INVISIBLE
-            return
-        }
-
-        // Reverse the confirmation, faster than the enter (~75% of the state/reveal tempo).
-        val revState = (durState * 3) / 4
-        val revReveal = (durReveal * 3) / 4
-        val connected = themeColor(R.attr.connectedColor)
-        ValueAnimator.ofObject(ArgbEvaluator(), connected, grey).apply {
-            duration = revState
-            interpolator = easeStandard
-            addUpdateListener { binding.imgConnectFilled.setColorFilter(it.animatedValue as Int) }
-            start()
-        }
-        binding.imgConnectFilled.animate().cancel()
-        binding.imgConnectFilled.animate().alpha(0f).setDuration(revState).setInterpolator(easeStandard).start()
-        binding.imgConnect.animate().cancel()
-        binding.imgConnect.animate().alpha(restAlpha).setDuration(revState).setInterpolator(easeStandard).start()
-        binding.viewConnectGlow.animate().cancel()
-        binding.viewConnectGlow.animate().alpha(0f).setDuration(revReveal).setInterpolator(easeStandard)
-            .withEndAction { binding.viewConnectGlow.visibility = android.view.View.INVISIBLE }.start()
     }
 
     /**
      * Resolves a themed color attribute (respects the active blue/mono overlay).
      */
-    private fun themeColor(attr: Int): Int = MaterialColors.getColor(binding.cardConnect, attr)
-
-    /**
-     * Shows the subtle, neutral gray status toast (custom pill) that reflects the VPN state —
-     * «Подключение…» / «Прокси подключён» / «Отключено» / «Не удалось подключиться». Neutral
-     * surface colour (no green/system style). Cancels any previous status toast so states never
-     * queue up behind each other.
-     */
-    @Suppress("DEPRECATION") // custom Toast view (Toast(context)/setView) is the intended, subtle status pill
-    private fun showStatusToast(text: CharSequence) {
-        statusToast?.cancel()
-        val view = layoutInflater.inflate(R.layout.toast_status, null)
-        view.findViewById<android.widget.TextView>(R.id.tv_toast_status).text = text
-        statusToast = android.widget.Toast(this).apply {
-            duration = android.widget.Toast.LENGTH_SHORT
-            setView(view)
-            val yOffset = (110 * resources.displayMetrics.density).toInt()
-            setGravity(android.view.Gravity.BOTTOM or android.view.Gravity.CENTER_HORIZONTAL, 0, yOffset)
-            show()
-        }
-    }
-
-    /**
-     * Incy-style press feedback on the connect knob: a quick "depress" (scale to 0.94 over
-     * motion_press_in, ease-out-quart) that eases back to rest (over motion_press_out,
-     * ease-out-quint). Ease-out only — no overshoot or bounce (impeccable animate.md). There is
-     * NO colour/fill change on press (ripple and pressed foreground are cleared in the layout), so
-     * this scale is the only visual press feedback. The VIRTUAL_KEY haptic fires on the tap even
-     * under reduced motion; when motion is off the scale simply stays at rest.
-     */
-    private fun animateConnectPress() {
-        binding.cardConnect.pressHaptic()
-        if (binding.cardConnect.reducedMotion()) return
-        binding.cardConnect.animate().cancel()
-        binding.cardConnect.animate()
-            .scaleX(0.94f).scaleY(0.94f)
-            .setInterpolator(easeOutQuart)
-            .setDuration(durPressIn)
-            .withEndAction {
-                binding.cardConnect.animate()
-                    .scaleX(1f).scaleY(1f)
-                    .setInterpolator(easeOutQuint)
-                    .setDuration(durPressOut)
-                    .start()
-            }
-            .start()
-    }
-
-    /**
-     * "Connecting" visual: the thin rotating arc sweeps the ring while the halo glow BREATHES
-     * softly (scale 0.96↔1.04, alpha 0.3↔0.6, ~850ms reverse, ease-in-out). The shield stays a
-     * full-opacity blue outline — no alpha fade (which read as "broken"), no solid fill. Reduced
-     * motion / animations-off: the arc is the only signal, the glow stays off (nothing breathes).
-     */
-    private fun startConnectingAnim() {
-        connectArcConnecting = true
-        refreshConnectArc()
-        binding.imgConnect.alpha = 1f
-        connectPulse?.cancel()
-        val glow = binding.viewConnectGlow
-        if (binding.cardConnect.reducedMotion()) {
-            connectPulse = null
-            glow.animate().cancel()
-            glow.scaleX = 1f
-            glow.scaleY = 1f
-            glow.visibility = android.view.View.INVISIBLE
-            return
-        }
-        glow.animate().cancel()
-        glow.visibility = android.view.View.VISIBLE
-        glow.alpha = 0.3f
-        glow.scaleX = 0.96f
-        glow.scaleY = 0.96f
-        connectPulse = ObjectAnimator.ofPropertyValuesHolder(
-            glow,
-            PropertyValuesHolder.ofFloat(View.ALPHA, 0.3f, 0.6f),
-            PropertyValuesHolder.ofFloat(View.SCALE_X, 0.96f, 1.04f),
-            PropertyValuesHolder.ofFloat(View.SCALE_Y, 0.96f, 1.04f),
-        ).apply {
-            duration = 850
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.REVERSE
-            interpolator = android.view.animation.AccelerateDecelerateInterpolator()
-            start()
-        }
-    }
-
-    /**
-     * Stops the connecting breathe and hides the arc (unless a subscription is still loading).
-     * Resets the glow scale to rest so the connected/idle glow renders cleanly; the caller owns
-     * the glow's final visibility/alpha.
-     */
-    private fun stopConnectingAnim() {
-        connectArcConnecting = false
-        refreshConnectArc()
-        connectPulse?.cancel()
-        connectPulse = null
-        binding.imgConnect.alpha = 1f
-        binding.viewConnectGlow.animate().cancel()
-        binding.viewConnectGlow.scaleX = 1f
-        binding.viewConnectGlow.scaleY = 1f
-    }
-
-    /**
-     * The arc spins whenever we are connecting OR a subscription is loading. Uses the indicator's
-     * own show()/hide() (grow-in / shrink-out per the layout's animationBehavior) for a smooth
-     * start/stop, and pins its colour to the connecting accent so the arc always matches the
-     * shield (correct in both the blue and mono overlays).
-     */
-    private fun refreshConnectArc() {
-        val show = connectArcConnecting || connectArcSubLoads > 0
-        if (show) {
-            binding.progressConnect.setIndicatorColor(themeColor(R.attr.connectActiveColor))
-            binding.progressConnect.show()
-        } else {
-            binding.progressConnect.hide()
-        }
-    }
-
-    /**
-     * Routes subscription add/refresh progress onto the connect circle (the shared rotating
-     * arc) instead of a top progress bar. Ref-counted so overlapping loads don't clash with
-     * the connecting state. Overrides the BaseActivity top-bar spinner.
-     */
-    override fun showLoading() {
-        runOnUiThread {
-            connectArcSubLoads++
-            refreshConnectArc()
-        }
-    }
-
-    override fun hideLoading() {
-        runOnUiThread {
-            if (connectArcSubLoads > 0) connectArcSubLoads--
-            refreshConnectArc()
-        }
-    }
-
-    /**
-     * Updates the selected server name shown in the hero panel.
-     */
-    /**
-     * Refreshes the home memory card (MB + green/amber/red status), or hides it per preference.
-     */
-    private fun updateMemoryCard() {
-        val show = MmkvManager.decodeSettingsBool(AppConfig.PREF_SHOW_MEMORY, false)
-        binding.cardMemory.isVisible = show
-        if (!show) return
-        val mb = MemoryStatsManager.currentUsedMb()
-        val (labelRes, colorRes) = when (MemoryStatsManager.levelFor(mb)) {
-            MemoryStatsManager.Level.NORMAL -> R.string.memory_normal to R.color.color_connected
-            MemoryStatsManager.Level.ELEVATED -> R.string.memory_elevated to R.color.colorConfigType
-            MemoryStatsManager.Level.HIGH -> R.string.memory_high to R.color.colorPingRed
-        }
-        binding.tvMemory.text = getString(R.string.memory_value, mb, getString(labelRes))
-        binding.dotMemory.backgroundTintList = android.content.res.ColorStateList.valueOf(getColor(colorRes))
-    }
-
-    /** The name shown under the shield ONLY when connected (selected server remarks). */
-    private fun selectedServerName(): String {
-        val guid = MmkvManager.getSelectServer()
-        val remarks = guid?.let { MmkvManager.decodeServerConfig(it)?.remarks }
-        return remarks?.takeIf { it.isNotBlank() } ?: getString(R.string.home_select_server)
-    }
-
-    /**
-     * Neutral under-shield status when NOT connected: never the server name. Shows
-     * «Не подключено» when a server is selected, «Выберите сервер» when none is.
-     */
-    private fun idleStatusText(): String {
-        val guid = MmkvManager.getSelectServer()
-        val hasServer = guid?.let { MmkvManager.decodeServerConfig(it) } != null
-        return getString(if (hasServer) R.string.home_not_connected else R.string.home_select_server)
-    }
-
-    private fun updateSelectedServer() {
-        // Connecting/connected labels are owned by applyRunningState; when idle keep a
-        // neutral status (the server name only appears once actually connected).
-        if (mainViewModel.isRunning.value == true) return
-        binding.tvConnectionStatus.text = idleStatusText()
-    }
-
-    /**
-     * Starts a lightweight per-second timer showing the connection uptime.
-     * Uses a single reused Runnable to keep memory/CPU footprint minimal.
-     */
-    private fun startConnectionTimer() {
-        // Persist the start time so the uptime survives rotation / theme recreate.
-        val stored = MmkvManager.decodeSettingsLong(KEY_CONNECTION_START, 0L)
-        connectionStartTime = if (stored > 0L) {
-            stored
-        } else {
-            System.currentTimeMillis().also { MmkvManager.encodeSettings(KEY_CONNECTION_START, it) }
-        }
-        binding.tvConnectionTime.visibility = android.view.View.VISIBLE
-        timerHandler.removeCallbacks(timerRunnable)
-        timerHandler.post(timerRunnable)
-    }
-
-    private fun stopConnectionTimer() {
-        timerHandler.removeCallbacks(timerRunnable)
-        connectionStartTime = 0L
-        MmkvManager.encodeSettings(KEY_CONNECTION_START, 0L)
-        binding.tvConnectionTime.text = "00:00:00"
-    }
-
-    /**
-     * Schedules the one-shot post-connect health check, if auto-fallback is enabled and it
-     * hasn't already run this session.
-     */
-    private fun scheduleHealthCheckIfEnabled() {
-        // Any half-finished probe from the previous tunnel is void. Nothing about the fallback's
-        // one-shot state is touched here: this runs on EVERY isRunning==true emission, including
-        // the stale one the core answers MSG_REGISTER_CLIENT with (the quick-settings tile
-        // registers every time the panel opens), so "a tunnel is up" is not evidence that the
-        // fallback's restart has landed — the restart itself clears that flag.
-        healthCheckConfirming = false
-        timerHandler.removeCallbacks(healthRecheckRunnable)
-        if (mainViewModel.autoFallbackUsed) return
-        if (!MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_FALLBACK, true)) return
-        timerHandler.removeCallbacks(healthCheckRunnable)
-        timerHandler.postDelayed(healthCheckRunnable, HEALTH_CHECK_DELAY_MS)
-    }
-
-    /**
-     * Cancels a pending health check and its confirmation re-probe. On a *genuine* user disconnect
-     * it also clears the once-per-session fallback flag; during the fallback's own internal restart
-     * ([MainViewModel.fallbackInProgress]) the flag must survive, or the next START_SUCCESS re-arms
-     * the check and the switch/restart loop returns.
-     */
-    private fun cancelHealthCheck() {
-        healthCheckPending = false
-        healthCheckConfirming = false
-        timerHandler.removeCallbacks(healthCheckRunnable)
-        timerHandler.removeCallbacks(healthRecheckRunnable)
-        if (!mainViewModel.fallbackInProgress) {
-            mainViewModel.autoFallbackUsed = false
-        }
-    }
-
-    /** Arms the connect watchdog so a stalled/crashed start can't hang the UI on "connecting". */
-    private fun scheduleConnectWatchdog() {
-        timerHandler.removeCallbacks(connectWatchdogRunnable)
-        timerHandler.postDelayed(connectWatchdogRunnable, CONNECT_TIMEOUT_MS)
-    }
-
-    /** Cancels the connect watchdog once the attempt resolved (success/failure/stop). */
-    private fun cancelConnectWatchdog() {
-        timerHandler.removeCallbacks(connectWatchdogRunnable)
-    }
-
-    private val timerRunnable = object : Runnable {
-        override fun run() {
-            if (connectionStartTime == 0L) return
-            val elapsed = (System.currentTimeMillis() - connectionStartTime) / 1000
-            val h = elapsed / 3600
-            val m = (elapsed % 3600) / 60
-            val s = elapsed % 60
-            binding.tvConnectionTime.text = String.format("%02d:%02d:%02d", h, m, s)
-            timerHandler.postDelayed(this, 1000)
-        }
-    }
+    private fun themeColor(attr: Int): Int = MaterialColors.getColor(binding.mainContent, attr)
 
     override fun onResume() {
         super.onResume()
-        updateSelectedServer()
-        // Other entry points change the selected server without owning these lists — the URL-scheme
+        // Other entry points change the selected server without owning this list — the URL-scheme
         // and shortcut activities, and the quick tile. Re-reading it here keeps the rows honest
-        // instead of leaving a stale one painted as selected.
+        // instead of leaving a stale one painted as selected. (Главная re-reads its own list, and
+        // its account chip, in HomeFragment.onResume — a hidden tab is still RESUMED, so every tab
+        // refreshes itself without the shell reaching into it.)
         serversAdapter?.syncSelection()
-        homeAdapter.syncSelection()
-        // The account header is repainted reactively by the AccountSession.state collector
-        // (repeatOnLifecycle STARTED); re-evaluate the departament-subscription gate here too, so a
-        // subscription added/removed elsewhere shows/hides the account on return without a restart.
-        updateAccountGate()
-        updateLoginCtaVisibility()
-        // Настройки re-reads its own persisted values in SettingsTabFragment.onResume — a hidden
-        // tab is still RESUMED, so it is refreshed here too without the shell reaching into it.
-        timerHandler.removeCallbacks(memoryRunnable)
-        timerHandler.post(memoryRunnable)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        timerHandler.removeCallbacks(memoryRunnable)
+        // A login or a subscription change from another screen can add or remove the Аккаунт item
+        // and, in the onboarding state, the bar itself.
+        refreshNavGates()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -2803,7 +1417,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
                     LogUtil.i(AppConfig.TAG, "delAllConfig: $listed listed servers, $wiped profile entries wiped")
                     withContext(Dispatchers.Main) {
                         mainViewModel.reloadServerList()
-                        updateSelectedServer()
+                        homeFragment?.refreshSelectedServer()
                         hideLoading()
                         showActionSnackbar(getString(R.string.menu_actions_all_deleted, listed))
                     }
@@ -2868,7 +1482,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
             val ret = remove()
             withContext(Dispatchers.Main) {
                 mainViewModel.reloadServerList()
-                updateSelectedServer()
+                homeFragment?.refreshSelectedServer()
                 hideLoading()
                 if (ret > 0) {
                     showActionSnackbar(
@@ -2940,7 +1554,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
                 ?.let { MmkvManager.setSelectServer(it) }
             withContext(Dispatchers.Main) {
                 mainViewModel.reloadServerList()
-                updateSelectedServer()
+                homeFragment?.refreshSelectedServer()
                 hideLoading()
                 showActionSnackbar(getString(R.string.menu_actions_restored))
             }
@@ -2951,7 +1565,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * Bulk deletions are refused while the tunnel is up.
      *
      * Deleting the running server would leave the hero labelled with a server that no longer
-     * exists, and emptying the list hides the connect control altogether ([updateHomeEmptyState]),
+     * exists, and emptying the list hides the connect control altogether (Главная's empty state),
      * which would strand the user with a live tunnel and no way to stop it. The per-server delete
      * already refuses to touch the selected server, so this is the same rule at list scale.
      */
@@ -2960,7 +1574,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
         showActionSnackbar(
             getString(R.string.menu_actions_busy),
             getString(R.string.menu_actions_busy_action),
-        ) { handleFabAction() }
+        ) { toggleConnection() }
         return false
     }
 
@@ -3020,10 +1634,11 @@ class MainActivity : HelperBaseActivity(), MainHost {
                 ) { serversFragment?.clearSearch() }
             } else {
                 val onServers = selectedNavId == R.id.nav_servers
-                // On Серверы the anchor is that header's control; the Home fallback is only ever
-                // reached from Главная, where its own "+" is the one on screen.
-                val anchor = (if (onServers) serversFragment?.addMenuAnchor() else null)
-                    ?: binding.btnHomeAdd
+                // Each tab offers its own control to anchor to: the Серверы header's, or Главная's
+                // scrolling "+". With neither on screen the menu is anchored to the bar itself, so
+                // the action is never a dead end.
+                val anchor = (if (onServers) serversFragment?.addMenuAnchor() else homeFragment?.addMenuAnchor())
+                    ?: binding.bottomNav
                 showActionSnackbar(
                     getString(R.string.menu_actions_ping_empty),
                     getString(R.string.menu_actions_add),
@@ -3140,17 +1755,5 @@ class MainActivity : HelperBaseActivity(), MainHost {
             return true
         }
         return super.onKeyDown(keyCode, event)
-    }
-
-
-    override fun onDestroy() {
-        timerHandler.removeCallbacks(timerRunnable)
-        timerHandler.removeCallbacks(healthCheckRunnable)
-        timerHandler.removeCallbacks(healthRecheckRunnable)
-        timerHandler.removeCallbacks(memoryRunnable)
-        timerHandler.removeCallbacks(connectWatchdogRunnable)
-        stopConnectingAnim()
-        statusToast?.cancel()
-        super.onDestroy()
     }
 }

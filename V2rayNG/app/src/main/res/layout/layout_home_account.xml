@@ -1,155 +1,170 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Home account header. One slot, two mutually-exclusive states:
-    - signed out -> login entry points (group_login):
-        * "Войти через Telegram" tonal pill (btn_telegram_login)
-        * "Войти через сайт" text button (btn_site_login)
-        * dismissible "link Telegram" CTA banner (cta_link_telegram) for pasted-sub users
-    - signed in  -> account chip (chip_account)
-  Whole element is GONE unless BackendConfig.isConfigured().
+  ============================================================================
+  THE HEADER ROW of Главная. 13-start-screen.md 10, audit2026/android-home.md W-12.
+  ============================================================================
+
+  This is `row_account` from the spec, living under its historical file name so the
+  rebuild does not have to mint a layout in a directory another wave owns.
+
+      [ 16 ][ 40 slot holding a 36 avatar ][ 12 ][ text column ][ 12 ][ 20 chevron ][ 16 ]
+
+  THE 40dp SLOT IS THE WHOLE POINT (S-8). 11-app-structure.md asks for a 36dp
+  avatar, which would put this screen's text origin at 64 and break the 68 held by
+  every other row in the product. A 36 avatar CENTRED IN A 40 SLOT satisfies both,
+  and 68 = 16 + 40 + 12 is exactly @dimen/divider_inset_start.
+
+  Geometry, padding, press feedback and the touch target come from
+  @style/Widget.Departament.Row - the same style view_row.xml wears - so this row
+  cannot drift 2dp away from the two ledger rows below it. Nothing here restates a
+  number the style already owns.
+
+  THE AVATAR IS NEUTRAL, NEVER ACCENT (13 s. 10, 03-direction 3.2 / 5.7). The brand
+  does not spend the screen's one accent on advertising the user's identity, and the
+  monogram's circular fill is applied from HomeFragment against
+  ?attr/colorSurfaceContainerHighest rather than the blue it used to carry.
+
+  SIGNED OUT THIS IS A NAVIGATION ROW, NOT A CALL TO ACTION. It reads «Аккаунт» /
+  «Вход, подписка, устройства» and is not styled as a button; the verb «Войти» lives
+  on the gate primary, exactly once. The dead `group_login` block and the dead
+  «Привязать Telegram» CTA it owned (with its text-glyph close button, ban 1.4.4) are
+  this rewrite - W-13. Linking Telegram belongs to Аккаунт.
+
+  THE SKELETON IS THE SILHOUETTE OF THE TEXT COLUMN, not a spinner: two bars at the
+  title's and the subtitle's own heights, shown only if the account outlasts 300ms
+  (SkeletonBinder). The slot and the chevron stay put, so the hand-over moves nothing.
 -->
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/row_account"
+    style="@style/Widget.Departament.Row"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginStart="@dimen/screen_gutter"
-    android:layout_marginTop="@dimen/space_8"
-    android:layout_marginEnd="@dimen/screen_gutter"
-    android:visibility="gone">
+    android:baselineAligned="false">
 
-    <!-- Signed out: the "link Telegram" CTA for pasted-sub users. The primary login buttons
-         now live in the onboarding card (layout_home_empty); this container only carries the CTA. -->
-    <LinearLayout
-        android:id="@+id/group_login"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <!-- Dismissible CTA banner: prompt pasted-sub users to link Telegram -->
-        <LinearLayout
-            android:id="@+id/cta_link_telegram"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_8"
-            android:background="@drawable/bg_card_incy"
-            android:clickable="true"
-            android:focusable="true"
-            android:foreground="?attr/selectableItemBackground"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingStart="@dimen/space_12"
-            android:paddingTop="@dimen/space_8"
-            android:paddingEnd="@dimen/space_4"
-            android:paddingBottom="@dimen/space_8"
-            android:stateListAnimator="@anim/press_scale"
-            android:visibility="gone">
-
-            <ImageView
-                android:layout_width="@dimen/tile_glyph"
-                android:layout_height="@dimen/tile_glyph"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_telegram_24dp" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="@dimen/space_12"
-                android:text="@string/auth_link_telegram_cta"
-                android:textAppearance="@style/TextAppearance.App.Subtitle" />
-
-            <TextView
-                android:id="@+id/btn_cta_dismiss"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:clickable="true"
-                android:contentDescription="@string/auth_link_telegram_cta_dismiss"
-                android:focusable="true"
-                android:gravity="center"
-                android:text="✕"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textSize="16sp" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <!-- Signed in: account chip -->
-    <LinearLayout
-        android:id="@+id/chip_account"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@drawable/bg_card_incy"
-        android:clickable="true"
-        android:focusable="true"
-        android:foreground="?attr/selectableItemBackground"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="@dimen/space_12"
-        android:paddingTop="@dimen/space_8"
-        android:paddingEnd="@dimen/screen_gutter"
-        android:paddingBottom="@dimen/space_8"
-        android:stateListAnimator="@anim/press_scale"
-        android:visibility="gone">
-
-        <FrameLayout
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:background="@drawable/bg_avatar_circle">
-
-            <TextView
-                android:id="@+id/tv_avatar_initial"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:text="?"
-                android:textColor="?attr/iconTintBlue"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <ImageView
-                android:id="@+id/img_avatar"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:layout_gravity="center"
-                android:importantForAccessibility="no"
-                android:scaleType="centerCrop"
-                android:visibility="gone" />
-        </FrameLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="@dimen/space_12"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/tv_account_name"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text="@string/auth_account"
-                android:textAppearance="@style/TextAppearance.App.Title" />
-
-            <TextView
-                android:id="@+id/tv_account_sub"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_4"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text="@string/auth_open_account"
-                android:textAppearance="@style/TextAppearance.App.Caption" />
-        </LinearLayout>
+    <!-- The 40dp leading slot. Exactly one of its three children is visible: the
+         signed-out tile, the avatar photo, or the monogram. -->
+    <FrameLayout
+        android:id="@+id/account_slot"
+        android:layout_width="@dimen/tile_size"
+        android:layout_height="@dimen/tile_size"
+        android:layout_marginEnd="@dimen/space_12">
 
         <ImageView
-            android:layout_width="18dp"
-            android:layout_height="18dp"
-            android:layout_marginStart="@dimen/space_8"
-            android:contentDescription="@null"
-            android:src="@drawable/ic_chevron_right"
-            app:tint="?attr/colorOnSurfaceVariant" />
+            android:id="@+id/account_tile"
+            style="@style/Widget.Departament.Tile"
+            android:layout_width="@dimen/tile_size"
+            android:layout_height="@dimen/tile_size"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_nav_account" />
+
+        <!-- 36dp, centred in the 40 slot. AvatarManager clips the bitmap to a circle
+             and toggles this against the monogram, so neither is ever half-shown. -->
+        <ImageView
+            android:id="@+id/img_avatar"
+            android:layout_width="@dimen/avatar_chip"
+            android:layout_height="@dimen/avatar_chip"
+            android:layout_gravity="center"
+            android:importantForAccessibility="no"
+            android:scaleType="centerCrop"
+            android:visibility="gone" />
+
+        <!-- The fallback initial. Its circular neutral fill is applied in Kotlin from
+             ?attr/colorSurfaceContainerHighest - the same P3 plane as the disc. -->
+        <TextView
+            android:id="@+id/tv_avatar_initial"
+            android:layout_width="@dimen/avatar_chip"
+            android:layout_height="@dimen/avatar_chip"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:importantForAccessibility="no"
+            android:textAppearance="@style/TextAppearance.App.Title.Medium"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:visibility="gone"
+            tools:text="D"
+            tools:visibility="visible" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/account_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tv_account_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/home_account_title"
+            android:textAppearance="@style/TextAppearance.App.Title" />
+
+        <TextView
+            android:id="@+id/tv_account_sub"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_4"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/home_account_subtitle"
+            android:textAppearance="@style/TextAppearance.App.Subtitle" />
     </LinearLayout>
-</FrameLayout>
+
+    <!-- Same weight and the same two line heights as the text column it stands in
+         for, so the row does not change height when the account resolves. -->
+    <LinearLayout
+        android:id="@+id/account_skeleton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <View
+                style="@style/Widget.Departament.Skeleton.Bar"
+                android:layout_width="0dp"
+                android:layout_weight="4" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="@dimen/glyph_16"
+                android:layout_weight="6" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_4"
+            android:orientation="horizontal">
+
+            <View
+                style="@style/Widget.Departament.Skeleton.Bar"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/space_12"
+                android:layout_weight="7" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="@dimen/space_12"
+                android:layout_weight="3" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- S-7: 20dp, the row archetype's inline chevron, not the 22 of a tile glyph. -->
+    <ImageView
+        android:id="@+id/account_chevron"
+        android:layout_width="@dimen/glyph_20"
+        android:layout_height="@dimen/glyph_20"
+        android:layout_marginStart="@dimen/space_12"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_chevron_right"
+        android:tint="?attr/colorOnSurfaceVariant" />
+</LinearLayout>

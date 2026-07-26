@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ============================================================================
+  ГЛАВНАЯ - every visible string on the start screen.
+  13-start-screen.md 13.1, docs/agents/audit2026/android-home.md 11.1.
+  ============================================================================
+
+  Russian, sentence case, no final period on a label or a button, full stops
+  inside sentences, «ёлочки», U+2026 as ONE character, hyphen only (00-rules.md
+  1.4.11 forbids the em- and en-dash).
+
+  The mirror of res/values/strings_home.xml, byte-identical below this comment and
+  meant to stay that way. values/ is the fallback for every locale and
+  01-inventory-android.md 5.4 makes it Russian, so whichever of the two a device
+  resolves, the screen reads the same. This file exists so a later wave can turn
+  values/ into English without silently taking Главная with it.
+
+  The three plural sets are the only ones this screen needs. Russian takes
+  one / few / many / other and all four are declared: dropping "many" prints
+  «5 сервера».
+-->
+<resources>
+
+    <!-- ===================================================================== -->
+    <!-- The status line under the disc (13 s. 6). The WORD carries the state; -->
+    <!-- its colour only reinforces it, and there is no status dot (S-1).      -->
+    <!-- ===================================================================== -->
+    <string name="home_status_disconnected">Отключено</string>
+    <string name="home_status_connecting">Подключение…</string>
+    <string name="home_status_connected">Подключено</string>
+    <string name="home_status_disconnecting">Отключение…</string>
+    <string name="home_status_error">Не удалось подключиться</string>
+    <string name="home_status_no_server">Сервер не выбран</string>
+    <string name="home_status_no_servers">Нет серверов</string>
+    <string name="home_status_no_subscription">Подписки нет</string>
+    <string name="home_status_expired">Подписка истекла</string>
+    <string name="home_detail_retry">Нажмите, чтобы повторить</string>
+    <string name="home_detail_pick_server">Выберите сервер в разделе «Серверы»</string>
+
+    <!-- ===================================================================== -->
+    <!-- The numeric strip (13 s. 7). The UNIT lives in the label so the value  -->
+    <!-- stays a pure figure and the column's reserve never has to grow for it. -->
+    <!-- ===================================================================== -->
+    <string name="home_strip_down_label">Приём, Мбит/с</string>
+    <string name="home_strip_up_label">Отдача, Мбит/с</string>
+    <string name="home_strip_ping_label">Задержка, мс</string>
+
+    <!-- ===================================================================== -->
+    <!-- The two ledger rows (13 s. 8.1).                                      -->
+    <!-- ===================================================================== -->
+    <string name="home_row_servers">Серверы</string>
+    <!-- «15 серверов · 2 провайдера». U+00B7, never a hyphen and never a dash. -->
+    <string name="home_row_servers_value">%1$s · %2$s</string>
+    <string name="home_row_subscription">Подписка</string>
+
+    <string name="home_sub_active">Действует до %1$s</string>
+    <string name="home_sub_trial">Пробный период до %1$s</string>
+    <string name="home_sub_expired">Истекла %1$s</string>
+    <string name="home_sub_none">Не оформлена</string>
+    <string name="home_sub_stale">Не удалось обновить</string>
+
+    <string name="home_chip_expiring">Истекает</string>
+    <string name="home_chip_expired">Истекла</string>
+
+    <!-- ===================================================================== -->
+    <!-- The header row (13 s. 10). Signed out it is a NAVIGATION row, never a  -->
+    <!-- call to action: the verb lives on the gate primary, exactly once.      -->
+    <!-- ===================================================================== -->
+    <string name="home_account_title">Аккаунт</string>
+    <string name="home_account_subtitle">Вход, подписка, устройства</string>
+    <string name="home_account_manage">Управление аккаунтом</string>
+
+    <!-- ===================================================================== -->
+    <!-- The gate block (13 s. 8.2 / 8.3). One filled surface, one text button. -->
+    <!-- ===================================================================== -->
+    <string name="home_gate_signin_caption">Войдите, чтобы получить серверы Departament.</string>
+    <string name="home_gate_signin">Войти</string>
+    <string name="home_gate_add_provider">Добавить провайдера</string>
+    <!-- The build with no backend configured: signing in is meaningless there, so
+         adding a provider is the primary and there is no secondary. -->
+    <string name="home_gate_provider_caption">Добавьте провайдера, чтобы получить серверы.</string>
+    <string name="home_gate_buy_caption">Осталось выбрать тариф.</string>
+    <string name="home_gate_buy">Купить подписку</string>
+    <string name="home_gate_sync_caption">Подписка активна, серверы ещё не загружены.</string>
+    <string name="home_gate_sync">Загрузить серверы</string>
+    <string name="home_gate_sync_failed_caption">Не удалось загрузить серверы. Проверьте соединение.</string>
+    <string name="home_gate_retry">Повторить</string>
+
+    <!-- ===================================================================== -->
+    <!-- The inline status strip (13 s. 9). A CONDITION, not an event: at most  -->
+    <!-- one is shown and the priority order lives in HomeFragment.             -->
+    <!-- ===================================================================== -->
+    <string name="home_condition_expired">Подписка истекла. Продлите её, чтобы подключаться.</string>
+    <string name="home_condition_expiring">Подписка заканчивается %1$s.</string>
+    <!-- Row 2 of 13 s. 9 («Достигнут лимит устройств.» / «Устройства») and row 6 (TUN requested
+         but unavailable / «Как исправить») have NO producer on Android yet: the live connected-
+         device count comes from GET /client/devices, which nothing on this screen calls, and the
+         TUN cause is not modelled at all. Their keys are deliberately absent rather than declared
+         with no reader; add them back with the code that resolves them. -->
+    <string name="home_condition_offline">Нет сети. Показаны последние данные.</string>
+    <string name="home_condition_silent">Сервер не отвечает. Выберите другой сервер.</string>
+    <!-- Not in 13 s. 9's six rows. The shell reports every subscription import,
+         refresh and export through MainHost's loading hooks, and the connect sweep
+         is no longer allowed to stand in for them (13 s. 5.3: the sweep means the
+         core is negotiating and nothing else). Lowest priority, so a real condition
+         always wins the single strip. -->
+    <string name="home_condition_loading">Обновляем данные…</string>
+    <string name="home_stale_hint">Данные могли устареть</string>
+
+    <string name="home_action_renew">Продлить</string>
+    <string name="home_action_retry">Повторить</string>
+    <string name="home_action_change_server">Сменить сервер</string>
+
+    <!-- ===================================================================== -->
+    <!-- Accessible names for the connect disc (13 s. 14): STATE and ACTION,    -->
+    <!-- never just the verb.                                                  -->
+    <!-- ===================================================================== -->
+    <string name="home_cd_connect">Отключено. Нажмите, чтобы подключить</string>
+    <string name="home_cd_cancel">Подключение. Нажмите, чтобы отменить</string>
+    <string name="home_cd_disconnect">Подключено. Нажмите, чтобы отключить</string>
+    <string name="home_cd_locked">Недоступно. Нет подписки</string>
+
+    <!-- ===================================================================== -->
+    <!-- Dates. «14 августа» inside the current year, «14 августа 2027»         -->
+    <!-- otherwise. Never a numeric date on this screen (13 s. 13.1).           -->
+    <!--                                                                        -->
+    <!-- The month name is a resource rather than SimpleDateFormat("d MMMM"),   -->
+    <!-- because that formatter follows the DEVICE locale: on an English phone  -->
+    <!-- it prints «Действует до 14 August», a Russian sentence with an English -->
+    <!-- word in it. The genitive forms below are the ones a date takes.        -->
+    <!-- ===================================================================== -->
+    <string name="home_date_short">%1$d %2$s</string>
+    <string name="home_date_full">%1$d %2$s %3$d</string>
+    <string-array name="home_months_genitive">
+        <item>января</item>
+        <item>февраля</item>
+        <item>марта</item>
+        <item>апреля</item>
+        <item>мая</item>
+        <item>июня</item>
+        <item>июля</item>
+        <item>августа</item>
+        <item>сентября</item>
+        <item>октября</item>
+        <item>ноября</item>
+        <item>декабря</item>
+    </string-array>
+
+    <plurals name="home_servers_count">
+        <item quantity="one">%d сервер</item>
+        <item quantity="few">%d сервера</item>
+        <item quantity="many">%d серверов</item>
+        <item quantity="other">%d сервера</item>
+    </plurals>
+    <plurals name="home_providers_count">
+        <item quantity="one">%d провайдер</item>
+        <item quantity="few">%d провайдера</item>
+        <item quantity="many">%d провайдеров</item>
+        <item quantity="other">%d провайдера</item>
+    </plurals>
+    <plurals name="home_sub_days_left">
+        <item quantity="one">Остался %d день</item>
+        <item quantity="few">Осталось %d дня</item>
+        <item quantity="many">Осталось %d дней</item>
+        <item quantity="other">Осталось %d дня</item>
+    </plurals>
+</resources>

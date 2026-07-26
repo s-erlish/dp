@@ -1,139 +1,77 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Home empty state: shown only when there are no servers/subscriptions yet. -->
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/home_empty_root"
+<!--
+  ============================================================================
+  THE GATE BLOCK of Главная. 13-start-screen.md 8.2 / 8.3, android-home.md W-2.
+  ============================================================================
+
+  What used to be the onboarding CARD - the de-facto sign-in screen for every new
+  install, floating on a radial gradient with up to four filled accent surfaces on
+  it - is now one caption and one action, occupying the SAME SLOT as the two ledger
+  rows and never shown beside them (13 s. 4: #ledger and #gate are mutually
+  exclusive).
+
+      [ caption   Body 14/400, centred, wraps to 2 lines ]
+         16
+      [ primary   the ONE filled accent surface on this screen ]
+         12
+      [ secondary Tertiary text button, optional ]
+
+  ACCENT BUDGET (00-rules.md 3.6, 13 s. 8.2). Exactly one filled accent surface.
+  On a gated screen the connect disc is disabled, so the count is still one; the
+  card this replaces carried a filled «Сканировать QR», a tonal capsule «Войти через
+  Telegram», an accent ring and an accent glow at the same time.
+
+  NO CARD. A card is an object acted on as a unit; this is the screen's own next
+  step, on the screen's own ground. That also retires the 52dp fixed button height,
+  the 26dp capsule radius and the synthetic bold the old card carried - every one of
+  them now comes from @style/Widget.Departament.Button.*, where a height is a
+  MINIMUM and Material's 6dp insets are already zeroed (R2).
+
+  S-9: «Войти» is the primary and «Добавить провайдера» the secondary. This product
+  sells subscriptions through the site and the bot, so the overwhelmingly common
+  first run is a user who has already paid and needs to sign in. QR and clipboard
+  import stay one tap away behind the secondary, and also live in Серверы.
+
+  The caption's colour is set by HomeFragment: onSurfaceVariant normally,
+  @color/color_destructive_text when the caption IS the failure reason.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/gate"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginStart="@dimen/screen_gutter"
-    android:layout_marginTop="@dimen/space_4"
     android:layout_marginEnd="@dimen/screen_gutter"
-    android:layout_marginBottom="@dimen/space_4"
-    app:cardBackgroundColor="?attr/colorSurface"
-    app:cardCornerRadius="20dp"
-    app:cardElevation="0dp"
-    app:strokeColor="?attr/colorOutlineVariant"
-    app:strokeWidth="1dp">
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:visibility="gone"
+    tools:visibility="visible">
 
-    <LinearLayout
+    <TextView
+        android:id="@+id/tv_gate_caption"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_horizontal"
-        android:orientation="vertical"
-        android:paddingStart="@dimen/screen_gutter"
-        android:paddingTop="@dimen/space_24"
-        android:paddingEnd="@dimen/screen_gutter"
-        android:paddingBottom="@dimen/space_24">
+        android:gravity="center"
+        android:maxLines="2"
+        android:textAppearance="@style/TextAppearance.App.Body"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        tools:text="Войдите, чтобы получить серверы Departament." />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/home_empty_title"
-            android:textAppearance="@style/TextAppearance.App.Title" />
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_gate_primary"
+        style="@style/Widget.Departament.Button.Primary.Tall"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_16"
+        tools:text="Войти" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_8"
-            android:gravity="center"
-            android:text="@string/home_empty_subtitle"
-            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_home_add_qr"
-            android:stateListAnimator="@anim/press_scale"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_24"
-            android:text="@string/home_empty_add_qr"
-            app:icon="@drawable/ic_scan_24dp"
-            app:iconGravity="textStart" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_home_add_clipboard"
-            android:stateListAnimator="@anim/press_scale"
-            style="@style/Widget.Material3.Button.OutlinedButton.Icon"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_8"
-            android:text="@string/home_empty_add_clipboard"
-            app:icon="@drawable/ic_copy"
-            app:iconGravity="textStart" />
-
-        <!-- Signed-in + no-subscription state: buy a subscription (bound to the account) instead of
-             pasting one. Shown (and the QR/clipboard buttons above hidden) only when logged in;
-             GONE by default so the signed-out onboarding is unchanged. -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_home_buy"
-            android:stateListAnimator="@anim/press_scale"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_24"
-            android:text="@string/home_buy_subscription"
-            android:visibility="gone" />
-
-        <!-- Offered alongside the buy CTA only when the account's Telegram is not yet linked. -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_home_link_tg"
-            android:stateListAnimator="@anim/press_scale"
-            style="@style/Widget.Material3.Button.OutlinedButton.Icon"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_8"
-            android:text="@string/home_link_telegram"
-            android:visibility="gone"
-            app:icon="@drawable/ic_telegram_24dp"
-            app:iconGravity="textStart"
-            app:iconTint="@null" />
-
-        <!-- Sign-in entry points (only when a backend is configured and the user is signed out).
-             Kept together with the add buttons so onboarding lives in one card. -->
-        <LinearLayout
-            android:id="@+id/group_home_login"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_16"
-                android:gravity="center"
-                android:text="@string/home_or_sign_in"
-                android:textAppearance="@style/TextAppearance.App.Caption" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_home_login_tg"
-                android:stateListAnimator="@anim/press_scale"
-                style="@style/Widget.Material3.Button.TonalButton.Icon"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="@dimen/space_8"
-                android:text="@string/auth_sign_in_telegram"
-                android:textAllCaps="false"
-                android:textColor="?attr/colorOnPrimaryContainer"
-                android:textStyle="bold"
-                app:backgroundTint="?attr/colorPrimaryContainer"
-                app:cornerRadius="26dp"
-                app:icon="@drawable/ic_telegram_24dp"
-                app:iconGravity="textStart"
-                app:iconTint="@null" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_home_login_site"
-                android:stateListAnimator="@anim/press_scale"
-                style="@style/Widget.Material3.Button.OutlinedButton.Icon"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_8"
-                android:text="@string/auth_sign_in_site"
-                android:textAllCaps="false"
-                app:icon="@drawable/ic_globe_24dp"
-                app:iconGravity="textStart" />
-
-        </LinearLayout>
-
-    </LinearLayout>
-
-</com.google.android.material.card.MaterialCardView>
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_gate_secondary"
+        style="@style/Widget.Departament.Button.Tertiary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_12"
+        android:visibility="gone"
+        tools:text="Добавить провайдера"
+        tools:visibility="visible" />
+</LinearLayout>
