@@ -7,15 +7,37 @@ answers lead to opposite work. Here it is.
 
 - `res/values/arrays.xml:140-151` offers **Система / Русский / English**.
 - There is no `values-en/`, so picking English falls through to `values/`.
-- `values/` holds **1255** keys, **847 of them Russian**, across 20 files — every departament screen was
+- `values/` holds **1268** keys across 20 files, **839 of them Russian** — every departament screen was
   written straight into the default bucket.
-- `values-ru/` holds 880. The ~372 keys with no `values-ru` entry are invisible on a Russian device and
-  fatal on every other.
+- `values-ru/` holds **880**. The **388** keys with no `values-ru` entry are invisible on a Russian
+  device and fatal on every other.
 - Seven vendored upstream locales (`ar`, `bn`, `bqi-rIR`, `fa`, `vi`, `zh-rCN`, `zh-rTW`) carry ~352
   keys each — v2rayNG's strings, none of departament's.
 
 So the language picker's only non-Russian option produces a half-Russian app, and six more locales ship
 in that state without being offered at all.
+
+### `values/` is NOT a Russian master today, and the register says otherwise
+
+Re-measured directly, key by key, because a whole wave group is about to delete directories on the
+strength of it. Of the **880** keys `values/` and `values-ru/` share:
+
+| | count | |
+|---|---|---|
+| identical in both | **505** | fold either way, no decision needed |
+| `values/` **English**, `values-ru/` Russian | **367** | all in `strings.xml` — upstream v2rayNG's file |
+| both Russian but differing | **0** | there is no editorial conflict to resolve |
+| neither (URLs, protocol labels) | 8 | `server_lab_id`, `summary_pref_delay_test_url`, … |
+
+`MASTER-REGISTER.md` M-42 checks only the *reverse* hazard — Russian in `values/` shadowed by leftover
+English in `values-ru/` — finds zero, and concludes `values/` can simply be kept. **That conclusion is
+wrong in the direction it did not measure.** `values/` is a mix: departament's own 839 Russian strings
+plus upstream's ~429 English ones, which `values-ru/` is what translates. Keeping `values/` and
+discarding `values-ru/` would revert **367 strings to English** — «Search», «Connecting…», «Support»,
+«Автоподключение при включении устройства» — which is the same half-Russian app this decision exists to
+eliminate, arrived at from the other side.
+
+The good news is that with **zero** both-Russian conflicts the fold is mechanical, not editorial.
 
 ## The decision
 
@@ -43,9 +65,17 @@ without untangling anything first.
    leaving Система / Русский. Check every reader of the stored value for an index assumption.
 2. Delete `res/values-ar/`, `values-bn/`, `values-bqi-rIR/`, `values-fa/`, `values-vi/`, `values-zh-rCN/`,
    `values-zh-rTW/` — upstream strings for screens this product no longer has.
-3. `values-ru/` is now redundant with `values/`. Fold it down rather than leaving two masters to drift:
-   the ~372 keys that exist only in `values/` are already the live copy, and `values-ru/` duplicates the
-   other 880 exactly (verified for `strings_home.xml`, key-for-key and body-for-body). Keep `values/`.
+3. Fold `values-ru/` into `values/` so one master is left rather than two that drift — **and fold it in
+   the right direction**, which is not the one the register assumes. Per key:
+   - present only in `values/` (**388** keys) — keep as is; these are departament's own screens, already
+     Russian;
+   - identical in both (**505**) — keep either;
+   - `values/` English and `values-ru/` Russian (**367**, all in `strings.xml`) — **`values-ru/`'s body
+     wins.** Copying `values/` over these is the one move that must not happen;
+   - the 8 with no Cyrillic in either (URLs, protocol field labels) — keep `values/`.
+   There are **zero** keys where both files hold different Russian, so nothing here needs a human to
+   choose wording. When the fold is done, delete `values-ru/` and verify the result: every key in
+   `values/` that a user can see should be Russian, and the count should be 1268.
 4. **M-44** while in here: `res/layout/view_toolbar.xml:70` has the tree's one hardcoded
    `contentDescription="Назад"`. Make it a resource.
 
