@@ -43,9 +43,18 @@ object HttpUtil {
      * Resolves the User-Agent of a subscription request. The caller-supplied value — the
      * per-subscription override, else the operator-configured UA — always wins and is never
      * rewritten, because the panel keys the response format off it; the default only fills a blank.
+     *
+     * A value that cannot travel in a header also falls back: the override is free text the user
+     * types, and OkHttp throws while building the request on a control or non-ASCII character, so
+     * one stray character would otherwise fail every future update of that subscription with
+     * nothing but a log line to explain it.
      */
     private fun resolveSubscriptionUserAgent(userAgent: String?): String =
-        userAgent?.trim()?.ifBlank { null } ?: DEFAULT_SUBSCRIPTION_USER_AGENT
+        userAgent?.trim()?.takeIf { it.isNotEmpty() && it.isHeaderSafe() }
+            ?: DEFAULT_SUBSCRIPTION_USER_AGENT
+
+    /** Mirrors OkHttp's own header-value check: printable ASCII, plus tab. */
+    private fun String.isHeaderSafe(): Boolean = all { it == '\t' || it in ' '..'~' }
 
     /**
      * Converts the domain part of a URL string to its IDN (Punycode, ASCII Compatible Encoding) format.

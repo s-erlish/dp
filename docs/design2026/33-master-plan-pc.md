@@ -1272,3 +1272,2571 @@ set, and one `Button.Text` «Вернуть мои настройки». `hide-u
 directives are parsed and the value discarded. Icon choices are an enumeration we render.
 
 ---
+
+## 5. Destination 1 - Главная
+
+**Files today:** `Views/HomeView.axaml` (74 ln), `Views/CompactHomeView.axaml` (94 ln),
+`Views/ConnectHeroView.axaml` (839 ln) + `.axaml.cs` (1 156 ln), `Views/HomeAccountChip.axaml`
+(131 ln), `Views/ServerListView.axaml` (313 ln), `Views/SubscriptionMetaView.axaml` (335 ln).
+**Files after:** `Views/Home/HomePage.axaml` (one file, both modes),
+`Views/Home/ConnectControl.axaml`, `Views/Home/StatsRow.axaml`.
+**Verdict: REBUILD `HomeView` and `CompactHomeView` into one `HomePage`. RESTYLE `ConnectHeroView`
+into `ConnectControl` (delete five of its nine layers). MOVE `ServerListView` and
+`SubscriptionMetaView` to the Серверы destination. FOLD `HomeAccountChip` into the account row.**
+
+**Android counterpart:** `activity_main.xml` Home tab. Same concept: one connect object, one server
+identity, one subscription state, three live numbers, nothing else. Same states, same copy, same
+motion tempo. **Deliberate difference:** the desktop splits into two panes above 980px of content
+width, because a 1600px window with a single 720px column and a 176px disc leaves the right half
+empty; Android has no such width to answer for. **Deliberate difference:** on Android the account
+chip is a row at the top of Home; on desktop it is a row in the ledger, because the rail already
+carries the «Аккаунт» destination and a second permanent account affordance at the top of the page
+would be two entrances to one room.
+
+### 5.1 What Главная is for
+
+Four seconds. Is it on, what am I connected to, is my subscription alive, and the single control
+that changes the first of those. It is **not** where servers are browsed (that is Серверы) and it is
+not a dashboard.
+
+`03-direction.md` 3.2: the connect screen is the *least* branded screen in the app, not the most.
+The identity of this product lives in its numbers and its ledger, not in the disc.
+
+### 5.2 Layout
+
+**Compact and wide below 980px of content width - one centred column, `MaxWidth` 560:**
+
+```
+ScrollViewer  (one scroller, Padding 0,0,0,16)
+└─ StackPanel  MaxWidth 560  HorizontalAlignment=Center  Margin 16,0
+   ├─ 32                                              (space above the hero)
+   ├─ ConnectControl                     176px disc inside a 200px frame, centred
+   ├─ 16
+   ├─ TextBlock #statusLine              Title 16/700 + status dot + word
+   ├─ 4
+   ├─ TextBlock #gateLine                Subtitle 13, only when the subscription is not «активна»
+   ├─ 24
+   ├─ StatsRow                           only when connected; 3 columns, 44px tall
+   ├─ 32
+   ├─ TextBlock.SectionHeader «Подключение»
+   ├─ 8
+   ├─ Border.Card  Padding 0             the ledger
+   │   ├─ Border.Row  #rowServer         flag tile · name · protocol chip · ping · chevron
+   │   ├─ hairline at 68
+   │   ├─ Border.Row  #rowSubscription   tile · «Подписка» · state chip + expiry · chevron
+   │   ├─ hairline at 68
+   │   └─ Border.Row  #rowAccount        avatar tile · @handle · «Управление аккаунтом» · chevron
+   └─ 16
+```
+
+**Wide at content width >= 980 - two panes, both centred as one group, total `MaxWidth` 988:**
+
+```
+Grid  ColumnDefinitions="420,48,*"   MaxWidth 988   HorizontalAlignment=Center
+├─ [0] StackPanel  VerticalAlignment=Center        ← the connect pane
+│      ConnectControl · 16 · statusLine · 4 · gateLine · 24 · StatsRow
+└─ [2] StackPanel  VerticalAlignment=Center  MaxWidth 520    ← the ledger pane
+       SectionHeader «Подключение» · 8 · Border.Card with the three rows
+```
+
+No divider between the panes. 48px of space is the separator; a 1px line there would be the third
+background decision on a screen that needs one (today `HomeView` has a full-bleed gradient, a
+per-column gradient and a 1px divider).
+
+**Why the split is at 980 and not at the shell breakpoint:** at 760 window width the content area is
+`760 - 76 rail - 1 hairline - 32 gutter = 651px`. A 420px pane plus a 520px pane needs 988. Below
+that the single column is the correct layout, and it is the same column the compact mode shows, so
+there is one Home to design and one to test rather than two files that have already drifted (today
+`HomeView` and `CompactHomeView` inline the same 25-line TUN banner character for character, with
+`Padding="14,12"` and `Spacing="10"` in both copies).
+
+### 5.3 The connect control
+
+`Views/Home/ConnectControl.axaml`. The current `ConnectHeroView` stacks **nine** layers to express
+one boolean plus two transitions: `#AmbientSonar` → `#AmbientRing` → `#GlowHalo` → `#RingOuter` /
+`#RingHoverGlow` / `#RingInner` → `#SonarPulse` / `#SonarPulseEcho` → `#ConnectingArc` →
+`#ConnectDisc` → two shields. Our own inventory calls it **two competing idle animations on the same
+object**. Five layers are deleted.
+
+**5.3.1 The object, after.**
+
+```
+Panel #connectFrame  200x200  ClipToBounds=False
+├─ Ellipse #ring       200x200  StrokeThickness 1   Stroke Brush.Outline
+├─ Arc     #arc        200x200  StrokeThickness 3   Stroke Brush.Accent   (connecting only)
+├─ Ellipse #sonar      200x200  StrokeThickness 2   Stroke Brush.Accent   (the hero moment only)
+└─ Border  #disc       176x176  CornerRadius 88     Background Brush.SurfaceHigh
+     └─ Viewbox 80x80
+        ├─ PathIcon #shieldOutline  Geo.Server.ShieldOutline
+        └─ PathIcon #shieldFilled   Geo.Server.ShieldFilled   (Opacity 0 at rest)
+```
+
+Deleted: `#GlowHalo` and `Brush.ConnectGlow`, `#AmbientSonar`, `#AmbientRing`, `#RingHoverGlow`,
+`#SonarPulseEcho`, `Brush.Ring.Outer`, `Brush.Ring.Inner`. The frame drops from 230 to 200 because
+nothing needs to bloom outside the ring any more; 200 and 176 are both off the spacing scale and both
+are legitimate component sizes carried as tokens (`Size.ConnectFrame` 200, `Size.ConnectDisc` 176,
+`Size.ShieldGlyph` 80).
+
+**5.3.2 The four states.**
+
+| State | Disc | Ring | Shield | Status line |
+|---|---|---|---|---|
+| Отключено | `Brush.SurfaceHigh` `#1A1D21` | 1px `Brush.Outline` `#2A2E36` | outline, `Brush.OnSurfaceVariant` | 8px `Brush.OnSurfaceVariant` dot + «Не подключено» |
+| Подключение | `Brush.SurfaceHigh` | the arc replaces the ring: 3px `Brush.Accent`, 90 degrees of sweep, rotating | outline, `Brush.OnSurfaceVariant` | 8px `Brush.Accent` dot + «Подключение…» |
+| Подключено | `Brush.SurfaceHigh` | 1px `Brush.Outline`, back to rest | **filled, `Brush.Accent`** | 8px `Brush.Green` dot + «Подключено» |
+| Ошибка | `Brush.SurfaceHigh` | 1px `Brush.Red` | outline, `Brush.RedText` | 8px `Brush.Red` dot + the taxonomy's cause line, plus «Нажмите, чтобы повторить» |
+
+The idle state is **recessed, not tinted**: it is darker than the page because `Brush.SurfaceHigh` on
+`Brush.Bg` is a step up in a dark theme and reads as an inset control, and it carries **no blue at
+all**. `03-direction.md` 5.5: if the user's connection is off, nothing on the screen is blue. That is
+also what leaves contrast available to spend when it comes on.
+
+Colour is never the only signal: every state pairs the dot with the word.
+
+**5.3.3 Interaction.**
+
+| Input | Behaviour |
+|---|---|
+| Click on the disc | Toggle. Disabled while `Подключение` unless the press is a second press, which cancels |
+| `Ctrl+Enter` | Same |
+| Hover | `Brush.SurfaceHighest` on the disc, 150ms `Ease.Standard`. **No glow ring** (`#RingHoverGlow` deleted) |
+| Press | `scale(0.94)` at `Dur.PressIn` 90ms, out at `Dur.PressOut` 160ms. The documented exception to 0.97, because 0.97 is imperceptible on a 176px object |
+| Focus | 2px `Brush.Accent` ring at 2px offset, radius 88, drawn outside the ring |
+| Disabled | No subscription, or no server selected: `Opacity` 0.38, `IsEnabled=False`, cursor default, and the gate line explains why |
+| Tooltip | «Подключить (Ctrl+Enter)» / «Отключить (Ctrl+Enter)» |
+| Accessible name | «Кнопка подключения. Состояние: не подключено» |
+
+**5.3.4 The connecting arc.** 3px stroke on the 200px circle, 90 degrees of sweep, one rotation per
+**1.2 s**, linear (a genuine indeterminate progress indicator is the one place linear is correct),
+preceded by a one-shot 200ms `Ease.OutQuint` wind-up from 0 to 90 degrees of sweep so it starts
+decisively rather than snapping into a spin. It runs **only while the core is actually negotiating**
+and stops the frame the state resolves. An indeterminate indicator that runs while nothing is
+happening is a lie about the system. Under `.lite` the arc is a static 90-degree accent segment.
+
+**5.3.5 What was deleted and why.**
+
+| Deleted | Reason |
+|---|---|
+| `#GlowHalo` + `Brush.ConnectGlow` radial | Absolute ban on decorative glow. It carries no information and it needs a redrawn variant per theme; in light it made the idle disc almost invisible |
+| `#AmbientSonar`, `#AmbientRing` (850ms breathing loops) | Idle ambience. `03-direction.md` 8.5: no looping animation exists in this product except a genuine indeterminate indicator |
+| `#SonarPulseEcho` | A second ring. The hero moment emits exactly one |
+| `#RingHoverGlow` | Hover is a surface step, not a bloom |
+| `Brush.Ring.Outer` / `.Inner` (alpha rings) | Two extra strokes saying what one 1px ring says |
+| `#CornerAddButton` | The app's primary "add subscription" action was parked in the hero's corner, in the wide layout only. It moves to the Серверы destination, where adding a server or a provider belongs, and to the onboarding page |
+| `Text="↑"` / `Text="↓"` | Typographic characters standing in for icons. `Geo.Action.ArrowUp/Down` at 16px |
+
+**5.3.6 The hero moment.** The one 600ms event in the entire product, at the instant the tunnel
+confirms:
+
+1. `#shieldOutline` `Opacity 1 → 0` and `#shieldFilled` `Opacity 0 → 1`, both **220ms**
+   `Ease.Standard`, starting at t=0.
+2. `#sonar` emits **one** ring from the disc edge: `scale 1.0 → 1.35` with `Opacity 0.6 → 0`, over
+   **600ms** `Ease.OutQuint`, starting at t=0. It never loops. There is never a second ring.
+3. The status dot crossfades to `Brush.Green` over 220ms; the word «Подключено» **changes with no
+   animation at all**.
+4. Nothing else moves. The page does not flash, the background does not tint, the rail does not
+   react, the stats row fades in over `Dur.State` 220ms as ordinary content arriving.
+
+Disconnect is the same in reverse at **75 percent tempo** (450ms) and emits **no** ring.
+
+Under `.lite`: the shield swaps instantly, no sonar, the dot and the word change instantly.
+
+### 5.4 The status line and the gate line
+
+```
+StackPanel Orientation=Horizontal Spacing=8 HorizontalAlignment=Center
+├─ Ellipse 8x8   (the state dot, 5.3.2)
+└─ TextBlock.Title   «Подключено»
+```
+
+Below it, at 4px, `#gateLine`, `TextBlock.Subtitle` centred, `MaxWidth` 420, **present only when the
+subscription state is not `активна`**:
+
+| Subscription state | Gate line |
+|---|---|
+| `активна` | (nothing) |
+| `истекает` | `Подписка истекает через 3 дня` |
+| `истекла` | `Подписка истекла. Продлите её, чтобы подключаться.` |
+| `лимит устройств` | `Достигнут лимит устройств. Отвяжите одно в разделе «Устройства».` |
+| `нет подписки` | `Купите тариф, чтобы подключаться к серверам Departament.` |
+| `триал` | `Пробный период. Осталось 5 дней.` |
+
+A CTA that is always present is furniture; a gate line that appears only when something is wrong is
+information.
+
+### 5.5 The stats row
+
+`Views/Home/StatsRow.axaml`. **Visible only when connected.** Today three live counters, all reading
+zero, sit at the top of the page before the user has done anything, which is the hero-metric template
+inverted.
+
+```
+Grid ColumnDefinitions="*,Auto,*"  Height 44  MaxWidth 420
+├─ [0] StackPanel Orientation=Horizontal Spacing 4  HorizontalAlignment=Right
+│        PathIcon Geo.Action.ArrowUp 16 Brush.OnSurfaceVariant
+│        TextBlock.Numeric «3,1»   +  TextBlock.Caption «Мбит/с»
+├─ [1] TextBlock.Numeric  «02:14:07»  16/500  Brush.OnSurface   Margin 24,0
+└─ [2] StackPanel Orientation=Horizontal Spacing 4  HorizontalAlignment=Left
+         PathIcon Geo.Action.ArrowDown 16
+         TextBlock.Numeric «24,8»  +  TextBlock.Caption «Мбит/с»
+```
+
+- **Uptime is the middle stat and it is the largest of the three.** Speeds fluctuate and mean little;
+  a duration is a trust signal. Two hours fourteen minutes of unbroken tunnel is the single most
+  reassuring number a VPN can show, and it costs one ticker. This is Incy's best Home idea
+  (`30-reference-analysis.md` 2.1.4) and it is free.
+- Every figure is `TextBlock.Numeric` with `tnum,lnum` so nothing jitters. Each speed column reserves
+  `5 x 0.62 x 13 = 41px` for its digits so `9,9` to `12,4` does not shift the row. Uptime reserves
+  `8 x 0.62 x 16 = 80px`.
+- The 42px invisible spacer that fakes optical centring today is deleted; a three-column `Grid` with
+  a centred middle column does it honestly.
+- Units are in the UI face at `Caption` 12; figures are in the figure face. A sentence never ripples
+  between two faces, but these are values in their own slots, which is exactly where the split
+  belongs.
+
+### 5.6 The ledger rows
+
+**`#rowServer`** - the unified server icon, and the only server affordance on Главная.
+
+```
+Border.Row  #rowServer
+├─ ServerIcon 40   flag tile 28 circular, globe fallback
+├─ 12
+├─ text     Title    «Нидерланды, Amsterdam»          (remark, flag emoji stripped)
+│           Subtitle «VLESS · Reality · TCP»          (protocol chip + transport)
+├─ value    Numeric  «48 мс»   right-aligned, 48px reserved
+└─ chevron 20   → route `servers`
+```
+
+Click, `Enter` or `Space` opens the Серверы destination with that server scrolled into view and
+selected. Right-click opens the same `MenuFlyout` the server list uses (6.5). When no server is
+selected: title «Сервер не выбран», subtitle «Выберите сервер, чтобы подключиться», tile is the globe
+glyph, no ping, and the row is the primary affordance on the page.
+
+**`#rowSubscription`** - the subscription object's Home rendering (4.1).
+
+```
+Border.Row  #rowSubscription
+├─ Border.Tile   Geo.Set.Shield 22    neutral, or .amber / .red in the warning states
+├─ 12
+├─ text     Title    «Подписка»
+│           Subtitle «12,4 ГБ из 50 ГБ»               traffic, beside a 4px meter, never on it
+├─ trailing Border.Chip  «Активна до 12.08.2026»      state word + colour + glyph
+└─ chevron 20   → route `account/subscription/{id}`
+```
+
+With two or more subscriptions the row's title becomes «Подписки», the subtitle becomes
+«3 подписки · ближайшая истекает 12.08.2026», and the chip carries the **worst** state of the set.
+
+**`#rowAccount`** - replaces `HomeAccountChip.axaml` as a standalone component.
+
+```
+Border.Row  #rowAccount
+├─ Border.Avatar 40   monogram Title 16/700 Brush.OnAccent on Brush.Tile.Blue, or the photo
+├─ 12
+├─ text     Title    «@username»                      user content, ellipsises at the end
+│           Subtitle «Управление аккаунтом»
+└─ chevron 20   → destination `account`
+```
+
+Signed out, the row becomes: neutral tile with `Geo.Auth.Telegram`, title «Войти в departament»,
+subtitle «Через Telegram, быстро и без пароля», chevron → route `auth/login`. It is never hidden,
+because a signed-out user needs the entrance more than a signed-in one needs the exit.
+
+While the profile resolves, the row shows the skeleton variant: a 40px `Border.Skeleton` circle, a
+120x14 bar, a 90x12 bar, all pulsing. `HomeAccountChip` already does this correctly and the behaviour
+is carried over verbatim.
+
+### 5.7 The TUN banner
+
+Docked above the hero, both modes, one definition (today it is inlined twice, character for
+character). It is an `info` variant of the status strip component, not a bespoke banner:
+
+```
+Border.StatusStrip.warning   MinHeight 48   Margin 0,0,0,16
+├─ PathIcon 20 Geo.State.Warning  Brush.Icon.Yellow
+├─ TextBlock.Body  «Режим «весь трафик» недоступен без прав администратора»
+└─ Button.Text     «Перезапустить с правами»
+```
+
+Visible only when TUN is selected and elevation is missing. On Linux this is the first thing a user
+meets, so its action must work: it triggers the elevation prompt, which on Linux is the sudo dialog
+(9.3).
+
+### 5.8 Every state of Главная
+
+| State | Rendering |
+|---|---|
+| **Default, disconnected** | Neutral disc, «Не подключено», no stats row, three ledger rows |
+| **Default, connected** | Filled shield, green dot, «Подключено», stats row visible with live values |
+| **Connecting** | Arc, «Подключение…», stats row hidden, disc still clickable to cancel |
+| **First run** | Reached only past onboarding, so: disc **disabled**, gate line «Купите тариф, чтобы подключаться к серверам Departament.», `#rowServer` in its "no server" form, `#rowSubscription` in its `нет подписки` form with the chip absent and one `Button.Primary` «Купить подписку» as the row's trailing element instead of a chevron |
+| **Loading** | The three ledger rows render as skeletons; the disc is disabled with no gate line. Appears only after 300ms |
+| **Empty (no servers, signed in)** | Disc disabled, `#rowServer` reads «Серверов пока нет» / «Добавьте провайдера, чтобы появились серверы», chevron → `servers` |
+| **Error (tunnel)** | Red ring, `Brush.RedText` shield outline, status «Не удалось подключиться», gate line = the taxonomy's cause, «Нажмите, чтобы повторить» under the disc, and the status strip carries the recovery action |
+| **Offline** | Persistent info strip `Нет сети. Показаны последние данные.` with «Повторить»; the ledger keeps its last values; the disc is enabled (connecting is the way out of offline) |
+| **Partial** | The subscription row failed but servers loaded: the subscription row shows «Не удалось загрузить» with a `Button.Text` «Повторить» as its trailing element; everything else renders |
+| **Long content** | A 70-character server remark wraps to two lines and the row grows; a 40-character Telegram handle ellipsises at the end |
+| **Short content** | One server, no subscription: the layout still has three rows and does not look broken |
+| **Gated** | Expired subscription: disc disabled, gate line, and `#rowSubscription`'s trailing element becomes `Button.Primary` «Продлить» |
+| **Success** | The hero moment (5.3.6), then stillness |
+
+### 5.9 Keyboard path
+
+`Tab` order: rail, then `#connectFrame`, then `#rowServer`, `#rowSubscription`, `#rowAccount`, then
+the status strip's action if present. `Ctrl+Enter` toggles from anywhere. `Ctrl+2` leaves for
+Серверы. Every task on this page is completable with no mouse.
+
+### 5.10 Главная acceptance
+
+- [ ] Zero gradients, zero glows, zero looping idle animation
+- [ ] Exactly one accent element at rest (the rail); two when connected or connecting
+- [ ] The disc is neutral when disconnected
+- [ ] Stats appear only when connected; uptime is the middle and largest figure; nothing jitters
+- [ ] One card, three rows, one section header, and gaps of 32 / 24 / 16 / 8 / 4 present
+- [ ] Two panes above 980, one column below, no divider between panes
+- [ ] All thirteen states in 5.8 implemented and looked at
+- [ ] The server row and the subscription row use the same vocabulary as Серверы and Аккаунт
+
+---
+
+## 6. Destination 2 - Серверы
+
+**New destination.** Files today: `Views/ServerListView.axaml` (313 ln) + `.axaml.cs` (939 ln),
+`Views/SubscriptionMetaView.axaml` (335 ln) + `.axaml.cs` (687 ln), plus three dead files that
+contain features: `Views/ServersView.axaml` (12 ln, orphan wrapper),
+`Views/CompactServersView.axaml` (116 ln, **contains the app's only search field**, bound to
+`Profiles.ServerFilter`, instantiated by nothing), `Views/ProfilesView.axaml` (322 ln, registered in
+`SimpleViewLocator:29`, never shown).
+**Files after:** `Views/Servers/ServersPage.axaml`, `ProviderPane.axaml`, `ServerList.axaml`,
+`ServerRow.axaml`, `ProviderGroupHeader.axaml`, `ServerEditorPage.axaml`,
+`ProviderEditorPage.axaml`.
+**Verdict: REBUILD as a destination. HARVEST the search from `CompactServersView` and delete it.
+DELETE `ServersView` and `ProfilesView`.**
+
+**Android counterpart:** the Серверы tab (`layout_servers_header.xml`, `item_recycler_main.xml`,
+`item_section_header.xml`, `layout_servers_empty.xml`). Same concept: one list, grouped under the
+provider that produced it, one search, one sort, per-item actions one deliberate gesture away.
+**Deliberate differences:** desktop adds a provider pane at width, multi-select with `Ctrl` and
+`Shift`, right-click, keyboard navigation of the list, and a kebab that appears on hover; Android has
+none of those and uses a bottom sheet where desktop uses a flyout. The **row** is identical on both.
+
+### 6.1 Why it is a destination
+
+Three reasons, all of them structural rather than aesthetic:
+
+1. **Parity.** `00-rules.md` 13 fixes the destination set as identical. Android has four. Desktop
+   has three and hides servers in a column of Home.
+2. **Search has no home otherwise.** With 80 to 150 servers per subscription, a list with no search
+   is a functional hole, not a polish item. The only search field in the codebase is in a dead file.
+3. **The duplicate-list failure.** Putting the full list on Home is Incy's own IA mistake
+   (`30-reference-analysis.md` 2.2.8) and the desktop inherited it: on the default 372x630 window a
+   440px-minimum hero means the list starts below the fold and the hero cannot be skipped.
+
+### 6.2 Layout
+
+**Wide, content width >= 900 - two panes:**
+
+```
+Grid  ColumnDefinitions="300,1,*"
+├─ [0] ProviderPane        Width Size.PanePrimary 300, own ScrollViewer
+├─ [1] Border              Width 1  Brush.OutlineVariant
+└─ [2] DockPanel           the list pane
+      ├─ [Top] the list toolbar     56px: search field + sort + actions
+      └─ ServerList                 own ScrollViewer, virtualised
+```
+
+Two scrollers is the single documented exception to "one scroll region per view" and it is safe
+because they never overlap and never nest.
+
+**Compact, and wide below 900 - one column, `MaxWidth` `Size.Content` 720:**
+
+```
+DockPanel
+├─ [Top] the list toolbar   56px
+└─ ScrollViewer
+   └─ ItemsControl over provider groups
+      ├─ ProviderGroupHeader   sticky, 56px
+      ├─ ServerRow x N
+      ├─ ProviderGroupHeader   sticky
+      └─ ...
+```
+
+Group headers are **sticky** here because the list is long enough to lose context
+(`00-rules.md` 4.6). Settings groups are not sticky, because they are not.
+
+### 6.3 The list toolbar
+
+```
+Grid  Height 56  Margin 16,0  ColumnDefinitions="*,Auto,Auto,Auto"  ColumnSpacing 8
+├─ [0] TextBox.Field.search   Height 40   MaxWidth 360   HorizontalAlignment=Left
+│        watermark «Поиск серверов…»   leading Geo.Action.Search 20
+│        trailing clear button when non-empty     Ctrl+F focuses, Esc clears
+├─ [1] Button.IconButton40  Geo.Action.Sort     ToolTip «Сортировка»       → flyout
+├─ [2] Button.IconButton40  Geo.Action.Speed    ToolTip «Проверить задержку (Ctrl+P)»
+└─ [3] Button.IconButton40  Geo.Action.Add      ToolTip «Добавить (Ctrl+N)» → MenuFlyout
+```
+
+- **Search filters in place; it never navigates.** It matches the remark, the address, the protocol
+  and the provider name, case-insensitive, and it is debounced at 120ms.
+- **Sort flyout**, three options, radio semantics with a filled check on the current one:
+  «По умолчанию» · «По задержке» · «По названию». Persisted per provider. This mirrors the
+  `sort-order: none | ping | name` header both reference protocols carry.
+- **Add flyout**: «Добавить провайдера» · «Добавить по QR-коду (Ctrl+S)» · «Добавить из буфера
+  обмена (Ctrl+V)» · hairline · «Создать сервер вручную» → route `servers/editor`.
+- Four trailing controls is the ceiling. A fifth goes into a kebab. (Android's header today carries
+  four 36px icon buttons crammed against the right edge, all under the 48dp floor; desktop's are 40px
+  and meet the desktop floor.)
+
+### 6.4 The provider pane (wide only)
+
+```
+Border  Width 300  Background Brush.Bg
+└─ DockPanel
+   ├─ [Top]  TextBlock.SectionHeader «Провайдеры»   Margin 16,16,16,8
+   ├─ [Fill] ScrollViewer
+   │   └─ StackPanel
+   │      ├─ Border.Row.selectable  «Все серверы»       value «147»
+   │      ├─ 8
+   │      ├─ Border.Row.selectable  per provider:
+   │      │     Border.Tile   Geo.Set.Provider 22   neutral, or .amber/.red on subscription state
+   │      │     Title      «Departament»            (profile-title, capped at 25 chars in the parser)
+   │      │     Subtitle   «84 сервера · до 12.08.2026»
+   │      │     trailing   Border.Chip when the state is not «активна»
+   │      │     kebab 40   on hover / focus  → provider MenuFlyout
+   │      └─ ...
+   └─ [Bottom] Button.Text  «Добавить провайдера»   Margin 16,8,16,16
+```
+
+Selection is `Brush.SelectedFill` plus a 2px `Brush.Accent` left-edge **indicator is banned**
+(side-stripe). Instead: `Brush.SelectedFill` fill plus the title stepping to weight 700. Two channels.
+
+**Provider `MenuFlyout`:** «Обновить» · «Переименовать» · «Закрепить» / «Открепить» · «Открыть
+поддержку» · «Скопировать ссылку» · hairline · «Удалить провайдер» in `Brush.RedText`.
+
+**Pin** sorts the provider to the top **and** makes it the pane's default selection on launch. One
+gesture that changes both order and where the app opens (Happ's best small idea,
+`30-reference-analysis.md` 1.1.5).
+
+### 6.5 The server row
+
+`Views/Servers/ServerRow.axaml`. One definition, used in both layout modes, and its anatomy is
+byte-for-byte the concept Android's `item_recycler_main.xml` renders.
+
+```
+Border.ServerRow   MinHeight 56   Padding 16,8   CornerRadius 12
+├─ ServerIcon 40                 flag tile 28 circular · globe fallback
+├─ 12
+├─ text column (star)
+│    Title     «Нидерланды, Amsterdam»        16/700, max 2 lines, wraps
+│    Subtitle  Border.ProtocolChip «VLESS» + «Reality · TCP»   13/400 muted
+├─ 12
+├─ ping        TextBlock.Numeric «48 мс»      13/500, right-aligned, 56px reserved
+│              or an 18px arc spinner while probing
+│              or «нет ответа» in Brush.OnSurfaceVariant on failure
+└─ kebab 40    Button.IconButton40.Row  Geo.Action.More   Opacity 0 → 1 on :pointerover or :focus
+```
+
+A 1px `Brush.OutlineVariant` hairline separates rows, inset to **68**, hidden on the selected row and
+on the row above it. The permanent 1.5px transparent border each row carries today is deleted; it
+existed so selection could change a border colour without a layout shift, and the same result comes
+from a fill plus a glyph.
+
+| State | Rendering |
+|---|---|
+| Rest | transparent |
+| Hover | `Brush.Hover`, 150ms |
+| Pressed | `scale(0.97)` |
+| Selected (this is the active server) | `Brush.SelectedFill` `#4C8DFF` at 0.12 **and** a filled 20px `Geo.State.Check` in `Brush.Accent` replacing the kebab slot until hover |
+| Multi-selected (`Ctrl+click`) | `Brush.SurfaceHighest` fill plus a 20px checkbox glyph at the leading edge, replacing the flag tile |
+| Focus | inner 2px `Brush.Accent` ring, r12 |
+| Probing | ping slot shows an 18px indeterminate arc |
+| Unreachable | ping «нет ответа» in `Brush.OnSurfaceVariant`; the row is not dimmed, because it may still connect |
+
+**Ping is a value and a word, never a bare colour dot.** The ping figure never uses colour alone: a
+good latency is plain `Brush.OnSurface`, a bad one is `Brush.OnSurfaceVariant` with the word.
+
+**Selection uses two channels and no side stripe.** The zero-size indicator `View` that exists only
+so an adapter can still call `setBackgroundColor` is an Android artefact; desktop must not grow one.
+
+### 6.6 Actions
+
+**Discovery is the problem today**: the context menu is the only route to seven actions and nothing
+on the row says so. Three entrances, all opening the same `MenuFlyout`:
+
+- Right-click anywhere on the row.
+- The kebab, which fades in at `Opacity 0 → 1` over 150ms on hover or keyboard focus.
+- The `Menu` key or `Shift+F10` when the row has focus.
+
+```
+MenuFlyout, 40px rows, 20px leading glyph, 12 gap
+├─ Подключиться                Geo.Action.Connect        (Enter)
+├─ Сделать основным            Geo.State.Check
+├─ Проверить задержку          Geo.Action.Speed          (Ctrl+P)
+├─ hairline
+├─ Изменить                    Geo.Action.Edit           → route servers/editor/{id}
+├─ Дублировать                 Geo.Action.Copy
+├─ Поделиться · QR-код         Geo.Action.Qr             → QR dialog (9.2)
+├─ Поделиться · ссылка         Geo.Action.Link           → copies, status strip confirms
+├─ hairline
+└─ Удалить                     Geo.Action.Delete   Brush.RedText   (Delete)
+```
+
+**Delete is undo, not confirm** (`00-rules.md` 7.5): the row disappears immediately and the status
+strip shows `Сервер удалён` with `Отменить` for 5 seconds. A dialog is reserved for genuinely
+irreversible costly actions, and deleting one server out of 147 is not one.
+
+**Multi-select.** `Ctrl+click` toggles, `Shift+click` extends, `Ctrl+A` selects all in the current
+group, `Esc` clears. With two or more selected, the list toolbar's right side is replaced by a
+selection bar: `«Выбрано 12»` plus `Button.Text` «Проверить задержку», `Button.Text` «Дублировать»,
+`Button.Text` «Удалить» in `Brush.RedText`, and a 40px close button. Deleting many is still undo, one
+strip for the whole batch.
+
+### 6.7 The provider group header (compact, and «Все серверы» in wide)
+
+This is `SubscriptionMetaView` rebuilt. Today it is a card that carries **four** trailing icon
+buttons and locally shrinks the global `IconButton40` to **34x34 with 20px glyphs** to fit them into
+a 372px window. That is a structural problem solved by shrinking targets; the structural fix is an
+overflow.
+
+```
+Border  Height 56  Background Brush.Bg   (sticky)
+└─ Grid ColumnDefinitions="Auto,*,Auto,Auto"  Margin 16,0  ColumnSpacing 12
+   ├─ [0] Button.IconButton40  Geo.Action.ChevronDown   rotates 0 → -90 when collapsed
+   ├─ [1] StackPanel
+   │        TextBlock.Title    «Departament»
+   │        TextBlock.Subtitle «84 сервера · 12,4 ГБ из 50 ГБ · до 12.08.2026»
+   ├─ [2] Border.Chip           only when the state is not «активна»
+   └─ [3] Button.IconButton40   Geo.Action.More  → the provider MenuFlyout (6.4)
+```
+
+**Four trailing buttons become one kebab plus a collapse chevron.** Ping, refresh, pin and delete all
+move into the flyout. Both remaining buttons are 40x40 at full token size.
+
+The traffic figure lives in the subtitle as text; the 160px `Border.TrafficPill` with a label printed
+on a moving `LinearGradientBrush` fill is deleted. If a meter is wanted, it is a 4px `Border.Meter`
+below the subtitle with the label beside it, and the fill is a **solid** accent.
+
+**Operator message.** One component, one lifetime (`30-reference-analysis.md` 6.3b rule 5).
+`announce`, `announce-url` and the `sub-info-*` family all resolve into a single dismissible row
+directly under the group header:
+
+```
+Border  Background Brush.SurfaceHighest  r12  Padding 12  Margin 16,0,16,8
+├─ PathIcon 20   from the enumerated icon key, our glyph, our colour
+├─ TextBlock.Body  <= 200 chars, <= 5 lines, enforced in the parser not the view
+├─ Button.Text     the operator's labelled action, if any
+└─ Button.IconButton40.Row  Geo.Action.Close
+```
+
+Dismissal is keyed on a hash of the text, so a **new** message re-appears while the same one stays
+gone. The operator supplies text, a link, an enumerated icon key and one of three severities. Colour
+directives are parsed and **the value discarded**.
+
+### 6.8 Every state of Серверы
+
+| State | Rendering |
+|---|---|
+| **Default** | Provider pane with N providers, list with the current provider's servers, one selected |
+| **First run** | Reached only past onboarding; shows the empty state below |
+| **Loading** | Eight `Border.Skeleton` rows in the exact silhouette of a real row (40 circle, 180x16 bar, 120x13 bar, 40x13 bar), pulsing. Provider pane shows three skeleton rows. After 300ms only |
+| **Empty, no providers** | `Border.EmptyIcon` 64 with `Geo.Set.Provider`, Title «Нет серверов», Body «Добавьте провайдера или отсканируйте QR-код, чтобы появились серверы.», `Button.Primary` «Добавить провайдера», `Button.Text` «Добавить по QR-коду» |
+| **Empty, provider has no servers** | Same tile, Title «В этом провайдере нет серверов», Body «Обновите подписку или проверьте ссылку провайдера.», `Button.Primary` «Обновить» |
+| **No search results** | Title «Ничего не найдено», Body «Попробуйте другой запрос.», `Button.Text` «Сбросить поиск». The search field keeps its text and its focus |
+| **Error** | Title «Не удалось обновить подписку», Body «Проверьте ссылку провайдера и повторите.», `Button.Tonal` «Повторить». The last known list stays visible below, marked «Данные могли устареть» |
+| **Offline** | Last known list, the persistent offline strip, refresh and ping disabled, connect still enabled |
+| **Partial** | Provider A loaded, provider B failed: B's group header carries `Border.Chip.red` «Не обновлено» and a `Button.Text` «Повторить» in its flyout; A renders normally |
+| **Long content** | A 70-character remark wraps to two lines and the row grows to 72px; a provider name over 25 chars is capped **in the parser** |
+| **Short content** | One provider, one server: the pane still renders, «Все серверы» still renders, nothing looks broken |
+| **Probing all** | Every ping slot shows its arc; the toolbar's speed button becomes a cancel button |
+| **Multi-select** | The selection bar replaces the toolbar's right side |
+
+### 6.9 Keyboard path
+
+`Tab`: rail → search → sort → ping-all → add → provider pane (one stop, arrows move within) → list
+(one stop, arrows move within). Inside the list: `Up`/`Down` move focus, `Home`/`End` jump,
+`Enter` connects to the focused server, `Space` toggles selection, `Delete` removes with undo,
+`Menu` opens the flyout, `Ctrl+A` selects all, `Ctrl+P` pings the group, `Ctrl+F` returns to search,
+`Esc` clears search then clears selection. The list is virtualised, so focus movement must scroll the
+container itself, not rely on realisation.
+
+### 6.10 Серверы acceptance
+
+- [ ] Search exists, filters in place, and has a designed no-results state
+- [ ] Sort exists with three options and persists per provider
+- [ ] Every one of the seven per-item actions is reachable by mouse **and** by keyboard
+- [ ] Delete is undo; no confirmation dialog for a single server
+- [ ] One unified server icon; no emoji in the tile and none left in the remark text
+- [ ] Ping never uses colour as its only signal, and never jitters
+- [ ] Group headers carry two buttons, both 40x40; no local size overrides
+- [ ] The list is virtualised and stays smooth at 500 rows
+- [ ] Two panes above 900px of content width, one column below; no nested scrollers
+- [ ] All twelve states in 6.8 implemented and looked at
+
+---
+
+## 7. Destinations 3 and 4, and every sub-page
+
+### 7.1 Destination 4 - Аккаунт
+
+**File today:** `Views/AccountView.axaml` (1 474 ln, the largest view) + `.axaml.cs` (524 ln).
+**Files after:** `Views/Account/AccountPage.axaml` (the tab) and
+`Views/Account/SubscriptionPage.axaml` (a sub-page).
+**Verdict: REBUILD.** The visual grammar is right and is kept: one hero card, three zones separated
+by hairlines, one `Display` figure, quiet red text for sign-out. The **structure** is not: a
+four-panel flyout wizard inside a hand-rolled drag-snap carousel inside a vertical scroll, in one
+1 474-line file. The owner has already said the Account tab and every button in it are to be
+reworked on both platforms.
+
+**Android counterpart:** `AccountFragment` / `activity_account.xml`. Same three zones in the same
+order, same four-state subscription slot (skeleton / content / empty / error), same copy.
+**Deliberate differences:** desktop replaces the carousel with a vertical list because a horizontal
+drag carousel is a touch idiom and a pointer has a scrollbar; desktop moves the upgrade and
+add-devices flows onto a real sub-page because it has one and a phone bottom sheet is the Android
+answer; desktop shows the sign-in gate **inside** the tab while Android hides the tab, and this plan
+picks the desktop behaviour for both (`21-account-survey.md` 2.3 item 13 flags the divergence and
+`00-rules.md` 13 demands one answer).
+
+#### 7.1.1 Layout
+
+```
+ScrollViewer
+└─ StackPanel  MaxWidth Size.Content 720  Margin 16,16,16,32  HorizontalAlignment=Center
+   ├─ Border.Card  #hero        Padding 16              ZONE 1
+   ├─ 24
+   ├─ TextBlock.SectionHeader «Подписка»                ZONE 2
+   ├─ 8
+   ├─ Panel #subscriptionSlot   four exclusive states
+   ├─ 24
+   ├─ TextBlock.SectionHeader «Способы входа»           ZONE 3
+   ├─ 8
+   ├─ Border.Card  Padding 0    rows
+   ├─ 24
+   ├─ TextBlock.SectionHeader «Управление»              ZONE 4
+   ├─ 8
+   ├─ Border.Card  Padding 0    rows
+   ├─ 24
+   └─ Border.Row  #rowSignOut   outside any card
+```
+
+#### 7.1.2 Zone 1, the hero card
+
+Three sub-zones, two 1px `Brush.OutlineVariant` hairlines, one card. **No nested cards.**
+
+```
+Border.Card #hero  Padding 16
+├─ A identity     Grid ColumnDefinitions="48,12,*"
+│   ├─ Border.Avatar 48   monogram TextBlock.Headline 24/700 Brush.OnAccent on Brush.Tile.Blue
+│   └─ StackPanel
+│        TextBlock.Title      «Александр»            16/700, ellipsises   ← was Headline 24
+│        TextBlock.Caption    «Тариф · Base»          or «Пробный период»
+├─ hairline  Margin 0,16,0,16
+├─ B money        Grid ColumnDefinitions="*,Auto"  VerticalAlignment=Bottom
+│   ├─ StackPanel
+│   │    TextBlock.Caption  «Баланс»
+│   │    StackPanel Orientation=Horizontal  VerticalAlignment=Bottom
+│   │      TextBlock.Display.Numeric «1 240»   34/700, tnum lnum, zero OFF (money)
+│   │      TextBlock.Title «₽»  Brush.OnSurfaceVariant  Margin 4,0,0,4
+│   └─ Button.Tonal  «Пополнить»   48h            ← was Primary; see the accent note
+├─ hairline  (only when HasReferral)
+└─ C referral     Grid ColumnDefinitions="*,Auto"
+    ├─ TextBlock.Caption «Код друга» + Border.Chip.neutral with the code in Font.Numeric
+    └─ Button.IconButton40.Row  Geo.Action.Copy   ToolTip «Скопировать код»
+```
+
+Two changes with reasons:
+
+- **The name drops from `Headline` 24 to `Title` 16/700.** Today `Display` 34 (balance) plus
+  `Headline` 24 (name) plus `Headline` 24 (the ₽ symbol) sit inside one card and the identity fights
+  the money at the same weight. One `Display` per screen is the rule; the *second* loudest thing
+  should not tie with it.
+- **«Пополнить» becomes `Button.Tonal`.** The tab's single filled accent belongs to «Продлить» on the
+  subscription, or to «Купить подписку» when there is none. Today a default logged-in view carries
+  simultaneously: a filled «Пополнить», a filled «Продлить», an accent-coloured «Купить подписку» row
+  title, a blue Telegram tile, a blue buy tile and an accent traffic fill. The allowance is one.
+
+**Top-up flyout**, anchored to «Пополнить», `IncyFlyoutTheme`, Width 280, Spacing 12:
+Title «Пополнение баланса» → Caption «Введите сумму в рублях. Откроется страница оплаты.» →
+`TextBox.Field.numeric` (watermark «Сумма, ₽», `Enter` submits) → an error line in `Brush.RedText` 12
+that is always present in the markup → method rows when there are two or more (`Border.Row.selectable`
+with a filled check, **not** the current `Button.MethodChip` wrap panel) → `Button.Primary`
+«Продолжить», disabled until valid. The flyout closes only on success, so a validation error stays
+visible. Both fields opt into `TextBox.Field`; today they are stock Semi.
+
+#### 7.1.3 Zone 2, the subscription
+
+**The carousel is deleted.** Four exclusive states, and in the content state a **vertical list**:
+
+| State | Rendering |
+|---|---|
+| `ShowSkeleton` | One `Border.Card` MinHeight 176 with `Border.Skeleton` bars in the loaded silhouette: 180x16, 72x24 chip, 220x4 meter, 160x13 x2. No layout shift when the real card arrives |
+| `ShowContent`, one subscription | One `Border.Card`, the anatomy below |
+| `ShowContent`, two or more | A `StackPanel` of `Border.Row` summary rows inside one card, 8 apart, each opening `account/subscription/{id}`. No dots, no arrows, no drag |
+| `ShowEmpty` | `Border.Card` MinHeight 120: `Border.EmptyIcon` + Title «Подписки пока нет» + Subtitle «Купите тариф, чтобы подключаться к серверам Departament.» + `Button.Primary` «Купить» |
+| `ShowError` | `Border.Card`: neutral tile + alert glyph + Title «Не удалось загрузить» + Subtitle from the taxonomy + `Button.Tonal` «Повторить» |
+
+**The single-subscription card:**
+
+```
+Border.Card  Padding 16
+├─ header    Grid "*,Auto,Auto"
+│     TextBlock.Title  «Ваша подписка»  (or the user's rename)
+│     Border.Chip      state word + colour + glyph        (4.1)
+│     Button.IconButton40.Row  Geo.Action.More            → MenuFlyout
+├─ 16
+├─ meters    StackPanel Spacing 12
+│     expiry   TextBlock.Subtitle.Numeric  «Активна до 12.08.2026»
+│              classes .urgent → Brush.Icon.Yellow, .expired → Brush.RedText
+│     traffic  Grid "*,Auto":  Border.Meter 4px  +  Subtitle.Numeric «12,4 ГБ из 50 ГБ»
+│              label BESIDE the bar, fill SOLID Brush.Accent, never a gradient
+│     devices  Border.Row.static:  Subtitle «2 из 5 устройств»  + chevron → account/devices
+├─ 16
+├─ action    ONE full-width button, 48h
+│              Button.Primary «Продлить»   when истекает / истекла
+│              Button.Tonal   «Продлить»   otherwise
+├─ 12
+└─ autorenew Border.Row  «Автопродление»  + ToggleSwitch.iOS
+              Subtitle.Numeric «Продлится 03.08, спишем 150 ₽»
+```
+
+**The kebab flyout is two items, not four panels:** «Улучшить тариф» and «Докупить устройства», both
+routing to `account/subscription/{id}` with that section expanded. The four-panel wizard (menu →
+device stepper → upgrade list → upgrade confirm), with its own back buttons and its own titles inside
+a popup inside a card inside a carousel, is deleted. `00-rules.md` 7.6 orders inline > expandable row
+> flyout > dialog; a purchase flow with a stepper, a price estimate and two payment buttons is not a
+per-item overflow action.
+
+**The multi-subscription summary row:**
+
+```
+Border.Row   → account/subscription/{id}
+├─ Border.Tile  Geo.Set.Shield 22   neutral / .amber / .red
+├─ text  Title «Подписка · Base»   Subtitle «12,4 ГБ из 50 ГБ · до 12.08.2026»
+├─ Border.Chip  state
+└─ chevron 20
+```
+
+#### 7.1.4 Zone 3, «Способы входа»
+
+One card, four 56px rows, 68px hairlines.
+
+| Row | Tile | Value | Trailing |
+|---|---|---|---|
+| Telegram | `.Blue` `Geo.Auth.Telegram` | `@username` when linked | 20px `Geo.State.Check` `Brush.OnSurfaceVariant`; when pending, a `Border.Chip` with the code plus `Button.Text` «Открыть бота»; when unlinked, `Button.Text` «Привязать» |
+| «Почта и пароль» | neutral `Geo.Auth.Mail` | the address when linked | check, or `Button.Text` «Добавить» with a flyout: Title «Привязать почту», `TextBox.Field`, `Button.Primary` «Отправить» |
+| Google | neutral `Geo.Auth.Google` | the address when linked | check, or the row is **hidden entirely** |
+| «Веб-кабинет» | neutral `Geo.Action.Globe` | - | `Button.Text` «Открыть» |
+
+**The permanently disabled «Скоро» is deleted.** A control that is `IsEnabled="False"` and will never
+enable in this build is unfinished work rendered as UI, not a state. The Google row appears when
+Google sign-in ships.
+
+#### 7.1.5 Zone 4, «Управление», and sign-out
+
+One card, three rows: «История платежей» with the latest payment date as its value and a chevron;
+«Купить подписку» with a `.Blue` tile and a chevron (the title is **not** accent-coloured; an
+accent-tinted row title is a fifth accent element on a tab that already has its one); «Веб-кабинет».
+
+Sign-out is a `Border.Row` **outside** the card, 24 below it: neutral tile with
+`Geo.Action.SignOut`, title in `Brush.RedText`, no fill, no chevron. Clicking it opens the one
+genuinely destructive confirm on this tab (a modal, 9.1), because signing out on desktop discards the
+local session and the answer to "did I mean that" is not recoverable by undo.
+
+#### 7.1.6 The signed-out gate
+
+Rendered **inside** the tab, not instead of it:
+
+```
+StackPanel  MaxWidth Size.Form 480  VerticalAlignment=Center  Spacing 16
+├─ Border.Avatar 56   Geo.Auth.Telegram 28  Brush.Tile.Blue
+├─ TextBlock.Headline  «Войдите в departament»
+├─ TextBlock.Body      «Через Telegram, быстро и без пароля. Или по почте на сайте.»  MaxWidth 420
+├─ Button.Primary.Tall «Войти через Telegram»   52h  → route auth/login (panel Method, Telegram)
+└─ Button.Text         «Другие способы входа»          → route auth/login (panel Method)
+```
+
+#### 7.1.7 Every state of Аккаунт
+
+Signed out · loading (hero skeleton plus subscription skeleton) · signed in with no subscription ·
+one subscription in each of the six subscription states · two or more subscriptions · balance zero ·
+balance six digits (`1 284 371 ₽`, and the column does not shift) · Telegram pending · error on
+profile · error on subscriptions only (partial: hero renders, zone 2 shows its error card) · offline
+· sign-out in flight (row disabled with an inline arc).
+
+#### 7.1.8 Motion
+
+The entrance stagger stays: group 1 at delay 0, group 2 at +40ms, capped at 400ms total, played
+once per session per tab and only when the tab becomes active. The balance crossfades (`Opacity`
+0.25 → 1, `TranslateY` -6 → 0, `Dur.State`) **only on a real change**, never on first paint, never
+when the tab is not hit-test-visible, never under `.lite`. Everything else is still.
+
+#### 7.1.9 Acceptance
+
+- [ ] Exactly one filled accent surface on the tab in every state
+- [ ] Exactly one `Display` figure
+- [ ] No carousel, no four-panel flyout, no drag threshold, no tunnel pointer handlers
+- [ ] Both `TextBox`es use `TextBox.Field`; zero Semi defaults on the tab
+- [ ] Zero raw hex (`AccountView.axaml:65` `#3D7EF0` and `:68` `#3877E0` move to the button class)
+- [ ] Zero off-scale spacing (today: `Spacing="6"` x2, `"10"`, `"20"`, `Margin="6,0,0,4"`)
+- [ ] The traffic meter fill is solid; the label is beside the bar
+- [ ] The health chip does not reuse payment-status class names
+- [ ] Both icon-only buttons without names get names
+- [ ] The file is under 400 lines and the sub-page carries the rest
+
+---
+
+### 7.2 `account/subscription/{id}` - the subscription sub-page
+
+**New file:** `Views/Account/SubscriptionPage.axaml`. This is where the deleted four-panel flyout
+goes, and it is the answer to «Докупить устройства» and «Улучшить тариф» being three levels deep.
+
+**Android counterpart:** the subscription card's expanded actions. Android reaches the same two flows
+through `PaymentMethodSheet` and a stepper dialog; desktop uses a page. Same copy, same order, same
+prices, same confirmations.
+
+```
+SubPage  Title = the subscription's name   MaxWidth Size.Content 720
+├─ header block                 Border.Card Padding 16
+│    Title + rename affordance (Button.IconButton40.Row Geo.Action.Edit → inline TextBox.Field)
+│    Border.Chip state
+│    expiry · traffic meter · device meter, the same three meters as the card
+├─ 24
+├─ SectionHeader «Действия»
+├─ Border.Card Padding 0
+│    Border.Row  «Продлить»            value «1 500 ₽ · 30 дней»    chevron → payment picker
+│    Border.Row  «Улучшить тариф»      value «Base»                  chevron → tariff picker
+│    Border.Row  «Докупить устройства» value «2 из 5»                rotating chevron → inline stepper
+│    Border.Row  «Автопродление»       value «Продлится 03.08»       ToggleSwitch.iOS
+├─ 24
+├─ SectionHeader «Подключение»
+├─ Border.Card Padding 0
+│    Border.Row  «Ссылка подписки»     value the host, ellipsised    Button.IconButton40.Row copy
+│    Border.Row  «QR-код»                                            chevron → QR dialog
+│    Border.Row  «Устройства»          value «2 из 5»                chevron → account/devices
+└─ 24
+   Border.Row   «Удалить подписку»  Brush.RedText, outside the card
+```
+
+- **«Продлить» is the one filled accent** on this page, and it is rendered as a `Button.Primary` bar
+  docked at the bottom of the page when the state is `истекает` or `истекла`; otherwise it is the row
+  shown above. One page, one primary.
+- **The device stepper is an inline expand**, not a flyout: the row's chevron rotates 0 to 90 and a
+  panel opens below it with `Button.Stepper` minus / `TextBlock.Headline.Numeric` count /
+  `Button.Stepper` plus, an estimate line `TextBlock.Title.Numeric` «≈ 150 ₽», a caption «Примерная
+  сумма. Точную посчитаем при оплате.», and the payment choice as two rows.
+- **The payment choice is one grammar everywhere**: two `Border.Row.selectable` rows, «С баланса ·
+  1 500 ₽» and «Картой», with a filled check on the selected one, then one `Button.Primary`
+  «Оплатить». Today the same decision is inline buttons in three places on Аккаунт and a bottom sheet
+  on Покупка. If the save button looks different in two places, one is wrong.
+- **`hide-url` is refused**: the «Ссылка подписки» row always shows and always copies. We may keep
+  the URL out of a shared backup; we never remove the owner's ability to read it.
+
+States: loading (skeleton rows) · content · renewing (the action row's trailing becomes an 18px arc
+and the row is disabled) · upgrade in flight · error (status strip plus the row's inline retry) ·
+offline (all money actions disabled, the copy and QR rows still work).
+
+---
+
+### 7.3 `account/buy` - Покупка
+
+**File:** `Views/BuyView.axaml` (709 ln) + `.axaml.cs` (173 ln) → `Views/Account/BuyPage.axaml`.
+**Verdict: RESTYLE.** Our own inventory calls it the closest thing to a finished 2026 screen: five
+states, real skeletons, a proper scrim, Escape handling, one accent CTA. Six defects to close.
+
+**Android counterpart:** `activity_buy_tariff.xml` plus `PaymentMethodSheet`. Identical tariff card
+anatomy, identical price-option rows, identical total line, identical copy. **Deliberate
+difference:** the payment picker is a bottom sheet on Android and inline rows on desktop.
+
+```
+SubPage Title «Купить подписку»   MaxWidth Size.Content 720
+└─ StackPanel Margin 16,8,16,32
+   ├─ TextBlock.Title «Выберите тариф»   Margin 0,0,0,8
+   ├─ ItemsControl of Border.TariffCard, 12 apart, entering with a +40ms stagger capped at 6 steps
+   │    Border.TariffCard  Brush.Surface  r20  1.5px border (constant, colour changes on select)
+   │      header  Border.Row MinHeight 56:
+   │         Title «Base»   Subtitle.Numeric «3 устройства · трафик без ограничений»
+   │         20px Geo.State.Check, slot always reserved, fades in over 150ms
+   │      options (revealed when selected, fade + 6px rise, Dur.Reveal 300 OutQuint)
+   │         Border.Row.selectable  r12  MinHeight 48   ← was Border.PriceOption r14
+   │            Body.Numeric «30 дней»            Body Bold accent «1 290 ₽»
+   └─ Border.Card #checkout   (visible when a price option is chosen)
+        Border.Row  «Дополнительные устройства»  value ExtraCostText  two Button.Stepper
+        hairline
+        Grid  «Итого»  +  TextBlock.Headline.Numeric accent «1 440»  +  Title muted «₽»
+        hairline
+        SectionHeader-less group: two Border.Row.selectable payment rows + filled check
+        Button.Primary.Tall  «Оплатить»  52h, wallet glyph swaps for an 18px arc while paying
+```
+
+**The six fixes:**
+
+1. **Card in card.** A bordered option row inside a bordered tariff card is the nested-card ban.
+   Option rows lose their border and become plain rows separated by a hairline inset to 16, with the
+   selected one carrying `Brush.SelectedFill` plus a filled check.
+2. **Radius 14 inside radius 20.** `Border.PriceOption` at `Radius.Search` 14 breaks the shape lock.
+   It becomes a row at 12.
+3. **The bottom sheet.** A slide-up sheet at the bottom of a 900x600 window is a phone idiom. It
+   becomes two inline rows in the checkout card, matching 7.2.
+4. **Error text in `Brush.Red`** (`#F04452`, 4.88:1) becomes `Brush.RedText` (`#FF6069`, 6.15:1).
+5. **Toolbar title at `Headline` 24** becomes `Title` 16/700.
+6. **The success state is a dead end.** It becomes: check tile, Title «Подписка оплачена», Subtitle
+   «Серверы уже добавлены. Можно подключаться.», `Button.Primary` «Подключиться» which pops to
+   `home` and starts the tunnel, plus `Button.Text` «К списку серверов».
+
+Also added: a **purchase summary** in the checkout card (the chosen tariff name and period restated
+above the total), because today the user never sees what they are buying next to what they are
+paying. Same hole exists on Android and is closed there too.
+
+States: skeleton (three `Border.Skeleton` cards at 76px) · content · pending (`Платёж обрабатывается…`
+as an info strip) · success · empty (`Тарифы недоступны`) · error · offline (the CTA is disabled and
+the strip explains).
+
+---
+
+### 7.4 `account/devices` - Устройства
+
+**File:** `Views/DevicesView.axaml` (491 ln) → `Views/Account/DevicesPage.axaml`.
+**Verdict: RESTYLE.** Five states, one card with inset dividers, correct destructive treatment.
+
+**Android counterpart:** `activity_devices.xml` plus `item_device.xml`, which today renders each
+device as its own 20dp card with 8dp gaps. Both platforms converge on **one card, divided rows**.
+
+```
+SubPage Title «Устройства»   trailing: Border.Chip.neutral «2 из 5»   MaxWidth Size.Content 720
+└─ StackPanel Margin 16,8,16,32
+   ├─ TextBlock.Subtitle «Устройства, подключённые к вашей подписке»   (hidden in empty/error)
+   ├─ 16
+   └─ Border.Card  Padding 0
+        Border.Row per device   MinHeight 56  Padding 16,12
+        ├─ Border.Tile 40   platform glyph: Geo.Dev.Windows | Android | Apple | Router | Generic
+        ├─ text   Title «MacBook Pro»  +  Border.Chip.accent «Это устройство» when current
+        │         Subtitle.Numeric «Подключено 12.08.2026 · 192.168.1.14»
+        └─ Button.IconButton40.Row  Geo.Action.Unlink  Brush.Red  ToolTip «Отвязать устройство»
+        hairline at 68
+```
+
+**Five fixes:**
+
+1. **The raw HWID third line is deleted from the row.** It moves into the row's tooltip and into a
+   `Button.Text` «Показать идентификатор» in the row's flyout. Three lines per row of which the third
+   is a hex fingerprint is a developer surface.
+2. **The current-device wash is deleted.** Today `Brush.Tile.Blue` is painted across the whole row
+   **and** used as the chip's background, so the chip dissolves into its own backdrop, and an accent
+   wash sits on a row that is not selected. The chip alone carries the fact.
+3. **`Background="#80000000"`** (`:451`) becomes `{DynamicResource Brush.Scrim}`.
+4. **Off-scale `Margin="0,3,0,0"` and `Margin="16,10"`** become 4 and 16,12.
+5. **Unlink becomes undo, not confirm.** The device re-registers on the next connect, so this is a
+   reversible action and `00-rules.md` 7.5 prefers undo: the row disappears, the status strip shows
+   `Устройство отвязано` with `Отменить` for 5 seconds. The centred confirm card on a scrim is
+   deleted.
+
+States: list · loading (three skeleton rows with the real row's geometry) · empty («Устройств пока
+нет» / «Устройства появятся после первого подключения.») · no subscription («Активная подписка не
+найдена» + `Button.Primary` «Купить подписку») · error · offline · at limit (the toolbar chip turns
+`.amber` and a warning strip carries «Достигнут лимит устройств»).
+
+---
+
+### 7.5 `account/history` - История платежей
+
+**File:** `Views/PaymentHistoryView.axaml` (351 ln) → `Views/Account/PaymentHistoryPage.axaml`.
+**Verdict: RESTYLE.**
+
+**Android counterpart:** `activity_payment_history.xml` plus `item_payment.xml`. Same row, same
+status vocabulary, same empty CTA. Android has swipe-to-refresh; desktop gets `F5` and a toolbar
+refresh button, which is the pointer equivalent.
+
+```
+SubPage Title «История платежей»   trailing Button.IconButton40 Geo.Action.Refresh (F5)
+└─ Border.Card Padding 0   MaxWidth Size.Content 720
+     Border.Row.static per payment   MinHeight 56
+     ├─ Border.Tile 40  neutral  Geo.Pay.History 22
+     ├─ text   Body «Продление подписки Base»   Caption.Numeric «12.08.2026, 14:32»
+     ├─ right  Body Bold Numeric «1 290 ₽»
+     │         Border.Chip  «Оплачено» .green | «В обработке» .amber | «Ошибка» .red | «Отменён» .neutral
+     hairline at 68
+```
+
+Fixes: the three hand-copied 60-line skeleton blocks become one `SkeletonList` component with a count
+parameter; the hand-coded 64x64 `CornerRadius="20"` empty tile becomes `Border.EmptyIcon`; the
+identical non-interactive card stack becomes one card with divided rows; the toolbar title drops to
+`Title` 16/700.
+
+States: list · loading · empty («Платежей пока нет» / «Здесь появится история покупок и продлений.» /
+`Button.Primary` «Купить подписку») · error (`Button.Tonal` «Повторить», **and** the buy CTA, which
+the error state lacks today) · offline · partial (older pages failed to load: an inline
+`Button.Text` «Загрузить ещё» at the bottom with its own error line).
+
+---
+
+### 7.6 Destination 3 - Настройки
+
+**File:** `Views/SettingsView.axaml` (1 075 ln) + `.axaml.cs` (359 ln) →
+`Views/Settings/SettingsPage.axaml`.
+**Verdict: RESTYLE the rows, REBUILD the information architecture.**
+
+The affordance-honesty grammar documented at `SettingsView.axaml.cs:14-22` is the single best design
+decision in the codebase, it is now product law (4.3a), and it is kept verbatim. What changes: the
+missing `MaxWidth`, the group count and order, a search field, the eight rows that today have no home
+at all, and the ten engine features that exist only inside the dead `OptionSettingWindow`.
+
+**Android counterpart:** `layout_settings_content.xml`. `00-rules.md` 13 fixes the group order as
+identical, and it currently is not (desktop has 5 groups, Android 6, in different orders). **This
+plan sets the order for both platforms.** Everything else is identical: same rows, same values, same
+defaults, same sub-page destinations, same copy keys.
+
+#### 7.6.1 The hub
+
+```
+SubPage-less destination (no back button; it is a tab)
+DockPanel
+├─ [Top] Grid Height 56  Margin 16,8,16,0   MaxWidth Size.Content 720
+│     TextBox.Field.search   Height 40   watermark «Поиск по настройкам…»   Ctrl+F
+└─ ScrollViewer
+   └─ StackPanel  MaxWidth Size.Content 720  HorizontalAlignment=Center  Margin 0,0,0,32
+        SectionHeader + Border.Card(Padding 0) x 4, 24 apart
+```
+
+**Four groups, maximum seven rows each** (`03-direction.md` 7.3). Twenty rows total, down from
+twenty-two but covering ten features that are currently unreachable.
+
+**Group 1 - «Подключение»** (6 rows)
+
+| Row | Value shown | Affordance | Target |
+|---|---|---|---|
+| Режим | - | segment «Весь трафик» / «Прокси» | in place |
+| Прокси по приложениям | «Кроме 12 приложений» / «Выкл» | chevron | `settings/perapp` |
+| Маршрутизация | «Стандартные · 42 правила» | chevron | `settings/routing` |
+| DNS | «Cloudflare» | chevron | `settings/dns` |
+| Обход блокировок | «Mux, фрагментация» / «Выкл» | chevron | `settings/bypass` |
+| Локальный прокси | «127.0.0.1:10808» | rotating chevron | inline panel |
+
+**Group 2 - «Интерфейс»** (6 rows)
+
+| Row | Value | Affordance |
+|---|---|---|
+| Оформление | - | segment «Тёмная» / «Светлая» |
+| Монохром | - | switch |
+| Масштаб интерфейса | «125 %» | unfold, cycles 100 / 125 / 150 / 175 / 200 |
+| Язык | «Русский» | unfold, cycles Русский / English |
+| Облегчённый режим | - | switch (reduced motion, live) |
+| Запуск при входе в систему | - | switch |
+
+**Group 3 - «Подписки и серверы»** (4 rows)
+
+| Row | Value | Affordance | Target |
+|---|---|---|---|
+| Провайдеры | «Автообновление · 6 ч» | chevron | `settings/provider` |
+| Задержка | «Реальная · 5 с» | chevron | `settings/ping` |
+| Файлы ресурсов | «geoip 8,2 МБ · обновлён 12.08» | chevron | `settings/geofiles` |
+| Схемы URL-адресов | «Зарегистрирована» / «Не зарегистрирована» | chevron | `settings/urlschemes` |
+
+**Group 4 - «Система»** (5 rows)
+
+| Row | Value | Affordance | Target |
+|---|---|---|---|
+| Ядро и журнал | «Xray · предупреждения» | chevron | `settings/core` |
+| Горячие клавиши | «12 назначено» | chevron | `settings/hotkeys` |
+| Резервная копия | - | chevron | `settings/backup` |
+| Обновления | «Версия 7.13.4 · актуальна» | chevron | `settings/update` |
+| О приложении | - | chevron | `settings/about` |
+
+**«Автообновление подписки» exists once**, inside `settings/provider`. Today Android carries it in
+two places, in two visual languages, two taps apart, writing the same fields.
+
+**Where the theme settings live, and why there is no theme page.** `Views/ThemeSettingView.axaml`
+(67 ln, registered and never built) is deleted rather than rebuilt. A theme picker with three
+controls does not earn a push: «Оформление» is a two-state change and is therefore a segment applied
+in place, «Монохром» is a boolean and is therefore a switch, and «Масштаб интерфейса» is a short
+cycle and is therefore `unfold_more`. All three obey the affordance grammar, all three are visible
+and adjustable from the hub without navigating, and the theme flood-reveal (3.10) plays from the
+segment's own click point. This is the one place where the desktop deliberately has **fewer** pages
+than a naive port of Android's settings tree would produce, and the reason is the grammar, not
+laziness: a page whose entire content is three rows is a row group.
+
+#### 7.6.2 The row
+
+```
+Border.SettingRow   MinHeight 56  Padding 16,12   Focusable  IsTabStop
+├─ Border.Tile 40   NEUTRAL by default; today 21 of 22 already are, and that is the model
+├─ 12
+├─ text  Title 16/700  «DNS»
+│        Subtitle 13   «Через какой сервер приложение разрешает домены»   (only when it adds something)
+├─ value Subtitle 13 muted, right-aligned    ← Incy's best idea: the current value on every row
+├─ 8
+└─ ONE trailing affordance
+```
+
+A subtitle that restates its title is deleted (`03-direction.md` F16). The **value** is what earns
+the space: you can audit your entire configuration by scrolling once, without opening anything.
+
+Rows are `Focusable`, `Enter` and `Space` activate, the focus ring is drawn inside the row at r12,
+and the trailing switch is removed from the tab order so the row owns the stop. `SettingsView` already
+implements this and it is the pattern for every list in the product.
+
+#### 7.6.3 Search
+
+Typing filters the hub's rows **and** the rows of every sub-page. A matched sub-page row renders as:
+
+```
+Border.Row
+├─ tile
+├─ Title «Тайм-аут проверки»
+├─ Caption «Подключение › Задержка»          ← the breadcrumb, so the result is locatable
+└─ chevron  → opens that sub-page with the row highlighted for 1.2 s (Brush.SelectedFill, fading out)
+```
+
+`Esc` clears the field; a second `Esc` returns focus to the list. No results shows the standard
+«Ничего не найдено» / «Попробуйте другой запрос.» / «Сбросить поиск».
+
+#### 7.6.4 Inline expansion
+
+«Локальный прокси» expands in place (rotating chevron), revealing a panel inside the same card:
+port `TextBox.Field.numeric`, «SOCKS5-авторизация» switch, login and password fields, and a caption
+«Адрес: 127.0.0.1. Пустые логин и пароль отключают SOCKS5-авторизацию.» Reveal is `Dur.Reveal` 300ms
+`Ease.OutQuint` on height plus opacity; collapse is 225ms. This is correct per `00-rules.md` 7.6 and
+it stays.
+
+#### 7.6.5 States
+
+Default · search active · no results · a row disabled because the platform cannot do it (see 7.6.6) ·
+a value that is still resolving (the value slot shows a 40x13 skeleton bar, never «…») · error
+applying a setting (the status strip, and the control reverts).
+
+#### 7.6.6 Platform honesty
+
+Neither reference app does this and it is a trust differentiator (`30-reference-analysis.md` 3.2.3).
+Where a setting cannot do what its label implies on this OS, the row is **disabled with an
+explanation**, never silently present:
+
+| Setting | Constraint | Row behaviour |
+|---|---|---|
+| Режим «Весь трафик» (TUN) | needs elevation on Linux and macOS | Enabled, but selecting it raises the elevation prompt; if refused, the row reverts and the TUN banner appears on Главная |
+| Прокси по приложениям | TUN mode only, sing-box only | Disabled with the subtitle «Работает в режиме «весь трафик»» when the mode is Прокси |
+| Запуск при входе в систему | not available in some Linux sandboxes | Disabled with the subtitle «Недоступно в этой сборке» |
+| Схемы URL-адресов | Windows only | Disabled with the subtitle «Регистрация схемы доступна только в Windows» |
+
+#### 7.6.7 Acceptance
+
+- [ ] `MaxWidth Size.Content` 720, centred; rows never run 1030px wide
+- [ ] Four groups, in this order, matching Android exactly
+- [ ] Every row shows its current value
+- [ ] Every row's affordance matches its behaviour
+- [ ] 20 neutral tiles, at most one coloured, and only if it is a category
+- [ ] Search covers the hub and every sub-page and has a no-results state
+- [ ] Zero accent elements at rest except the rail and the focus ring
+- [ ] The duplicate `TextBox.Incy` re-declaration inside the view is deleted
+- [ ] Card bottom margins are `space_24` between groups, not `8 + header padding`
+
+---
+
+### 7.7 Settings sub-pages: the shared contract
+
+All fourteen are `SubPage` instances (3.6) with `MaxWidth Size.Content` 720. Each one:
+
+- uses the **shared** `Button.BackNav` and the shared toolbar; the nine local
+  `Button.IconButton:pressed { scale(0.92) }` re-declarations and the nine local `Geo.Sub.Back`
+  copies are deleted,
+- opens with an intro paragraph in `TextBlock.Body`, `MaxWidth` 560, `Margin 16,8,16,16`, that says
+  what the page controls in one or two sentences and never markets,
+- groups rows in `Border.Card Padding=0` with 68px hairlines under a sentence-case `SectionHeader`,
+- carries **at most one** filled accent control, and most carry none,
+- ships default, loading, empty, error and offline where each applies,
+- is completable with the keyboard alone,
+- has a stable `RouteId` from 3.7.1.
+
+Below, only what is specific to each page.
+
+---
+
+### 7.8 `settings/perapp` - Прокси по приложениям
+
+**File:** `Views/PerAppProxyPage.axaml` (163 ln) + `.cs` (238 ln). **RESTYLE.**
+**Android counterpart:** `activity_bypass_list.xml` plus `AppPickerActivity`, which today is a bare
+10-line `RecyclerView` with no empty state at all. Same concept, same two modes, same copy.
+
+```
+intro «Выберите, какие программы идут через VPN. Правила применяются при следующем подключении.»
+SectionHeader «Режим»
+Border.Card Padding 0
+  Border.SettingRow «Раздельное туннелирование»   switch
+  Border.SettingRow.segmentRow  segment «Кроме выбранных» / «Только выбранные»
+     subtitle changes with the mode:
+       «Кроме выбранных: они идут напрямую, минуя VPN»
+       «Только выбранные: через VPN идут лишь они»
+SectionHeader «Приложения»   +   trailing Button.Text «Добавить .exe»
+TextBox.Field.search   Height 40   watermark «Поиск программ…»   Ctrl+F
+Border.Card Padding 0
+  virtualised list of Border.Row:
+    Border.Tile 40 with the app icon (extracted, 24px, or Geo.Set.Grid fallback)
+    Title  the app name          Subtitle  the executable path, ellipsised at the END
+    trailing CheckBox styled as a 20px Geo.State.Check inside a 24px box
+```
+
+Selected apps sort to the top of the list, above a hairline, with a `Caption` «Выбрано 12» above
+them. Fixes: `Margin="10"` off-scale; the local `Button.IconButton` style; the list must virtualise
+(a Windows machine has 200 to 400 installed programs). States: loading the app list (skeleton rows),
+empty («Программы не найдены»), no search results, disabled (mode is Прокси, per 7.6.6).
+
+---
+
+### 7.9 `settings/routing` - Маршрутизация
+
+**Files:** `Views/RoutingSubView.axaml` (184 ln) + `.cs` (140 ln), and the two upstream windows it
+escapes into: `RoutingRuleSettingWindow.axaml` (259 ln, 27 `resx:`) and
+`RoutingRuleDetailsWindow.axaml` (263 ln, 16 `resx:`).
+**Verdict: RESTYLE the page, REBUILD both windows as one depth-2 sub-page. The escape hatch into a
+900x600 Chinese-string window closes here.**
+
+**Android counterpart:** `activity_routing_setting.xml` plus `activity_routing_edit.xml`, which have
+exactly the same hole.
+
+**Page 1, `settings/routing`:**
+
+```
+intro «Наборы правил решают, какой трафик идёт через VPN, а какой напрямую. Выберите активный набор.»
+SectionHeader «Наборы правил»
+Border.Card Padding 0
+  Border.Row.selectable per rule set
+    Border.Tile 40  Geo.Set.Routing
+    Title «Стандартные»    Subtitle.Numeric «42 правила»
+    trailing: 20px Geo.State.Check Brush.Accent when active; kebab on hover
+    row click = make active (immediate, no confirm)
+    kebab MenuFlyout: «Изменить» → settings/routing/ruleset/{id} · «Дублировать» ·
+                      «Экспорт» · hairline · «Удалить» Brush.RedText
+  Border.Row  «Создать набор»   Geo.Action.Add   chevron
+SectionHeader «Разрешение доменов»
+Border.Card Padding 0
+  Border.SettingRow «Стратегия доменов»  value «IP при несовпадении»  unfold, cycles 3
+     subtitle «Как ядро сопоставляет домены с правилами»
+SectionHeader «Обслуживание»
+Border.Card Padding 0
+  Border.Row «Стандартные правила»  Subtitle «Пересоздать встроенные наборы»  Button.Text «Сбросить»
+```
+
+**Page 2, `settings/routing/ruleset/{id}` (depth 2, the rebuild of both windows):**
+
+```
+SubPage Title = the rule set's name   trailing Button.IconButton40 Geo.Action.Add «Добавить правило»
+TextBox.Field  «Название набора»  (label above, helper slot below)
+SectionHeader «Правила»  +  Caption «Порядок важен: применяется первое совпавшее правило»
+Border.Card Padding 0
+  Border.Row per rule, draggable by a 20px Geo.Action.Drag handle at the leading edge
+    Border.Tile 40  tinted by outbound: .Blue = проксировать, neutral = напрямую, .Red = блокировать
+    Title  «Домены: 12 · IP: 3»  or the rule's name when it has one
+    Subtitle  «Через прокси»  /  «Напрямую»  /  «Блокировать»
+    trailing ToggleSwitch.iOS (enabled / disabled) and a kebab
+  click on the row → the rule editor, INLINE (rotating chevron), not a third page
+```
+
+The **rule editor is an inline expansion**, which is what keeps navigation depth at 2:
+
+```
+panel inside the card, revealed at Dur.Reveal 300
+  segment  «Проксировать» / «Напрямую» / «Блокировать»
+  TextBox.Field multiline «Домены»       helper «Один на строку. Поддерживаются geosite:, regexp:»
+  TextBox.Field multiline «IP-адреса»    helper «Один на строку. Поддерживаются geoip:, CIDR»
+  TextBox.Field «Порты»                  helper «Например: 80, 443, 1000-2000»
+  TextBox.Field «Протокол»               picker flyout: любой / http / tls / bittorrent
+  row  «Входящий тег»                    picker flyout
+  Button.Text «Удалить правило» Brush.RedText   +   Button.Primary «Готово»
+```
+
+Every field validates on blur with a specific message: «Укажите домен, порт или IP-адрес», «Порт
+должен быть числом от 1 до 65535», «Неверный формат CIDR». Reordering is drag by the handle **and**
+`Alt+Up` / `Alt+Down` on the focused row, because reordering must not be mouse-only.
+
+---
+
+### 7.10 `settings/dns` - DNS
+
+**File:** `Views/DnsSubView.axaml` (162 ln) + `.cs` (130 ln). **RESTYLE.**
+**Android counterpart:** the DNS `AlertDialog` today, which becomes the same page.
+
+```
+intro «DNS-сервер, через который приложение разрешает домены при подключении. По умолчанию
+       используется встроенный резолвер.»
+SectionHeader «Провайдер»
+Border.Card Padding 0
+  Border.Row.selectable x6:  «По умолчанию» · «Cloudflare» · «Google» · «AdGuard» · «FakeIP» · «Свой»
+    Subtitle carries the actual address, e.g. «https://1.1.1.1/dns-query»
+    trailing 20px Geo.State.Check on the selected one
+Border.Card  (visible only when «Свой» is selected)
+  TextBox.Field  label «Свой DNS-адрес»
+     helper «DoH-адрес (https://…/dns-query), DoT или обычный IP: 1.1.1.1»
+     validation on blur: «Укажите адрес в формате https://…/dns-query или IP»
+SectionHeader «Дополнительно»
+Border.Card Padding 0
+  Border.SettingRow «Локальные ответы DNS»  switch
+     subtitle «Ускоряет соединение, отвечая на DNS-запросы локально (sing-box)»
+```
+
+**`Border.DnsChip` is deleted.** It was a fully accent-**filled** selected chip at `Padding="16,10"`
+with `FontWeight="SemiBold"` - an off-scale padding, a weight the ramp does not have, and a filled
+accent surface on a settings page whose accent budget is zero. Six selectable rows with a check is
+the same choice, in the product's own vocabulary, and it survives the mono theme.
+
+---
+
+### 7.11 `settings/bypass` - Обход блокировок
+
+**New page**, absorbing the current hub group and the fragmentation controls that live only in
+`OptionSettingWindow`.
+**Android counterpart:** the «Обход блокировок» settings group, promoted to the same page.
+
+```
+intro «Приёмы против DPI. Включайте по одному: лишние могут замедлить соединение.»
+SectionHeader «Мультиплексирование»
+Border.Card Padding 0
+  «Mux»                       switch      subtitle «Объединяет запросы в один канал соединения»
+  «Число соединений»          unfold 4/8/16/32   visible only when Mux is on
+SectionHeader «Фрагментация»
+Border.Card Padding 0
+  «Фрагментация пакетов»      switch      subtitle «Разбивает TLS-рукопожатие против DPI»
+  «Размер фрагмента»          unfold      visible only when on
+  «Интервал»                  unfold      visible only when on
+SectionHeader «Шум UDP»
+Border.Card Padding 0
+  «Шум перед рукопожатием»    switch      subtitle «Маскирует начало соединения»
+  «Тип шума»                  picker      visible only when on
+```
+
+Rows that appear conditionally do so with the `Dur.Reveal` 300ms height-plus-opacity expansion, never
+by popping in. When a provider has set any of these (4.3b), the row's subtitle becomes «Задано
+провайдером» and a `Button.Text` «Вернуть мои настройки» appears at the bottom of the page.
+
+---
+
+### 7.12 `settings/provider` - Провайдеры
+
+**File:** `Views/ProviderSettingsPage.axaml` (138 ln) + `.cs` (86 ln). **Fully built, fully styled,
+zero references.** Verdict: **WIRE and RESTYLE**, and extend it with the provider-transparency
+section that neither reference app has.
+
+```
+intro «Как приложение обновляет подписки и что о нём знает провайдер.»
+SectionHeader «Обновление»
+Border.Card Padding 0
+  «Автообновление подписок»   switch
+  «Интервал обновления»       unfold «6 ч» (1 / 3 / 6 / 12 / 24)     visible when on
+  «Обновить все сейчас»       Button.Text, with an inline arc while running
+SectionHeader «Сеть»
+Border.Card Padding 0
+  «User-Agent»                value the current UA, ellipsised    rotating chevron → TextBox.Field
+     subtitle «Отправляется ядром на исходящих соединениях»
+  «Идентификатор устройства»  value the HWID in Font.Numeric      Button.IconButton40.Row copy
+SectionHeader «Что настроил провайдер»          ← only when at least one directive is applied
+Border.Card Padding 0
+  Border.Row per applied directive:
+    Title «Прокси по приложениям»   Subtitle «Задано провайдером»   value «12 приложений»  chevron
+    Title «Фрагментация»            Subtitle «Задано провайдером»   value «Включена»       chevron
+    Title «Маршрутизация»           Subtitle «Задано провайдером»   value «Обновляется»    chevron
+    Title «Определение адресов»     Subtitle «Задано провайдером»   value «DoH»            chevron
+Button.Text «Вернуть мои настройки»   Brush.Accent   Margin 16,16,16,0
+```
+
+The four rules from 4.3b apply here in full: every directive that changes device behaviour appears,
+anything that overrides a user setting is revertable, `hide-url` is refused, and the operator
+supplies content and severity but never presentation.
+
+---
+
+### 7.13 `settings/ping` - Задержка
+
+**File:** `Views/PingSettingsPage.axaml` (160 ln). **RESTYLE.**
+
+```
+intro «Как измерять задержку серверов. Ниже адрес и тайм-аут проверки.»
+SectionHeader «Метод»
+Border.Card Padding 0
+  Border.Row.selectable «Реальная задержка»  Subtitle «Через ядро, как при подключении»  check
+  Border.Row.selectable «TCP»                Subtitle «TCP-подключение к серверу»        check
+SectionHeader «Параметры»
+Border.Card Padding 0
+  TextBox.Field  label «Адрес проверки задержки»   default https://www.gstatic.com/generate_204
+  TextBox.Field.numeric  label «Тайм-аут проверки, сек»   default 5   range 1..30
+```
+
+`Border.MethodRow`, invented locally in this file, is deleted in favour of `Border.Row.selectable`.
+
+---
+
+### 7.14 `settings/geofiles` - Файлы ресурсов
+
+**File:** `Views/GeoFilesPage.axaml` (100 ln) + `.cs` (99 ln). **RESTYLE.**
+
+```
+intro «Базы geoip и geosite нужны для маршрутизации по странам и доменам. Обновляются с GitHub.»
+Border.Card Padding 0
+  Border.Row  «geoip.dat»    value.Numeric «8,2 МБ · обновлён 12.08.2026»   or «Не загружен»
+  Border.Row  «geosite.dat»  value.Numeric «12,7 МБ · обновлён 12.08.2026»
+Button.Primary «Обновить сейчас»  48h  Margin 16,16,16,0
+```
+
+**The download states this page currently lacks:** while running, the button's label swaps for an
+18px arc and the button is disabled; each row's value becomes «Загрузка… 42 %» with a 4px
+`Border.Meter` under it showing real progress; on success the values update and an info strip says
+`Базы обновлены`; on failure the row's value becomes «Не удалось обновить» in `Brush.RedText`, the
+button re-enables, and an error strip carries `Повторить`. Offline disables the button and explains.
+
+---
+
+### 7.15 `settings/urlschemes` - Схемы URL-адресов
+
+**File:** `Views/UrlSchemesPage.axaml` (115 ln) + `.cs` (157 ln). **RESTYLE.**
+
+```
+intro «Быстрые команды depv://. Нажмите на схему, чтобы скопировать. Используйте их в ярлыках,
+       скриптах или других приложениях.»
+SectionHeader «Регистрация»
+Border.Card Padding 0
+  Border.Row  «Схема depv://»  value «Зарегистрирована» / «Не зарегистрирована»
+              trailing Button.Text «Зарегистрировать» / «Убрать»
+SectionHeader «Команды»
+Border.Card Padding 0
+  Border.Row per scheme, click copies:
+    Title «Запустить туннель»    Subtitle.Numeric «depv://connect»
+    trailing Button.IconButton40.Row Geo.Action.Copy
+  ... «Открыть приложение» · «Остановить соединение» · «Переключить соединение»
+      · «Импорт (автоопределение типа)» · «Добавить по URL»
+```
+
+Copy confirms through the status strip (`Скопировано`), never through a toast. On non-Windows the
+registration card is disabled with «Регистрация схемы доступна только в Windows» and the command list
+still renders, because the schemes still work when passed on the command line.
+
+---
+
+### 7.16 `settings/core` - Ядро и журнал
+
+**New page.** This is where roughly ten features currently reachable only through the **unreachable**
+`OptionSettingWindow` (1 206 ln, 91 `resx:`, 74 controls, 30 of them stock `ComboBox`) come back into
+the product, in our own language.
+
+```
+intro «Движок, который поднимает туннель, и его журнал.»
+SectionHeader «Ядро»
+Border.Card Padding 0
+  «Ядро»                    value «Xray»            picker flyout: Xray / sing-box
+  «Версия ядра»             value.Numeric «25.1.30»  read-only, no affordance
+  «Уровень журнала»         value «Предупреждения»   unfold: Выкл / Ошибки / Предупреждения / Отладка
+  «Журнал»                  value «312 записей»      chevron → settings/core/log
+SectionHeader «Порты»
+Border.Card Padding 0
+  «SOCKS5»                  value.Numeric «10808»    rotating chevron → TextBox.Field.numeric
+  «HTTP»                    value.Numeric «10809»    rotating chevron → TextBox.Field.numeric
+  «Разрешить из локальной сети»  switch   subtitle «Другие устройства смогут использовать прокси»
+SectionHeader «Дополнительно»
+Border.Card Padding 0
+  «Шаблон конфигурации»     Subtitle «Для опытных пользователей»   chevron → settings/core/advanced
+  «Сбросить настройки ядра» Brush.RedText  Button.Text
+```
+
+**`settings/core/log` (depth 2)** - the durable half of the feedback channel, and the reason
+`MsgView` existed:
+
+```
+SubPage Title «Журнал»   trailing Button.IconButton40 Geo.Action.More → kebab
+├─ toolbar row: TextBox.Field.search (Ctrl+F) + level chips «Все» «Ошибки» «Предупреждения» «Отладка»
+├─ virtualised list of Border.Row.static  MinHeight 40  (not 56: this is dense technical output)
+│     Caption.Numeric «14:32:07»  fixed 64px column
+│     Body  the message, wrapping, selectable text
+│     leading 4px colour bar? NO - side stripes are banned. Instead a 16px leading glyph:
+│       Geo.State.Info | Geo.State.Warning | Geo.State.Error, tinted
+└─ kebab: «Копировать всё» · «Сохранить в файл…» · hairline · «Очистить» Brush.RedText
+```
+
+Text is selectable. `Ctrl+A` then `Ctrl+C` works. Auto-scroll follows the tail and stops the moment
+the user scrolls up, with a `Button.Text` «К последним» appearing at the bottom right. States: empty
+(«Записей пока нет» / «Здесь появятся сообщения ядра и приложения.»), filtered-empty, error.
+
+**`settings/core/advanced` (depth 2)** - the rebuild of `FullConfigTemplateWindow` (197 ln, 15
+`resx:`). One `JsonEditor` (kept as a control, restyled: `Brush.SurfaceHighest` background, our
+scrollbar, our font at 13, `Font.Numeric` for the gutter), a validation line under it in
+`Brush.RedText` that reports the parse error and its line number, and two buttons: `Button.Tonal`
+«Сбросить» and `Button.Primary` «Сохранить», the latter disabled while the JSON is invalid. A
+warning strip at the top: `Неверный шаблон может сломать подключение.`
+
+---
+
+### 7.17 `settings/hotkeys` - Горячие клавиши
+
+**Rebuild** of `GlobalHotkeySettingWindow.axaml` (133 ln, 11 `resx:`, currently unreachable). Global
+hotkeys are a desktop-native expectation with no UI at all right now.
+
+```
+intro «Сочетания работают, даже когда окно свёрнуто.»
+Border.Card Padding 0
+  Border.Row per action:
+    Title  «Подключить или отключить»
+    trailing Border.Chip.neutral with the binding in Font.Numeric «Ctrl+Alt+V»
+             or Button.Text «Назначить» when unset
+    click → the row enters capture mode: the chip becomes «Нажмите сочетание…» in Brush.Accent,
+            the next key chord is captured, Esc cancels, Backspace clears
+  actions: Подключить или отключить · Показать окно · Скрыть окно · Перезапустить ядро ·
+           Следующий сервер · Предыдущий сервер
+Caption «Занятые системой сочетания подсвечиваются: назначить их не получится.»
+```
+
+A conflict with another application shows the chip in `Brush.RedText` with «Сочетание занято» below
+the row. This page also lists **the in-app shortcuts** from 2.8 as a read-only section, because a
+user who comes here to find a shortcut should find all of them.
+
+---
+
+### 7.18 `settings/backup` - Резервная копия
+
+**File:** `Views/BackupPage.axaml` (96 ln) + `.cs` (91 ln). **RESTYLE.**
+`Views/BackupAndRestoreView.axaml` (213 ln, registered and never built, with a WebDAV panel) is
+**DELETED**; its WebDAV feature is not migrated, because no UI ever exposed it and no owner request
+covers it. That deletion is explicit, not silent.
+
+```
+intro «Сохраните все настройки, подписки и серверы в один .zip-файл или восстановите их из
+       сохранённой копии.»
+Border.Card Padding 0
+  Border.Row «Экспорт»   Subtitle «Сохранить копию в файл»                  Button.Text «Сохранить…»
+  Border.Row «Импорт»    Subtitle «Восстановить из файла. Приложение перезапустится»
+                                                                            Button.Text «Восстановить…»
+```
+
+Import is the one place a **confirmation dialog** is correct on this page: it is irreversible and it
+restarts the app. `Восстановить из копии?` / `Текущие настройки, подписки и серверы будут заменены.`
+/ `Отмена` + `Восстановить` (destructive, right). Progress is an info strip; failure is an error
+strip with the file name and the parse error.
+
+---
+
+### 7.19 `settings/update` - Обновления
+
+**Rebuild** of `Views/CheckUpdateView.axaml` (95 ln, registered, never built). **There is no "check
+for updates" anywhere in the shipping UI**, which on a desktop app that ships outside a store is a
+functional hole.
+
+```
+Border.Card Padding 16
+  TextBlock.Title.Numeric «Версия 7.13.4»
+  TextBlock.Subtitle «Последняя проверка: сегодня, 14:32»
+  Button.Tonal «Проверить обновления»   48h
+States on the same card:
+  checking   → the button's label becomes an 18px arc, disabled
+  up to date → Subtitle «Установлена последняя версия», Border.Chip.green «Актуальна»
+  available  → Title «Доступна версия 7.14.0», a changelog block (Body, MaxWidth 560,
+               scrollable, MaxHeight 240), Button.Primary «Скачать и установить»
+  downloading→ 4px Border.Meter with real percentage and Caption.Numeric «12,4 МБ из 38,1 МБ»
+  failed     → Subtitle in Brush.RedText «Не удалось проверить обновления» + Button.Tonal «Повторить»
+SectionHeader «Компоненты»
+Border.Card Padding 0
+  Border.Row «Ядро Xray»     value.Numeric «25.1.30»   Button.Text «Обновить»
+  Border.Row «Ядро sing-box» value.Numeric «1.11.1»    Button.Text «Обновить»
+Border.SettingRow «Проверять автоматически»  switch
+```
+
+---
+
+### 7.20 `settings/about` - О приложении
+
+**File:** `Views/AboutPage.axaml` (105 ln). **RESTYLE.** Its `MaxWidth="620"` becomes
+`Size.Content` 720 like every other sub-page.
+
+```
+StackPanel  HorizontalAlignment=Center  Spacing 16  Margin 0,32,0,0
+├─ Border 64x64 r20  Brush.Tile.Neutral  →  PathIcon Geo.Server.ShieldOutline 32
+├─ TextBlock «departament»   Title 16/700  Font.Grotesk   Brush.OnSurface   (NOT accent)
+├─ TextBlock.Caption.Numeric «Версия 7.13.4 (2 041)»
+SectionHeader «Сведения»
+Border.Card Padding 0
+  Border.Row.static «Операционная система»  value «Windows 11 26100»
+  Border.Row.static «Архитектура»           value «x64»
+  Border.Row.static «.NET»                  value.Numeric «9.0.1»
+  Border.Row.static «Ядро»                  value «Xray 25.1.30»
+  Border.Row  «Копировать сведения»   Button.IconButton40.Row Geo.Action.Copy
+SectionHeader «Ссылки»
+Border.Card Padding 0
+  Border.Row «Сайт departament.site»  chevron  → browser
+  Border.Row «Telegram-бот»           chevron  → browser
+  Border.Row «Поддержка»              chevron  → browser
+```
+
+The wordmark is **not** blue (`03-direction.md` 3.2 corollary): the brand does not spend its one
+accent on advertising itself.
+
+---
+
+### 7.21 `auth/login` - Вход
+
+**File:** `Views/LoginView.axaml` (954 ln) + `.axaml.cs` (1 377 ln) → `Views/Auth/LoginPage.axaml`.
+**Verdict: REBUILD.** The owner named this screen: «сейчас все выглядит плохо».
+
+**The measured problem.** 20 buttons, 5 text boxes, 6 sign-in methods and 34 localisation keys in one
+scrolling column, with the primary method - Telegram - **not first**: it sits below the e-mail form,
+under an «или» divider, as a **tonal** button, while the accent `Primary` is spent on the e-mail
+submit. The hierarchy is inverted and the page carries every method at once instead of one path with
+the rest behind a disclosure.
+
+**Android counterpart:** `activity_login.xml`, graded **D-** in `31-self-assessment.md`, with four
+blue controls, two identical cards, the error line at the very bottom of the scroll after both cards,
+and the 2FA block inserted between the submit button and the register button. **Both platforms get
+this exact structure**; the desktop version is the reference implementation and Android ports it.
+
+#### 7.21.1 Structure: one column, five panels
+
+```
+SubPage Title «Вход»   (back = close the page, Esc = step back one panel then close)
+└─ Panel  MaxWidth Size.Form 480  HorizontalAlignment=Center  VerticalAlignment=Center  Margin 16,0
+   five z-stacked panels, exactly one visible, crossfaded at Dur.State 220ms
+   with TranslateX +16 → 0 forward and -16 → 0 backward
+```
+
+**Panel 1 - `Method` (default)**
+
+```
+StackPanel Spacing 0
+├─ Border 64x64 r20  Brush.Tile.Blue  →  PathIcon Geo.Server.ShieldOutline 30 Brush.Accent
+├─ 16
+├─ TextBlock «departament»   Title 16/700  Font.Grotesk
+├─ 8
+├─ TextBlock.Headline  «Вход в departament»
+├─ 4
+├─ TextBlock.Body      «Через Telegram, быстро и без пароля.»   Brush.OnSurfaceVariant  MaxWidth 380
+├─ 32
+├─ Button.Primary.Tall «Войти через Telegram»   52h, full width      ← THE one lit element
+├─ 12
+├─ Button.Tonal.Tall   «Войти через сайт»       52h, full width
+├─ 12
+└─ Button.Text         «Другой способ входа»    40h, centred, rotating chevron 20 trailing
+                                                 → panel Email
+```
+
+Four controls. Not twenty.
+
+**Panel 2 - `Email`**
+
+```
+├─ Button.Text «Назад» with a leading 20px Geo.Action.Back, left-aligned, 40h
+├─ 8
+├─ TextBlock.Headline  «Почта и пароль»
+├─ 24
+├─ ToggleButton.Segment pair  «Вход» | «Регистрация»    44h track, neutral thumb (Brush.Bg), NOT blue
+├─ 16
+├─ field  label Caption «Почта»           TextBox.Field 48h   helper slot always present
+├─ 16
+├─ field  label Caption «Пароль»          TextBox.Field 48h with a 40px eye toggle in InnerRightContent
+├─ 16
+├─ field  label Caption «Повторите пароль» (registration only, revealed at Dur.Reveal 300)
+├─ 8
+├─ TextBlock.Caption   password rules (registration only): «Не короче 8 символов»
+├─ 24
+├─ Button.Primary.Tall «Войти» / «Создать аккаунт»   52h            ← THE one lit element here
+├─ 12
+├─ Button.Text «Забыли пароль?»           40h
+├─ Button.Text «Войти по коду из письма»  40h   → panel Code
+└─ TextBlock #errorLine  Brush.RedText 12, present in the markup, empty by default
+```
+
+**Panel 3 - `Code`** - six `TextBox.Field` cells 48x56 with `Radius.Chip` 12, 8 apart, auto-advancing,
+paste-aware (pasting six digits fills all six), `Backspace` steps back, `Enter` submits. Title
+«Код из письма», Body «Отправили шестизначный код на a@b.ru.», `Button.Primary.Tall` «Подтвердить»,
+`Button.Text` «Отправить ещё раз» with a 60-second cooldown rendered as «Отправить ещё раз через
+0:47» in `Font.Numeric`.
+
+**Panel 4 - `AwaitingTelegram`** - the confirmation wait. A 64px ring: static
+`Brush.OutlineVariant` track plus a `Brush.Accent` arc spinning at 1.2s, with the brand shield inside
+at 30px. Title «Ждём подтверждения», Body «Откройте бота и нажмите «Подтвердить».»,
+`Button.Primary.Tall` «Открыть Telegram», `Button.Text` «Начать заново», `Button.Text` «Другой способ
+входа». On success the arc completes into a `Geo.State.Check` over 220ms, then the page hands off.
+The breathing plane animation is deleted; the arc alone carries the wait.
+
+**Panel 5 - `PendingEmail`** - Title «Проверьте почту», Body «Отправили ссылку для входа на a@b.ru.
+Откройте её на этом устройстве.», an 18px arc, `Button.Text` «Отправить ещё раз», `Button.Text`
+«Назад».
+
+#### 7.21.2 States
+
+Idle · focused (2px ring) · submitting (the CTA's label swaps for a 20px arc, **the button keeps its
+exact size so nothing reflows**, and it is disabled) · field error (inline under the field, red 1px
+border, focus moves to the first invalid field) · form error (the `#errorLine` above the CTA, never at
+the bottom of the scroll) · locked out («Слишком много попыток. Повторите через 5 минут.») · offline
+(«Нет сети. Проверьте подключение и повторите.» with every submit disabled) · success (the hand-off).
+
+#### 7.21.3 Motion
+
+**Nothing on entry.** The one exception in the entire product is the hand-off out of this screen to
+Главная: `Dur.Slow` 450ms `Ease.OutExpo`, already tokenised and reserved for exactly this. Panel
+changes are 220ms crossfades. Under `.lite` everything snaps.
+
+#### 7.21.4 What gets deleted
+
+The two-block z-stack with 20 buttons; the local `Geo.Login.Back` copy; the local
+`Button.SegItem` class; the four hand-rolled spinner `Ellipse`s with `StrokeDashArray="6.9,20.8"`
+re-declared in one file; `CornerRadius="8"` on `SegItem` and `SoonPill`; `FontSize="20"` on the code
+digits; the off-scale margins 14 / 20 / 28 / 40 / 3; the permanently disabled Google «Скоро» button;
+and `Brush.HomeGradient` as the page background.
+
+#### 7.21.5 Acceptance
+
+- [ ] Four controls visible on first paint, one of them filled accent
+- [ ] Telegram is first and is the filled control
+- [ ] Every panel has exactly one filled accent control
+- [ ] Errors appear under their field; the form error appears above the CTA
+- [ ] The helper slot exists in the markup even when empty; nothing jumps
+- [ ] The submit button does not change size while loading
+- [ ] Completable with the keyboard alone, including the six code cells
+- [ ] Flat `Brush.Bg`; no gradient
+- [ ] Under 350 lines of AXAML
+
+---
+
+### 7.22 Онбординг - the first frame
+
+**File:** `Views/OnboardingView.axaml` (238 ln) + `.axaml.cs` (213 ln) →
+`Views/Auth/OnboardingPage.axaml`. **RESTYLE.**
+
+It is already close: one accent, one tonal, one demoted link, correct rhythm. Three changes.
+
+```
+Border  Background Brush.Bg                                    ← was Brush.HomeGradient
+└─ ScrollViewer → Panel Margin 16,0 MinHeight={Scroll.Bounds.Height}
+   └─ StackPanel MaxWidth Size.Form 480  VerticalAlignment=Center
+      ├─ Border 64x64 r20 Brush.Tile.Blue → shield 30
+      ├─ 16   TextBlock «departament»  Title 16/700 Font.Grotesk
+      ├─ 24   TextBlock.Headline  «Добавьте подписку»          ← was Display 34
+      ├─ 8    TextBlock.Body «Отсканируйте QR-код или вставьте ссылку из буфера. Доступ появится
+      │        сразу.»   MaxWidth 380
+      ├─ 32   Button.Primary.Tall  «Добавить по QR-коду»    52h
+      ├─ 12   Button.Tonal.Tall    «Добавить из буфера»     52h
+      ├─ 24   two hairlines with «или войдите в аккаунт» between them, Caption
+      ├─ 16   Button.Tonal.Tall    «Войти через Telegram»   52h
+      ├─ 12   Button.Text          «Войти через сайт»       40h
+      └─ 12   Button.Text          «Восстановить из копии»  40h   ← NEW third path
+```
+
+Changes: flat background; the headline drops from `Display` 34 to `Headline` 24, because `Display` is
+reserved for one live figure per screen and «Добавьте подписку» is not a figure; and the third path
+is added, because a returning user who reinstalled has neither a QR code nor a wish to sign in again
+and today has no route at all. The locally declared `Button.Tonal.Tall` override is deleted once the
+class is global.
+
+---
+
+### 7.23 Синхронизация - the post-login gate
+
+**File:** `Views/AccountSyncView.axaml` (176 ln) + `.axaml.cs` (324 ln) →
+`Views/Auth/AccountSyncPage.axaml`. **KEEP**, with the background fixed.
+
+This is the strongest state surface in either app and it is not touched beyond two things: the
+`Brush.HomeGradient` becomes `Brush.Bg`, and the misnamed key `Account_SyncSubtitle` (which carries a
+*stage* string, not a subtitle) is renamed `Account_SyncStageSubscriptions`.
+
+Kept verbatim: the 64px ring (static `Brush.OutlineVariant` track plus a spinning `Brush.Accent` arc,
+`StrokeDashArray="16.75,50.25"`) around the brand shield; the live stage caption crossfading through
+«Проверяем аккаунт» → «Загружаем подписки…» → «Обновляем серверы»; the failure state that
+crossfades **in place** to a red alert ring, «Не удалось синхронизировать», «Проверьте соединение и
+попробуйте снова.», `Button.Primary` «Повторить» and `Button.Tonal` «Войти заново»; and the success
+settle (1.0 → 1.04 → 1.0) before the shell crossfades to Главная.
+
+It also serves the **cold-start loading** case (3.9): same ring, same shield, caption «Загружаем
+данные», no stage list. That is what stops a returning user from seeing the sign-in gate for one
+frame.
+
+---
+
+## 8. The upstream stratum: 15 windows, converted or deleted
+
+**The single most damaging fact about the desktop client:** right-click any server, choose
+«Изменить», and a 900x600 OS-decorated window opens with Chinese-origin resource strings, stock Semi
+controls, a `TabControl`, 54 unstyled `TextBox`es and two `Width="100"` buttons centred at the
+bottom. That is `AddServerWindow.axaml` (1 388 ln, 94 `resx:` references, 87 controls, **zero** Incy
+classes), reached from `ServerListView.axaml:154` → `.axaml.cs:780` →
+`ProfilesViewModel.EditServerAsync()` → `ServiceLib/ViewModels/ProfilesViewModel.cs:527`. The 2026
+redesign stops dead at that click.
+
+`AddServerWindow` and `OptionSettingWindow` alone hold **161 controls, a third of the desktop
+client**, and not one of them uses an Incy style. Together the stratum is 22 of 49 views and 289 of
+483 controls.
+
+**The rule after this plan: nothing reachable is unstyled, and nothing unreachable survives.**
+
+| Window | Lines / `resx:` | Verdict | Becomes |
+|---|---|---|---|
+| `AddServerWindow.axaml` | 1 388 / 94 | **REBUILD** | `servers/editor/{id}` sub-page (8.1) |
+| `AddServer2Window.axaml` | 160 / 14 | **REBUILD, merged** | the «Свой конфиг» mode of the same sub-page |
+| `AddGroupServerWindow.axaml` | 258 / 32 | **REBUILD, merged** | the «Группа» mode of the same sub-page |
+| `SubEditWindow.axaml` | 272 / 29 | **REBUILD** | `servers/provider-editor/{id}` sub-page (8.2) |
+| `RoutingRuleSettingWindow.axaml` | 259 / 27 | **REBUILD, merged** | `settings/routing/ruleset/{id}` (7.9) |
+| `RoutingRuleDetailsWindow.axaml` | 263 / 16 | **REBUILD, merged** | the inline rule editor on that page (7.9) |
+| `ProfilesSelectWindow.axaml` | 129 / 12 | **REBUILD** | `PickerFlyout`, a component, not a window (8.3) |
+| `FullConfigTemplateWindow.axaml` | 197 / 15 | **REBUILD** | `settings/core/advanced` (7.16) |
+| `GlobalHotkeySettingWindow.axaml` | 133 / 11 | **REBUILD** | `settings/hotkeys` (7.17) |
+| `OptionSettingWindow.axaml` | 1 206 / 91 | **DELETE** | its ~10 unique controls migrate to `settings/core`, `settings/bypass`, `settings/ping` (7.11, 7.13, 7.16) |
+| `SubSettingWindow.axaml` | 82 / 16 | **DELETE** | the provider list is the Серверы destination's provider pane (6.4) |
+| `QrcodeView.axaml` | 31 / - | **REBUILD** | `Dialogs/QrDialog.axaml` (9.2) |
+| `SudoPasswordInputView.axaml` | 66 / - | **REBUILD** | `Dialogs/SudoDialog.axaml` (9.3) |
+| `MsgView.axaml` | 104 / - | **REBUILD** | `settings/core/log` (7.16) |
+| `JsonEditor.axaml` | 26 / - | **KEEP as a control, RESTYLE its chrome** | used by `settings/core/advanced` and the editor's raw mode |
+
+### 8.1 `servers/editor/{id}` - the server editor
+
+**The highest-value single conversion in the project.** One sub-page replaces three windows.
+
+**Android counterpart:** the nine `activity_server_*.xml` layouts plus their three shared
+`<include>` blocks (`layout_address_port.xml`, `layout_transport.xml`, `layout_tls*.xml`), which have
+the identical problem. One `ServerEditorRow` component applied to those three includes fixes nine
+Android screens at once, and the desktop page below is the shape both platforms build to.
+
+```
+SubPage  Title «Изменить сервер» / «Новый сервер»
+         trailing Button.IconButton40 Geo.Action.More → kebab
+         MaxWidth Size.Content 720
+└─ StackPanel Margin 16,8,16,32
+
+├─ Border.Card Padding 16                       ← IDENTITY, always visible
+│    ServerIcon 40 + TextBox.Field «Название»  (label above, the remark)
+│    Border.ProtocolChip «VLESS»                (read-only; the protocol is chosen below)
+│
+├─ 24  SectionHeader «Протокол»
+├─ Border.Card Padding 0
+│    Border.Row «Протокол»   value «VLESS»   chevron → PickerFlyout
+│      (VLESS · VMess · Trojan · Shadowsocks · SOCKS5 · HTTP · WireGuard · Hysteria2 · TUIC ·
+│       Свой конфиг · Группа)
+│
+├─ 24  SectionHeader «Адрес»
+├─ Border.Card Padding 0
+│    TextBox.Field «Адрес»            helper «Домен или IP»
+│    TextBox.Field.numeric «Порт»     helper «1-65535»
+│    TextBox.Field «Идентификатор»    protocol-dependent label: UUID / пароль / метод + пароль
+│
+├─ 24  SectionHeader «Транспорт»
+├─ Border.Card Padding 0
+│    Border.Row «Транспорт»  value «TCP»  chevron → PickerFlyout (TCP · WS · HTTP/2 · gRPC · QUIC · KCP · HTTPUpgrade · XHTTP)
+│    fields revealed by transport, at Dur.Reveal 300, never popped in:
+│      WS      → «Путь», «Хост»
+│      gRPC    → «Имя сервиса», «Режим»
+│      HTTP/2  → «Путь», «Хост»
+│      KCP     → «Seed», «Маскировка»
+│
+├─ 24  SectionHeader «Шифрование»
+├─ Border.Card Padding 0
+│    Border.Row «TLS»  segment «Нет» / «TLS» / «Reality»
+│    revealed by choice:
+│      TLS     → «SNI», «ALPN», «Отпечаток», switch «Разрешить небезопасное»
+│      Reality → «SNI», «Публичный ключ», «Short ID», «SpiderX», «Отпечаток»
+│
+├─ 24  SectionHeader «Дополнительно»   (collapsed by default, rotating chevron)
+├─ Border.Card Padding 0
+│    «Sniffing» switch · «Mux для этого сервера» switch · «Заметка» multiline
+│
+└─ docked bottom bar, 72px, Brush.Bg, 1px top hairline
+     Button.Text «Проверить»  (runs a real-delay probe against the edited values, inline result)
+     spacer
+     Button.Tonal «Отмена»    Button.Primary «Сохранить»   both 48h, 120 min width
+```
+
+**Rules that make this a Departament screen rather than a form dump:**
+
+- **No `TabControl`.** Sections in one scroll, with headers. A tab strip in an editor hides half the
+  object being edited and is what makes the current window feel like a different application.
+- **Progressive disclosure by protocol and transport.** A VLESS-over-TCP-with-Reality server shows
+  eleven fields, not fifty-four. The revealed fields animate in at `Dur.Reveal` 300ms.
+- **Label above, helper below, always present in the markup.** Validation on blur. Error text below
+  the field in `Brush.RedText` 12 with a red 1px border and a specific message: «Укажите адрес»,
+  «Порт должен быть числом от 1 до 65535», «Неверный формат UUID».
+- **Save is disabled until the form is valid**, and shows an inline arc while saving. After a failed
+  submit, focus moves to the first invalid field.
+- **The kebab** carries: «Показать как ссылку» (a read-only `TextBox.Field` with a copy button),
+  «Показать QR-код», «Открыть в редакторе JSON» (`JsonEditor`, the raw mode that replaces
+  `AddServer2Window`), hairline, «Удалить сервер» in `Brush.RedText`.
+- **The «Группа» mode** (replacing `AddGroupServerWindow`) swaps the Адрес and Транспорт sections for
+  a member list: `Border.Row` per member with a drag handle, a `PickerFlyout` to add, and a
+  «Стратегия» row (`По очереди` / `Случайно` / `Наименьшая задержка`).
+- **Unsaved changes** are guarded: Escape and back raise `Отменить изменения?` /
+  `Введённые данные не сохранятся.` / `Продолжить редактирование` + `Отменить` (destructive).
+  This is one of the three legitimate confirmation dialogs in the product.
+- Keyboard: `Tab` walks fields in visual order, `Enter` in any single-line field moves to the next,
+  `Ctrl+S` saves, `Esc` cancels with the guard.
+
+**States:** new (all defaults, title «Новый сервер») · editing · validating · saving · save failed
+(error strip plus the field-level errors) · probing (the «Проверить» button shows an arc, then a
+result chip «48 мс» in `.green` or «Не отвечает» in `.red`) · protocol not supported by the selected
+core (an inline warning row: «Xray не поддерживает Hysteria2. Переключите ядро в настройках.» with a
+`Button.Text` linking to `settings/core`).
+
+### 8.2 `servers/provider-editor/{id}` - the provider editor
+
+Replaces `SubEditWindow.axaml` (272 ln, 29 `resx:`).
+
+```
+SubPage Title «Провайдер»   MaxWidth Size.Content 720
+├─ Border.Card Padding 16
+│    TextBox.Field «Название»     helper «Не длиннее 25 символов»   ← the protocol cap, in the view too
+│    TextBox.Field «Ссылка»       helper «https://…»    multiline, wraps, monospaced via Font.Numeric
+├─ 24  SectionHeader «Обновление»
+├─ Border.Card Padding 0
+│    «Автообновление»           switch
+│    «Интервал»                 unfold «6 ч»                  visible when on
+│    «User-Agent»               value, rotating chevron → field
+│    «Обновлять при запуске»    switch
+├─ 24  SectionHeader «Фильтр»
+├─ Border.Card Padding 0
+│    TextBox.Field «Фильтр серверов»   helper «Регулярное выражение. Пустое поле берёт все серверы»
+│    Caption showing a live match count: «Подходит 84 из 147 серверов»
+├─ 24  SectionHeader «Прокси для обновления»
+├─ Border.Card Padding 0
+│    Border.Row «Через сервер»  value «Не использовать»  chevron → PickerFlyout (8.3)
+└─ docked bottom bar: Button.Text «Обновить сейчас» · Button.Tonal «Отмена» · Button.Primary «Сохранить»
+```
+
+### 8.3 `PickerFlyout` - the component that kills `ComboBox`
+
+Replaces `ProfilesSelectWindow.axaml` (an 800x450 **window** for choosing one item from a list,
+called from three places) and all 66 stock `ComboBox` instances.
+
+```
+Flyout (IncyFlyoutTheme)  MinWidth 280  MaxWidth 420  MaxHeight 400
+└─ DockPanel
+   ├─ [Top] TextBox.Field.search  Height 40   shown only when the list exceeds 8 items
+   └─ ScrollViewer → virtualised list of Border.Row.selectable
+        Border.Tile 40 (optional)  ·  Title  ·  Subtitle  ·  20px Geo.State.Check when selected
+```
+
+Opens anchored to the invoking row, `Dur.Reveal` 300ms. `Up` / `Down` move, `Enter` selects and
+closes, `Esc` closes and returns focus to the row, typing filters. The invoking row shows the chosen
+value immediately, per the affordance grammar.
+
+### 8.4 What migrates out of `OptionSettingWindow` before it is deleted
+
+The window is unreachable today (`MainWindowViewModel.cs:726` has no UI binding), so these are
+features that exist in the engine and have **no** UI at all:
+
+| Feature | New home |
+|---|---|
+| Core selection (Xray / sing-box) | `settings/core` › Ядро |
+| Log level, log enable | `settings/core` › Уровень журнала, and `settings/core/log` |
+| SOCKS5 and HTTP inbound ports, LAN exposure | `settings/core` › Порты |
+| Speed-test URL and timeout | `settings/ping` › Параметры |
+| Mux concurrency, protocol scope | `settings/bypass` › Мультиплексирование |
+| Fragmentation packets, length, interval | `settings/bypass` › Фрагментация |
+| Sniffing, route-only sniffing | `settings/bypass` and per-server in the editor |
+| Auto-update check on launch | `settings/update` › Проверять автоматически |
+| Clipboard and URL-scheme import toggles | `settings/urlschemes` |
+| Custom DNS per core (raw JSON) | `settings/core/advanced` |
+
+Nothing is dropped silently. Anything not in that table and not otherwise specified in this document
+is deliberately not migrated, and the decision is recorded in section 12.
+
+---
+
+## 9. Dialogs and windows
+
+After this plan the desktop client has **three** modal windows, down from fifteen-plus. Everything
+else is a sub-page, a flyout or an inline panel, per `00-rules.md` 7.6: inline > expandable row >
+flyout > dialog.
+
+### 9.1 `Dialogs/MessageDialog.axaml` - the one confirmation
+
+**File:** `Views/MessageBoxDialog.axaml` (74 ln). **KEEP**, minus the shadow.
+
+```
+Window  WindowDecorations=None  SizeToContent=WidthAndHeight  Background=Brush.Scrim
+└─ Border.Card  Width Size.Form 480  Padding 24  r20  1px Brush.OutlineVariant  NO BoxShadow
+   ├─ TextBlock.Title      the question IS the title: «Удалить подписку?»
+   ├─ 8
+   ├─ TextBlock.Body       the consequence: «Все её серверы исчезнут из списка.»  MaxWidth 400
+   ├─ 24
+   └─ StackPanel Orientation=Horizontal HorizontalAlignment=Right Spacing 12
+        Button.Tonal «Отмена»          48h, min width 120, auto-focused
+        Button.Destructive «Удалить»   48h, min width 120
+```
+
+- The buttons **say what they do**. Never «OK», never «Да» / «Нет».
+- Destructive on the right, neutral on the left, and the neutral one takes focus, so `Enter` on a
+  dialog nobody read cancels rather than destroys.
+- `Esc` cancels. The scrim click cancels. Focus is trapped inside and returns to the trigger on
+  close.
+
+**The only four dialogs that exist after this plan**, because each is genuinely irreversible and
+costly: delete a provider (and its servers), restore a backup (replaces everything and restarts),
+discard unsaved editor changes, sign out. Everything else is undo through the status strip.
+
+### 9.2 `Dialogs/QrDialog.axaml` - QR share
+
+**File:** `Views/QrcodeView.axaml` (31 ln). **REBUILD.** Today it is 25 lines of raw upstream inside
+our `DialogHost`: a 400x400 `Image` and a read-only `TextBox` with legacy `Margin8` resources, no
+card, no title, no copy button, no tokens.
+
+```
+Window  as 9.1
+└─ Border.Card  Width Size.Form 480  Padding 24
+   ├─ Grid: TextBlock.Title «QR-код сервера»  ·  Button.IconButton40.Row Geo.Action.Close
+   ├─ 16
+   ├─ Border  320x320  Background #FFFFFF  r12  Padding 16     ← the QR needs a white quiet zone;
+   │    └─ Image 288x288                                          this is the one white surface in
+   │                                                              the dark theme and it is functional
+   ├─ 16
+   ├─ TextBlock.Body  the server name, centred, ellipsised
+   ├─ 8
+   ├─ TextBox.Field  read-only, the link, selectable, 3 lines max, Font.Numeric 13
+   ├─ 16
+   └─ StackPanel Orientation=Horizontal Spacing 12
+        Button.Tonal «Скопировать ссылку»   Button.Tonal «Сохранить изображение…»
+```
+
+Also used for the subscription link (7.2) with the title «QR-код подписки».
+
+### 9.3 `Dialogs/SudoDialog.axaml` - elevation on Linux
+
+**File:** `Views/SudoPasswordInputView.axaml` (66 ln). **REBUILD.** Today it uses
+`Theme="{DynamicResource CardBorder}"`, `resx:ResUI.TbConfirm` / `TbCancel`, and `Width="100"`
+buttons. **Linux users see this on the first TUN start**, so it is a first-run screen wearing
+somebody else's chrome.
+
+```
+Window as 9.1
+└─ Border.Card  Width Size.Form 480  Padding 24
+   ├─ TextBlock.Title  «Нужны права администратора»
+   ├─ 8
+   ├─ TextBlock.Body   «Режим «весь трафик» создаёт сетевой интерфейс. Введите пароль пользователя.»
+   ├─ 24
+   ├─ field  label Caption «Пароль»   TextBox.Field  PasswordChar, eye toggle, Enter submits
+   │         helper slot; on failure «Неверный пароль» in Brush.RedText
+   ├─ 16
+   ├─ Border.Row  «Запомнить на эту сессию»  +  ToggleSwitch.iOS
+   ├─ 24
+   └─ Button.Tonal «Отмена»  ·  Button.Primary «Продолжить»
+```
+
+The password is never logged, never echoed to the status strip, and the field is cleared on close.
+
+### 9.4 Flyouts, in full
+
+| Flyout | Anchor | Contents |
+|---|---|---|
+| Server actions | a server row | 7 items + 1 destructive (6.6) |
+| Provider actions | a provider row or group header | 6 items + 1 destructive (6.4) |
+| Subscription actions | the subscription card's kebab | 2 items (7.1.3) |
+| Sort | the sort button | 3 selectable rows |
+| Add | the add button | 4 items |
+| Top-up | «Пополнить» | amount field, error line, method rows, CTA (7.1.2) |
+| Link e-mail | «Добавить» on the e-mail row | field + CTA |
+| Picker (generic) | any row with a chevron that chooses one of many | 8.3 |
+| Log actions | the log kebab | 3 items + 1 destructive |
+
+All of them: `Esc` closes, focus enters on open and returns to the anchor on close, `Dur.Reveal`
+300ms in and 225ms out, and none of them carries a shadow.
+
+---
+
+## 10. Dead code: eleven files, eleven explicit decisions
+
+`02-inventory-pc.md` 4.7 lists eleven built, styled, compiled and unreachable surfaces. Dead surfaces
+are not neutral: they rot, they confuse search, and they are where inconsistency hides
+(`03-direction.md` 1.8, F15). Every one gets a decision in the same change.
+
+| File | Lines | Decision |
+|---|---|---|
+| `ServersView.axaml` | 12 | **DELETE.** An orphan wrapper around `ServerListView` with no reference anywhere |
+| `CompactServersView.axaml` | 116 | **HARVEST then DELETE.** It contains the app's only search field (`:90`, bound to `Profiles.ServerFilter`). The binding moves to `ServersPage`'s toolbar (6.3) in the same commit that deletes the file |
+| `ProfilesView.axaml` | 322 | **DELETE.** Registered in `SimpleViewLocator:29`; `ProfilesViewModel` is never shown as a dialog; its interaction handlers were already re-implemented in `ServerListView.axaml.cs:71-133` |
+| `ClashProxiesView.axaml` | 158 | **DELETE.** Mihomo/Clash proxy-group control is absent from the product and no owner request covers it. If it is ever wanted, it is a new destination, not a resurrected view |
+| `ClashConnectionsView.axaml` | 104 | **DELETE**, with a note: a live connection list is a real desktop expectation, and it is recorded as a **future** feature in section 12, not as dead code kept "just in case" |
+| `ThemeSettingView.axaml` | 67 | **DELETE.** Superseded by Настройки › Интерфейс |
+| `CheckUpdateView.axaml` | 95 | **REBUILD and WIRE** as `settings/update` (7.19) |
+| `BackupAndRestoreView.axaml` | 213 | **DELETE.** Superseded by `settings/backup`; its WebDAV panel is explicitly not migrated |
+| `ProviderSettingsPage.axaml` | 138 | **WIRE and RESTYLE** as `settings/provider` (7.12) |
+| `StatusBarView.axaml` | 125 | **REFACTOR.** It is mounted at `Width=0 Height=0 Opacity=0` (`MainWindow.axaml:643-651`) purely to keep its interaction handlers and `StatusBarViewModel` alive. The handlers move to the shell; the phantom view is deleted |
+| `MsgView.axaml` | 104 | **REBUILD** as `settings/core/log` (7.16) |
+
+Net: **six deletions, three rebuilds-and-wires, one harvest, one refactor.** After this section the
+project has zero unreachable views, and that becomes a standing check: a view with no route and no
+call site is a defect.
+
+---
+
+## 11. Parity with Android, screen by screen
+
+Read this table with `32-master-plan-android.md` open. **Same concept** means the two clients render
+the same information in the same order with the same words; **native expression** is how the platform
+draws it; **deliberate difference** is a divergence with a reason, and anything not listed as
+deliberate is a drift to be fixed.
+
+| Surface | Android | Desktop | Same concept | Native expression | Deliberate difference |
+|---|---|---|---|---|---|
+| Navigation | Bottom nav, 4 items, labels always visible | Rail 76 at >= 760, compact bar below | Same 4 destinations, same order, same labels, same current-marking on two channels | Bottom bar vs left rail; the rail is the desktop's fixed-edge target | Desktop adds `Ctrl+1..4` and `Ctrl+Tab`; the rail collapses to 0 and Android's bar does not |
+| Window chrome | none | 32px caption, 3 buttons, drag, 8-zone resize, in-app zoom | n/a | n/a | Desktop-only, entirely |
+| Главная | Connect object, status line, gate line, stats, 3 ledger rows | identical set | Yes, item for item | Two panes above 980px content width | Android never splits; the desktop hover state on the disc; `Ctrl+Enter` |
+| Connect control | 176dp disc, 200 ring, arc, one sonar | 176px disc, 200 ring, arc, one sonar | Yes, same layer count, same states, same 600ms hero | Same | Haptic on Android; hover on desktop |
+| Серверы | Search, sort, grouped list, per-item sheet | Search, sort, grouped list **plus a provider pane at width**, per-item flyout | Same row, same grouping, same 7 actions, same empty states | Sheet vs flyout; pane vs single column | Desktop adds multi-select, right-click, keyboard list navigation, `Ctrl+P`; Android does not offer them |
+| Server row | flag tile 28 in a 40 slot, name, protocol chip, transport, ping | identical | Yes | Same | Desktop's kebab appears on hover; Android's opens by long-press |
+| Server editor | 9 activities to be unified around 3 shared includes | one `servers/editor` sub-page | Same sections, same progressive disclosure, same validation copy | Activity vs sub-page | none |
+| Настройки | 4 groups, same 20 rows, same values, same affordance grammar | identical | Yes, row for row | Same | Desktop adds settings search; Android's is a future item |
+| Settings sub-pages | 14 activities | 14 sub-pages | Same content, same order, same copy keys | Activity vs sub-page | Desktop's `settings/hotkeys` has no Android counterpart (no global hotkeys on Android); Android's per-app list reads installed packages, desktop's reads `.exe` paths |
+| Аккаунт | hero card, subscription slot, sign-in methods, management, sign-out | identical | Yes, zone for zone | Same | Android hides the tab when signed out **today**; this plan makes both show the gate inside the tab |
+| Subscription | one card, six states | one card plus a sub-page for the two purchase flows | Same six states, same chips, same copy | Sheet vs sub-page for upgrade and add-devices | Desktop has a sub-page; Android uses `PaymentMethodSheet` and a stepper dialog |
+| Покупка | tariff cards, price options, checkout, payment picker | identical, picker inline | Same anatomy, same total line, same copy | Bottom sheet vs inline rows | The picker surface only |
+| Устройства | one divided list, undo unlink | identical | Yes | Same | none |
+| История | one divided list, status chips | identical + a refresh button | Yes | Swipe-to-refresh vs `F5` and a button | The refresh affordance only |
+| Вход | 5 panels, one filled accent per panel | identical | Yes, panel for panel | Same | Desktop's code cells accept paste; `Esc` steps back |
+| Онбординг | shield, 2 CTAs, divider, 2 links | identical | Yes | Same | none |
+| Синхронизация | ring, stage line, failure with two exits | identical | Yes | Same | none |
+| Feedback | Snackbar above the bottom nav, 48dp, one action | Status strip docked above the bar or at the content bottom | Same anatomy, same severities, same persistence rules, same copy | Snackbar vs docked strip | Desktop's is docked and never floats; Android's is a Snackbar because that is the platform component |
+| Log | Settings › Ядро и журнал › Журнал | identical | Yes | Same | Desktop's text is selectable and copyable |
+| Dialogs | Material dialog, themed | modal window, same layout | Same four dialogs, same copy, same button order | Material vs `Border.Card` on a scrim | none |
+| Tray / notification | ongoing notification: state, server, two actions | tray icon, tooltip, 6-item menu | Same facts, same words | Notification vs tray | Desktop-only |
+
+**Known parity gaps, logged rather than silently different** (`00-rules.md` 13):
+
+1. Global hotkeys exist on desktop only. Android has no equivalent and none is planned.
+2. Multi-select on the server list is desktop-only.
+3. In-app UI zoom is desktop-only; Android uses the system font scale, which desktop must also honour
+   through DPI.
+4. The provider pane on Серверы is a desktop layout at width; Android renders the same providers as
+   sticky group headers at every size.
+5. Per-app proxy targets packages on Android and executables on desktop. Same page, same copy,
+   different unit, and the subtitle says which.
+
+---
+
+## 12. Decisions
+
+### 12.1 Taken here, inside existing law
+
+- **PC-A.** Gradients and glows are **replaced, not amended**: `Brush.HomeGradient`,
+  `Brush.ConnectGlow`, `Brush.Ring.Outer`, `Brush.Ring.Inner` and `Nav.Scrim` are deleted.
+- **PC-B.** Servers is a **destination**, making four on both platforms.
+- **PC-C.** The sub-page stack is **per destination**, and every route has a stable id.
+- **PC-D.** The feedback channel is a **docked status strip** plus a **log page**. `Border.Toast` is
+  deleted.
+- **PC-E.** Escape, `Alt+Left` and mouse button 4 all pop the stack.
+- **PC-F.** The horizontal subscription **carousel is deleted** and replaced by a list; the
+  four-panel flyout wizard becomes a sub-page.
+- **PC-G.** Bottom sheets do not exist on desktop; `BuyView`'s becomes inline rows.
+- **PC-H.** One press language (`scale(0.97)`), one hover language (`Brush.Hover` at 150ms), one
+  icon-button system (`IconButton40`), one geometry dictionary, one field theme, one nav-item class.
+- **PC-I.** `ComboBox` is removed from the product in favour of a row plus `PickerFlyout`.
+- **PC-J.** Six dead views are deleted, three are wired, one is harvested, one is refactored
+  (section 10).
+- **PC-K.** Every reachable surface speaks `Common/L.*.cs`; `resx:ResUI` disappears from the desktop
+  UI entirely.
+- **PC-L.** Connected state: the **shield** fills accent, the **ring** returns to neutral, the
+  **status line** carries a green dot and the word. This resolves the `03-direction.md` 10.2 versus
+  `30-reference-analysis.md` 2.3 divergence in favour of the direction.
+
+### 12.2 Needs an owner decision, in `00-rules.md` section 18 row format
+
+| Date | Decision | Rule affected |
+|---|---|---|
+| pending | **PC-D1.** The desktop destination set becomes four (Главная · Серверы · Настройки · Аккаунт), matching Android, and `Nav_Servers` is added to `Common/L.Shell.cs` | 13, 7.7 |
+| pending | **PC-D2.** `Brush.HomeGradient` and `Brush.ConnectGlow` are deleted rather than exempted; the brand layer on both clients is the surface ramp, the single accent and the figure face | 1.4.3, 6.5 |
+| pending | **PC-D3.** The default window is 1080x720 in wide mode with a 900x600 wide floor; compact mode is an explicit user choice with a 380x620 floor, and `00-rules.md` 12.3's "minimum window 900x600" is read as "every view must be usable at 900x600", which compact mode also satisfies at its own floor | 12.3 |
+| pending | **PC-D4.** Buttons are a rounded rectangle at radius 16 on both platforms, not a pill. The owner's recorded rejection of capsules (`GlobalStyles.axaml:2-16`) outranks the rule, so the rule changes | 3.2 |
+| pending | **PC-D5.** A field-height token is added: `Size.Field` 48 on desktop, `@dimen/field_height` 48dp on Android, and input radius is `Radius.Chip` 12 on both. `Radius.Search` 14 is deleted | 3.2, 3.3 |
+| pending | **PC-D6.** Button label type is 14 (Bold on filled, Medium elsewhere) on both platforms; the desktop's 15 and Android's `textAppearanceLabelLarge` both go | 3.4 |
+| pending | **PC-D7.** `Font.Ui` is introduced as a separate token from `Font.Grotesk` on both platforms, and `Font.Grotesk` is never applied to a Russian string. This is the desktop half of `03-direction.md` D-1 and D-2 and cannot ship without them | 5.1, 3.4 |
+| pending | **PC-D8.** `Brush.Accent`, `Brush.OnAccent`, `Brush.Tile.*`, `Brush.SelectedFill` and `Brush.StatusChip.*` move inside `ResourceDictionary.ThemeDictionaries`; the light-theme accent becomes `#1E5FC7` (5.97:1) instead of `#4C8DFF` (2.98:1) | 3.5, 14.1 |
+| pending | **PC-D9.** Clash/Mihomo proxy-group control and the live connection list are **not** features of this product in 2026. `ClashProxiesView` and `ClashConnectionsView` are deleted. If either is wanted later it is a new destination with its own spec | n/a, records a deletion |
+| pending | **PC-D10.** WebDAV backup is not a feature; `BackupAndRestoreView` is deleted without migration | n/a |
+
+Nothing in 12.2 is implemented until the row is pasted into `00-rules.md` section 18 and the rule body
+is updated there.
+
+### 12.3 Recorded as future, not built
+
+Written down so nobody rediscovers them as "missing":
+
+- A command palette (`Ctrl+K`). The shortcut is reserved and unbound.
+- A live connection list (what Clash's connections view would have been), as a destination under
+  Настройки › Ядро и журнал.
+- Per-server routing overrides beyond the Mux and sniffing switches already in the editor.
+- Multi-window (a detached log or server list).
+- macOS menu-bar integration beyond the tray.
+
+---
+
+## 13. Implementation sequence
+
+Ten waves. The order is dependency-driven, not importance-driven: every wave leaves the app shippable,
+and no wave asks a screen to be redesigned twice. Each wave has an exit criterion that is checkable
+without judgement.
+
+### Wave 0 - Unblock (before any UI work)
+
+| # | Task | Files |
+|---|---|---|
+| 0.1 | Get the pending owner decisions signed: PC-D1 (four destinations), PC-D2 (delete the gradients), PC-D3 (window sizes), PC-D4 (radius 16), PC-D7 (`Font.Ui`), plus `03-direction.md` D-1 and D-2 | `00-rules.md` 18 |
+| 0.2 | Choose and vendor the Cyrillic UI face; verify it renders the longest Russian string in the product at 11, 13, 14, 16, 24 and 34 | `Assets/Fonts/` |
+| 0.3 | Re-measure the two contrast pairs that were hand-computed and never verified: `Brush.OnSurfaceVariant` on `Brush.SurfaceHigh`, and every pair in the light theme after the accent moves into the theme dictionaries | - |
+
+**Exit:** the six decision rows are in `00-rules.md` 18 and the UI face is in the repo.
+
+### Wave 1 - The token and file foundation
+
+Nothing visible changes. Everything after this wave depends on it.
+
+| # | Task | Files |
+|---|---|---|
+| 1.1 | Split `GlobalResources.axaml` into `Assets/Tokens.axaml`, `Assets/Icons.axaml` and `Assets/Themes/{Dark,Light,Mono}.axaml`. Move the mono overlay out of `App.axaml.cs:580 BuildMonoOverlay` and delete that function | `Assets/`, `App.axaml.cs` |
+| 1.2 | Move `Color.Accent`, `Brush.Accent`, `Brush.OnAccent`, `Brush.Tile.*`, `Brush.SelectedFill`, `Brush.StatusChip.*` inside `ThemeDictionaries`; set the light accent to `#1E5FC7` | `Assets/Themes/` |
+| 1.3 | Delete `Brush.HomeGradient`, `Brush.ConnectGlow`, `Brush.Ring.Outer`, `Brush.Ring.Inner`, `Nav.Scrim`. Point all six consumers at `Brush.Bg` | `Assets/`, 6 views |
+| 1.4 | Split `GlobalStyles.axaml` into `Assets/Styles/{Text,Buttons,Rows,Inputs,Overlays,Shell,Motion}.axaml`. Move `MainWindow`'s 260 lines of chrome styles into `Shell.axaml` | `Assets/Styles/`, `MainWindow.axaml` |
+| 1.5 | Add `Size.Content` 720, `Size.Form` 480, `Size.PanePrimary` 300, `Size.Field` 48, `Size.ConnectFrame` 200. Delete `Radius.Search`. Move `Radius.Button` into `Tokens.axaml` | `Assets/Tokens.axaml` |
+| 1.6 | Consolidate every `Geo.*` into `Icons.axaml`; delete the 40-plus local `StreamGeometry` declarations including the nine copies of `Geo.Sub.Back` | `Assets/Icons.axaml`, 24 views |
+| 1.7 | Add `Font.Ui`; repoint the 16 `Font.Grotesk` setters in the style sheet; leave `Font.Grotesk` only on `Chip`, `Numeric`, the wordmark and the protocol chip | `Assets/Styles/Text.axaml` |
+| 1.8 | Clear all 44 em-dashes and en-dashes from `Common/L.*.cs`; replace `DelayDisplayConverter`'s «-» with «нет ответа» | `Common/L.*.cs`, `ServerListView.axaml.cs` |
+| 1.9 | Rename the view directories per 2.11 | `Views/**` |
+
+**Exit:** the four mechanical greps in `00-rules.md` 1.5 return zero for inline hex, zero for
+`StaticResource Brush.*` and zero for dashes; the app builds and looks unchanged except that five
+gradients are gone; all three themes still switch live.
+
+### Wave 2 - The component library
+
+| # | Task |
+|---|---|
+| 2.1 | Write the 13 button classes; delete `Button.IconButton` (32), `LinkAction`, `OutlinedAccent`, and the 12 view-local button classes; delete the ten local `IconButton:pressed` re-declarations |
+| 2.2 | Write `Border.Row` and its modifiers (`.selectable`, `.static`, `.pressed`), `Border.Tile`, `Border.Chip`, `Border.Meter`, `Border.Skeleton`; delete `Border.StatusChip`, `Border.TrafficPill`, `Border.PriceOption`, `Border.SearchPill`, `Border.AccountChip`, `Border.SheetTop`, `Border.SheetHandle`, `Border.Toast`, and the four view-local row classes |
+| 2.3 | Write `TextBox.Field` with its `.search`, `.numeric` and `.error` modifiers; delete `TextBox.Incy`, `TextBox.IncyField` and the duplicate declaration inside `SettingsView.axaml` |
+| 2.4 | Write `Views/Components/SubPage.axaml` (toolbar + back + title + one trailing slot + content slot with `MaxWidth`) |
+| 2.5 | Write `PickerFlyout`, `EmptyState`, `ErrorState`, `SkeletonList`, `SearchField`, `MeterBar`, `ServerIcon` |
+| 2.6 | Unify press to `scale(0.97)` with the one documented disc exception; unify hover to `Brush.Hover` at 150ms; add focus rings to every focusable class including `ToggleSwitch.iOS` |
+| 2.7 | Add every new class to the `.lite` suppression block |
+
+**Exit:** `grep -c '<Style Selector=' Views/**/*.axaml` is under 20; every control in the component
+gallery renders correctly in dark, light and mono, at DPI 100 and 200, with hover, press, focus and
+disabled all visible.
+
+### Wave 3 - The shell
+
+| # | Task |
+|---|---|
+| 3.1 | Four destinations in the rail and the compact bar; add `Nav_Servers`; merge `NavRailItem` and `BottomNavItem` into `Button.NavItem` |
+| 3.2 | Caption buttons to 46x32 with names; rail toggle to 40x40 |
+| 3.3 | Per-destination sub-page stacks; route ids; `Esc`, `Alt+Left`, mouse button 4 |
+| 3.4 | The status strip: component, queue, severities, auto-dismiss, and rewire `DelegateSnackMsg` into it. Delete `snackHost` |
+| 3.5 | Default window 1080x720; wide floor 900x600; compact floor 380x620 |
+| 3.6 | Delete the phantom `StatusBarView` mount; move its handlers to the shell |
+| 3.7 | The full shortcut table from 2.8 |
+| 3.8 | Tray: identity line, six items, left-click shows, icon states |
+
+**Exit:** the shell acceptance list in 3.12 is fully ticked; a message sent through
+`NoticeManager` is visible to a user for the first time in the product's history.
+
+### Wave 4 - The two screens the owner named
+
+These come before the rest because they are the standing bar: «сейчас все выглядит плохо».
+
+| # | Task |
+|---|---|
+| 4.1 | `auth/login` rebuilt as five panels (7.21) |
+| 4.2 | `Онбординг` restyled: flat background, `Headline` not `Display`, the backup path (7.22) |
+| 4.3 | `Главная` rebuilt as one `HomePage` with both modes; `ConnectControl` with five layers deleted; `StatsRow`; the three ledger rows (5) |
+| 4.4 | `AccountSyncPage`: flat background, the renamed stage key, the cold-start variant (7.23) |
+
+**Exit:** the first frame at launch and the sign-in screen both pass the nine-question slop test in
+1.5, in all three themes, at 900x600 and 380x620.
+
+### Wave 5 - Серверы
+
+| # | Task |
+|---|---|
+| 5.1 | `ServersPage` with the two-pane and single-column layouts (6.2) |
+| 5.2 | The toolbar: search harvested from `CompactServersView`, sort, ping-all, add (6.3) |
+| 5.3 | `ProviderPane` with pin, and the provider flyout (6.4) |
+| 5.4 | `ServerRow` with the unified server icon, the selection contract and the kebab (6.5) |
+| 5.5 | Per-item actions: right-click, kebab, `Menu` key; delete with undo; multi-select (6.6) |
+| 5.6 | `ProviderGroupHeader` rebuilt from `SubscriptionMetaView`: two 40px buttons, no local shrink, meter beside its label (6.7) |
+| 5.7 | The operator-message component with its parser caps and hash-keyed dismissal |
+| 5.8 | Delete `ServersView`, `CompactServersView`, `ProfilesView` |
+
+**Exit:** a user can find, sort, edit, share, duplicate and delete a server, by mouse and by
+keyboard, at 500 rows, without a single Semi-default control appearing.
+
+### Wave 6 - The server and provider editors
+
+| # | Task |
+|---|---|
+| 6.1 | `servers/editor/{id}` (8.1), absorbing `AddServerWindow`, `AddServer2Window`, `AddGroupServerWindow` |
+| 6.2 | `servers/provider-editor/{id}` (8.2), absorbing `SubEditWindow` |
+| 6.3 | `PickerFlyout` replaces `ProfilesSelectWindow` at all three call sites |
+| 6.4 | Restyle `JsonEditor`'s chrome |
+| 6.5 | Delete the four windows and `SubSettingWindow` |
+
+**Exit:** `grep -rl 'resx:ResUI' Views/` returns nothing outside the three files scheduled for wave 8;
+right-clicking a server and choosing «Изменить» stays inside the shell.
+
+### Wave 7 - Настройки and its fourteen sub-pages
+
+| # | Task |
+|---|---|
+| 7.1 | The hub: `MaxWidth`, four groups in the agreed order, values on every row, search (7.6) |
+| 7.2 | Rebuild all eight existing sub-pages onto `SubPage`; delete the nine local chrome copies |
+| 7.3 | New pages: `bypass`, `core`, `core/log`, `core/advanced`, `hotkeys`, `update` |
+| 7.4 | Wire `ProviderSettingsPage` as `settings/provider` and add the provider-transparency section |
+| 7.5 | `settings/routing` plus the depth-2 rule-set page with the inline rule editor (7.9) |
+| 7.6 | Migrate the ten features out of `OptionSettingWindow`, then delete it (8.4) |
+| 7.7 | Delete `ThemeSettingView`, `BackupAndRestoreView`, `CheckUpdateView` (rebuilt), `MsgView` (rebuilt) |
+
+**Exit:** every setting the engine supports is reachable from the hub in at most two pushes; the
+affordance grammar holds on all 20 hub rows and every sub-page row; settings search finds a row on a
+sub-page and lands on it.
+
+### Wave 8 - Аккаунт and commerce
+
+| # | Task |
+|---|---|
+| 8.1 | `AccountPage` rebuilt: hero tightened, carousel deleted, flyout wizard deleted, Google row hidden, both fields on `TextBox.Field` (7.1) |
+| 8.2 | `account/subscription/{id}` built (7.2) |
+| 8.3 | `BuyPage`: sheet to inline rows, nested card removed, radius fixed, error colour fixed, success state given a forward path, purchase summary added (7.3) |
+| 8.4 | `DevicesPage`: HWID out of the row, current-device wash removed, unlink to undo, scrim token (7.4) |
+| 8.5 | `PaymentHistoryPage`: one skeleton component, `Border.EmptyIcon`, one card, refresh (7.5) |
+
+**Exit:** the owner's "every button in the Account tab" review passes; exactly one filled accent
+surface on the tab in every state; `AccountView.axaml` is replaced by two files each under 400 lines.
+
+### Wave 9 - The remaining dialogs, and the sweep
+
+| # | Task |
+|---|---|
+| 9.1 | `QrDialog`, `SudoDialog` rebuilt; `MessageDialog` shadow removed (9.1-9.3) |
+| 9.2 | The full off-scale spacing sweep: 97 occurrences, 14 values, to zero |
+| 9.3 | The glyph-size sweep: 10 sizes to 4 |
+| 9.4 | Accessible names on the 18 unnamed icon-only controls |
+| 9.5 | The state sweep: open every screen in section 15 of `00-rules.md`'s eleven states and fix what was skipped |
+| 9.6 | The 200 percent sweep: every screen at DPI 200 and at UI zoom 200, at 900x600 and 380x620 |
+| 9.7 | The three-theme sweep: every screen in dark, light and mono |
+
+**Exit:** the pre-flight checklist in `00-rules.md` 16 is fully ticked for every screen, and every
+screen scores at least 18/20 on the five `audit.native.md` dimensions with no dimension below 3.
+
+### Wave 10 - Parity reconciliation
+
+| # | Task |
+|---|---|
+| 10.1 | Diff every user-visible string between `Common/L.*.cs` and `res/values*/strings*.xml` for the same concept; fix the platform that drifted |
+| 10.2 | Diff the settings group order, row order and default values between platforms |
+| 10.3 | Diff the state matrix per screen |
+| 10.4 | Update section 11's parity table with what actually shipped, and log every remaining gap |
+
+**Exit:** a user who learns one client recognises the other; every remaining difference appears in
+section 11 as deliberate, with a reason.
+
+### 13.1 What can be done in parallel
+
+Waves 0 and 1 are strictly serial. After wave 2 the following are independent and can run
+concurrently: wave 4 (the two named screens), wave 7 (settings), wave 8 (account). Wave 5 must
+precede wave 6. Wave 9 must come last except for 9.1, which can land any time after wave 2.
+
+### 13.2 If only five things can be done
+
+In this order, and this is the honest triage:
+
+1. **Delete the five gradient and glow tokens and repoint their six consumers.** One afternoon, and
+   the product stops looking like every other VPN on a store page.
+2. **Rebuild the sign-in screen** (7.21). It is the first screen a paying user sees, it carries 20
+   buttons, and its hierarchy is inverted.
+3. **Build the status strip and wire `DelegateSnackMsg` into it** (3.8). The product currently cannot
+   say «Готово», and it cannot report a failed clipboard import at all.
+4. **Add the Серверы destination with search** (section 6). With 80 to 150 servers per subscription,
+   a list with no search is a functional hole and the shipping app has none.
+5. **Build `SubPage` and the row component, and delete the sixty hand-rolled copies** (2.7). This is
+   what stops the drift that produced nine chrome copies, seven press scales and ten glyph sizes.
+
+Everything else in this document is downstream of those five.
+
+---
+
+## 14. File index and verdicts
+
+Every `.axaml` in `v2rayN.Desktop`, with its verdict and its destination. **50 view files today**,
+plus `App.axaml` and the two `Assets/` dictionaries. After the rebuild: 17 deleted outright, 9
+deleted-by-merge into a rebuilt surface, 11 new files created, and the two `Assets/` dictionaries
+split into thirteen.
+
+### 14.1 Shell and system
+
+| File | Lines | Verdict | Becomes |
+|---|---|---|---|
+| `App.axaml` / `.axaml.cs` | 49 / 707 | RESTYLE | theme selection + tray only; `BuildMonoOverlay` deleted |
+| `Assets/GlobalResources.axaml` | 569 | SPLIT | `Tokens.axaml` + `Icons.axaml` + `Themes/{Dark,Light,Mono}.axaml` |
+| `Assets/GlobalStyles.axaml` | 1 448 | SPLIT | `Styles/{Text,Buttons,Rows,Inputs,Overlays,Shell,Motion}.axaml` |
+| `Views/MainWindow.axaml` / `.cs` | 737 / 2 029 | RESTYLE | `Views/Shell/MainWindow` + the chrome styles moved out |
+| `Views/BottomNavBar.axaml` | 180 | REBUILD | `Views/Shell/CompactNavBar` on the shared `Button.NavItem` |
+| `Views/StatusBarView.axaml` | 125 | REFACTOR then DELETE | handlers move to the shell |
+| - | - | NEW | `Views/Shell/StatusStrip.axaml` |
+| - | - | NEW | `Views/Components/SubPage.axaml` |
+
+### 14.2 Главная
+
+| File | Lines | Verdict | Becomes |
+|---|---|---|---|
+| `HomeView.axaml` | 74 | REBUILD | `Views/Home/HomePage.axaml` (both modes) |
+| `CompactHomeView.axaml` | 94 | DELETE, merged | same |
+| `ConnectHeroView.axaml` / `.cs` | 839 / 1 156 | RESTYLE | `Views/Home/ConnectControl.axaml`, five layers deleted |
+| `HomeAccountChip.axaml` | 131 | RESTYLE | the account row inside `HomePage` |
+| - | - | NEW | `Views/Home/StatsRow.axaml` |
+
+### 14.3 Серверы
+
+| File | Lines | Verdict | Becomes |
+|---|---|---|---|
+| `ServerListView.axaml` / `.cs` | 313 / 939 | RESTYLE | `Views/Servers/ServerList.axaml` + `ServerRow.axaml` |
+| `SubscriptionMetaView.axaml` / `.cs` | 335 / 687 | REBUILD | `Views/Servers/ProviderGroupHeader.axaml` |
+| `ServersView.axaml` | 12 | DELETE | - |
+| `CompactServersView.axaml` | 116 | HARVEST then DELETE | its search becomes the toolbar's |
+| `ProfilesView.axaml` | 322 | DELETE | - |
+| `AddServerWindow.axaml` | 1 388 | REBUILD | `Views/Servers/ServerEditorPage.axaml` |
+| `AddServer2Window.axaml` | 160 | DELETE, merged | the editor's raw-JSON mode |
+| `AddGroupServerWindow.axaml` | 258 | DELETE, merged | the editor's group mode |
+| `SubEditWindow.axaml` | 272 | REBUILD | `Views/Servers/ProviderEditorPage.axaml` |
+| `SubSettingWindow.axaml` | 82 | DELETE | the provider pane |
+| `ProfilesSelectWindow.axaml` | 129 | REBUILD | `Views/Components/PickerFlyout.axaml` |
+| - | - | NEW | `Views/Servers/ServersPage.axaml`, `ProviderPane.axaml` |
+
+### 14.4 Настройки
+
+| File | Lines | Verdict | Becomes |
+|---|---|---|---|
+| `SettingsView.axaml` / `.cs` | 1 075 / 359 | RESTYLE | `Views/Settings/SettingsPage.axaml`, 4 groups |
+| `PerAppProxyPage.axaml` | 163 | RESTYLE | on `SubPage` |
+| `DnsSubView.axaml` | 162 | RESTYLE | on `SubPage`, `Border.DnsChip` deleted |
+| `PingSettingsPage.axaml` | 160 | RESTYLE | on `SubPage`, `Border.MethodRow` deleted |
+| `RoutingSubView.axaml` | 184 | RESTYLE | on `SubPage` |
+| `RoutingRuleSettingWindow.axaml` | 259 | REBUILD | `settings/routing/ruleset/{id}` |
+| `RoutingRuleDetailsWindow.axaml` | 263 | DELETE, merged | the inline rule editor |
+| `GeoFilesPage.axaml` | 100 | RESTYLE | plus real download states |
+| `UrlSchemesPage.axaml` | 115 | RESTYLE | on `SubPage` |
+| `BackupPage.axaml` | 96 | RESTYLE | on `SubPage` |
+| `AboutPage.axaml` | 105 | RESTYLE | `MaxWidth` 620 to 720 |
+| `ProviderSettingsPage.axaml` | 138 | WIRE + RESTYLE | `settings/provider` |
+| `OptionSettingWindow.axaml` | 1 206 | DELETE | 10 features migrated (8.4) |
+| `FullConfigTemplateWindow.axaml` | 197 | REBUILD | `settings/core/advanced` |
+| `GlobalHotkeySettingWindow.axaml` | 133 | REBUILD | `settings/hotkeys` |
+| `MsgView.axaml` | 104 | REBUILD | `settings/core/log` |
+| `CheckUpdateView.axaml` | 95 | REBUILD + WIRE | `settings/update` |
+| `ThemeSettingView.axaml` | 67 | DELETE | Настройки › Интерфейс |
+| `BackupAndRestoreView.axaml` | 213 | DELETE | - |
+| `JsonEditor.axaml` | 26 | KEEP + RESTYLE | used by `core/advanced` |
+| - | - | NEW | `settings/bypass`, `settings/core` |
+
+### 14.5 Аккаунт and auth
+
+| File | Lines | Verdict | Becomes |
+|---|---|---|---|
+| `AccountView.axaml` / `.cs` | 1 474 / 524 | REBUILD | `Views/Account/AccountPage.axaml` (< 400 ln) |
+| - | - | NEW | `Views/Account/SubscriptionPage.axaml` |
+| `BuyView.axaml` | 709 | RESTYLE | `Views/Account/BuyPage.axaml` |
+| `DevicesView.axaml` | 491 | RESTYLE | `Views/Account/DevicesPage.axaml` |
+| `PaymentHistoryView.axaml` | 351 | RESTYLE | `Views/Account/PaymentHistoryPage.axaml` |
+| `LoginView.axaml` / `.cs` | 954 / 1 377 | REBUILD | `Views/Auth/LoginPage.axaml` (< 350 ln) |
+| `OnboardingView.axaml` | 238 | RESTYLE | `Views/Auth/OnboardingPage.axaml` |
+| `AccountSyncView.axaml` | 176 | KEEP | `Views/Auth/AccountSyncPage.axaml`, flat background |
+
+### 14.6 Dialogs and deletions
+
+| File | Lines | Verdict |
+|---|---|---|
+| `MessageBoxDialog.axaml` | 74 | KEEP, shadow removed |
+| `QrcodeView.axaml` | 31 | REBUILD as `Dialogs/QrDialog.axaml` |
+| `SudoPasswordInputView.axaml` | 66 | REBUILD as `Dialogs/SudoDialog.axaml` |
+| `ClashProxiesView.axaml` | 158 | DELETE |
+| `ClashConnectionsView.axaml` | 104 | DELETE |
+
+---
+
+## 15. The desktop definition of done
+
+A desktop screen is finished when every box is honestly ticked. This is `00-rules.md` 16 with the
+desktop-specific rows filled in.
+
+**Tokens and system**
+- [ ] Zero inline hex in the view; zero `StaticResource` on a theme brush
+- [ ] Zero off-scale `Margin`, `Padding` or `Spacing`
+- [ ] Zero inline `FontSize`; every text element carries a ramp class
+- [ ] Zero view-local `<Style Selector=...>` outside the four permitted cases
+- [ ] Radii: 16 buttons, 20 cards, 12 chips and tiles and inputs
+- [ ] No new token without a comment stating its purpose and its contrast ratio
+
+**Bans**
+- [ ] No gradient, no glow, no blur, no `BoxShadow`, no side stripe
+- [ ] No nested cards; at most one card per region and no card inside a card
+- [ ] No identical-card grid where a divided list belongs
+- [ ] Section headers sentence-case bold; no ALL-CAPS, no numbered scaffolding
+- [ ] No emoji as chrome, no text characters standing in for icons
+- [ ] One filled accent surface; the accent count matches the table in 2.2
+- [ ] No bottom sheet, no carousel, no pull-to-refresh, no phone idiom
+
+**Colour and type**
+- [ ] Dark, light and mono all checked
+- [ ] Body >= 4.5:1, large >= 3:1, icons >= 3:1, placeholders >= 4.5:1, in all three
+- [ ] Colour is never the only signal
+- [ ] Inactive and disabled states are desaturated
+- [ ] Every number uses `Font.Numeric` with `tnum,lnum` and a reserved column width
+- [ ] No Russian string is set in `Font.Grotesk`
+- [ ] The longest real Russian string fits at 900x600 and at 380x620
+
+**Interaction**
+- [ ] Default, hover, pressed, focus, disabled, loading and error all implemented
+- [ ] Focus is visible on every focusable control and tab order matches visual order
+- [ ] Selection reads on two channels
+- [ ] Pointer targets: 32 minimum, 40 in rows and toolbars, 52 for a primary CTA
+- [ ] Feedback within 100ms; a loading state after 300ms; skeletons shaped like the result
+- [ ] Forms: label above, helper slot always present, validate on blur, error below
+- [ ] Destructive actions use undo; a dialog only for the four irreversible cases
+- [ ] `Esc`, `Alt+Left` and mouse button 4 all go back; back restores scroll and filter
+- [ ] The whole screen is completable with the keyboard alone
+
+**Motion**
+- [ ] Every duration and curve is a token; ease-out only; exit is 75 percent of enter
+- [ ] Press is 0.97 everywhere except the documented connect disc
+- [ ] No looping idle animation; no page-load choreography; no animated layout property
+- [ ] Only one 600ms hero moment exists in the product and this is not a new one
+- [ ] `.lite` verified by toggling it live, not by reading the code
+
+**Copy**
+- [ ] Every string in `Common/L.*.cs`; zero `resx:ResUI`
+- [ ] Russian, sentence case, active verbs, terminology per `00-rules.md` 9.3
+- [ ] Zero em-dashes and en-dashes; `₽`, `…` and «ёлочки» used correctly
+- [ ] Errors state the cause and the fix and offer recovery
+- [ ] Empty states are title plus one line plus one action
+
+**States**
+- [ ] Default, first run, loading, empty, error, offline, partial, long, short, gated, success
+- [ ] The product gate states: нет подписки, истекает, истекла, триал, Telegram не привязан, нет
+      серверов, подключение, подключено, отключение, ошибка туннеля, лимит устройств
+
+**Platform**
+- [ ] Usable at 900x600 wide and 380x620 compact, with no horizontal scroll
+- [ ] DPI 100 / 125 / 150 / 200 and UI zoom 100 / 200 all verified
+- [ ] No Semi or Fluent default leaks anywhere on the screen
+- [ ] One scroll region, no nested scrollers (the Серверы two-pane layout excepted)
+- [ ] The window can be resized across the 760 breakpoint without losing state
+
+**Verification**
+- [ ] The screen was run and looked at, in three themes, at two window sizes, at two zoom levels
+- [ ] The nine questions of the desktop slop test (1.5) answered out loud
+- [ ] Parity checked against the Android counterpart in section 11
+
+---
+
+## 16. One paragraph, for whoever picks this up
+
+The desktop client is the same instrument as the phone, mounted on a bench. It keeps the near-black
+surface ramp with no shadows and no gradients, the one blue spent on the single thing the screen
+wants you to press, the 56px hairline-ruled row at the 68px text origin as the repeating unit of the
+whole product, and every quantity set in tabular figures so a live counter is as still as a printed
+one. It gains four things the phone cannot have and must not fake: a hover state on everything
+clickable, a focus ring that is always visible, a keyboard path through every task, and a window that
+restructures rather than stretches between 380px and 3840px. It loses four things it should never
+have had: five layers of glow around a 176px disc, a horizontal card carousel, a bottom sheet, and
+fifteen OS-decorated windows speaking a language the product does not. The build order is: settle the
+tokens, build the components, fix the shell, then the sign-in screen and the first frame the owner
+named, then servers, then the editors, then settings, then the account, then the sweep. Nothing ships
+with only a happy path, nothing ships unreachable, and nothing ships that a user fluent in Raycast,
+Linear and Telegram Desktop would pause at.
+
+---
+
+## Change log
+
+| Date | Change |
+|---|---|
+| 2026-07-26 | First issue. Built on `00-rules.md`, `02-inventory-pc.md`, `03-direction.md`, `20-control-survey.md`, `21-account-survey.md`, `30-reference-analysis.md`, `31-self-assessment.md`. Answers the seven open questions of `02-inventory-pc.md` 6 and resolves the two conflicts between `03-direction.md` and `30-reference-analysis.md` |

@@ -252,13 +252,10 @@ object SubscriptionUpdater {
                 return Result.success()
             }
 
-            // A subscription with no User-Agent of its own inherits the global one from the
-            // provider screen. Applied to this decoded copy only and never written back, so
-            // clearing the global value restores the operator default on the next run.
-            if (subItem.userAgent.isNullOrBlank()) {
-                SettingsManager.getSubscriptionUserAgent()?.let { subItem.userAgent = it }
-            }
-
+            // The global User-Agent fallback is NOT applied here: updateConfigViaSub writes this
+            // item back to storage (lastUpdated, provider directives), so anything set on it now
+            // would be persisted as that subscription's own User-Agent and would survive clearing
+            // the global one. It resolves per-sub → global → operator default at the fetch itself.
             val sub = SubscriptionCache(subId, subItem)
 
             // Notify about update start

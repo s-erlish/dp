@@ -788,10 +788,13 @@ object AngConfigManager {
             }
             LogUtil.i(AppConfig.TAG, url)
             // The panel picks the response format (XRAY_JSON template vs base64 link list) from
-            // the User-Agent, so a per-subscription override wins over everything; the
-            // operator-configured UA is the fallback, and HttpUtil supplies the last-resort
-            // default when neither is set.
+            // the User-Agent, so a per-subscription override wins over everything, then the
+            // global override from the provider screen, then the operator-configured UA. All
+            // three tiers are resolved here because this is the only fetch point: the scheduled
+            // worker also applies the global override, and a manual refresh that skipped it would
+            // pull a different response format than the automatic one for the same subscription.
             val userAgent = it.subscription.userAgent?.trim()?.ifBlank { null }
+                ?: SettingsManager.getSubscriptionUserAgent()
                 ?: BackendConfig.subscriptionUserAgent
             val proxyUsername = SettingsManager.getSocksUsername()
             val proxyPassword = SettingsManager.getSocksPassword()

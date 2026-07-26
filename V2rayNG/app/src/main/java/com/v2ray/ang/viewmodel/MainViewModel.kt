@@ -71,10 +71,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // and is NOT reset by the fallback's own service restart — prevents reconnect loops.
     var autoFallbackUsed = false
 
-    // True only while the auto-fallback's own stop→start restart is in flight. The anti-loop
+    // True only while the auto-fallback's own stop→start restart is in flight: set when the
+    // fallback commits, released when the restart is actually issued (or abandoned). The anti-loop
     // invariant rests on [autoFallbackUsed] surviving that restart, and this flag is what lets
     // the disconnect handler tell the internal restart apart from a genuine user disconnect
     // instead of leaving the distinction implicit in "nothing happens to clear the flag".
+    // It must NOT be released merely because a tunnel is up — the core reports "running" again on
+    // every client registration, and clearing it there would expose the internal stop.
     var fallbackInProgress = false
 
     /**

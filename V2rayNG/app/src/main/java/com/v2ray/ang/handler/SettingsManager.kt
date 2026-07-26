@@ -447,16 +447,24 @@ object SettingsManager {
             val guids = MmkvManager.decodeServerList(subId)
             if (guids.size < 2) return@forEach
 
+            // Each key is read once and then sorted, never re-read per comparison: this runs on the
+            // main thread during startup and one key costs an MMKV read plus a JSON parse.
             val sorted = when (order) {
-                AppConfig.SERVER_SORT_PING -> guids.sortedBy { guid ->
-                    // Untested and unreachable servers sink to the bottom instead of leading it.
-                    val delay = MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: -1L
-                    if (delay <= 0L) Long.MAX_VALUE else delay
-                }
+                AppConfig.SERVER_SORT_PING -> guids
+                    .map { guid ->
+                        // Untested and unreachable servers sink to the bottom instead of leading it.
+                        val delay = MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: -1L
+                        guid to if (delay <= 0L) Long.MAX_VALUE else delay
+                    }
+                    .sortedBy { it.second }
+                    .map { it.first }
 
-                AppConfig.SERVER_SORT_NAME -> guids.sortedBy { guid ->
-                    decodeServerConfig(guid)?.remarks?.lowercase(Locale.getDefault()).orEmpty()
-                }
+                AppConfig.SERVER_SORT_NAME -> guids
+                    .map { guid ->
+                        guid to decodeServerConfig(guid)?.remarks?.lowercase(Locale.getDefault()).orEmpty()
+                    }
+                    .sortedBy { it.second }
+                    .map { it.first }
 
                 else -> return@forEach
             }

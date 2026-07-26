@@ -53,10 +53,12 @@ class SubscriptionSyncManager {
             }
 
             MmkvManager.encodeSubscription(guid, item)
-            // Fetch first, schedule second — the order is load-bearing. The fetch stamps
+            // Fetch first, schedule second — the order is load-bearing. A successful fetch stamps
             // `lastUpdated`, and syncOne derives the worker's initial delay from it, so the timer
-            // starts a full interval out. Reversed, lastUpdated would still be -1 and the periodic
-            // worker would fire at once, pulling the same subscription twice on every sign-in.
+            // starts a full interval out. Reversed, that delay would be 0 and the periodic worker
+            // would fire at once, pulling the same subscription twice on every sign-in. A failed
+            // fetch leaves `lastUpdated` untouched and the worker does run promptly — that retry is
+            // the point, not the duplicate above.
             AngConfigManager.updateConfigViaSub(SubscriptionCache(guid, item))
             SubscriptionUpdater.syncOne(subId = guid)
 

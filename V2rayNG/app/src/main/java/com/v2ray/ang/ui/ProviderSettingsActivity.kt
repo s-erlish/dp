@@ -9,6 +9,7 @@ import com.v2ray.ang.R
 import com.v2ray.ang.auth.BackendConfig
 import com.v2ray.ang.databinding.ActivityProviderSettingsBinding
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
 
@@ -184,7 +185,10 @@ class ProviderSettingsActivity : BaseActivity() {
 
     private fun editUserAgent() {
         val input = EditText(this).apply {
-            setText(currentUserAgent())
+            // Only the override is prefilled: confirming an untouched dialog must not freeze the
+            // operator default into a permanent override that a later build could no longer change.
+            // The row itself already shows the User-Agent that is actually sent.
+            setText(SettingsManager.getSubscriptionUserAgent().orEmpty())
             setSingleLine()
             inputType = InputType.TYPE_CLASS_TEXT
             hint = getString(R.string.ps_user_agent_hint)
@@ -219,8 +223,10 @@ class ProviderSettingsActivity : BaseActivity() {
             .setSingleChoiceItems(entries, idx) { dialog, which ->
                 MmkvManager.encodeSettings(AppConfig.PREF_SERVER_SORT_ORDER, sortValues[which])
                 // Order lives in storage, so reorder now — the servers list renders what is stored
-                // and never re-sorts on its own.
+                // and never re-sorts on its own. It also holds its rows from before this screen was
+                // opened, so ask it to rebuild; otherwise the new order only shows after a restart.
                 SettingsManager.applyServerSortOrder()
+                SettingsChangeManager.makeSetupGroupTab()
                 bindState()
                 dialog.dismiss()
             }

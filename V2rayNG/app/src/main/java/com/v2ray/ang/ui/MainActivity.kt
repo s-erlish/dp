@@ -557,6 +557,9 @@ class MainActivity : HelperBaseActivity() {
             if (mainViewModel.isRunning.value == true) {
                 restartV2Ray()
             } else {
+                // The tunnel went down while the fallback was still testing, so there is no
+                // internal stop left for the disconnect handler to protect.
+                mainViewModel.fallbackInProgress = false
                 // Mark the attempt so a failed fast-connect is reported as «Не удалось подключиться».
                 connectInProgress = true
                 applyRunningState(isLoading = true, isRunning = false)
@@ -1592,6 +1595,11 @@ class MainActivity : HelperBaseActivity() {
                 applyRunningState(isLoading = false, isRunning = true)
                 return@launch
             }
+            // The stop landed and the new start is going out now, so an auto-fallback restart is
+            // no longer in flight. Released here, after the stop the disconnect handler had to
+            // read as internal — releasing it any earlier hands that stop to the user-disconnect
+            // branch of cancelHealthCheck() and re-opens the switch/restart loop.
+            mainViewModel.fallbackInProgress = false
             startV2Ray()
         }
     }
@@ -1974,9 +1982,11 @@ class MainActivity : HelperBaseActivity() {
      * hasn't already run this session.
      */
     private fun scheduleHealthCheckIfEnabled() {
-        // A tunnel is up: the fallback's own restart (if there was one) has landed, and any
-        // half-finished probe from the previous tunnel is void.
-        mainViewModel.fallbackInProgress = false
+        // Any half-finished probe from the previous tunnel is void. Nothing about the fallback's
+        // one-shot state is touched here: this runs on EVERY isRunning==true emission, including
+        // the stale one the core answers MSG_REGISTER_CLIENT with (the quick-settings tile
+        // registers every time the panel opens), so "a tunnel is up" is not evidence that the
+        // fallback's restart has landed — the restart itself clears that flag.
         healthCheckConfirming = false
         timerHandler.removeCallbacks(healthRecheckRunnable)
         if (mainViewModel.autoFallbackUsed) return
