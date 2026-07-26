@@ -1,68 +1,81 @@
 package com.v2ray.ang.ui.component
 
 import android.view.View
+import android.view.ViewStub
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.annotation.DrawableRes
+import androidx.annotation.LayoutRes
+import com.google.android.material.button.MaterialButton
 import com.v2ray.ang.R
 
 /**
- * The empty state (22-components.md 15, 32-master-plan-android.md 8.8). One grammar, replacing the
- * three the app ships today (a card on Account, a tile block on Devices, a `drawableTop` on a
- * TextView on Payment history).
+ * The empty state - `res/layout/view_empty_state.xml` bound in one call (22-components.md 15,
+ * 32-master-plan-android.md 8.8). One grammar, replacing the three the app ships today: a card on
+ * Account, a tile block on Devices, a `drawableTop` on a TextView on Payment history.
  *
  * ```
- * [ 64 tile, r20, colorSurfaceContainerHighest, 32dp glyph in colorOnSurfaceVariant ]
- *                              16
- *                Title   Headline 24/700, centred, max 2 lines
- *                              8
- *                Line    Subtitle 13/400, centred, max 2 lines
- *                              24
- *                Action  ONE button
+ * [ 64 tile r20, neutral, 32dp glyph ]
+ *                 16
+ *   Title   Headline 24/700, centred, max 2 lines
+ *                 8
+ *   Line    Subtitle 13/400, centred, max 2 lines
+ *                 24
+ *   Action  ONE button, or none
  * ```
  *
  * What the binder enforces, because these are the three things that go wrong:
  *
  * - **The tile is neutral.** An empty state is not the screen's primary action surface and does not
- *   spend the accent budget on decoration. The tile colour is not a parameter.
+ *   spend the accent budget on decoration, so the tile colour is not a parameter.
  * - **One action, or none.** Two buttons in an empty state is the current Account defect. The
- *   signature has room for exactly one.
- * - **The cause is passed in, never written into the layout.** An error state is this same
- *   silhouette with the alert glyph, the mapped cause and a Tertiary «Повторить»; the hard-wired
- *   «Что-то пошло не так» in `activity_account.xml` is what this replaces.
+ *   action lives in a `ViewStub`, and a stub inflates once, so the second button has nowhere to go.
+ * - **The cause is passed in, never written into the layout.** The error variant is this same
+ *   silhouette with the alert glyph, the MAPPED cause and a Tertiary «Повторить»; the hard-wired
+ *   «Что-то пошло не так» in `activity_account.xml` is exactly what this replaces.
  *
- * Copy follows 00-rules.md 9.5: title says what is not here, one line says why or what it gives
- * you, one action. Never «Нет данных» alone, never an illustration, never an emoji. Strings belong
- * to the screen, so this binder takes `CharSequence` and owns no copy of its own.
+ * Copy follows 00-rules.md 9.5 - title says what is not here, one line says why or what it gives
+ * you, one action - and belongs to the screen, so this binder takes `CharSequence` and owns none.
  */
 object EmptyStateBinder {
 
     /**
-     * Binds an empty, error or offline-empty state.
+     * Which button the action is. It is chosen ONCE, at the first bind that shows an action,
+     * because a `ViewStub` inflates once.
+     *
+     * - [PRIMARY] - the action genuinely is the screen's job: «Купить», «Добавить провайдера».
+     * - [SECONDARY] - anything else. This is the default, and it is the common case.
+     * - [TERTIARY] - the error variant's «Повторить».
+     */
+    enum class Emphasis { PRIMARY, SECONDARY, TERTIARY }
+
+    /**
+     * Binds an empty or an error state and makes the block visible.
      *
      * ```kotlin
      * EmptyStateBinder.bind(
-     *     root = binding.emptyState.root,
+     *     root = binding.emptyState.emptyState,
      *     glyph = R.drawable.ic_globe_24dp,
      *     title = getString(R.string.servers_empty_title),
      *     line = getString(R.string.servers_empty_line),
      *     actionLabel = getString(R.string.servers_empty_action),
+     *     emphasis = EmptyStateBinder.Emphasis.PRIMARY,
      *     onAction = { SubPage.open(this, providerIntent) },
      * )
      * ```
      *
-     * @param root the inflated empty-state block.
-     * @param glyph the 32dp neutral glyph.
+     * @param root the inflated block, i.e. `@id/empty_state`.
+     * @param glyph the 32dp neutral glyph. Decorative: the title is the accessible name.
      * @param title what is not here. Headline by default; pass `compact = true` inside a card or a
-     *   list section, where the Title role is the right step.
-     * @param line why it is not here, or what having it gives the user. One line, about 60
-     *   characters, or null when the title says everything.
+     *   list section, where the Title role is the right step of the ramp.
+     * @param line why it is not here, or what having it would give the user. One line, about 60
+     *   characters, or null when the title already says everything.
      * @param actionLabel the one action, or null for a state with nothing to do («Платежей пока
-     *   нет»). An action that is the screen's own job is a Primary button; anything else is
-     *   Secondary, and that choice belongs to the layout's style, not to this call.
+     *   нет»). Never two.
+     * @param emphasis which button tier, honoured at the first bind that shows an action.
      * @param compact true when the state sits inside a card or a list rather than owning the screen.
      * @param onAction what the action does, routed through [onSingleClick]. Required whenever
-     *   [actionLabel] is set.
+     *   [actionLabel] is set, and forbidden when it is not.
      */
     fun bind(
         root: View,
@@ -70,6 +83,7 @@ object EmptyStateBinder {
         title: CharSequence,
         line: CharSequence? = null,
         actionLabel: CharSequence? = null,
+        emphasis: Emphasis = Emphasis.SECONDARY,
         compact: Boolean = false,
         onAction: ((View) -> Unit)? = null,
     ) {
@@ -80,68 +94,86 @@ object EmptyStateBinder {
 
         val slots = EmptyStateSlots.of(root)
 
-        Slots.requireSlot(slots.tile, "empty-state glyph", EmptyStateSlots.TILE).let {
-            it.setImageResource(glyph)
-            // The glyph restates the title in picture form; the title is the accessible name.
-            it.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-        }
+        slots.glyph.setImageResource(glyph)
 
-        Slots.requireSlot(slots.title, "empty-state title", EmptyStateSlots.TITLE).let {
-            it.text = title
-            it.setTextAppearance(
-                if (compact) R.style.TextAppearance_App_Title else R.style.TextAppearance_App_Headline
-            )
-        }
+        slots.title.text = title
+        slots.title.setTextAppearance(
+            if (compact) R.style.TextAppearance_App_Title else R.style.TextAppearance_App_Headline
+        )
 
-        slots.line?.let {
-            it.text = line ?: ""
-            it.visibility = if (line.isNullOrEmpty()) View.GONE else View.VISIBLE
-        }
+        slots.line.text = line ?: ""
+        slots.line.visibility = if (line.isNullOrEmpty()) View.GONE else View.VISIBLE
 
-        slots.action?.let { button ->
-            if (actionLabel == null || onAction == null) {
-                button.clearClick()
-                button.visibility = View.GONE
-            } else {
-                button.text = actionLabel
-                button.visibility = View.VISIBLE
-                button.onSingleClick(action = onAction)
-            }
-        }
+        bindAction(root, actionLabel, emphasis, onAction)
 
         root.visibility = View.VISIBLE
     }
 
-    /** Hides the whole block. Use it when the content arrives, rather than hiding parts of it. */
+    /** Hides the whole block. Use it when the content arrives; never hide the parts one by one. */
     fun hide(root: View) {
-        EmptyStateSlots.of(root).action?.clearClick()
+        EmptyStateSlots.action(root)?.clearClick()
         root.visibility = View.GONE
+    }
+
+    private fun bindAction(
+        root: View,
+        label: CharSequence?,
+        emphasis: Emphasis,
+        onAction: ((View) -> Unit)?,
+    ) {
+        if (label == null || onAction == null) {
+            // Nothing to do here: leave the stub uninflated so the state costs no views at all.
+            EmptyStateSlots.action(root)?.let {
+                it.clearClick()
+                it.visibility = View.GONE
+            }
+            return
+        }
+
+        val button = EmptyStateSlots.action(root) ?: inflateAction(root, emphasis) ?: return
+        button.text = label
+        button.visibility = View.VISIBLE
+        button.onSingleClick(action = onAction)
+    }
+
+    private fun inflateAction(root: View, emphasis: Emphasis): MaterialButton? {
+        val stub = root.findViewById<ViewStub>(R.id.empty_action_stub) ?: return null
+        stub.layoutResource = layoutFor(emphasis)
+        stub.inflate()
+        return EmptyStateSlots.action(root)
+    }
+
+    @LayoutRes
+    private fun layoutFor(emphasis: Emphasis): Int = when (emphasis) {
+        Emphasis.PRIMARY -> R.layout.view_action_primary
+        Emphasis.SECONDARY -> R.layout.view_action_secondary
+        Emphasis.TERTIARY -> R.layout.view_action_tertiary
     }
 }
 
-/** The empty state's child views, resolved once. See [RowSlots] for why lookup is by name. */
-class EmptyStateSlots(
+/**
+ * The empty state's child views. The action is deliberately absent from this holder: it lives
+ * behind a `ViewStub` and does not exist until a state that has something to do asks for it.
+ */
+class EmptyStateSlots private constructor(
     val root: View,
-    val tile: ImageView? = null,
-    val title: TextView? = null,
-    val line: TextView? = null,
-    val action: TextView? = null,
+    val glyph: ImageView,
+    val title: TextView,
+    val line: TextView,
 ) {
 
     companion object {
 
-        // Pin these to the real ids when res/layout/view_empty_state.xml lands.
-        internal val TILE = arrayOf("empty_glyph", "empty_tile", "iv_empty")
-        internal val TITLE = arrayOf("empty_title", "tv_empty_title")
-        internal val LINE = arrayOf("empty_line", "empty_subtitle", "tv_empty_line")
-        internal val ACTION = arrayOf("empty_action", "btn_empty_action")
+        private const val LAYOUT = "res/layout/view_empty_state.xml"
 
         fun of(root: View): EmptyStateSlots = EmptyStateSlots(
             root = root,
-            tile = Slots.image(root, TILE),
-            title = Slots.text(root, TITLE),
-            line = Slots.text(root, LINE),
-            action = Slots.text(root, ACTION),
+            glyph = root.slot(R.id.empty_glyph, LAYOUT, "empty_glyph"),
+            title = root.slot(R.id.empty_title, LAYOUT, "empty_title"),
+            line = root.slot(R.id.empty_line, LAYOUT, "empty_line"),
         )
+
+        /** The action button, or null while its `ViewStub` is still uninflated. */
+        fun action(root: View): MaterialButton? = root.findViewById(R.id.empty_action)
     }
 }

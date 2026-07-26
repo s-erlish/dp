@@ -84,10 +84,16 @@ object ChipBinder {
         when (chip) {
             is Chip -> {
                 chip.chipBackgroundColor = container
+                // A chip never carries both a fill and a stroke: that is a hole with a rim.
                 chip.chipStrokeWidth = 0f
-                chip.isChipIconVisible = glyph != 0
-                chip.setChipIconResource(glyph)
-                chip.chipIconTint = content
+                if (glyph == 0) {
+                    chip.chipIcon = null
+                    chip.isChipIconVisible = false
+                } else {
+                    chip.setChipIconResource(glyph)
+                    chip.chipIconTint = content
+                    chip.isChipIconVisible = true
+                }
                 chip.isCheckable = false
             }
 

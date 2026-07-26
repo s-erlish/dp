@@ -50,7 +50,6 @@
             android:entryValues="@array/adv_loglevel_values"
             android:key="pref_core_loglevel"
             android:negativeButtonText="@string/adv_cancel"
-            android:summary="%s"
             android:title="@string/adv_loglevel_title"
             app:iconSpaceReserved="false"
             app:singleLineTitle="false" />
@@ -119,7 +118,6 @@
             android:entryValues="@array/adv_iface_values"
             android:key="pref_vpn_interface_address_config_index"
             android:negativeButtonText="@string/adv_cancel"
-            android:summary="%s"
             android:title="@string/adv_iface_title"
             app:iconSpaceReserved="false"
             app:singleLineTitle="false" />
@@ -181,7 +179,6 @@
             android:entryValues="@array/adv_resolve_values"
             android:key="pref_outbound_domain_resolve_method"
             android:negativeButtonText="@string/adv_cancel"
-            android:summary="%s"
             android:title="@string/adv_resolve_title"
             app:iconSpaceReserved="false"
             app:singleLineTitle="false" />
@@ -225,7 +222,6 @@
             android:entryValues="@array/adv_fragment_packets"
             android:key="pref_fragment_packets"
             android:negativeButtonText="@string/adv_cancel"
-            android:summary="%s"
             android:title="@string/adv_fragment_packets_title"
             app:iconSpaceReserved="false"
             app:singleLineTitle="false" />
@@ -266,7 +262,6 @@
             android:entryValues="@array/adv_ping_concurrency"
             android:key="pref_real_ping_concurrency"
             android:negativeButtonText="@string/adv_cancel"
-            android:summary="%s"
             android:title="@string/adv_ping_concurrency_title"
             app:iconSpaceReserved="false"
             app:singleLineTitle="false" />

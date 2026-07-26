@@ -118,7 +118,7 @@
     </LinearLayout>
 
     <!-- THE TRAILING SLOT. Show exactly one control. row_value is text and may
-         accompany row_chevron or row_check; it is not a control. Every element in the
+         accompany row_chevron or row_marker; it is not a control. Every element in the
          trailing cluster is 12 from its neighbour, the same gap as tile-to-text. -->
 
     <TextView

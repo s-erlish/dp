@@ -463,8 +463,10 @@ class AccountViewModel : ViewModel() {
      * Drops every piece of account data this ViewModel publishes, and stops the loads that would
      * refill it, so nothing can paint a signed-out screen with the previous session's values.
      *
-     * Also called when [AccountSession] wipes itself from outside a user-initiated sign-out (a 401
-     * on the identity endpoint), which is why it is separate from [logout].
+     * Public, and separate from [logout], because the session can also drop without the user
+     * asking: [AccountRepository.refreshProfile] wipes it when the identity endpoint returns 401.
+     * The Account tab calls this on that transition too, so an expired token leaves no more
+     * behind than an explicit sign-out does.
      */
     fun clearAccountData() {
         subsJob?.cancel()

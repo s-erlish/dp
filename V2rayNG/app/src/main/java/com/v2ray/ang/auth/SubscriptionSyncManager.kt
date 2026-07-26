@@ -57,11 +57,13 @@ class SubscriptionSyncManager {
                 // account refresh. Leaving it unset resolves to the same operator default, but
                 // now an override can actually reach the request.
                 //
-                // Earlier builds did stamp it: a stored value still equal to that default carries
-                // no user intent, so drop it and let the chain apply. Anything else is the user's
-                // and is kept.
-                userAgent = userAgent
-                    ?.takeIf { it.isNotBlank() && it.trim() != BackendConfig.subscriptionUserAgent }
+                // Earlier builds did stamp it, and that stamp is still there on every upgraded
+                // install — sitting in the tier that wins absolutely, which is what defeated the
+                // fix above for exactly the users who already had the app. It was written by an
+                // OLDER build, so it cannot be recognised by comparing against today's resolved
+                // default; [BackendConfig.isAppStampedUserAgent] knows every string this app has
+                // ever stamped. Anything else was typed by the user and is kept.
+                userAgent = userAgent?.takeIf { !BackendConfig.isAppStampedUserAgent(it) }
             }
 
             MmkvManager.encodeSubscription(guid, item)

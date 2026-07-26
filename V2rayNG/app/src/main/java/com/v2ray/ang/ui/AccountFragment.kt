@@ -275,6 +275,9 @@ class AccountFragment : Fragment() {
      */
     private fun onSessionCleared() {
         endSignOutBusy()
+        // Idempotent, and the only thing that clears the ViewModel on the 401 route (an explicit
+        // sign-out has already done it by the time we get here).
+        viewModel.clearAccountData()
         pollJob?.cancel()
         pollJob = null
         pendingPayment = false
@@ -721,7 +724,10 @@ class AccountFragment : Fragment() {
         val b = _binding ?: return
         val bar = Snackbar.make(b.root, R.string.account_logout_failed, Snackbar.LENGTH_LONG)
             .setAction(R.string.account_retry) { beginSignOut() }
-        activity?.findViewById<View>(R.id.bottom_nav)?.let { bar.setAnchorView(it) }
+        // Only anchor to a bar that is actually on screen; the bottom nav is hidden during
+        // onboarding, and anchoring to a gone view drops the snackbar off the bottom edge.
+        activity?.findViewById<View>(R.id.bottom_nav)?.takeIf { it.isVisible }
+            ?.let { bar.setAnchorView(it) }
         bar.show()
     }
 

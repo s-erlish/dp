@@ -27,9 +27,12 @@ object HttpUtil {
      * configured one.
      *
      * Panels (Remnawave/3x-ui) pick the response format — XRAY_JSON template vs base64 link list —
-     * from this header and only recognise known client strings, so the fallback has to be the
-     * upstream one: a branding string is an unknown client and gets a plain link list, which
-     * silently drops the operator's routing/DNS template.
+     * from this header, using their own client->template mapping, so no value the app can pick on
+     * its own guarantees the template: an unknown client string gets the base64 link list, and so
+     * does a v2rayNG one unless the operator mapped it. The fallback is therefore the upstream
+     * client string — honest about which client this is, understood by every panel, and answered
+     * with the link list this app parses. Negotiating the template is the operator's job, via
+     * `SUB_USER_AGENT` (see [com.v2ray.ang.auth.BackendConfig.subscriptionUserAgent]).
      */
     val DEFAULT_SUBSCRIPTION_USER_AGENT: String get() = "v2rayNG/${BuildConfig.VERSION_NAME}"
 
@@ -48,8 +51,13 @@ object HttpUtil {
      * types, and OkHttp throws while building the request on a control or non-ASCII character, so
      * one stray character (a Cyrillic client string, say) would otherwise fail every future update
      * of that subscription with nothing but a log line to explain it.
+     *
+     * Public so a screen that DISPLAYS the User-Agent can display the one that will actually be
+     * sent, instead of the stored text: showing a value this function would replace is the exact
+     * dishonesty the fallback would otherwise introduce. The editors validate on entry, so the
+     * fallback should now only ever fire on a value stored by an older build.
      */
-    private fun resolveSubscriptionUserAgent(userAgent: String?): String =
+    fun resolveSubscriptionUserAgent(userAgent: String?): String =
         userAgent?.trim()?.takeIf { it.isNotEmpty() && isHeaderSafe(it) }
             ?: DEFAULT_SUBSCRIPTION_USER_AGENT
 

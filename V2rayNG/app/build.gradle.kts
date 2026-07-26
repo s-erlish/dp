@@ -43,7 +43,19 @@ android {
         // Fill these in (or override per build type/flavor) when the real bot backend lands.
         buildConfigField("String", "BACKEND_BASE_URL", "\"https://web.departament.site/api\"")
         buildConfigField("String", "BOT_USERNAME", "\"departamentvpnbot\"")
-        buildConfigField("String", "SUB_USER_AGENT", "\"DepartamentVPN/1.0\"")
+        // User-Agent for subscription fetches and backend calls. The panel picks the subscription
+        // format (XRAY_JSON template vs base64 link list) from this header using ITS OWN
+        // client->template mapping, so the string that yields the template is operator-specific:
+        // this field is that operator's knob and is sent verbatim (BackendConfig only refuses a
+        // value that cannot travel in an HTTP header).
+        // Blank = the app's own default, "v2rayNG/<versionName>" — the client string every panel
+        // recognises as this client, answered with the base64 link list, which the app parses and
+        // which is what ships today. Fill this in with the client string this deployment's
+        // Remnawave maps to xray-json to negotiate the operator's routing/DNS template.
+        // Do NOT put branding here: "DepartamentVPN/1.0" (what earlier builds shipped) is an
+        // unknown client to every panel, so it gets the base64 list anyway AND names the
+        // deployment on every request.
+        buildConfigField("String", "SUB_USER_AGENT", "\"\"")
     }
 
     buildTypes {
