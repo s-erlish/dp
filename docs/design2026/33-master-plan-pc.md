@@ -160,7 +160,7 @@ of this plan.
 |---|---|---|---|
 | F1 | The shell, Home, Login, Onboarding and AccountSync are painted with a navy radial gradient, and the connect control carries a radial glow, two alpha rings, an ambient breathing loop and a sonar loop | `GlobalResources.axaml:88`, `:124`, `:269`, `:280-281`; `MainWindow.axaml:434`, `:551`; `ConnectHeroView.axaml:342-470` | 2.1 and 5.3. The gradient tokens are deleted, not restyled |
 | F2 | 289 of 483 controls fall through to the Semi default look; **22 of the 50** `Views/*.axaml` speak upstream `ResUI` strings | `20-control-survey.md` B.2; `ls Views/*.axaml \| wc -l` = 50, `grep -l resx:ResUI Views/*.axaml \| wc -l` = 22 | Section 8. Every reachable surface is converted or deleted |
-| F3 | There is no user-visible feedback surface at all. `snackHost` is permanently invisible and `MsgView` is never mounted | `MainWindow.axaml:623`, `MainWindow.axaml.cs:1765`, `SimpleViewLocator.cs:26` | 3.8 and `settings/core/log` (7.16) |
+| F3 | There is no user-visible feedback surface at all. `snackHost` is permanently invisible and `MsgView` is never mounted | `MainWindow.axaml:623`, `MainWindow.axaml.cs:1765`, `SimpleViewLocator.cs:26` | 3.8 and `settings/core/log` |
 | F4 | Escape does not go back; the sub-page stack is global rather than per-destination | `MainWindow.axaml.cs:74`, `:1086` | 3.7 |
 | F5 | There is no server search, no sort, no multi-select, and no Servers destination | `CompactServersView.axaml:90` is dead; the rail has three items | Section 6 |
 | F6 | Seven press scales, ten glyph sizes, two icon-button systems, 28 button class combinations, 190 view-local style rules, 10 copies of one back-arrow geometry | `20-control-survey.md` B.3, B.5 | 2.7 and 2.5 |
@@ -234,7 +234,7 @@ window.
 single column with a six-panel internal stack: `Method` (default) → `Email` → `TwoFactor` → `Code`
 → `AwaitingTelegram` → `PendingEmail`. Moving between panels is a 220ms crossfade plus a 16px
 directional slide, Escape steps back one panel, and each panel has exactly one filled accent
-control. Route `auth/login`, **section 7.21**. Which method is promoted is not this document's call
+control. Route `auth/login`, **section 7.27**. Which method is promoted is not this document's call
 to make alone: it is **2.12.4**, decided by **PC-D12**, and it changes the sibling plan's 10.3.
 
 **Q4. The upstream stratum: which are rebuilt, which are deleted?**
@@ -845,7 +845,7 @@ removed from the tab order and the **row** owns the tab stop and the `Space` act
 | `Border.StatusStrip` | section 3.8 |
 
 **Bottom sheets do not exist on desktop.** `BuyView`'s payment-method sheet is a phone idiom in a
-900x600 window and is replaced by an inline row group (7.10).
+900x600 window and is replaced by an inline row group (`account/buy`, 7.3).
 
 #### 2.7.5 The four permitted view-local styles
 
@@ -1316,8 +1316,8 @@ Panel #windowRoot
 │           ├─ [0] Grid #titleBar        32px custom caption          (3.2)
 │           └─ [1] Panel
 │                 ├─ Grid  #bodyRoot     the shell                    (3.3)
-│                 ├─ OnboardingPage      full bleed, first run        (7.11)
-│                 ├─ AccountSyncPage     post-login import overlay    (7.12)
+│                 ├─ OnboardingPage      full bleed, first run        (7.28)
+│                 ├─ AccountSyncPage     post-login import overlay    (7.29)
 │                 └─ ContentControl #subPageHost   the sub-page stack (3.7)
 ├─ Border #themeTransitionOverlay + Image           theme flood snapshot (3.10)
 └─ Grid #resizeGripHost   4/*/4 x 4/*/4             8 transparent 4px resize zones
@@ -1586,7 +1586,7 @@ Border.StatusStrip   MinHeight 48   Background Brush.Surface
   the scroll position is preserved.
 - The action is a route (`Повторить`, `Продлить`, `Устройства`, `Открыть журнал`), executed through
   the route table in 3.7.1.
-- Every message is also appended to the durable log (7.20), so «Открыть журнал» always has
+- Every message is also appended to the durable log (`settings/core/log`), so «Открыть журнал» always has
   somewhere to go.
 
 **The eight error cases** (`30-reference-analysis.md` 6.2a) render here with their copy and their
@@ -1605,9 +1605,9 @@ content`. Kept, with the launch bug closed.
 
 | Gate | Condition | Surface |
 |---|---|---|
-| Syncing | post-login import in flight | `AccountSyncPage`, full bleed under the caption (7.12) |
+| Syncing | post-login import in flight | `AccountSyncPage`, full bleed under the caption (7.29) |
 | Startup loading | cold start with a stored session, before the first profile resolve | `AccountSyncPage` in its «Загружаем» variant. **Not** the sign-in gate |
-| Empty | `HomeViewModel.IsEmpty` is a **known** fact, and the user is not signed in | `OnboardingPage` (7.11) |
+| Empty | `HomeViewModel.IsEmpty` is a **known** fact, and the user is not signed in | `OnboardingPage` (7.28) |
 | Content | otherwise | `#bodyRoot` |
 
 The distinction between "we know the user has nothing" and "we do not know yet" is load-bearing:
@@ -1764,7 +1764,7 @@ veil can already say what will happen:
 | A `.png` / `.jpg` / `.webp` image | extension | Decode a QR code from it; on success import what it carries | `Сервер добавлен` · `Показать` |
 | Text: one or more `vless://` `vmess://` `trojan://` `ss://` `hysteria2://` `tuic://` `wg://` links | scheme prefix | Import as servers | `Добавлено серверов: 2` · `Показать` |
 | Text: an `http(s)://` URL | scheme prefix | Add as a **provider**, opening `servers/provider-editor` with the URL filled in and the name focused | (the page is the feedback) |
-| Text: a `depv://` URL | scheme prefix | Execute the scheme (7.15) | per the command |
+| Text: a `depv://` URL | scheme prefix | Execute the scheme (`settings/urlschemes`) | per the command |
 | Anything else | - | Refused. `DragEffects.None`, the veil shows the refusal line, and dropping does nothing | none |
 
 **The drop veil.** Not a dashed rectangle and not a dimmed page.
@@ -1859,7 +1859,7 @@ Three parts, all desktop-visible:
    retryable}`. No raw core strings, no exit codes, ever, on any surface. Copy in
    `30-reference-analysis.md` 6.2a and `00-rules.md` 9.4.
 2. **One silent retry** before anything is shown.
-3. **The status strip** (3.8) as the transient surface and **Журнал** (7.20) as the durable one.
+3. **The status strip** (3.8) as the transient surface and **Журнал** (`settings/core/log`) as the durable one.
 
 ### 4.3 Ничего не происходит незаметно
 
@@ -1880,7 +1880,7 @@ Enforcement: exactly **one** trailing element per row; the current value always 
 whole row is the target; and a row whose affordance does not match its behaviour is a defect, not a
 nit.
 
-**(b) Provider power is visible and revocable.** Настройки › Провайдеры (7.17) lists every directive
+**(b) Provider power is visible and revocable.** Настройки › Провайдеры (`settings/provider`) lists every directive
 that changed device behaviour, in Russian, with the subtitle `Задано провайдером` and the value it
 set, and one `Button.Text` «Вернуть мои настройки». `hide-url` is refused as specified: we may honour
 "keep this out of a shared backup", we never remove the user's ability to read their own URL. Colour
@@ -3039,9 +3039,22 @@ price row's `Brush.SelectedFill`. Nothing else on Покупка is blue.
    «Серверы уже добавлены. Можно подключаться.», `Button.Primary` «Подключиться» which pops to
    `home` and starts the tunnel, plus `Button.Text` «К списку серверов».
 
-Also added: a **purchase summary** in the checkout card (the chosen tariff name and period restated
-above the total), because today the user never sees what they are buying next to what they are
-paying. Same hole exists on Android and is closed there too.
+**Three more, added in this revision because the accent ledger did not survive its own audit:**
+
+7. **Every price was `Body Bold accent`.** Three tariffs times three options is up to nine accent
+   labels on one screen, most of them on rows that are not selected - which 2.2 bans by name ("any
+   inactive state"). Prices are `Brush.OnSurface`; the selected one steps to weight 700 and keeps
+   its colour. A price is a fact, and the user is not being invited to press it.
+8. **«Итого» was an accent `Headline`.** It becomes `Brush.OnSurface`. The total is the strongest
+   *typographic* element in the card - 24/700 against 14/400 rows - and it does not need colour on
+   top of that. The thing the user presses is «Оплатить», and it is directly under the total.
+9. **The price row carried a check as well as a fill.** It keeps the fill plus weight 700, which is
+   two channels, and the check glyph is reserved for the tariff card. One check per screen means the
+   check still means "this is the choice", rather than appearing twice at two levels.
+
+Also added: a **purchase summary** at the top of the checkout card (the chosen tariff name and
+period restated above the total), because today the user never sees what they are buying next to
+what they are paying. Same hole exists on Android and is closed there too.
 
 States: skeleton (three `Border.Skeleton` cards at 76px) · content · pending (`Платёж обрабатывается…`
 as an info strip) · success · empty (`Тарифы недоступны`) · error · offline (the CTA is disabled and
@@ -3065,7 +3078,7 @@ SubPage Title «Устройства»   trailing: Border.Chip.neutral «2 из 
    └─ Border.Card  Padding 0
         Border.Row per device   MinHeight 56  Padding 16,12
         ├─ Border.Tile 40   platform glyph: Geo.Dev.Windows | Android | Apple | Router | Generic
-        ├─ text   Title «MacBook Pro»  +  Border.Chip.accent «Это устройство» when current
+        ├─ text   Title «MacBook Pro»  +  Border.Chip.neutral «Это устройство» when current
         │         Subtitle.Numeric «Подключено 12.08.2026 · 192.168.1.14»
         └─ Button.IconButton40.Row  Geo.Action.Unlink  Brush.Red  ToolTip «Отвязать устройство»
         hairline at 68
@@ -3076,9 +3089,13 @@ SubPage Title «Устройства»   trailing: Border.Chip.neutral «2 из 
 1. **The raw HWID third line is deleted from the row.** It moves into the row's tooltip and into a
    `Button.Text` «Показать идентификатор» in the row's flyout. Three lines per row of which the third
    is a hex fingerprint is a developer surface.
-2. **The current-device wash is deleted.** Today `Brush.Tile.Blue` is painted across the whole row
-   **and** used as the chip's background, so the chip dissolves into its own backdrop, and an accent
-   wash sits on a row that is not selected. The chip alone carries the fact.
+2. **The current-device wash is deleted, and the chip becomes neutral.** Today `Brush.Tile.Blue` is
+   painted across the whole row **and** used as the chip's background, so the chip dissolves into
+   its own backdrop, and an accent wash sits on a row that is not selected. The chip alone carries
+   the fact - and it carries it in `Border.Chip.neutral`, not `.accent`: being the current device is
+   something true about the world, not a state the user chose, and 2.2's whole rule is that accent
+   means action or user-controlled state. **Устройства's accent count is 0**, which is correct for a
+   screen whose only real action is destructive.
 3. **`Background="#80000000"`** (`:451`) becomes `{DynamicResource Brush.Scrim}`.
 4. **Off-scale `Margin="0,3,0,0"` and `Margin="16,10"`** become 4 and 16,12.
 5. **Unlink becomes undo, not confirm.** The device re-registers on the next connect, so this is a
@@ -3137,9 +3154,15 @@ missing `MaxWidth`, the group count and order, a search field, the eight rows th
 at all, and the ten engine features that exist only inside the dead `OptionSettingWindow`.
 
 **Android counterpart:** `layout_settings_content.xml`. `00-rules.md` 13 fixes the group order as
-identical, and it currently is not (desktop has 5 groups, Android 6, in different orders). **This
-plan sets the order for both platforms.** Everything else is identical: same rows, same values, same
-defaults, same sub-page destinations, same copy keys.
+identical, and it currently is not (desktop has 5 groups, Android 6, in different orders).
+
+**The hub is not set here. It is set in 2.12.5**, as one table with a per-platform column, and both
+master plans render it. The first issue of this document said "**this plan** sets the order for both
+platforms" and then specified four groups and twenty rows that the sibling plan's 19.3 does not
+contain: different group names («Интерфейс» / «Подписки и серверы» / «Система» against
+«Обход блокировок» / «Подписка» / «Приложение»), a row on one side that is a whole group on the
+other, and a different affordance for the same row. Two documents cannot both set one order. What
+follows is this platform's column of 2.12.5, rendered.
 
 #### 7.6.1 The hub
 
@@ -3153,39 +3176,44 @@ DockPanel
         SectionHeader + Border.Card(Padding 0) x 4, 24 apart
 ```
 
-**Four groups, maximum seven rows each** (`03-direction.md` 7.3). Twenty rows total, down from
-twenty-two but covering ten features that are currently unreachable.
+**Four groups, maximum seven rows each** (`03-direction.md` 7.3). **Twenty-four rows**, covering
+every feature the engine has, including the thirty-one that are currently reachable only through the
+unreachable `OptionSettingWindow` (F9). Affordances follow **2.12.6**, the option-count rule, so
+neither platform has to argue one row at a time.
 
-**Group 1 - «Подключение»** (6 rows)
+**Group 1 - «Подключение»** (7 rows)
 
 | Row | Value shown | Affordance | Target |
 |---|---|---|---|
-| Режим | - | segment «Весь трафик» / «Прокси» | in place |
-| Прокси по приложениям | «Кроме 12 приложений» / «Выкл» | chevron | `settings/perapp` |
+| Режим | - | segment «Весь трафик» / «Прокси» (2 options) | in place |
+| Параметры туннеля | «gvisor · MTU 9000» | chevron | `settings/tun` |
+| Прокси | «SOCKS5 10808 · системный вкл» | chevron | `settings/proxy` |
+| Прокси по приложениям | «Кроме 12 программ» / «Выкл» | chevron | `settings/perapp` |
 | Маршрутизация | «Стандартные · 42 правила» | chevron | `settings/routing` |
 | DNS | «Cloudflare» | chevron | `settings/dns` |
 | Обход блокировок | «Mux, фрагментация» / «Выкл» | chevron | `settings/bypass` |
-| Локальный прокси | «127.0.0.1:10808» | rotating chevron | inline panel |
 
-**Group 2 - «Интерфейс»** (6 rows)
-
-| Row | Value | Affordance |
-|---|---|---|
-| Оформление | - | segment «Тёмная» / «Светлая» |
-| Монохром | - | switch |
-| Масштаб интерфейса | «125 %» | unfold, cycles 100 / 125 / 150 / 175 / 200 |
-| Язык | «Русский» | unfold, cycles Русский / English |
-| Облегчённый режим | - | switch (reduced motion, live) |
-| Запуск при входе в систему | - | switch |
-
-**Group 3 - «Подписки и серверы»** (4 rows)
+**Group 2 - «Подписки и серверы»** (6 rows)
 
 | Row | Value | Affordance | Target |
 |---|---|---|---|
-| Провайдеры | «Автообновление · 6 ч» | chevron | `settings/provider` |
-| Задержка | «Реальная · 5 с» | chevron | `settings/ping` |
+| Провайдеры | «2 провайдера · автообновление 6 ч» | chevron | `settings/provider` |
+| Что настроил провайдер | «4 настройки»; **the row is hidden at 0** | chevron | `settings/applied` |
+| Список серверов | «По задержке · вручную 3» | chevron | `settings/serverlist` |
+| Проверка серверов | «Реальная · 5 с» | chevron | `settings/ping` |
 | Файлы ресурсов | «geoip 8,2 МБ · обновлён 12.08» | chevron | `settings/geofiles` |
 | Схемы URL-адресов | «Зарегистрирована» / «Не зарегистрирована» | chevron | `settings/urlschemes` |
+
+**Group 3 - «Интерфейс»** (6 rows)
+
+| Row | Value | Affordance | Target |
+|---|---|---|---|
+| Оформление | «Тёмная» / «Тёмная · чёрно-белая» | chevron (4 options, two need subtitles) | `settings/appearance` |
+| Язык | «Русский» | unfold, cycles Русский / English (2 options) | in place |
+| Масштаб интерфейса | «125 %» | unfold, cycles 100 / 125 / 150 / 175 / 200 | in place |
+| Облегчённый режим | - | switch (reduced motion, live) | in place |
+| Окно и трей | «Сворачивать в трей» | chevron | `settings/window` |
+| Запуск при входе в систему | - | switch | in place |
 
 **Group 4 - «Система»** (5 rows)
 
@@ -3193,28 +3221,27 @@ twenty-two but covering ten features that are currently unreachable.
 |---|---|---|---|
 | Ядро и журнал | «Xray · предупреждения» | chevron | `settings/core` |
 | Горячие клавиши | «12 назначено» | chevron | `settings/hotkeys` |
-| Резервная копия | - | chevron | `settings/backup` |
+| Резервная копия | «Копия 09.07.2026» | chevron | `settings/backup` |
 | Обновления | «Версия 7.13.4 · актуальна» | chevron | `settings/update` |
-| О приложении | - | chevron | `settings/about` |
+| О приложении | «7.13.4» | chevron | `settings/about` |
 
 **«Автообновление подписки» exists once**, inside `settings/provider`. Today Android carries it in
 two places, in two visual languages, two taps apart, writing the same fields.
 
-**Where the theme settings live, and why there is no theme page.** `Views/ThemeSettingView.axaml`
-(67 ln, registered and never built) is deleted rather than rebuilt. A theme picker with three
-controls does not earn a push: «Оформление» is a two-state change and is therefore a segment applied
-in place, «Монохром» is a boolean and is therefore a switch, and «Масштаб интерфейса» is a short
-cycle and is therefore `unfold_more`. All three obey the affordance grammar, all three are visible
-and adjustable from the hub without navigating, and the theme flood-reveal (3.10) plays from the
-segment's own click point. This is the one place where the desktop deliberately has **fewer** pages
-than a naive port of Android's settings tree would produce, and the reason is the grammar, not
-laziness: a page whose entire content is three rows is a row group.
+**Where the theme settings live: a page, and here is why the first issue was wrong.** It deleted
+`Views/ThemeSettingView.axaml` (67 ln) with the argument that "a page whose entire content is three
+rows is a row group", made «Оформление» a two-state segment and «Монохром» a separate switch. The
+sibling plan's 20.11 makes it a page of four rows with subtitles. **2.12.6 settles it**: four
+options, two of which need a subtitle, is a page. `ThemeSettingView.axaml` is still DELETE - it is
+67 lines of upstream with four `resx:` references and nothing worth keeping - but its *route* comes
+back as `settings/appearance`, and the theme flood (3.10) plays from the pressed row's own
+centre. The desktop does **not** have fewer pages than Android here; it has the same page.
 
 #### 7.6.2 The row
 
 ```
 Border.SettingRow   MinHeight 56  Padding 16,12   Focusable  IsTabStop
-├─ Border.Tile 40   NEUTRAL by default; today 21 of 22 already are, and that is the model
+├─ Border.Tile 40   NEUTRAL, all 24 of them. Today 21 of 22 already are, and that is the model
 ├─ 12
 ├─ text  Title 16/700  «DNS»
 │        Subtitle 13   «Через какой сервер приложение разрешает домены»   (only when it adds something)
@@ -3247,11 +3274,17 @@ Border.Row
 
 #### 7.6.4 Inline expansion
 
-«Локальный прокси» expands in place (rotating chevron), revealing a panel inside the same card:
-port `TextBox.Field.numeric`, «SOCKS5-авторизация» switch, login and password fields, and a caption
-«Адрес: 127.0.0.1. Пустые логин и пароль отключают SOCKS5-авторизацию.» Reveal is `Dur.Reveal` 300ms
-`Ease.OutQuint` on height plus opacity; collapse is 225ms. This is correct per `00-rules.md` 7.6 and
-it stays.
+No row on the hub itself expands: all twenty-four either change in place (segment, unfold, switch)
+or push a page. The first issue expanded «Локальный прокси» inline on the hub; that content is now
+`settings/proxy`, because once the system-proxy half is included it is fourteen controls, not
+four, and a fourteen-control panel unfolding inside a settings hub pushes everything below it off
+the screen.
+
+Inline expansion is still the product's third-choice affordance (`00-rules.md` 7.6: inline >
+expandable row > flyout > dialog) and it is used on **sub-pages**, where a page has room to grow:
+the port fields on `settings/proxy`, the device stepper on `account/subscription/{id}`, the rule
+editor on `settings/routing/ruleset/{id}`, the User-Agent field on `settings/provider`. Reveal is
+`Dur.Reveal` 300ms `Ease.OutQuint` on height plus opacity; collapse is 225ms.
 
 #### 7.6.5 States
 
@@ -3268,21 +3301,26 @@ explanation**, never silently present:
 | Setting | Constraint | Row behaviour |
 |---|---|---|
 | Режим «Весь трафик» (TUN) | needs elevation on Linux and macOS | Enabled, but selecting it raises the elevation prompt; if refused, the row reverts and the TUN banner appears on Главная |
+| Параметры туннеля | TUN is sing-box only | The whole page is reachable but its rows are disabled with the subtitle «Работает только с ядром sing-box» while the core is Xray, and a `Button.Text` «Переключить ядро» links to `settings/core` |
 | Прокси по приложениям | TUN mode only, sing-box only | Disabled with the subtitle «Работает в режиме «весь трафик»» when the mode is Прокси |
+| Системный прокси | Windows and Linux have it, macOS applies it per network service | On macOS the PAC and script rows are disabled with «Недоступно в macOS»; the exceptions list stays |
 | Запуск при входе в систему | not available in some Linux sandboxes | Disabled with the subtitle «Недоступно в этой сборке» |
-| Схемы URL-адресов | Windows only | Disabled with the subtitle «Регистрация схемы доступна только в Windows» |
+| Схемы URL-адресов | registration is Windows only | The registration row is disabled with «Регистрация схемы доступна только в Windows»; the command list still renders, because the schemes work on the command line everywhere |
+| Показывать в Dock | macOS only | The row is absent, not disabled, on Windows and Linux: it names an OS concept the other two do not have |
+| Обновления | not shown in a store build | Absent when `Global.IsStoreBuild`; the app updates through the store |
 
 #### 7.6.7 Acceptance
 
 - [ ] `MaxWidth Size.Content` 720, centred; rows never run 1030px wide
-- [ ] Four groups, in this order, matching Android exactly
-- [ ] Every row shows its current value
-- [ ] Every row's affordance matches its behaviour
-- [ ] 20 neutral tiles, at most one coloured, and only if it is a category
+- [ ] Four groups, in 2.12.5's order, with 2.12.5's names, and the per-platform column honoured
+- [ ] Twenty-four rows, every one of which shows its current value
+- [ ] Every row's affordance matches its behaviour **and** matches 2.12.6's option-count rule
+- [ ] **24 neutral tiles, zero coloured.** A settings hub has no categories worth colouring
 - [ ] Search covers the hub and every sub-page and has a no-results state
-- [ ] Zero accent elements at rest except the rail and the focus ring
+- [ ] **Accent count is 0** at rest, excluding the rail and the focus ring
 - [ ] The duplicate `TextBox.Incy` re-declaration inside the view is deleted
 - [ ] Card bottom margins are `space_24` between groups, not `8 + header padding`
+- [ ] No row on the hub expands inline (7.6.4)
 
 ---
 
@@ -3305,7 +3343,7 @@ Below, only what is specific to each page.
 
 ---
 
-### 7.8 `settings/perapp` - Прокси по приложениям
+### 7.10 `settings/perapp` - Прокси по приложениям
 
 **File:** `Views/PerAppProxyPage.axaml` (163 ln) + `.cs` (238 ln). **RESTYLE.**
 **Android counterpart:** `activity_bypass_list.xml` plus `AppPickerActivity`, which today is a bare
@@ -3336,7 +3374,7 @@ empty («Программы не найдены»), no search results, disabled 
 
 ---
 
-### 7.9 `settings/routing` - Маршрутизация
+### 7.11 `settings/routing` - Маршрутизация
 
 **Files:** `Views/RoutingSubView.axaml` (184 ln) + `.cs` (140 ln), and the two upstream windows it
 escapes into: `RoutingRuleSettingWindow.axaml` (259 ln, 27 `resx:`) and
@@ -3404,7 +3442,7 @@ Every field validates on blur with a specific message: «Укажите доме
 
 ---
 
-### 7.10 `settings/dns` - DNS
+### 7.12 `settings/dns` - DNS
 
 **File:** `Views/DnsSubView.axaml` (162 ln) + `.cs` (130 ln). **RESTYLE.**
 **Android counterpart:** the DNS `AlertDialog` today, which becomes the same page.
@@ -3434,7 +3472,7 @@ the same choice, in the product's own vocabulary, and it survives the mono theme
 
 ---
 
-### 7.11 `settings/bypass` - Обход блокировок
+### 7.13 `settings/bypass` - Обход блокировок
 
 **New page**, absorbing the current hub group and the fragmentation controls that live only in
 `OptionSettingWindow`.
@@ -3463,7 +3501,7 @@ by popping in. When a provider has set any of these (4.3b), the row's subtitle b
 
 ---
 
-### 7.12 `settings/provider` - Провайдеры
+### 7.14 `settings/provider` - Провайдеры
 
 **File:** `Views/ProviderSettingsPage.axaml` (138 ln) + `.cs` (86 ln). **Fully built, fully styled,
 zero references.** Verdict: **WIRE and RESTYLE**, and extend it with the provider-transparency
@@ -3497,7 +3535,7 @@ supplies content and severity but never presentation.
 
 ---
 
-### 7.13 `settings/ping` - Задержка
+### 7.17 `settings/ping` - Проверка серверов
 
 **File:** `Views/PingSettingsPage.axaml` (160 ln). **RESTYLE.**
 
@@ -3517,7 +3555,7 @@ Border.Card Padding 0
 
 ---
 
-### 7.14 `settings/geofiles` - Файлы ресурсов
+### 7.18 `settings/geofiles` - Файлы ресурсов
 
 **File:** `Views/GeoFilesPage.axaml` (100 ln) + `.cs` (99 ln). **RESTYLE.**
 
@@ -3537,7 +3575,7 @@ button re-enables, and an error strip carries `Повторить`. Offline disa
 
 ---
 
-### 7.15 `settings/urlschemes` - Схемы URL-адресов
+### 7.19 `settings/urlschemes` - Схемы URL-адресов
 
 **File:** `Views/UrlSchemesPage.axaml` (115 ln) + `.cs` (157 ln). **RESTYLE.**
 
@@ -3563,7 +3601,7 @@ still renders, because the schemes still work when passed on the command line.
 
 ---
 
-### 7.16 `settings/core` - Ядро и журнал
+### 7.22 `settings/core` - Ядро и журнал
 
 **New page.** This is where roughly ten features currently reachable only through the **unreachable**
 `OptionSettingWindow` (1 206 ln, 91 `resx:`, 74 controls, 30 of them stock `ComboBox`) come back into
@@ -3615,7 +3653,7 @@ warning strip at the top: `Неверный шаблон может сломат
 
 ---
 
-### 7.17 `settings/hotkeys` - Горячие клавиши
+### 7.23 `settings/hotkeys` - Горячие клавиши
 
 **Rebuild** of `GlobalHotkeySettingWindow.axaml` (133 ln, 11 `resx:`, currently unreachable). Global
 hotkeys are a desktop-native expectation with no UI at all right now.
@@ -3640,7 +3678,7 @@ user who comes here to find a shortcut should find all of them.
 
 ---
 
-### 7.18 `settings/backup` - Резервная копия
+### 7.24 `settings/backup` - Резервная копия
 
 **File:** `Views/BackupPage.axaml` (96 ln) + `.cs` (91 ln). **RESTYLE.**
 `Views/BackupAndRestoreView.axaml` (213 ln, registered and never built, with a WebDAV panel) is
@@ -3663,7 +3701,7 @@ strip with the file name and the parse error.
 
 ---
 
-### 7.19 `settings/update` - Обновления
+### 7.25 `settings/update` - Обновления
 
 **Rebuild** of `Views/CheckUpdateView.axaml` (95 ln, registered, never built). **There is no "check
 for updates" anywhere in the shipping UI**, which on a desktop app that ships outside a store is a
@@ -3690,7 +3728,7 @@ Border.SettingRow «Проверять автоматически»  switch
 
 ---
 
-### 7.20 `settings/about` - О приложении
+### 7.26 `settings/about` - О приложении
 
 **File:** `Views/AboutPage.axaml` (105 ln). **RESTYLE.** Its `MaxWidth="620"` becomes
 `Size.Content` 720 like every other sub-page.
@@ -3719,7 +3757,7 @@ accent on advertising itself.
 
 ---
 
-### 7.21 `auth/login` - Вход
+### 7.27 `auth/login` - Вход
 
 **File:** `Views/LoginView.axaml` (954 ln) + `.axaml.cs` (1 377 ln) → `Views/Auth/LoginPage.axaml`.
 **Verdict: REBUILD.** The owner named this screen: «сейчас все выглядит плохо».
@@ -3735,7 +3773,7 @@ blue controls, two identical cards, the error line at the very bottom of the scr
 and the 2FA block inserted between the submit button and the register button. **Both platforms get
 this exact structure**; the desktop version is the reference implementation and Android ports it.
 
-#### 7.21.1 Structure: one column, five panels
+#### 7.27.1 Structure: one column, five panels
 
 ```
 SubPage Title «Вход»   (back = close the page, Esc = step back one panel then close)
@@ -3807,7 +3845,7 @@ The breathing plane animation is deleted; the arc alone carries the wait.
 Откройте её на этом устройстве.», an 18px arc, `Button.Text` «Отправить ещё раз», `Button.Text`
 «Назад».
 
-#### 7.21.2 States
+#### 7.27.2 States
 
 Idle · focused (2px ring) · submitting (the CTA's label swaps for a 20px arc, **the button keeps its
 exact size so nothing reflows**, and it is disabled) · field error (inline under the field, red 1px
@@ -3815,13 +3853,13 @@ border, focus moves to the first invalid field) · form error (the `#errorLine` 
 the bottom of the scroll) · locked out («Слишком много попыток. Повторите через 5 минут.») · offline
 («Нет сети. Проверьте подключение и повторите.» with every submit disabled) · success (the hand-off).
 
-#### 7.21.3 Motion
+#### 7.27.3 Motion
 
 **Nothing on entry.** The one exception in the entire product is the hand-off out of this screen to
 Главная: `Dur.Slow` 450ms `Ease.OutExpo`, already tokenised and reserved for exactly this. Panel
 changes are 220ms crossfades. Under `.lite` everything snaps.
 
-#### 7.21.4 What gets deleted
+#### 7.27.4 What gets deleted
 
 The two-block z-stack with 20 buttons; the local `Geo.Login.Back` copy; the local
 `Button.SegItem` class; the four hand-rolled spinner `Ellipse`s with `StrokeDashArray="6.9,20.8"`
@@ -3829,7 +3867,7 @@ re-declared in one file; `CornerRadius="8"` on `SegItem` and `SoonPill`; `FontSi
 digits; the off-scale margins 14 / 20 / 28 / 40 / 3; the permanently disabled Google «Скоро» button;
 and `Brush.HomeGradient` as the page background.
 
-#### 7.21.5 Acceptance
+#### 7.27.5 Acceptance
 
 - [ ] Four controls visible on first paint, one of them filled accent
 - [ ] Telegram is first and is the filled control
@@ -3843,7 +3881,7 @@ and `Brush.HomeGradient` as the page background.
 
 ---
 
-### 7.22 Онбординг - the first frame
+### 7.28 Онбординг - the first frame
 
 **File:** `Views/OnboardingView.axaml` (238 ln) + `.axaml.cs` (213 ln) →
 `Views/Auth/OnboardingPage.axaml`. **RESTYLE.**
@@ -3875,7 +3913,7 @@ class is global.
 
 ---
 
-### 7.23 Синхронизация - the post-login gate
+### 7.29 Синхронизация - the post-login gate
 
 **File:** `Views/AccountSyncView.axaml` (176 ln) + `.axaml.cs` (324 ln) →
 `Views/Auth/AccountSyncPage.axaml`. **KEEP**, with the background fixed.
@@ -3919,16 +3957,16 @@ client**, and not one of them uses an Incy style. Together the stratum is 22 of 
 | `AddServer2Window.axaml` | 160 / 14 | **REBUILD, merged** | the «Свой конфиг» mode of the same sub-page |
 | `AddGroupServerWindow.axaml` | 258 / 32 | **REBUILD, merged** | the «Группа» mode of the same sub-page |
 | `SubEditWindow.axaml` | 272 / 29 | **REBUILD** | `servers/provider-editor/{id}` sub-page (8.2) |
-| `RoutingRuleSettingWindow.axaml` | 259 / 27 | **REBUILD, merged** | `settings/routing/ruleset/{id}` (7.9) |
-| `RoutingRuleDetailsWindow.axaml` | 263 / 16 | **REBUILD, merged** | the inline rule editor on that page (7.9) |
+| `RoutingRuleSettingWindow.axaml` | 259 / 27 | **REBUILD, merged** | `settings/routing/ruleset/{id}` |
+| `RoutingRuleDetailsWindow.axaml` | 263 / 16 | **REBUILD, merged** | the inline rule editor on that page |
 | `ProfilesSelectWindow.axaml` | 129 / 12 | **REBUILD** | `PickerFlyout`, a component, not a window (8.3) |
-| `FullConfigTemplateWindow.axaml` | 197 / 15 | **REBUILD** | `settings/core/advanced` (7.16) |
-| `GlobalHotkeySettingWindow.axaml` | 133 / 11 | **REBUILD** | `settings/hotkeys` (7.17) |
+| `FullConfigTemplateWindow.axaml` | 197 / 15 | **REBUILD** | `settings/core/advanced` |
+| `GlobalHotkeySettingWindow.axaml` | 133 / 11 | **REBUILD** | `settings/hotkeys` |
 | `OptionSettingWindow.axaml` | 1 206 / 91 | **DELETE** | its ~10 unique controls migrate to `settings/core`, `settings/bypass`, `settings/ping` (7.11, 7.13, 7.16) |
 | `SubSettingWindow.axaml` | 82 / 16 | **DELETE** | the provider list is the Серверы destination's provider pane (6.4) |
 | `QrcodeView.axaml` | 31 / - | **REBUILD** | `Dialogs/QrDialog.axaml` (9.2) |
 | `SudoPasswordInputView.axaml` | 66 / - | **REBUILD** | `Dialogs/SudoDialog.axaml` (9.3) |
-| `MsgView.axaml` | 104 / - | **REBUILD** | `settings/core/log` (7.16) |
+| `MsgView.axaml` | 104 / - | **REBUILD** | `settings/core/log` |
 | `JsonEditor.axaml` | 26 / - | **KEEP as a control, RESTYLE its chrome** | used by `settings/core/advanced` and the editor's raw mode |
 
 ### 8.1 `servers/editor/{id}` - the server editor
@@ -4137,7 +4175,7 @@ Window  as 9.1
         Button.Tonal «Скопировать ссылку»   Button.Tonal «Сохранить изображение…»
 ```
 
-Also used for the subscription link (7.2) with the title «QR-код подписки».
+Also used for the subscription link (`account/subscription/{id}`) with the title «QR-код подписки».
 
 ### 9.3 `Dialogs/SudoDialog.axaml` - elevation on Linux
 
@@ -4196,11 +4234,11 @@ are not neutral: they rot, they confuse search, and they are where inconsistency
 | `ClashProxiesView.axaml` | 158 | **DELETE.** Mihomo/Clash proxy-group control is absent from the product and no owner request covers it. If it is ever wanted, it is a new destination, not a resurrected view |
 | `ClashConnectionsView.axaml` | 104 | **DELETE**, with a note: a live connection list is a real desktop expectation, and it is recorded as a **future** feature in section 12, not as dead code kept "just in case" |
 | `ThemeSettingView.axaml` | 67 | **DELETE.** Superseded by Настройки › Интерфейс |
-| `CheckUpdateView.axaml` | 95 | **REBUILD and WIRE** as `settings/update` (7.19) |
+| `CheckUpdateView.axaml` | 95 | **REBUILD and WIRE** as `settings/update` |
 | `BackupAndRestoreView.axaml` | 213 | **DELETE.** Superseded by `settings/backup`; its WebDAV panel is explicitly not migrated |
-| `ProviderSettingsPage.axaml` | 138 | **WIRE and RESTYLE** as `settings/provider` (7.12) |
+| `ProviderSettingsPage.axaml` | 138 | **WIRE and RESTYLE** as `settings/provider` |
 | `StatusBarView.axaml` | 125 | **REFACTOR.** It is mounted at `Width=0 Height=0 Opacity=0` (`MainWindow.axaml:643-651`) purely to keep its interaction handlers and `StatusBarViewModel` alive. The handlers move to the shell; the phantom view is deleted |
-| `MsgView.axaml` | 104 | **REBUILD** as `settings/core/log` (7.16) |
+| `MsgView.axaml` | 104 | **REBUILD** as `settings/core/log` |
 
 Net: **six deletions, three rebuilds-and-wires, one harvest, one refactor.** After this section the
 project has zero unreachable views, and that becomes a standing check: a view with no route and no
@@ -4382,10 +4420,10 @@ These come before the rest because they are the standing bar: «сейчас в�
 
 | # | Task |
 |---|---|
-| 4.1 | `auth/login` rebuilt as five panels (7.21) |
-| 4.2 | `Онбординг` restyled: flat background, `Headline` not `Display`, the backup path (7.22) |
+| 4.1 | `auth/login` rebuilt as six panels (7.27) |
+| 4.2 | `Онбординг` restyled: flat background, `Headline` not `Display`, the backup path (7.28) |
 | 4.3 | `Главная` rebuilt as one `HomePage` with both modes; `ConnectControl` with five layers deleted; `StatsRow`; the three ledger rows (5) |
-| 4.4 | `AccountSyncPage`: flat background, the renamed stage key, the cold-start variant (7.23) |
+| 4.4 | `AccountSyncPage`: flat background, the renamed stage key, the cold-start variant (7.29) |
 
 **Exit:** the first frame at launch and the sign-in screen both pass the nine-question slop test in
 1.5, in all three themes, at 900x600 and 380x620.
@@ -4427,7 +4465,7 @@ right-clicking a server and choosing «Изменить» stays inside the shell
 | 7.2 | Rebuild all eight existing sub-pages onto `SubPage`; delete the nine local chrome copies |
 | 7.3 | New pages: `bypass`, `core`, `core/log`, `core/advanced`, `hotkeys`, `update` |
 | 7.4 | Wire `ProviderSettingsPage` as `settings/provider` and add the provider-transparency section |
-| 7.5 | `settings/routing` plus the depth-2 rule-set page with the inline rule editor (7.9) |
+| 7.5 | `settings/routing` plus the depth-2 rule-set page with the inline rule editor (`settings/routing`) |
 | 7.6 | Migrate the ten features out of `OptionSettingWindow`, then delete it (8.4) |
 | 7.7 | Delete `ThemeSettingView`, `BackupAndRestoreView`, `CheckUpdateView` (rebuilt), `MsgView` (rebuilt) |
 
@@ -4487,7 +4525,7 @@ In this order, and this is the honest triage:
 
 1. **Delete the five gradient and glow tokens and repoint their six consumers.** One afternoon, and
    the product stops looking like every other VPN on a store page.
-2. **Rebuild the sign-in screen** (7.21). It is the first screen a paying user sees, it carries 20
+2. **Rebuild the sign-in screen** (`auth/login`, 7.27). It is the first screen a paying user sees, it carries 20
    buttons, and its hierarchy is inverted.
 3. **Build the status strip and wire `DelegateSnackMsg` into it** (3.8). The product currently cannot
    say «Готово», and it cannot report a failed clipboard import at all.

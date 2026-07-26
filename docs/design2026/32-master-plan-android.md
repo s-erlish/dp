@@ -2579,8 +2579,16 @@ Sheet 8.16
 ├── Row  ic_dl_copy           "Вставить из буфера"        "Ссылка уже скопирована"  (row disabled
 │                                                          at 0.38 when the clipboard has no link)
 ├── Row  ic_edit_24dp         "Ввести ссылку вручную"
-└── Row  ic_file_24dp         "Из файла"                  opens the system picker
+├── Row  ic_file_24dp         "Из файла"                  opens the system picker
+└── Row  ic_restore           "Восстановить из копии"     "Серверы и настройки из резервной копии"
+                                                          -> 20.13's restore path
 ```
+
+**Why the restore row is here.** The desktop plan ships an onboarding page whose third path is
+«Восстановить из копии», for the case a reinstalling user has neither a QR code nor any wish to sign
+in again. Android refuses the onboarding page (D-A4), so that path needs a home, and this sheet is
+already "get something into the app from wherever it is". It is the fifth and last row; the sheet
+does not grow again.
 
 ### 14.4 The scanner
 
@@ -2684,18 +2692,21 @@ LinearLayout (horizontal, gravity center_vertical), paddingHorizontal 16dp
      ├── TextView  name        App.Title, maxLines 1, ellipsize end     "@ivan_petrov"
      └── TextView  identity    App.Subtitle, marginTop 4dp              "ivan@example.com"
 [ 24 ]
-TextView "Баланс"   @style/TextAppearance.App.Caption, paddingHorizontal 16dp
+TextView "Баланс"   @style/TextAppearance.App.Subtitle, paddingHorizontal 16dp
+                    (Subtitle, not Caption: it labels a figure rather than annotating one,
+                     and dropping the Caption role here is what brings this frame to six — 4.2)
 [ 4 ]
 LinearLayout (horizontal, gravity bottom, paddingHorizontal 16dp)
 ├── TextView id=tv_balance  @style/TextAppearance.App.Display + Numeric, weight 1   "1 480 ₽"
+│            minWidth @dimen/value_w_money, never animated (7.4, D-A19)
 └── MaterialButton tonal  "Пополнить"  48dp, radius_pill, paddingH 16dp
 [ 32 ]
 TextView "Подписка"   @style/SettingsSectionLabel
 Card  11.6  (the ONE card on this screen; a ViewPager2 of cards when there is more than one
-             subscription, with 8dp dots below and a 12dp MarginPageTransformer)
+             subscription, with 8dp/6dp dots below and a 12dp MarginPageTransformer)
 [ 24 ]
 TextView "Управление"  @style/SettingsSectionLabel
-[ rows, hairlines at 68dp, no card around them ]
+[ a TILED group — five distinct glyphs (5.3, 6.4) — hairlines at 68dp, no card around them ]
 ├── Row  ACCENT tile ic_acc_upgrade   "Купить подписку"   chevron       <- the one accent tile
 ├── Row  neutral ic_acc_devices       "Устройства"        value "3 / 5" chevron
 ├── Row  neutral ic_acc_history       "История платежей"  value "12.06.2026" chevron
@@ -2703,19 +2714,20 @@ TextView "Управление"  @style/SettingsSectionLabel
 │                                     (hidden entirely when already linked; when linked, the
 │                                      identity line above shows the handle)
 └── Row  neutral ic_acc_gift          "Пригласить друга"  value "20 %" chevron
-[ 24 ]
-TextView "Реферальная программа"? -- NO. See 15.6: it is one row, not a section.
 [ 32 ]
 MaterialButton text  "Выйти"  48dp, full width, ?attr/colorError label
 [ 32 ]
 ```
 
+The referral is **one row, not a section** (15.6); there is no «Реферальная программа» header.
+
 Overflow (3 items): `Обновить`, `Сменить фото`, `Скопировать реферальный код`.
 
 **Accent count: one filled surface** («Продлить» or «Купить» inside the card, or the «Купить
 подписку» row's accent tile - never both: when the card is in a state that carries «Продлить», the
-management row's tile drops to neutral). Plus the tariff badge chip and the state chip. «Пополнить»
-is **tonal**, not filled, which fixes the current two-filled-buttons defect.
+management row's tile drops to neutral). Plus the card's one state chip. **The tariff badge chip is
+gone** (4.2), so this screen carries one chip, not two. «Пополнить» is **tonal**, not filled, which
+fixes the current two-filled-buttons defect.
 
 ### 15.4 States
 
@@ -2727,12 +2739,15 @@ is **tonal**, not filled, which fixes the current two-filled-buttons defect.
 | **No subscription** | The card is replaced by EmptyState 8.8 inside the «Подписка» section: «Подписки пока нет» / «Купите тариф, чтобы подключаться к серверам Departament.» / filled «Купить». The management «Купить подписку» row then drops to a neutral tile so only one accent surface exists |
 | **Trial** | Card in its `триал` state; a text action «Купить тариф» |
 | **Expiring / expired / device limit** | Card states per 11.6; the state chip is the screen's second accent-adjacent element and it is amber or red, never blue |
-| **Multiple subscriptions** | `ViewPager2` of cards, 8dp/6dp dots, neighbour peek 16dp only when count > 1. The dots are the only page affordance; long-press does nothing |
+| **Multiple subscriptions** | `ViewPager2` of cards, 8dp active / 6dp rest dots, neighbour peek 16dp only when count > 1. The dots are the only page affordance; long-press does nothing |
 | **Load error** | The card slot renders an error block: `ic_error` 28dp in a 56dp tile, «Не удалось загрузить подписку» Title, **the real cause** from `messageFor()` in Body (not a hard-wired string), tonal «Повторить». Identity and balance still render from cache |
 | **Payment pending** | A status strip: «Платёж обрабатывается…» with no action, replaced automatically when the poll resolves. The current `tv_pending` chip block is deleted |
 | **Offline** | Everything renders from `AccountCache`; a caption «Данные могли устареть» sits under the balance; «Пополнить», «Купить», «Продлить» and «Выйти» are disabled at 0.38; one persistent status strip |
-| **Long content** | A 32-character Telegram handle ellipsises; a 12-digit balance (`1 284 371 ₽`) fits because Display reserves 5 tabular figures and wraps to a second line above that; a 40-character subscription name wraps to 2 lines |
-| **Success** | A purchase, a top-up or a rename confirms with a 220ms state change plus the word in the status strip, then the screen moves on. No confetti, no checkmark animation |
+| **Long content** | A 32-character Telegram handle ellipsises; a balance up to `100 000 ₽` fits the reserved `value_w_money` and anything longer drops «Пополнить» to its own line below rather than shrinking the figure; a 40-character subscription name wraps to 2 lines under its chip |
+| **Success, purchase** | The card re-renders with its new expiry over a 220ms state change **and** the status strip says «Подписка продлена» for 5s. No confetti, no checkmark animation |
+| **Success, top-up** | The balance figure is **replaced** (never counted up, D-A19) and the strip says «Баланс пополнен» for 5s |
+| **Success, rename** | The card title is replaced and the strip says «Название сохранено» for 5s |
+| **Success, undo consumed** | When the 5s undo window closes without a tap, nothing is announced. When «Отменить» **is** tapped, the strip replaces its own text with «Действие отменено» for 5s and the item returns to its position |
 
 ### 15.5 Copy
 
@@ -2766,10 +2781,12 @@ is **tonal**, not filled, which fixes the current two-filled-buttons defect.
 | `account_sub_state_expiring` | `Истекает` |
 | `account_sub_state_expired` | `Истекла` |
 | `account_sub_state_device_limit` | `Лимит устройств` |
-| `account_sub_until` | `Действует до %1$s` |
-| `account_sub_left_days` | `Осталось %1$s` |
-| `account_sub_expired_on` | `Истекла %1$s` |
-| `account_sub_perpetual` | `Бессрочно` |
+| `account_sub_caption` | `%1$s · %2$s` — tariff name, then one of the four lines below |
+| `account_sub_until` | `действует до %1$s` |
+| `account_sub_left_days` | `осталось %1$s` — `%1$s` is `plural_days` (4.4), giving «осталось 3 дня», «осталось 1 день», «осталось 27 дней» |
+| `account_sub_expired_on` | `истекла %1$s` |
+| `account_sub_perpetual` | `бессрочно` |
+| `account_sub_trial_until` | `активен до %1$s` |
 | `account_traffic_label` | `Трафик` |
 | `account_traffic_value` | `%1$s из %2$s` |
 | `account_traffic_unlimited` | `%1$s · без ограничений` |
@@ -2779,6 +2796,10 @@ is **tonal**, not filled, which fixes the current two-filled-buttons defect.
 | `account_referral_copied` | `Реферальный код скопирован` |
 | `account_avatar_updated` | `Фото обновлено` |
 | `account_avatar_error` | `Не удалось загрузить фото. Попробуйте другое.` |
+| `account_success_purchase` | `Подписка продлена` — status strip, 5s |
+| `account_success_topup` | `Баланс пополнен` — status strip, 5s |
+| `account_success_rename` | `Название сохранено` — status strip, 5s |
+| `undo_restored` | `Действие отменено` — status strip, 5s, shared by every undo in the product (17.4, 12.8, 20.3) |
 
 Deleted (currently unreferenced or superseded): `account_profile_title`, `account_sub_summary_title`,
 `account_subs_empty`, `account_hub_devices_sub`, `account_hub_buy_sub`, `account_hub_history_sub`,
@@ -2808,9 +2829,11 @@ a small sub-page carrying the code, a copy action, the share sheet, and the stat
 - **Avatar** tap opens a sheet, not a list dialog: «Выбрать из галереи» / «Убрать фото» / «Отмена»
   is a sheet of two rows.
 - **The subscription card's rename** is reached by long-pressing nothing; it is a row inside the
-  card's own overflow (a 48dp `ic_more_vert_24dp` in the card's title row) containing
-  «Переименовать», «Показать QR», «Автопродление» (a switch), and «Удалить подписку» (destructive,
-  and the only place that action exists, with a confirmation dialog because it is irreversible).
+  card's own overflow - the 48dp `ic_more_vert_24dp` that sits at the end of the card's **chip
+  line** (11.6), where it cannot compete with the title for width - opening a sheet (8.16)
+  containing «Переименовать», «Показать QR», «Автопродление» (a switch) and «Удалить подписку»
+  (destructive, the only place that action exists, with a confirmation dialog because it is
+  irreversible). Rename is a one-field sheet whose success is `account_success_rename`.
 - **No `Toast` anywhere.** Referral copied, avatar updated, top-up succeeded and every error use the
   status strip.
 - **No raw HTTP codes.** The «Ошибка оплаты» dialog is replaced by the taxonomy message plus a
@@ -2882,28 +2905,30 @@ bought), and skeletons that do not match the real silhouette.
 Toolbar 56dp: back + "Купить подписку"
 [ 24 ]
 TextView "Выберите тариф"  @style/SettingsSectionLabel
-[ rows, hairlines at 68dp ]
+[ a PLAIN group — the glyph would be ic_acc_upgrade on every row, so no tile is drawn (5.3) —
+  origin 16dp, hairlines at 16dp ]
 Row.Selectable  per tariff
-   tile   neutral ic_acc_upgrade
+   no tile
    title  "Базовый"
    subtitle "3 устройства · без ограничений"
-   value  "от 290 ₽"   App.Subtitle + Numeric
+   value  "от 290 ₽"   App.Subtitle + Numeric, minWidth @dimen/value_w_money
    state marker  20dp ic_action_done ?attr/colorPrimary when selected
    selected background ?attr/colorSurfaceContainerHighest
 [ 24 ]  -- appears only after a tariff is chosen, entering over motion_reveal 300
 TextView "Срок"  @style/SettingsSectionLabel
-[ rows ]
+[ a PLAIN group, origin 16dp ]
 Row.Selectable  per price option
-   no tile (this group has a 16dp text origin; the whole group holds one origin)
    title  "3 месяца"
-   value  "870 ₽"  Numeric
+   value  "870 ₽"  Numeric, minWidth @dimen/value_w_money
    subtitle  "290 ₽ в месяц"           <- the comparison the user actually wants
    state marker as above
+[ 24 ]
+Row.Navigation  "Промокод"   value = the applied code, or empty   chevron   -> a one-field sheet
 [ 32 ]
 Card 8.3  id=card_checkout   -- the ONE card on this screen
 ├── TextView "Базовый, 3 месяца"   App.Title            <- the purchase summary that is missing today
 ├── [ 12 ]
-├── Row (inside the card, no tile, 16dp origin, 56dp)
+├── Row (inside the card, plain, origin 16dp relative to the card's own padding, 56dp)
 │      title "Дополнительные устройства"  subtitle "50 ₽ за устройство"
 │      trailing: Stepper 8.14, two 48dp buttons + a Numeric value
 ├── [ 16 ]  1dp ?attr/colorOutlineVariant
@@ -2915,6 +2940,11 @@ MaterialButton filled 52dp  "Оплатить 1 020 ₽"     <- the one lit elem
 [ 32 ]
 ```
 
+**This whole screen is plain, and it holds one origin throughout.** The previous revision gave the
+tariff rows a tile and the period rows none, which is the mixed-origin defect 5.3 exists to prevent;
+the derivation rule resolves it without a judgement call, because `ic_acc_upgrade` repeated on every
+tariff row carries no information and costs 52dp of a line whose real content is a price.
+
 **Selection never changes geometry.** A selected row gains a P3 background and a 20dp check. No
 stroke width changes, no radius changes, no card grows.
 
@@ -2922,7 +2952,7 @@ stroke width changes, no radius changes, no card grows.
 
 | State | Rendering |
 |---|---|
-| **Loading** | Four skeleton rows shaped like tariff rows (40dp tile square, an 18dp title bar, a 14dp subtitle bar, a right-aligned 14dp price bar), after 300ms, static; crossfade 220ms to content |
+| **Loading** | Four skeleton rows shaped like tariff rows (a 24dp title bar at 16dp, a 16dp subtitle bar, a right-aligned 16dp price bar — **no tile square, because the real rows have no tile**), after 300ms, static; crossfade 220ms to content as one block |
 | **Loaded, nothing selected** | Tariff rows only. No «Срок» group, no checkout card, no CTA |
 | **Tariff selected** | «Срок» group reveals over 300ms `ease_out_quint` |
 | **Option selected** | Checkout card and CTA reveal over 300ms |
@@ -2943,7 +2973,15 @@ stroke width changes, no radius changes, no card grows.
 | `buy_title` | `Купить подписку` |
 | `buy_section_tariff` | `Выберите тариф` |
 | `buy_section_period` | `Срок` |
-| `buy_tariff_info` | `%1$s · %2$s` (devices, traffic) |
+| `buy_tariff_info` | `%1$s · %2$s` — `%1$s` is `plural_devices` (4.4), `%2$s` is the traffic figure or «без ограничений». Never `%1$d устройства` |
+| `buy_promo` | `Промокод` |
+| `buy_promo_apply` | `Применить` |
+| `buy_promo_invalid` | `Промокод не подошёл. Проверьте написание.` |
+| `buy_promo_applied` | `Промокод применён` |
+| `buy_trial_title` | `Пробный период` |
+| `buy_trial_line` | `7 дней бесплатно` |
+| `buy_trial_cta` | `Активировать` |
+| `buy_trial_activated` | `Пробный период активирован` |
 | `buy_tariff_from` | `от %1$s` |
 | `buy_per_month` | `%1$s в месяц` |
 | `buy_extra_devices` | `Дополнительные устройства` |
@@ -3016,18 +3054,24 @@ terminology lock.
 Toolbar 56dp: back + "Устройства" + 48dp overflow ("Обновить")
 [ 16 ]
 TextView  App.Subtitle, gutter 16   "3 из 5 устройств подключено к подписке «Базовый»"
+                                    (assembled from plural_devices_of, 4.4)
 [ 16 ]
-RecyclerView, hairlines at 68dp
+RecyclerView — a TILED group (platform glyphs differ), hairlines at 68dp
 └── Row per device
       tile    neutral, platform glyph (ic_device_android / apple / windows / router / unknown)
-      title   "Pixel 8"        App.Title, maxLines 1
-      subtitle "Android · был в сети 09.07.2026"   App.Subtitle + Numeric for the date
-      value   Chip 8.4 neutral "Это устройство"    (only on the current device)
+      title   "Pixel 8"        App.Title, maxLines 2, ellipsize end, weight 1
+      subtitle "Это устройство · Android · был в сети 09.07.2026"   App.Subtitle,
+               Numeric on the date; the leading clause appears only on the current device
       trailing 48dp ImageButton ic_delete_24dp, tint ?attr/colorError, cd "Отвязать устройство"
 ```
 
 The delete button is the row's **one** trailing affordance and the row itself is not clickable, so
 the affordance grammar holds: nothing else on the row promises anything.
+
+**There is no «Это устройство» chip.** A ~95dp chip plus a 48dp button plus a 40dp tile plus the
+gaps leaves 77dp for a device model at 320dp (5.6), and a chip that ellipsises its own label is
+worse than no chip. The fact moves into the subtitle line, which already exists, and the current
+device also **sorts first**, so it is marked on two channels without spending any width.
 
 ### 17.4 States
 
@@ -3039,9 +3083,10 @@ the affordance grammar holds: nothing else on the row promises anything.
 | **No subscription** | EmptyState: «Нет активной подписки»; «Купите тариф, чтобы подключать устройства.»; filled «Купить» |
 | **Error** | EmptyState: «Не удалось загрузить устройства»; the real cause; tonal «Повторить» |
 | **Offline** | Cached list plus «Данные могли устареть»; the delete buttons disabled at 0.38 |
-| **At the limit** | The subtitle line reads «5 из 5 устройств. Отвяжите одно, чтобы подключить новое.» and carries a warning chip |
+| **At the limit** | The summary line reads «5 из 5 устройств. Отвяжите одно, чтобы подключить новое.» in `@color/warning`. No chip: the sentence is the signal, and it already says the number |
 | **Deleting** | That row's delete button becomes a 20dp indicator; the row stays in place |
-| **Deleted** | The row animates out over 220ms; the status strip offers «Отменить» for 5 seconds. **A device detach is reversible on the server within the poll window, so it is an undo, not a dialog** |
+| **Deleted** | The row animates out over 220ms; the status strip says «Устройство отвязано» and offers «Отменить» for 5 seconds. **A device detach is reversible on the server within the poll window, so it is an undo, not a dialog** |
+| **Undo consumed** | The row returns to its position with no animation and the strip's text is replaced by «Действие отменено» for 5 seconds |
 | **Long content** | A 40-character device model wraps to 2 lines; a 64-character HWID is not displayed at all (it moves into the row's long-press copy action) |
 
 ### 17.5 Copy
@@ -3049,10 +3094,11 @@ the affordance grammar holds: nothing else on the row promises anything.
 | Resource | Value |
 |---|---|
 | `devices_title` | `Устройства` |
-| `devices_summary` | `%1$s из %2$s устройств подключено к подписке «%3$s»` |
-| `devices_summary_limit` | `%1$s из %2$s устройств. Отвяжите одно, чтобы подключить новое.` |
-| `devices_this_device` | `Это устройство` |
+| `devices_summary` | `%1$s подключено к подписке «%2$s»` — `%1$s` is `plural_devices_of` (4.4), so «3 из 5 устройств», «1 из 1 устройства» |
+| `devices_summary_limit` | `%1$s. Отвяжите одно, чтобы подключить новое.` — same plural |
+| `devices_this_device` | `Это устройство` — now the first clause of the subtitle, not a chip |
 | `devices_last_seen` | `%1$s · был в сети %2$s` |
+| `devices_last_seen_current` | `Это устройство · %1$s · был в сети %2$s` |
 | `devices_unlink` | `Отвязать устройство` |
 | `devices_unlinked` | `Устройство отвязано` |
 | `devices_undo` | `Отменить` |
@@ -3089,13 +3135,13 @@ time when two records can share a day; and the four status hues collapse to thre
 ```
 Toolbar 56dp: back + "История платежей"
 SwipeRefreshLayout (accent colour scheme)
-└── RecyclerView, hairlines at 68dp
+└── RecyclerView — a PLAIN group (ic_acc_history would repeat on every row), hairlines at 16dp
     ├── sticky section header per month:  "Июль 2026"  @style/SettingsSectionLabel
-    └── Row per payment, not clickable
-          tile     neutral ic_acc_history
-          title    "Базовый, 3 месяца"        App.Title, maxLines 1
+    └── Row per payment, not clickable, no tile
+          title    "Базовый, 3 месяца"        App.Title, maxLines 2, weight 1
           subtitle "12.06.2026 19:41"          App.Subtitle + Numeric
-          value    "1 020 ₽"                   App.Subtitle + Numeric, onSurface
+          value    "1 020 ₽"                   App.Subtitle + Numeric, onSurface,
+                                               minWidth @dimen/value_w_money
           trailing Chip 8.4, status variant
 ```
 
@@ -3136,7 +3182,7 @@ still renders its month header).
 
 ### 19.1 Purpose
 
-Fifteen decisions, each showing its current value, each declaring what tapping it will do, arranged
+Sixteen decisions, each showing its current value, each declaring what tapping it will do, arranged
 so a user can audit his whole configuration by scrolling once.
 
 ### 19.2 Files today, and the verdict

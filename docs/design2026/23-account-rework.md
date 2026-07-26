@@ -854,43 +854,44 @@ LinearLayout  horizontal, gravity=center_vertical, minHeight=@dimen/row_min_heig
 
 ### 6.4 Switcher
 
-**2-3 subscriptions** (`layout_account_switcher_segments.xml`):
+**2-3 subscriptions** (`layout_account_switcher_segments.xml`) - the C§6 Segmented control, called,
+not re-specified:
 
 ```
 com.google.android.material.button.MaterialButtonToggleGroup
-    id=group_subs  width=match_parent  height=@dimen/segment_height (44)
+    id=group_subs  android:layout_width="match_parent"
+    android:layout_height="wrap_content"  android:minHeight="@dimen/btn_height"   (48)
+    android:background="@drawable/bg_segment_track"      (C§6.3, colorSurfaceContainerHighest, r16)
+    android:padding="@dimen/space_4"
     app:singleSelection="true"  app:selectionRequired="true"
+    app:spacing="@dimen/space_4"  app:innerCornerSize="@dimen/radius_chip"
     android:layout_marginBottom="@dimen/space_12"
-  ├ MaterialButton  style=@style/Widget.App.Segment  weight=1  (×2 or ×3)
+  ├ MaterialButton  style="@style/Widget.Departament.Segment"  layout_weight=1  (×2 or ×3)
+       android:layout_height="wrap_content"  android:minHeight="40dp"
+       android:checkable="true"
 ```
 
-`Widget.App.Segment`: `android:insetTop/Bottom=0dp`, `app:cornerRadius=@dimen/radius_chip`,
-`app:strokeWidth=1dp`, `app:strokeColor=@color/segment_stroke` (selector: `colorPrimary` checked,
-`colorOutline` unchecked), `android:background`/`backgroundTint=@color/segment_fill` (selector:
-`colorPrimary` at 12 % checked, transparent unchecked), `android:textAppearance` =
-`TextAppearance.App.Title.Medium`, `android:textColor=@color/segment_text` (selector: `colorPrimary`
-checked, `colorOnSurfaceVariant` unchecked). Checked weight steps to 700 by swapping the
-`textAppearance` in `MainActivity`-style code (`setTextAppearance`) on the check listener, exactly as
-the bottom nav already does (`MainActivity.kt:333`). `stateListAnimator=@anim/press_scale`.
+`Widget.Departament.Segment` is the library's style (C§6.3) and this tab sets nothing on the
+instance beyond `weight`, `text` and `contentDescription`. Selected state is the style's:
+`colorPrimaryContainer` fill, `colorOnPrimaryContainer` label, weight 700, crossfaded over
+`motion_state` 220 ms `ease_standard` with the weight snapping. **No** `stateListAnimator` - a
+segment is a slice of a track (C§R5).
 
-**4+ subscriptions:** a `layout_row_nav.xml` instance with the tile `ic_acc_upgrade`, title
-«Подписка», **value** = the selected subscription's name (so V5, not V6), `marginBottom=space_12`,
-opening `sheet_subscription_pick.xml`.
+**4+ subscriptions:** a `row_value.xml` instance with **no tile** (this is the Account tab, 1.4),
+title «Подписка», value = the selected subscription's name, `marginBottom=@dimen/space_12`, opening
+`sheet_subscription_pick.xml`.
 
 ### 6.5 The subscription card (`layout_account_card.xml`)
 
 ```xml
 <com.google.android.material.card.MaterialCardView
     android:id="@+id/card_sub"
-    android:layout_width="match_parent" android:layout_height="wrap_content"
-    app:cardBackgroundColor="?attr/colorSurface"
-    app:cardCornerRadius="@dimen/radius_card"
-    app:cardElevation="0dp"
-    app:strokeWidth="1dp" app:strokeColor="?attr/colorOutlineVariant">
+    style="@style/Widget.Departament.Card"
+    android:layout_width="match_parent" android:layout_height="wrap_content">
 
   <LinearLayout android:orientation="vertical"
       android:paddingStart="@dimen/space_16" android:paddingTop="@dimen/space_16"
-      android:paddingEnd="@dimen/space_16" android:paddingBottom="0dp">
+      android:paddingEnd="@dimen/space_16" android:paddingBottom="@dimen/space_16">
 
     <!-- 1. HEADER -->
     <LinearLayout android:orientation="horizontal" android:gravity="center_vertical"
@@ -898,38 +899,33 @@ opening `sheet_subscription_pick.xml`.
       <TextView android:id="@+id/tv_sub_name" android:layout_weight="1"
                 android:textAppearance="@style/TextAppearance.App.Title"
                 android:maxLines="1" android:ellipsize="end"/>
-      <TextView android:id="@+id/chip_tariff"
-                android:background="@drawable/bg_acc_badge"
-                android:paddingStart="@dimen/space_8" android:paddingEnd="@dimen/space_8"
-                android:paddingTop="@dimen/space_4"  android:paddingBottom="@dimen/space_4"
-                android:layout_marginStart="@dimen/space_8"
-                android:textAppearance="@style/TextAppearance.App.Chip"
-                android:textColor="?attr/colorOnSurface"/>
-      <ImageButton android:id="@+id/btn_rename"
+      <com.google.android.material.chip.Chip android:id="@+id/chip_tariff"
+                style="@style/Widget.Departament.Chip.Accent"
+                android:layout_marginStart="@dimen/space_8"/>
+      <com.google.android.material.button.MaterialButton android:id="@+id/btn_rename"
+                style="@style/Widget.Departament.Button.Icon"
                 android:layout_width="@dimen/view_height_dp48"
                 android:layout_height="@dimen/view_height_dp48"
                 android:layout_marginStart="@dimen/space_4"
-                android:padding="14dp"        <!-- 48 box, 20dp glyph -->
-                android:src="@drawable/ic_acc_edit" app:tint="?attr/colorOnSurfaceVariant"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                app:icon="@drawable/ic_acc_edit"
                 android:contentDescription="@string/account_card_rename"/>
     </LinearLayout>
 
     <!-- 2. TIME BLOCK -->
-    <LinearLayout android:id="@+id/block_days" android:orientation="horizontal"
-                  android:baselineAligned="true" android:layout_marginTop="@dimen/space_12"
-                  android:visibility="gone">
-      <TextView android:id="@+id/tv_days"
+    <TextView android:id="@+id/tv_time_label" android:layout_marginTop="@dimen/space_12"
+              android:textAppearance="@style/TextAppearance.App.Subtitle"/>
+    <LinearLayout android:id="@+id/block_figure" android:orientation="horizontal"
+                  android:baselineAligned="true" android:layout_marginTop="@dimen/space_4">
+      <TextView android:id="@+id/tv_figure"
                 android:textAppearance="@style/TextAppearance.App.Display"
                 android:fontFeatureSettings="tnum, lnum"/>
-      <TextView android:id="@+id/tv_days_unit" android:layout_marginStart="@dimen/space_8"
+      <TextView android:id="@+id/tv_figure_word" android:layout_marginStart="@dimen/space_8"
                 android:textAppearance="@style/TextAppearance.App.Title"
                 android:maxLines="2"/>
     </LinearLayout>
-    <TextView android:id="@+id/tv_time_title" android:layout_marginTop="@dimen/space_12"
-              android:textAppearance="@style/TextAppearance.App.Title"/>
     <TextView android:id="@+id/tv_time_detail" android:layout_marginTop="@dimen/space_4"
               android:textAppearance="@style/TextAppearance.App.Subtitle"/>
+    <!-- perpetual / unknown swap block_figure for two text lines; see 4.3 -->
 
     <!-- 3. TRAFFIC (gone unless root && trafficLimitBytes != null) -->
     <LinearLayout android:id="@+id/block_traffic" android:orientation="vertical"
@@ -942,149 +938,201 @@ opening `sheet_subscription_pick.xml`.
                   android:textColor="?attr/colorOnSurface"
                   android:fontFeatureSettings="tnum, lnum, zero"/>
       </LinearLayout>
-      <LinearLayout android:orientation="horizontal"
-                    android:layout_height="@dimen/meter_height"   <!-- 4dp -->
-                    android:layout_marginTop="@dimen/space_8"
-                    android:background="@drawable/bg_meter_track">
-        <View android:id="@+id/meter_fill" android:layout_width="0dp"
-              android:layout_height="match_parent"
-              android:background="@drawable/bg_meter_fill"/>
-        <View android:id="@+id/meter_rest" android:layout_width="0dp"
-              android:layout_height="match_parent"/>
-      </LinearLayout>
+      <com.google.android.material.progressindicator.LinearProgressIndicator
+          android:id="@+id/meter"
+          style="@style/Widget.Departament.Progress.Linear"
+          android:layout_width="match_parent"
+          android:layout_marginTop="@dimen/space_8"/>
     </LinearLayout>
 
     <!-- 4. CTA -->
     <com.google.android.material.button.MaterialButton android:id="@+id/btn_cta"
-        android:layout_width="match_parent" android:layout_height="@dimen/cta_height"
-        android:layout_marginTop="@dimen/space_16"
-        android:insetTop="0dp" android:insetBottom="0dp"
-        app:cornerRadius="@dimen/radius_pill"
-        android:textAppearance="@style/TextAppearance.App.Title"/>
+        style="@style/Widget.Departament.Button.Primary.Tall"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:minHeight="@dimen/btn_height_tall"
+        android:layout_marginTop="@dimen/space_16"/>
+        <!-- style is swapped to Widget.Departament.Button.Secondary, minHeight
+             @dimen/btn_height_tall retained, in the healthy and perpetual states -->
 
-    <!-- 5. UPGRADE, V3 text button, gone unless upgrade targets exist -->
+    <!-- 5. UPGRADE, gone unless upgrade targets exist -->
     <com.google.android.material.button.MaterialButton android:id="@+id/btn_upgrade"
-        style="@style/Widget.Material3.Button.TextButton"
-        android:layout_width="match_parent" android:layout_height="@dimen/view_height_dp48"
-        android:layout_marginTop="@dimen/space_12"
-        android:insetTop="0dp" android:insetBottom="0dp"
-        app:cornerRadius="@dimen/radius_pill"
-        android:textAppearance="@style/TextAppearance.App.Title.Medium"
+        style="@style/Widget.Departament.Button.Tertiary"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:minHeight="@dimen/btn_height"
+        android:layout_gravity="start"
+        android:layout_marginTop="@dimen/space_8"
         android:text="@string/account_card_upgrade" android:visibility="gone"/>
 
     <!-- 6. AUTO-RENEW -->
     <View android:id="@+id/div_auto" android:layout_width="match_parent"
           android:layout_height="1dp" android:layout_marginTop="@dimen/space_16"
           android:background="?attr/colorOutlineVariant"/>
-    <include layout="@layout/layout_row_switch" android:id="@+id/row_auto_renew"/>
+    <include layout="@layout/row_toggle" android:id="@+id/row_auto_renew"/>
         <!-- with paddingStart/End = 0dp (the card already pads 16) and
-             paddingBottom = @dimen/space_16 to close the card;
-             the switch row on this surface carries NO tile, so its text
-             origin is the card's inner 16 -->
+             paddingBottom = 0dp (the card closes itself, see below); the toggle
+             row on this surface carries NO tile, so its text origin is the
+             card's inner 16, matching the tab's tile-less rows -->
   </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
 ```
 
 **Card geometry facts:**
 
+- The card is `@style/Widget.Departament.Card` (C§9 Card / surface): `colorSurface`,
+  `radius_card` 20, 1dp `colorOutlineVariant`, elevation 0, no shadow. It is not re-declared here.
 - Height is `wrap_content`. `@dimen/sub_card_height` 152dp is deleted from `dimens.xml`.
-- `bg_acc_badge.xml` is retinted from `?attr/iconTileBgBlue` to `?attr/colorSurfaceContainerHighest`
-  (P3 inset, D§4.1) with `radius_chip` 12. Its text is `colorOnSurface` (14.14:1).
-- `bg_meter_track.xml` and `bg_meter_fill.xml` are `<shape android:shape="rectangle">` with
-  `<corners android:radius="@dimen/radius_pill"/>`; the track is `?attr/colorSurfaceContainerHighest`,
-  the fill is tinted at runtime (`colorOnSurfaceVariant` → `colorWarning` at ≥ 90 % → `colorErrorText`
-  at 100 %).
-- The meter is driven by `layout_weight`: `meter_fill.weight = used`, `meter_rest.weight = total - used`,
-  clamped so a non-zero usage always draws at least 2dp.
+- The tariff badge is `Widget.Departament.Chip.Accent` (C§10 Chip): min height 24, padding 8/4,
+  `radius_chip` 12, `TextAppearance.App.Chip` 11/500, `colorPrimaryContainer` on
+  `colorOnPrimaryContainer`, 9.57:1, `android:clickable="false"`. In the **trial** state it is
+  `Widget.Departament.Chip.Neutral` reading «Пробный». `bg_acc_badge.xml` is deleted by C§10, not
+  retinted.
+- The meter is C§17.2's determinate bar: `Widget.Departament.Progress.Linear`, `trackThickness` **6dp**
+  (`@dimen/meter_height`, the library's value - a 4dp bar with fully-round corners degenerates to a
+  dot at low usage, which is why an earlier "at least 2dp" clamp was needed), `trackCornerRadius` 3dp,
+  track `colorSurfaceContainerHighest`, `setProgressCompat(percent, animated = true)` over
+  `motion_state` 220 ms. `indicatorColor` is tinted at runtime: `colorOnSurfaceVariant` → `colorWarning`
+  at ≥ 90 % → `colorErrorText` at 100 %. The label sits **beside** the bar, never on it (C§17.2).
+- The rename button is `Widget.Departament.Button.Icon` and sets **no padding**: the library gives it
+  a 48dp box, a 20dp `app:icon` centred by `iconGravity`, `insetTop`/`insetBottom` 0 and
+  `?attr/selectableItemBackgroundBorderless`. (The `android:padding="14dp"` an earlier draft used to
+  hand-compute the glyph size is off-scale by §1.4.5, fails this file's own §14 grep, and derived a
+  size that a token already names.)
 - The rename button is hidden when `selectedSub.id` is blank - a primary-only account gets a
   synthesised root with **no id** (AS §4.2) and `PATCH /client/subscription/{scope}/{id}/name` would
   400.
+
+**The card closes itself.** `paddingBottom` is `@dimen/space_16` on the card's own `LinearLayout`,
+and `row_auto_renew` carries `paddingBottom="0dp"`. An earlier draft put the closing padding on the
+row and set the card's own to 0, which meant that any state hiding the row ended the card on a
+full-width hairline flush against its bottom edge. To make that impossible for every combination:
+
+```
+div_auto.isVisible = row_auto_renew.isVisible
+```
+
+is a hard binding in `AccountFragment`, not a call-site convention, and the same rule applies to
+every divider in this tab: **a divider is visible only when the element it precedes is visible.**
+
+**Which parts each variant draws.** No combination may end on a hairline, and no combination may
+leave a label with nothing under it:
+
+| Variant | header | badge | time label | figure+word | detail | traffic | CTA | upgrade | div_auto + auto-renew |
+|---|---|---|---|---|---|---|---|---|---|
+| Active > 30 d | yes | tariff | «Активна до» | yes | - | if root & limited | Secondary | if targets | yes |
+| Active 8-30 d | yes | tariff | «Активна до» | yes | count | if root & limited | Secondary | if targets | yes |
+| Expiring 1-7 d | yes | tariff | «Осталось» | yes, amber | date | if root & limited | Primary.Tall | if targets | yes |
+| Expiring today | yes | tariff | «Истекает» | yes, amber | «Сегодня последний день» | if root & limited | Primary.Tall | if targets | yes |
+| Expired | yes | tariff | «Истекла» | yes, red | - | **no** | Primary.Tall | **no** | yes |
+| Perpetual | yes | tariff | - | **no**, two text lines instead | - | if root & limited | Secondary, or none if no price | if targets | yes |
+| Unknown expiry | yes | tariff, if it resolves | - | **no**, two text lines instead | - | **no** | Secondary, or none if no price | **no** | yes |
+| Trial | yes | «Пробный», neutral | per health | per health | per health | if root & limited | Primary.Tall «Купить тариф» | **no** | **no - and `div_auto` hides with it** |
+
+The trial row is the case the binding above exists for: a trial does not auto-renew, so both the row
+and its divider go, and the card's own 16 closes it. Where a variant has **no** CTA and **no**
+upgrade and **no** auto-renew (unknown expiry with no price), the card ends on `tv_time_detail`'s
+line plus the card's 16 - still not a hairline.
 
 **Card variants:**
 
 | Variant | Layout | Contents |
 |---|---|---|
-| Empty | `layout_account_card_empty.xml` | 64dp neutral tile + 32dp `ic_acc_upgrade`, centred; Title «Подписки пока нет»; Body «Купите тариф, чтобы подключаться к серверам Departament.» (`maxWidth` ≈ 60 ch); **V1** «Купить»; and when `trialEnabled && !trialUsed`, a **V3** «Начать пробный период» 12 below |
-| Error | `layout_account_card_error.xml` | 64dp neutral tile + 32dp `ic_acc_alert`; Title «Не удалось загрузить аккаунт»; Body = the **mapped** cause (section 8.6), never a hard-wired string; **V2** «Повторить» |
+| Empty | `layout_account_card_empty.xml` | C§15 Empty state's silhouette inside the card: 64dp `Border.EmptyIcon`-equivalent neutral tile (`@dimen/empty_icon_size`) + 32dp `ic_acc_upgrade` (`@dimen/empty_glyph_size`), centred; Title «Подписки пока нет»; Body «Купите тариф, чтобы подключаться к серверам Departament.» (`maxWidth` ≈ 60 ch); then the action pair below |
+| Error | `layout_account_card_error.xml` | same silhouette with 32dp `ic_acc_alert`; Title «Не удалось загрузить аккаунт»; Body = the **mapped** cause (section 8.6), never a hard-wired string; `Button.Tertiary` «Повторить» |
 | Skeleton | `layout_account_skeleton.xml` | see 6.7 |
+
+**The empty card's action pair, and which one is primary.** A free trial outranks a purchase for a
+user with no subscription: it costs nothing, it is the shortest path to a working product, and it is
+the decision the business wants made.
+
+| Condition | `Button.Primary.Tall`, full width | `Button.Tertiary`, `wrap_content`, left-aligned, 8 below |
+|---|---|---|
+| `trialEnabled && !trialUsed` | «Начать пробный период» | «Купить» |
+| otherwise | «Купить» | *(none)* |
+
+Two full-width stacked buttons do not appear here, on the gate, or in the card - D§7.3, C§2.3.
 
 ### 6.6 Row groups
 
-Section header: `@style/SettingsSectionLabel`, corrected to
+**Section header.** `@style/SettingsSectionLabel`, corrected on three axes:
 `paddingStart/End=@dimen/space_16`, `paddingTop=@dimen/space_24`, `paddingBottom=@dimen/space_8`
-(its `paddingTop` is 18dp today, off-scale, CS §A.1). Sentence case, 16sp/700, `colorOnSurface`.
+(its `paddingTop` is 18dp today, off-scale, CS §A.1), and **`android:textColor` from
+`?attr/colorOnSurface` to `?attr/colorOnSurfaceVariant`** `#9BA1AD` - 6.99:1 on surface, 7.0:1 on
+background, comfortably over the 4.5:1 floor.
 
-The three row layouts, all sharing one geometry:
+The colour change is the point. A header at 16sp/700 `colorOnSurface` is *typographically identical*
+to every row title beneath it: same size, same weight, same colour. With three headers and up to
+three rows each, the only thing separating a group label from a row label was position, and §4.3
+requires hierarchy from two or three of size, weight, colour, position and space. Dropping the
+header to `colorOnSurfaceVariant` adds the second axis without reaching for the banned ALL-CAPS
+tracked eyebrow (§1.4.7): **headers read as labels, row titles read as content.** It is applied in
+`SettingsSectionLabel` once, so Settings and Account move together and no screen invents its own
+header.
 
-```
-minHeight=@dimen/row_min_height (56)
-paddingStart/End=@dimen/space_16   paddingTop/Bottom=@dimen/space_8
-background=?attr/selectableItemBackground
-android:stateListAnimator="@anim/press_scale"     (0.97)
-android:focusable="true"
-  [FrameLayout 40×40 @drawable/bg_icon_neutral, r12]
-     [ImageView 22dp, tint=?attr/colorOnSurfaceVariant]
-  [LinearLayout vertical, marginStart=@dimen/space_12, weight=1]
-     [TextView title    @style/TextAppearance.App.Title    maxLines=2 ellipsize=end]
-     [TextView subtitle @style/TextAppearance.App.Subtitle marginTop=@dimen/space_4
-               maxLines=2  visibility=gone]
-  trailing, exactly one of:
-     layout_row_value.xml : [TextView value @style/TextAppearance.App.Subtitle
-                             fontFeatureSettings="tnum, lnum" marginStart=@dimen/space_12]
-                            (strong: @style/TextAppearance.App.Title + colorOnSurface)
-     layout_row_nav.xml   : [ImageView 20dp @drawable/ic_chevron_right
-                             tint=?attr/colorOnSurfaceVariant marginStart=@dimen/space_12]
-     layout_row_switch.xml: [MaterialSwitch clickable=false focusable=false
-                             importantForAccessibility=no marginStart=@dimen/space_12]
-```
+**The rows themselves are `22-components.md`'s** (`@layout/row_value`, `row_navigation`,
+`row_toggle`, `row_destructive`), included with `<include>`. This tab sets exactly three things on
+them and nothing else:
 
-Text origin = 16 + 40 + 12 = **68** (`@dimen/row_text_origin`). Divider between rows in a group:
-`<View height=1dp background="?attr/colorOutlineVariant" layout_marginStart="@dimen/row_text_origin"/>`.
-No divider above the first row of a group and none under a section header (D§4.4). The current 72dp
-divider inset and the 18dp chevrons both die (CS §C.3.18, §C.2.12).
+| Set by the tab | Value |
+|---|---|
+| `tile` visibility | **`gone`** on every row of this tab's three groups (1.4). The tile column collapses; text starts at the 16 gutter |
+| divider inset | `@dimen/space_16` on this tab, `@dimen/row_text_origin` 68 on the tiled sub-pages |
+| content | title, value / chevron / switch, `contentDescription` |
 
-Group contents are exactly section 2's table. Two conditional rules:
+Geometry, press behaviour, focus, disabled, busy and the ripple all come from the library:
+`row_min_height` 56 growing with a 2-line subtitle, `space_12` vertical padding, `screen_gutter` 16
+horizontal, `@drawable/bg_row` (ripple over a `state_pressed` → `?attr/colorSurfaceContainerHigh`
+selector, 90 ms in / 160 ms out), `state_focused` → 2dp accent inset ring,
+`android:focusable="true"`. **No `stateListAnimator` on any row** (C§R5): a scaled row detaches from
+its own divider.
 
-- **«Купить подписку» is hidden** when the card is already showing a filled «Купить…» CTA (empty /
-  trial / expired states) - one entrance, never two.
-- **«Способы входа» is replaced by «Привязать Telegram»** (V6, tile `ic_acc_telegram`, subtitle
-  «Управление подпиской из бота») when `telegramLinked == false`. This is owner request §0.4.9,
-  satisfied as an explicit, state-driven CTA row.
+Divider between rows in a group:
+`<View height=1dp background="?attr/colorOutlineVariant" layout_marginStart="@dimen/space_16"/>`,
+via `@drawable/divider_row` applied by the group container, not by the row. No divider above the
+first row of a group, none below the last, and none under a section header (D§4.4). The current 72dp
+divider inset and the 18dp chevrons both die (CS §C.3.18, §C.2.12); the chevron is 20dp everywhere
+(C§8.2).
 
-The «Выйти» row is the last row of the «Вход» group, separated by the normal hairline, title in
-`?attr/colorErrorText`, tile neutral with `ic_acc_logout` in `colorOnSurfaceVariant`, no value, no
-chevron. It opens a confirm dialog (§7.5 permits a dialog when there is no undo path, and there is
-none: you cannot un-sign-out without credentials).
+Group contents are exactly section 2's table. Three conditional rules:
+
+- **«Купить подписку» is hidden** when the card is already showing a filled «Купить…» / «Начать
+  пробный период» CTA (the empty, trial and expired states) - one entrance, never two.
+- **There is no «Улучшить тариф» row.** The card owns that action (section 2). If the card is not
+  drawn - the cold-error state - the action is not offered at all, because there is nothing to
+  upgrade from.
+- **«Способы входа» is replaced by «Привязать Telegram»** (`Row.Navigation`, subtitle «Управление
+  подпиской из бота») when `telegramLinked == false`. This is owner request §0.4.9, satisfied as an
+  explicit, state-driven CTA row.
+
+The «Выйти» row is the last row of the «Аккаунт и вход» group: `@layout/row_destructive`, title in
+`@color/ping_bad` `#FF6069` (6.15:1), no tile on this tab, no value, no chevron. The group is named
+«Аккаунт и вход» rather than «Вход» so that it does not both open with «Способы входа» and close
+with «Выйти» under a header that means the opposite of one of them.
+
+«Выйти» opens a confirm dialog (§7.5 permits one when there is no undo path, and there is none: you
+cannot un-sign-out without credentials). The dialog is C§13.2's: cancel is `Button.Tertiary`
+«Отмена» on the left, confirm is **`Button.Destructive`** «Выйти» on the right - a real variant with
+a real state table (C§2.5 Destructive), not a red-labelled text button that appears in no registry.
 
 ### 6.7 Every state
 
-| State | Trigger | Rendering |
-|---|---|---|
-| **Skeleton** | `(pendingFirstLoad \|\| loading) && profile == null`, **after 300 ms** | `layout_account_skeleton.xml`: head silhouette (40dp tile block + a 45 %-width and a 30 %-width bar), one card silhouette (name bar 45 %, hero bar 30 %, detail bar 60 %, a full-width 52dp block), and three row silhouettes (40dp tile + 55 % bar). All blocks `@drawable/bg_skeleton_bar` (`colorSurfaceContainerHighest`, `radius_chip`), bars 16dp tall. **Static - no pulse.** D§8.5 permits no looping animation that is not real indeterminate progress; the 900 ms `AccelerateDecelerateInterpolator` pulse in `AccountFragment.kt:413-430` is deleted, off-token and off-direction |
-| **Loaded** | profile and subs resolved | section 2 |
-| **Empty account** | `subs.isEmpty()`, no error | head + empty card + the «Оплата» and «Вход» groups (the «Подписка» group is hidden - there is no subscription to manage) |
-| **Trial** | `selectedSub.isTrial` | badge «Пробный» (neutral chip); time block per 4.3; traffic block if the data exists; **CTA V1 «Купить тариф»**; `btn_upgrade` hidden; the auto-renew row hidden (a trial does not auto-renew); «Улучшить тариф» row hidden |
-| **Expired** | see 4.3 | as 4.3; traffic block hidden; `btn_upgrade` hidden |
-| **Offline** | no connectivity, or the last refresh failed with `ApiError.Network` | `layout_status_bar_inline.xml` pinned as the first child of `content`: 40dp tall, `radius_chip`, `colorSurfaceContainerHighest`, 20dp `ic_acc_cloud_off` + Body «Нет сети. Показаны последние данные.» + a V3 «Повторить». **Last known data stays on screen.** Every network action is disabled at 0.38: the CTA, `btn_upgrade`, the auto-renew switch row, «Баланс», «Купить подписку», «Улучшить тариф», the rename button. **«Выйти» stays enabled** (it is local). §9.6 |
-| **Error, cold** | `profile == null && error != null` | head renders from the session's cached email if there is one, else the person tile + «Аккаунт»; card slot = the error card with the **mapped** cause; groups render with values omitted (never a placeholder dash) |
-| **Partial** | profile OK, subs failed (or vice versa) | render what resolved; the failed half shows its own error card / omits its values; a single V2 «Повторить» in the failed half only |
-| **Payment polling** | `pendingPayment != null` | the same inline bar, with a 20dp indeterminate indicator + «Проверяем оплату…» + a V3 «Обновить». Offline wins if both apply. On confirmation the bar swaps to «Оплата прошла» in `colorTertiary` for 2 s, then hides, and the card re-renders. On timeout (6 × 8 s): «Не удалось подтвердить оплату. Проверьте историю платежей.» + V3 «История» |
-| **Long content** | 60-char Telegram name, 40-char sub name, 12-digit balance | name wraps to 2 lines then ellipsises; the card name is 1 line ellipsised (the chip and the rename button are fixed); the balance value is `wrap_content` and the row title ellipsises |
-| **Short content** | one subscription, one device, one payment | no switcher, no dots, no "1 of 1" - the card is simply the card |
-| **Gated** | signed out | `layout_account_gate.xml` replaces the whole content |
-| **Font scale 200 %** | - | every row is `wrap_content` with `minHeight`; the hero figure and its unit are a baseline-aligned `LinearLayout` with the unit at `maxLines=2` so «дней» drops to a second line rather than clipping |
+Twelve states. Section 7.8 renders the same twelve on the desktop, in the same order, with the same
+strings.
 
-**The gate** (`layout_account_gate.xml`): P0, no card (D§10.1 - "the sign-in form is not an object
-floating on a surface; it is the screen"). A centred column, `maxWidth=320dp`, vertically centred in the
-viewport:
-
-```
-TextView   @style/TextAppearance.App.Headline  «Вход в departament»   gravity=center
-TextView   @style/TextAppearance.App.Body      «Здесь будут подписка, устройства и платежи.»
-           colorOnSurfaceVariant, gravity=center, marginTop=@dimen/space_8
-MaterialButton V1  «Войти через Telegram»  match_parent, 52dp, marginTop=@dimen/space_24
-MaterialButton V3  «Войти по почте»        match_parent, 48dp, marginTop=@dimen/space_12
-```
+| # | State | Trigger | Rendering |
+|---|---|---|---|
+| 1 | **Skeleton** | `(pendingFirstLoad \|\| loading) && profile == null`, **after 300 ms** | `layout_account_skeleton.xml`, built from C§16 Skeleton: head silhouette (40dp tile block + a 45 %-width and a 30 %-width bar), one card silhouette (name bar 45 %, a 34dp-tall figure block 25 %, detail bar 60 %, a full-width 52dp block), three row silhouettes (55 % bar each, **no tile block** - the real rows have none). All bars `@dimen/skeleton_bar_height` 16 at `radius_chip` in `colorSurfaceContainerHighest`. **Pulse 0.45 ↔ 1.0 over `motion_pulse` 1000 ms `ease_standard`, infinite reverse** (C§16); reduced motion holds it static at 0.7. The off-token 900 ms `AccelerateDecelerateInterpolator` pulse in `AccountFragment.kt:413-430` is deleted and replaced by the library's `View.startSkeletonPulse()`. Swap to content is a 220 ms crossfade with no layout change |
+| 2 | **Loaded** | profile and subs resolved | section 2 |
+| 3 | **Empty account** | `subs.isEmpty()`, no error | head + empty card (6.5) + the «Оплата» and «Аккаунт и вход» groups. The «Подписка» group is hidden - there is no subscription to manage, and «Купить подписку» would be a second entrance to the card's own CTA |
+| 4 | **Trial** | `selectedSub.isTrial` | badge «Пробный» (`Chip.Neutral`); time block per 4.3; traffic block if the data exists; CTA `Button.Primary.Tall` «Купить тариф»; `btn_upgrade` hidden; **`row_auto_renew` and `div_auto` both hidden** (6.5); «Купить подписку» row hidden |
+| 5 | **Expired** | see 4.3 | as 4.3; traffic block hidden; `btn_upgrade` hidden; «Купить подписку» row hidden |
+| 6 | **Offline** | no connectivity, or the last refresh failed with `ApiError.Network` | the C-2 status bar as the first child of `content`, offline variant: `colorSurfaceContainerHigh`, `radius_chip` 12, `space_12` padding, `wrap_content` height with `minHeight` 48, **no icon**, Body «Нет сети. Показаны последние данные.» at `maxLines=2`, trailing `Button.Tertiary` «Повторить». **Last known data stays on screen.** Every network action goes to 0.38 and stops responding: the CTA, `btn_upgrade`, the auto-renew row, «Баланс», «Купить подписку», «Устройства», «История платежей», the rename button. **«Выйти» and «Реферальный код» stay enabled** (both are local). §9.6 |
+| 7 | **Error, cold** | `profile == null && error != null` | head renders from the session's cached email if there is one, else the person tile + «Аккаунт»; the card slot is the error card with the **mapped** cause (8.6); groups render with values omitted - never a placeholder dash |
+| 8 | **Partial** | profile OK, subs failed, or the reverse | render what resolved; the failed half shows its own error card, or omits its values; **one** `Button.Tertiary` «Повторить» in the failed half only |
+| 9 | **Payment polling** | `pendingPayment != null` | the same C-2 bar, polling variant: a 20dp inline spinner in the leading slot, «Проверяем оплату…», trailing `Button.Tertiary` «Обновить». Offline wins if both apply. On confirmation the bar's text swaps to «Оплата прошла» in `colorTertiary` and the spinner is replaced by nothing for 2 s, then the bar hides and the card re-renders. On timeout (6 × 8 s): «Не удалось подтвердить оплату. Проверьте историю платежей.» + `Button.Tertiary` «История» |
+| 10 | **Long content** | 60-char Telegram name, 40-char sub name, 12-digit balance | the head name wraps to 2 lines then ellipsises; the card name is 1 line ellipsised (the chip and the rename button are fixed); the balance value is `wrap_content` and the row **title** ellipsises, never the money |
+| 11 | **Short content** | one subscription, one device, one payment | no switcher, no dots, no "1 of 1" - the card is simply the card |
+| 12 | **Gated** | signed out | `14-auth.md` §5's gate replaces the content; see 5.1 |
+| + | **Font scale 200 %** | - | every row is `wrap_content` with `minHeight`; every button is `wrap_content` with `minHeight` (C§R2); the figure and its word are a baseline-aligned `LinearLayout` with the word at `maxLines=2` so «дней» drops to a second line rather than clipping; the status bar grows with its text |
 
 ### 6.8 Sheets and dialogs
 
@@ -1092,8 +1140,8 @@ MaterialButton V3  «Войти по почте»        match_parent, 48dp, mar
 #1 both-platform defect (AS §5.1: two components for the same decision).
 
 ```
-BottomSheetDialogFragment, background=@drawable/bg_sheet_top (radius_sheet 24 top, colorSurface)
-  View       36×4  @drawable/bg_sheet_handle (colorSurfaceContainerHighest, radius_pill)
+BottomSheetDialogFragment, style=@style/Widget.Departament.Sheet          (C§13.1)
+  View       36×4  the library's handle (colorSurfaceContainerHighest, radius_pill)
              layout_gravity=center_horizontal  marginTop=@dimen/space_12
   TextView   @style/TextAppearance.App.Title      «Оплата»
              paddingH=@dimen/space_16  marginTop=@dimen/space_12
@@ -1102,17 +1150,17 @@ BottomSheetDialogFragment, background=@drawable/bg_sheet_top (radius_sheet 24 to
              ← WHAT IS BEING BOUGHT, restated. This closes the "no purchase summary"
                hole that both platforms have today (AS §1.5, §2.4).
   [space 16]
-  include layout_ledger_row  id=row_total     «Итого» + value V5s (16/700 numeric, onSurface)
+  include row_ledger  id=row_total   «Итого» + value, `.strong` modifier (16/700 numeric, onSurface)
   View 1dp  colorOutlineVariant  marginStart/End=@dimen/space_16
-  [runtime method rows: include layout_ledger_row ×N]
+  [runtime method rows: include row_ledger ×N]
   paddingBottom = @dimen/space_16 + navigationBars inset
 ```
 
-- `layout_ledger_row.xml` is the **tile-less** row: `minHeight=56`, `paddingH=@dimen/space_16`,
-  `paddingV=@dimen/space_8`, title `App.Title` weight 1, optional subtitle, trailing value
-  `App.Subtitle` numeric. **No tile, no chevron.** The current sheet's chevron implies "goes further"
-  while the tap charges money (AS §1.8) - it is deleted. The green balance tile is deleted (§1.4.1:
-  green is a status colour).
+- `row_ledger.xml` is the library's tile-less row (amendment C-1, 3.3): `minHeight` 56,
+  `paddingH=@dimen/space_16`, `paddingV=@dimen/space_12`, title `App.Title` weight 1, optional
+  subtitle, trailing value `App.Subtitle` + Numeric. **No tile, no chevron.** The current sheet's
+  chevron implies "goes further" while the tap charges money (AS §1.8) - `Row.Ledger` has no chevron
+  slot at all. The green balance tile is deleted (§1.4.1: green is a status colour).
 - Method rows are **verbs**: «Оплатить с баланса» (trailing value «На балансе 1 500 ₽»), «Оплатить
   картой», «Оплатить через СБП», «Оплатить через {label}» for any other `plategaMethods` entry. SBP is
   detected by the existing `"sbp"`/`"СБП"` match on id or label.
@@ -1143,11 +1191,12 @@ Callers and their subject line:
 TextView  @style/TextAppearance.App.Title      «Пополнение баланса»
 TextView  @style/TextAppearance.App.Subtitle   «Сумма»            ← the LABEL, above, always visible
           marginTop=@dimen/space_16
-TextInputLayout  style=…OutlinedBox  boxCornerRadius* = @dimen/radius_chip
+TextInputLayout  style=@style/Widget.Departament.TextField           (C§4, 56 min, radius 12)
                  app:suffixText="₽"  android:hint=null       ← never placeholder-as-label
-  TextInputEditText  inputType=numberDecimal  imeOptions=actionDone
-                     textAppearance=@style/TextAppearance.App.Title  fontFeatureSettings="tnum, lnum"
-TextView  id=tv_amount_error  @style/TextAppearance.App.Caption  textColor=?attr/colorErrorText
+  TextInputEditText  style=@style/Widget.Departament.TextField.EditText
+                     inputType=numberDecimal  imeOptions=actionDone
+                     fontFeatureSettings="tnum, lnum"
+TextView  id=tv_amount_error  @style/TextAppearance.App.Caption  textColor="@color/ping_bad"
           minHeight=16dp   ← the helper slot is ALWAYS in the tree so the layout never jumps (§7.4)
 [method rows, disabled until the amount is valid]
 ```
@@ -1157,25 +1206,28 @@ Validation on **blur** and on submit, never per keystroke (§7.4): empty → «�
 the field. `dialog_top_up.xml` (hint-as-label, system «OK»/«Отмена», toast on error) is deleted.
 
 **`sheet_subscription_pick.xml`** (4+ subs): title «Выберите подписку», then a `RecyclerView`
-(virtualised, §4.6) of `layout_ledger_row` with a leading 20dp `MaterialRadioButton`, title = the
-subscription name, subtitle = short expiry («до 03.08.2026» / «истекла 31.05.2026» / «бессрочно»).
-Selected row: radio accent + title weight 700 (two channels).
+(virtualised, §4.6) of `row_ledger` with a leading 20dp `MaterialRadioButton` and `space_12` after it
+(origin 48 for this surface, C-1), title = the subscription name, subtitle = short expiry
+(«до 03.08.2026» / «истекла 31.05.2026» / «бессрочно»). Selection is C§18's, minus the fill: radio
+accent + title weight 700, two channels, the radio slot always reserved so nothing reflows.
 
 **`sheet_upgrade.xml`:** title «Улучшить тариф», subtitle «Доплата рассчитывается за оставшийся срок»,
-then one `layout_ledger_row` per target (title = tariff name, trailing value = the catalogue price).
-Tapping a target fetches `upgrade-quote` (the row shows the 16dp indicator while it does) and pushes the
-**payment sheet** with the exact quote. Two steps, one payment component. No four-panel wizard.
+then one `row_ledger` per target (title = tariff name, trailing value = the catalogue price).
+Tapping a target fetches `upgrade-quote` (the row shows the 16dp trailing spinner while it does) and
+pushes the **payment sheet** with the exact quote. Two steps, one payment component. No four-panel
+wizard.
 
 **`sheet_add_devices.xml`** (on the Devices page): title «Добавить устройства», a stepper row
-(V4 «−» / count at `App.Display` 34sp figure face / V4 «+», bounded by `maxExtraDevices`), the
-estimate line «Примерно 150 ₽» + «Точную сумму посчитаем при оплате», then a V1 «Перейти к оплате» that
-pushes the payment sheet. Stepper disabled state uses **0.38**, not the current imperative `0.4f`
-(`BuyTariffActivity.kt:616-619`).
+(`Button.Icon.Filled` «−» / count at `App.Display` 34sp figure face with `minWidth` 32dp /
+`Button.Icon.Filled` «+», bounded by `maxExtraDevices` - C§4.4 "Stepper-backed numeric"), the
+estimate line «Примерно 150 ₽» + «Точную сумму посчитаем при оплате», then a `Button.Primary.Tall`
+«Перейти к оплате» that pushes the payment sheet. The stepper's disabled ends are the library's
+declarative 0.38, never the current imperative `alpha = 0.4f` (`BuyTariffActivity.kt:616-619`).
 
 **`sheet_qr.xml`:** title «QR-код подписки», subtitle «Отсканируйте в приложении на другом устройстве»,
 a centred bitmap from `repo.getQr(remnawaveUuid)` at 240dp on a white `radius_card` plate (a QR needs a
 light quiet zone; this is the one white surface in the product and it is a *functional* requirement, not
-decoration), then a V2 «Скопировать ссылку».
+decoration), then a `Button.Secondary` «Скопировать ссылку».
 
 **`dialog_rename_subscription.xml`:** a themed `MaterialAlertDialog` (inherits
 `ThemeOverlay.Departament.Dialog`), title «Название подписки», body = a label «Название» above an
@@ -1184,9 +1236,13 @@ after trimming; empty → «Введите название». Rename is **optim
 updates immediately, reverts on failure with a Snackbar «Не удалось переименовать. Повторите.» +
 «Повторить».
 
-**Sign-out dialog:** title «Выйти из аккаунта?», body «Подписка останется активной. Чтобы вернуться,
-войдите снова.», negative «Отмена», positive «Выйти» as a **text button in `?attr/colorErrorText` on the
-right** (§7.5).
+**Sign-out dialog:** C§13.2, `MaterialAlertDialogBuilder` inheriting
+`ThemeOverlay.Departament.Dialog`. Title «Выйти из аккаунта?», body «Подписка останется активной.
+Чтобы вернуться, войдите снова.», actions right-aligned `space_8` apart: `Button.Tertiary` «Отмена»
+then **`Button.Destructive` «Выйти»** - red fill `?attr/colorError` `#F04452`, white label at 16/700
+(3.71:1, which clears the ≥3:1 large-text floor precisely because the label never drops below
+16sp/700), inner 2dp white-at-40 % focus ring, 0.38 disabled, 20dp white arc when loading.
+Auto-focus goes to the neutral action; Esc / Back / scrim tap cancels.
 
 ### 6.9 Sub-page: Devices
 
