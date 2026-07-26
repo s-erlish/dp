@@ -5,6 +5,7 @@ import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.DialogInterface
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -27,8 +28,11 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.viewpager2.widget.CompositePageTransformer
 import androidx.viewpager2.widget.MarginPageTransformer
 import androidx.viewpager2.widget.ViewPager2
+import androidx.core.content.ContextCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
 import com.v2ray.ang.R
+import com.v2ray.ang.auth.AccountSession
 import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.dto.PaymentDto
 import com.v2ray.ang.auth.dto.PaymentInitDto
@@ -82,6 +86,21 @@ class AccountFragment : Fragment() {
     private var pendingPayment = false
     private var pollJob: Job? = null
 
+    // Sign-out. The wipe is local and usually lands in a few milliseconds, so the row's trailing
+    // spinner is scheduled 300ms out and cancelled if the work finishes first — a spinner that
+    // flashes for one frame reads as a glitch (00-rules.md 7.3).
+    private var signOutSpinnerJob: Job? = null
+
+    // Last logged-in/out value this view has rendered. Null until the first emission, so the
+    // StateFlow's initial replay is not mistaken for a transition. Drives the reset that keeps a
+    // dropped session (sign-out, or a 401 on the identity endpoint) from leaving the previous
+    // user's name, balance and subscriptions painted on a fragment that is never recreated.
+    private var renderedLoggedIn: Boolean? = null
+
+    // Set when the session drops; consumed on the next sign-in so the tab cold-loads (skeleton,
+    // then real data) instead of re-showing whatever it last rendered.
+    private var needsColdLoad = false
+
     // Last balance figure actually shown, so a re-render counts UP from it instead of hard-swapping.
     // Null until the first paint (which sets the value instantly — no spin on open).
     private var lastBalance: Double? = null
@@ -125,6 +144,8 @@ class AccountFragment : Fragment() {
         balanceAnimator = null
         skeletonAnimator?.cancel()
         skeletonAnimator = null
+        signOutSpinnerJob?.cancel()
+        signOutSpinnerJob = null
         _binding = null
     }
 
@@ -170,6 +191,7 @@ class AccountFragment : Fragment() {
         binding.rowDevices.setOnClickListener { openSubScreen(DeviceManagementActivity::class.java) }
         binding.rowBuy.setOnClickListener { openSubScreen(BuyTariffActivity::class.java) }
         binding.rowHistory.setOnClickListener { openSubScreen(PaymentHistoryActivity::class.java) }
+        binding.rowLogout.setOnClickListener { confirmSignOut() }
         // Empty-state CTA: same destination as the buy row.
         binding.btnBuyFirst.setOnClickListener { openSubScreen(BuyTariffActivity::class.java) }
         // Cold-load error: re-run the initial load (and re-show the skeleton while it retries).
@@ -218,8 +240,59 @@ class AccountFragment : Fragment() {
                 // Skeleton is driven by loading (+ the first-load gate) via renderHeroState.
                 launch { viewModel.loading.collect { renderHeroState() } }
                 launch { viewModel.error.collect { renderError(it) } }
+                // The tab's fragment is added once and then only shown/hidden, so it outlives the
+                // session. Without this, signing out (or a 401) would leave the previous account's
+                // data painted, and signing in as somebody else would show it to them.
+                launch { viewModel.account.collect { onAccountState(it) } }
             }
         }
+    }
+
+    /**
+     * Reacts to logged-in/out TRANSITIONS only; the StateFlow's initial replay just records the
+     * current value, because [onViewCreated] has already kicked off the first load.
+     */
+    private fun onAccountState(state: AccountSession.AccountState) {
+        val loggedIn = state is AccountSession.AccountState.LoggedIn
+        val previous = renderedLoggedIn
+        renderedLoggedIn = loggedIn
+        if (previous == null || previous == loggedIn) return
+        if (loggedIn) {
+            if (!needsColdLoad) return
+            needsColdLoad = false
+            pendingFirstLoad = true
+            renderHeroState()
+            loadAll()
+        } else {
+            onSessionCleared()
+        }
+    }
+
+    /**
+     * Blanks every rendered value after the session goes away. Covers both routes to a dropped
+     * session: the user signing out here, and [AccountSession.wipe] firing from the repository
+     * when the identity endpoint returns 401.
+     */
+    private fun onSessionCleared() {
+        endSignOutBusy()
+        pollJob?.cancel()
+        pollJob = null
+        pendingPayment = false
+        awaitingPaymentError = false
+        binding.tvPending.visibility = View.GONE
+        // The empty hero, not the skeleton: there is nothing loading and nothing to wait for, and
+        // a pulse animator left looping on a tab the user can no longer open is pure battery.
+        pendingFirstLoad = false
+        needsColdLoad = true
+        latestProfile = null
+        currentSubs = emptyList()
+        subAdapter.submit(emptyList())
+        binding.llSubDots.removeAllViews()
+        binding.llSubDots.isVisible = false
+        binding.tvRowValueDevices.visibility = View.GONE
+        binding.tvRowValueHistory.visibility = View.GONE
+        renderProfile(null)
+        renderHeroState()
     }
 
     // Context-scoped toast helpers so the ported (Context.toast) calls work from a Fragment.
@@ -564,6 +637,95 @@ class AccountFragment : Fragment() {
         clipboard.setPrimaryClip(ClipData.newPlainText("referral", code))
         toast(R.string.account_referral_copied)
     }
+
+    // region sign out
+
+    /**
+     * 00-rules.md 7.5 prefers act-plus-undo over a confirmation, and this is the case it exempts:
+     * signing out is not usefully undoable. "Отменить" would have to re-import the subscription
+     * servers, restart their auto-update workers and re-establish the tunnel it had just torn
+     * down, from a token it has already destroyed. So a confirm dialog is correct here, and it
+     * follows the library's rules: the primary action is the verb it performs, «Выйти», never
+     * «OK» and never a Да/Нет pair; cancel sits on the left and holds focus, so an Enter on a
+     * keyboard or a TV remote can never sign somebody out by reflex.
+     *
+     * The body has two shapes because the tab does: it says the tunnel will drop only when there
+     * is a tunnel to drop.
+     */
+    private fun confirmSignOut() {
+        val body = if (viewModel.isTunnelRunning()) {
+            R.string.account_logout_body_connected
+        } else {
+            R.string.account_logout_body
+        }
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.account_logout_title)
+            .setMessage(body)
+            .setNegativeButton(R.string.account_logout_cancel, null)
+            .setPositiveButton(R.string.account_row_logout) { _, _ -> beginSignOut() }
+            .create()
+        dialog.show()
+        // Departament.Dialog.Button.Destructive (styles.xml) is Departament.Dialog.Button plus
+        // exactly this colour. MaterialAlertDialog styles all three buttons from the theme
+        // overlay, so applying the one delta here beats replacing the button bar with a custom
+        // view to get a per-button style.
+        dialog.getButton(DialogInterface.BUTTON_POSITIVE)?.apply {
+            setTextColor(ContextCompat.getColor(context, R.color.color_destructive_text))
+        }
+        dialog.getButton(DialogInterface.BUTTON_NEGATIVE)?.requestFocus()
+    }
+
+    /**
+     * Runs the sign-out. Acknowledgement is immediate (the dialog closes and the row stops taking
+     * taps, so the control is never left pressed with no response); the trailing spinner is
+     * scheduled 300ms out and usually never appears, because the work is local (00-rules.md 7.3).
+     *
+     * There is no success branch here on purpose: the session flipping to LoggedOut is what ends
+     * the busy state, via [onSessionCleared], and the visible change is the confirmation. A
+     * Snackbar saying "you signed out" on top of a screen that just emptied itself is noise.
+     */
+    private fun beginSignOut() {
+        val b = _binding ?: return
+        b.rowLogout.isClickable = false
+        b.rowLogout.contentDescription = getString(R.string.account_logout_progress)
+        signOutSpinnerJob?.cancel()
+        signOutSpinnerJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(300L)
+            _binding?.pbLogout?.isVisible = true
+        }
+        viewModel.logout(onFailure = ::onSignOutFailed)
+    }
+
+    /** Clears the busy state. Safe to call when the view is already gone. */
+    private fun endSignOutBusy() {
+        signOutSpinnerJob?.cancel()
+        signOutSpinnerJob = null
+        _binding?.let {
+            it.pbLogout.isVisible = false
+            it.rowLogout.isClickable = true
+            it.rowLogout.contentDescription = getString(R.string.account_row_logout)
+        }
+    }
+
+    /**
+     * The wipe threw, so the user is still signed in and nothing was half-removed that a retry
+     * cannot finish (every step of the wipe is idempotent). 00-rules.md 1.4.8: a failure the user
+     * can act on is a Snackbar with an action, never a Toast. Anchored above the bottom bar so
+     * the action is reachable.
+     *
+     * There is no "the call never returned" branch to design: this backend has no logout endpoint
+     * and issues a non-refreshable token, so sign-out never touches the network.
+     */
+    private fun onSignOutFailed() {
+        endSignOutBusy()
+        val b = _binding ?: return
+        val bar = Snackbar.make(b.root, R.string.account_logout_failed, Snackbar.LENGTH_LONG)
+            .setAction(R.string.account_retry) { beginSignOut() }
+        activity?.findViewById<View>(R.id.bottom_nav)?.let { bar.setAnchorView(it) }
+        bar.show()
+    }
+
+    // endregion
 
     // region avatar
 

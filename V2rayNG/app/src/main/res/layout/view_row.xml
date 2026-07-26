@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ============================================================================
+  THE UNIVERSAL ROW. One file, five archetypes.
+  32-master-plan-android.md 8.1 / 5.3, 22-components.md 8.1-8.7.
+  ============================================================================
+
+  This is the single most repeated object in the product: 137 hand-inlined copies
+  collapse into this file. Nothing here is optional decoration — every id below is
+  a slot a caller either shows or leaves hidden, and the archetype is decided by
+  WHICH ONE TRAILING SLOT is shown, never by a second layout file.
+
+  GEOMETRY (from @style/Widget.Departament.Row, never restated inline):
+      [ 16 gutter ][ 40 tile r12, 22 glyph ][ 12 ][ text column ][ 12 ][ trailing ][ 16 ]
+  Text origin 68 = 16 + 40 + 12 on a TILED row; 16 on a PLAIN row (5.3), which is
+  what hiding @id/row_tile gives you for free — its 12dp end margin goes with it.
+  minHeight 56, height wrap_content: a two-line subtitle GROWS the row, and at font
+  scale 200% every text box grows with it. There is not one fixed height in this file.
+
+  THE TWO ROW SPECIES ARE DERIVED, NOT CHOSEN (5.3): a group is tiled if and only if
+  its rows carry a leading glyph that DIFFERS between rows. If every row would carry
+  the same glyph, the group is plain and @id/row_tile stays gone. N identical tiles
+  down the left edge is the generated-settings tell, not a design.
+
+  EVERYTHING OPTIONAL SHIPS GONE. A caller shows exactly what its archetype needs,
+  so a forgotten line is a missing element and never a wrong one:
+
+    Row.Navigation   row_title [+ row_subtitle] [+ row_value] + row_chevron
+    Row.Value        row_title + row_value + row_chevron (or row_trailing_glyph to
+                     cycle the value in place, which promises no screen and no dialog)
+    Row.Toggle       row_title [+ row_subtitle] + row_switch
+    Row.Action       row_title [+ row_subtitle] + row_icon_action OR row_action
+                     AND the row itself stops being a target (see below)
+    Row.Destructive  row_title in TextAppearance.App.Title.Destructive, no trailing
+    Row.Fact         row_title + row_value, not clickable
+    Row.Selectable   row_title [+ row_value] + row_marker, view.isActivated = true
+
+  THE ONE SANCTIONED PAIRING (8.1): a row may carry a VALUE plus one trailing
+  affordance — value + chevron (22-components 8.3) or value + state marker (the
+  server row: ping plus check). The value is text, not a control. Two CONTROLS in
+  the trailing slot never happens: never a chevron and a switch, never two glyphs.
+
+  THE BINDER IS THE FRONT DOOR. ui/component/RowBinder.bind(root, title, …, trailing)
+  resolves every slot below by name, shows exactly one trailing affordance, resets the
+  others, and refuses at the call site to give a row two targets. Bind through it
+  rather than reaching for these ids one at a time.
+
+  WHAT CANNOT BE A LAYOUT ATTRIBUTE, AND WHY. A Material style binds at inflation, so
+  three archetype deltas are applied to the inflated row instead. Each is an exact
+  reproduction of a ratified style, not an invented value, and RowBinder already does
+  all three for you:
+    Row.Action       row.isClickable = false; row.isFocusable = false
+                     row.setBackgroundResource(0)      <- @style/…Row.Action verbatim
+    Row.Destructive  title.setTextAppearance(R.style.TextAppearance_App_Title_Destructive)
+    accent tile      rowTile.setBackgroundResource(R.drawable.bg_tile_accent) + the
+                     matching glyph tint  (D-5: one accent tile per screen, at most)
+  Disabled is alpha 0.38 on the row plus isEnabled = false (R6). Pressed, focused and
+  selected are already drawn by @drawable/bg_row and need no code at all.
+
+  ACCESSIBILITY. The WHOLE ROW is the touch target — that is why the switch below is
+  explicitly not clickable and not focusable (five shipped switch rows have two
+  targets that can disagree). The tile is decorative and is marked as such: the title
+  is the row's name. A selected row must announce it (isSelected on the a11y node),
+  not only draw it.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/row"
+    style="@style/Widget.Departament.Row"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:baselineAligned="false">
+
+    <!-- TILED groups only. Gone = a plain row at the 16dp origin (5.3). The glyph is
+         the caller's; the 40/12/22 geometry and the neutral fill are the style's. -->
+    <ImageView
+        android:id="@+id/row_tile"
+        style="@style/Widget.Departament.Tile"
+        android:layout_width="@dimen/tile_size"
+        android:layout_height="@dimen/tile_size"
+        android:layout_marginEnd="@dimen/space_12"
+        android:importantForAccessibility="no"
+        android:visibility="gone"
+        tools:src="@drawable/ic_settings_24dp"
+        tools:visibility="visible" />
+
+    <!-- The text column. weight 1, so a long title yields to the trailing slot and a
+         long value never pushes the title out of the row. -->
+    <LinearLayout
+        android:id="@+id/row_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/row_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textAppearance="@style/TextAppearance.App.Title"
+            tools:text="Маршрутизация" />
+
+        <!-- A subtitle that restates its title is deleted, not written (8.1). -->
+        <TextView
+            android:id="@+id/row_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_4"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textAppearance="@style/TextAppearance.App.Subtitle"
+            android:visibility="gone"
+            tools:text="Правила для доменов и приложений"
+            tools:visibility="visible" />
+    </LinearLayout>
+
+    <!-- THE TRAILING SLOT. Show exactly one control. row_value is text and may
+         accompany row_chevron or row_check; it is not a control. Every element in the
+         trailing cluster is 12 from its neighbour, the same gap as tile-to-text. -->
+
+    <TextView
+        android:id="@+id/row_value"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/space_12"
+        android:ellipsize="end"
+        android:gravity="end"
+        android:maxLines="1"
+        android:textAppearance="@style/TextAppearance.App.Subtitle"
+        android:visibility="gone"
+        tools:text="Cloudflare"
+        tools:visibility="visible" />
+
+    <!-- State marker: this item is the current selection. Not an action (8.1). The slot
+         is ALWAYS reserved and selection moves its alpha, so choosing an item never
+         reflows the list (22-components 18.1). -->
+    <ImageView
+        android:id="@+id/row_marker"
+        android:layout_width="@dimen/glyph_20"
+        android:layout_height="@dimen/glyph_20"
+        android:layout_marginStart="@dimen/space_12"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_action_done"
+        android:tint="?attr/colorPrimary"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
+    <!-- Tapping pushes a screen. Swap the src for the expand or cycle glyph when the
+         promise changes (8.1); the size and the tone stay. -->
+    <ImageView
+        android:id="@+id/row_chevron"
+        android:layout_width="@dimen/glyph_20"
+        android:layout_height="@dimen/glyph_20"
+        android:layout_marginStart="@dimen/space_12"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_chevron_right"
+        android:tint="?attr/colorOnSurfaceVariant"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
+    <!-- Tapping changes the value in place: no screen, no dialog. The caller sets the
+         glyph (the cycle affordance wants ic_unfold_more, which res/drawable does not
+         carry yet), so there is no src here to be wrong. -->
+    <ImageView
+        android:id="@+id/row_trailing_glyph"
+        android:layout_width="@dimen/glyph_20"
+        android:layout_height="@dimen/glyph_20"
+        android:layout_marginStart="@dimen/space_12"
+        android:importantForAccessibility="no"
+        android:tint="?attr/colorOnSurfaceVariant"
+        android:visibility="gone"
+        tools:src="@drawable/ic_arrow_drop_down" />
+
+    <!-- The row owns the toggle; the switch is decoration that reports state. -->
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/row_switch"
+        style="@style/Widget.Departament.Switch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/space_12"
+        android:clickable="false"
+        android:focusable="false"
+        android:importantForAccessibility="no"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
+    <!-- Row.Action's in-place action. When this is shown the ROW is not a target:
+         two targets doing different things is the layout_subscription_meta_bar
+         mistake. android:contentDescription is MANDATORY and states the ACTION. -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/row_icon_action"
+        style="@style/Widget.Departament.Button.Icon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/space_12"
+        android:visibility="gone"
+        app:icon="@drawable/ic_copy"
+        tools:ignore="ContentDescription"
+        tools:visibility="visible" />
+
+    <!-- The other half of Row.Action: a Tertiary button, and this row is the ONLY place
+         in the product a Tertiary is allowed to live inside a row («Привязать Telegram»
+         -> «Привязать»). The row is inert whenever this is showing. -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/row_action"
+        style="@style/Widget.Departament.Button.Tertiary"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/space_12"
+        android:visibility="gone"
+        tools:text="Привязать"
+        tools:visibility="visible" />
+</LinearLayout>

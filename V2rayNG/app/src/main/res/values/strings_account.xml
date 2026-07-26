@@ -7,7 +7,7 @@
     <string name="account_title">Аккаунт</string>
 
     <!-- Hub -->
-    <string name="account_profile_title">Ваш профиль</string>
+    <string name="account_profile_title">Ваш аккаунт</string>
     <string name="account_balance_inline">%1$s</string>
     <string name="account_sub_summary_title">Ваша подписка</string>
     <string name="account_manage_title">Управление</string>
@@ -22,6 +22,7 @@
     <string name="account_balance">Баланс</string>
     <string name="account_top_up">Пополнить</string>
     <string name="account_referral">Реф-код %1$s</string>
+    <!-- DEAD: no reference in any .kt/.xml (checked 2026-07-26). Delete with 24.2, do not translate. -->
     <string name="account_telegram">Telegram: \@%1$s</string>
     <string name="account_no_telegram">Telegram не привязан</string>
     <string name="account_copy_referral">Скопировать код</string>
@@ -29,22 +30,25 @@
 
     <!-- Subscriptions -->
     <string name="account_subs_header">Мои подписки</string>
-    <string name="account_subs_empty">У вас пока нет подписок</string>
-    <string name="account_no_subscription">Пока нет активной подписки. Оформите её, чтобы подключиться.</string>
-    <string name="account_empty_title">Оформите первую подписку</string>
-    <string name="account_error_load_title">Не удалось загрузить</string>
+    <string name="account_subs_empty">Подписки пока нет</string>
+    <string name="account_no_subscription">Купите тариф, чтобы подключаться к серверам Departament.</string>
+    <string name="account_empty_title">Подписки пока нет</string>
+    <string name="account_error_load_title">Не удалось загрузить данные</string>
     <string name="account_retry">Повторить</string>
     <string name="account_expires">Действует до %1$s</string>
     <string name="account_devices">Устройства: %1$s / %2$s</string>
     <string name="account_traffic">Трафик: %1$s / %2$s</string>
     <string name="account_unlimited">∞</string>
+    <!-- DEAD: no reference in any .kt/.xml (checked 2026-07-26). Also ALL-CAPS, which copy law 9.2
+         forbids; left verbatim so the deletion in 24.2 is a clean removal, not a copy edit. -->
     <string name="account_trial_badge">ПРОБНЫЙ</string>
     <string name="account_auto_renew">Автопродление</string>
 
     <!-- Tariffs -->
     <string name="account_tariffs_header">Тарифы</string>
     <string name="account_tariffs_empty">Тарифы недоступны</string>
-    <string name="account_price_option">%1$d дн. — %2$s</string>
+    <!-- DEAD: no reference in any .kt/.xml (checked 2026-07-26); kept only until 24.2 deletes it. -->
+    <string name="account_price_option">%1$d дн. · %2$s</string>
     <string name="account_option_duration">%1$d дн.</string>
     <string name="account_tariff_devices">Устройства: %1$d</string>
     <string name="account_tariff_traffic">Трафик: %1$s</string>
@@ -86,23 +90,47 @@
     <string name="account_status_canceled">Отменён</string>
 
     <!-- Errors -->
-    <string name="account_error_service_unavailable">Сервис временно недоступен</string>
-    <string name="account_error_network">Ошибка сети. Проверьте подключение</string>
-    <string name="account_error_unauthorized">Требуется вход в аккаунт</string>
-    <string name="account_error_rate_limited">Слишком много запросов. Попробуйте позже</string>
-    <string name="account_error_timeout">Превышено время ожидания</string>
-    <string name="account_error_generic">Что-то пошло не так</string>
-    <string name="account_checkout_no_browser">Не удалось открыть страницу оплаты</string>
+    <string name="account_error_service_unavailable">Сервис временно недоступен. Повторите попытку позже.</string>
+    <string name="account_error_network">Нет подключения к интернету. Проверьте сеть и повторите.</string>
+    <string name="account_error_unauthorized">Сессия истекла. Войдите снова, чтобы продолжить.</string>
+    <string name="account_error_rate_limited">Слишком много запросов. Подождите минуту и повторите.</string>
+    <string name="account_error_timeout">Сервер не ответил вовремя. Повторите попытку.</string>
+    <string name="account_error_generic">Что-то пошло не так. Повторите попытку.</string>
+    <string name="account_checkout_no_browser">Не удалось открыть страницу оплаты. Попробуйте другой способ оплаты.</string>
 
-    <!-- Payment error diagnostic (shows the real backend HTTP code + reason) -->
+    <!-- Payment error dialog. Copy law 9.4: the user never sees the HTTP code or the raw
+         backend reason. Both keys still take the arguments the call sites pass; the formatter
+         drops unused arguments, and the real cause belongs in the log, not on screen. -->
     <string name="account_payment_error_title">Ошибка оплаты</string>
-    <string name="account_payment_error_body">HTTP %1$s\n%2$s</string>
-    <string name="account_payment_error_body_nodetail">HTTP %1$s</string>
+    <string name="account_payment_error_body">Платёж не прошёл. Попробуйте другой способ оплаты.</string>
+    <string name="account_payment_error_body_nodetail">Платёж не прошёл. Попробуйте другой способ оплаты.</string>
+
+    <!-- Sign out. Placement, copy and component per 23-account-rework.md 2 / 6.6 / 6.8 and
+         15-account-tab.md 1286-1288: the last group on the tab, a destructive row with no value
+         and no chevron, opening a themed confirm dialog whose primary action is the verb «Выйти»
+         (never «OK», never «Да»/«Нет»; 00-rules.md 7.5 and the ThemeOverlay.Departament.Dialog
+         comment in styles.xml).
+
+         The group is «Аккаунт и вход», not «Вход»: a header meaning "sign IN" over a row that
+         signs OUT is the contradiction 23-account-rework.md 6.6 calls out by name. It is also not
+         «Аккаунт» on its own, which would just restate the tab's own nav label.
+
+         Two bodies because the tab has two truthful shapes here (00-rules.md 15): signing out
+         drops a live tunnel, and saying so when there is no tunnel would be noise. -->
+    <string name="account_group_signin">Аккаунт и вход</string>
+    <string name="account_row_logout">Выйти</string>
+    <string name="account_logout_title">Выйти из аккаунта?</string>
+    <string name="account_logout_body">Подписка останется активной. Серверы подписки исчезнут из приложения. Чтобы вернуться, войдите снова.</string>
+    <string name="account_logout_body_connected">Подписка останется активной. Активное подключение прервётся, серверы подписки исчезнут из приложения. Чтобы вернуться, войдите снова.</string>
+    <string name="account_logout_cancel">Отмена</string>
+    <!-- R8's loading contentDescription: "<label>, загрузка" (styles.xml, inline spinner). -->
+    <string name="account_logout_progress">Выйти, загрузка</string>
+    <string name="account_logout_failed">Не удалось выйти. Повторите.</string>
 
     <!-- Avatar -->
     <string name="account_change_avatar">Сменить фото</string>
     <string name="account_avatar_gallery">Выбрать из галереи</string>
     <string name="account_avatar_remove">Убрать фото</string>
     <string name="account_avatar_updated">Аватар обновлён</string>
-    <string name="account_avatar_error">Не удалось загрузить фото</string>
+    <string name="account_avatar_error">Не удалось загрузить фото. Выберите другое изображение.</string>
 </resources>

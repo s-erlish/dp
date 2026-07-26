@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ============================================================================
+  THE SEAMLESS SUB-PAGE TOOLBAR (owner request 0.4.6).
+  00-rules.md 4.8, 22-components.md 12.1, 32-master-plan-android.md 8.6.
+  ============================================================================
+
+  The header is not a bar, it is the top of the page. Same background as the page,
+  no elevation, no divider, no shadow, no scrim, no AppBarLayout tint, no
+  liftOnScroll. This one file is the fix for every peripheral screen at once — the
+  most repeated defect in the app is a sub-page whose Russian title is drawn in the
+  20sp Latin wordmark face, which has no Cyrillic at all (D-11).
+
+      [ 16 ][ back, 24 glyph ][ 16 ][ Title 16/700 ][ flex ][ action (0-1) ][ 16 ]
+
+  THE GUTTER ARITHMETIC, because it is the part that gets rebuilt wrong. The back
+  control is a 48dp touch target (14.2) holding a 24dp glyph, so the glyph sits 12
+  inside it. marginStart space_4 therefore puts the GLYPH at the 16dp gutter, exactly
+  where the title of the page below it starts, and the button's edge at 52. The
+  title's marginStart space_4 lands it at 56 — 16 clear of the glyph. The trailing
+  action mirrors it: marginEnd space_4 puts its glyph's far edge on the 16 gutter.
+
+  56 IS A MINIMUM, NEVER A HEIGHT. At font scale 200% a 16sp title needs ~34dp of
+  line box and this bar grows to hold it. android:layout_height="56dp" on anything
+  containing text is a P1 accessibility defect (14.5).
+
+  ON A TAB SCREEN there is no back affordance and the title starts at the gutter:
+      toolbarBack.isVisible = false
+      toolbarLeadingGap.isVisible = true      <- 12 + the title's 4 = the 16 gutter
+  Home is the ONE screen that keeps the wordmark: it applies
+  @style/ToolbarBrandTitle to @id/toolbar_title and nothing else in the app may.
+
+  THE HAIRLINE IS THE ONLY PERMITTED BOUNDARY and it ships at alpha 0. If a screen
+  genuinely needs a boundary once its content is scrolled, it fades the hairline in
+  over motion_state 220ms at scrollY > 0 and back out at the top. It never appears
+  at rest, and nothing else about this bar changes on scroll — no colour, no
+  elevation, no shadow.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/toolbar"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?android:attr/colorBackground"
+    android:elevation="0dp"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:id="@+id/toolbar_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:baselineAligned="false"
+        android:gravity="center_vertical"
+        android:minHeight="@dimen/toolbar_height"
+        android:orientation="horizontal">
+
+        <!-- ICON GAP: res/drawable has no back glyph. 22-components.md 12.1 asks for a
+             24dp ic_arrow_back; until the icon owner lands it, the 24dp chevron is
+             mirrored, which draws the correct left-pointing affordance. When
+             ic_arrow_back exists, set it on app:icon and DELETE the scaleX line.
+             STRING GAP: there is no «Назад» in res/values/strings*.xml and this wave
+             may not add one; the literal below wants to become @string/cd_back. -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/toolbar_back"
+            style="@style/Widget.Departament.Button.Icon.Toolbar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_4"
+            android:contentDescription="Назад"
+            android:scaleX="-1"
+            app:icon="@drawable/ic_chevron_right" />
+
+        <!-- Shown ONLY when the back control is hidden, so a tab screen's title still
+             starts at the 16dp gutter (12 here + the title's 4). -->
+        <Space
+            android:id="@+id/toolbar_leading_gap"
+            android:layout_width="@dimen/space_12"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/toolbar_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_4"
+            android:layout_marginEnd="@dimen/space_12"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.App.Title"
+            tools:text="Маршрутизация" />
+
+        <!-- AT MOST ONE. A second action becomes an overflow whose glyph is
+             ic_more_vert_24dp. The caller sets app:icon AND
+             android:contentDescription, which states the action and not the object. -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/toolbar_action"
+            style="@style/Widget.Departament.Button.Icon.Toolbar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="@dimen/space_4"
+            android:visibility="gone"
+            app:icon="@drawable/ic_more_vert_24dp"
+            tools:ignore="ContentDescription"
+            tools:visibility="visible" />
+    </LinearLayout>
+
+    <View
+        android:id="@+id/toolbar_hairline"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/stroke_hairline"
+        android:alpha="0"
+        android:background="?attr/colorOutlineVariant" />
+</LinearLayout>

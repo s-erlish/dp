@@ -2,6 +2,7 @@ package com.v2ray.ang.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.v2ray.ang.AngApplication
 import com.v2ray.ang.auth.AccountCache
 import com.v2ray.ang.auth.AccountRepository
 import com.v2ray.ang.auth.AccountSession
@@ -16,11 +17,16 @@ import com.v2ray.ang.auth.dto.ServerStatusDto
 import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.auth.dto.TariffGroupDto
 import com.v2ray.ang.auth.dto.UserProfileDto
+import com.v2ray.ang.core.CoreServiceManager
+import com.v2ray.ang.util.AvatarManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Backs the account/subscriptions/store/payments screens. Holds the observable data as
@@ -397,11 +403,70 @@ class AccountViewModel : ViewModel() {
         repo.renameSubscription(scope, id, name).onSuccess { onDone() }.onFailure { report(it) }
     }
 
-    fun logout() {
-        AccountSession.wipe()
-        // Hard reset: clear the in-memory cache eagerly rather than relying only on the lazy
-        // logged-out clear on next read, and stop any in-flight subscription load.
-        AccountCache.invalidateAll()
+    /** True while the core is up, so the sign-out dialog can tell the truth about the tunnel. */
+    fun isTunnelRunning(): Boolean = runCatching { CoreServiceManager.isRunning() }.getOrDefault(false)
+
+    /**
+     * Signs the user out.
+     *
+     * **There is no network call here, and there cannot be one.** This backend issues a 7-day,
+     * non-refreshable JWT and exposes no logout endpoint (see [com.v2ray.ang.auth.AuthManager]'s
+     * class comment: "There is NO refresh/logout here"). Sign-out is entirely local, so nothing
+     * can hang on the wire, time out, or come back after the screen is gone.
+     *
+     * The failure that matters is a HALF-cleared session, so the order is load-bearing:
+     *
+     * 1. **[AccountSession.wipe] runs first and alone.** It removes every subscription this
+     *    session imported, cancels their auto-update workers, drops the token / cached profile /
+     *    managed-guid map, and only then flips the state to LoggedOut. If it throws part-way, the
+     *    token is still there, the user is still signed in and still connected, and the whole
+     *    action is safely retryable (every step in it is idempotent).
+     * 2. **Then the tunnel is stopped**, because the servers it was built from no longer exist.
+     *    Left running, the core would keep routing the whole device through a subscription the
+     *    user just detached from their account, under a notification naming a profile that is
+     *    gone from storage, and the next launch would start with a live service and no selected
+     *    server. That is the undefined state; stopping is not optional.
+     *    (Removing the servers already cleared the selected-server key, see
+     *    `MmkvManager.removeServerViaSubid`.)
+     * 3. **Then the account-scoped local leftovers**: the in-memory [AccountCache], and the
+     *    locally-picked avatar, which would otherwise show the previous person's photo to
+     *    whoever signs in next on this device. The cost is that a returning user re-picks their
+     *    photo; the alternative is wearing a stranger's face, which is worse.
+     *
+     * What deliberately survives: `AuthTokenStore.deviceId()` (so signing back in reuses the same
+     * HWID slot instead of burning a device on the panel), and every server or subscription the
+     * user added by hand. Those are the user's, not the account's.
+     *
+     * [onFailure] is invoked when step 1 threw, i.e. the user is still signed in and the caller
+     * should offer a retry. It is deliberately NOT invoked on success: the state flip tears the
+     * tab down and the UI change is the confirmation, so there is nothing to say.
+     */
+    fun logout(onFailure: () -> Unit = {}) {
+        viewModelScope.launch {
+            // NonCancellable: a wipe interrupted half-way is the exact state this method exists to
+            // prevent, so it may not abort if the ViewModel is cleared while it runs.
+            val wiped = withContext(Dispatchers.IO + NonCancellable) {
+                val ok = runCatching { AccountSession.wipe() }.isSuccess
+                if (ok) {
+                    val app = AngApplication.application
+                    runCatching { if (CoreServiceManager.isRunning()) CoreServiceManager.stopVService(app) }
+                    runCatching { AccountCache.invalidateAll() }
+                    runCatching { AvatarManager.clearCustomAvatar(app) }
+                }
+                ok
+            }
+            if (wiped) clearAccountData() else onFailure()
+        }
+    }
+
+    /**
+     * Drops every piece of account data this ViewModel publishes, and stops the loads that would
+     * refill it, so nothing can paint a signed-out screen with the previous session's values.
+     *
+     * Also called when [AccountSession] wipes itself from outside a user-initiated sign-out (a 401
+     * on the identity endpoint), which is why it is separate from [logout].
+     */
+    fun clearAccountData() {
         subsJob?.cancel()
         subsJob = null
         devicesJob?.cancel()
@@ -414,6 +479,9 @@ class AccountViewModel : ViewModel() {
         _payments.value = emptyList()
         _deviceCount.value = null
         _importedGuids.value = emptyList()
+        _tariffs.value = emptyList()
+        _error.value = null
+        _loading.value = false
     }
 
     // endregion

@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Home-shell "Режим" option labels (latin, locale-independent). Kept out of the shared
-         strings.xml so translations are untouched. TUN = VPN(tun) mode; Proxy = proxy-only;
-         VPN + Proxy = VPN(tun) mode with local-proxy sharing enabled. -->
-    <string name="settings_mode_tun" translatable="false">TUN</string>
-    <string name="settings_mode_proxy_opt" translatable="false">Proxy</string>
-    <string name="settings_mode_vpn_proxy" translatable="false">VPN + Proxy</string>
+    <!-- Home-shell "Режим" option labels. Russian, locale-independent: translatable="false" keeps
+         the other locale folders from being asked for a translation this build never ships.
+         VPN-туннель = VPN(tun) mode; Прокси = proxy-only; VPN + прокси = VPN(tun) mode with
+         local-proxy sharing enabled. -->
+    <string name="settings_mode_tun" translatable="false">VPN-туннель</string>
+    <string name="settings_mode_proxy_opt" translatable="false">Прокси</string>
+    <string name="settings_mode_vpn_proxy" translatable="false">VPN + прокси</string>
 </resources>

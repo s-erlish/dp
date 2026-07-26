@@ -871,17 +871,6 @@ class MainActivity : HelperBaseActivity() {
     }
 
     /**
-     * Marks every server as "ping in flight" so each row shows a spinner. Must be called AFTER
-     * [MainViewModel.testAllServers], which synchronously clears all delays to 0 before launching
-     * its async pings; writing the -2L sentinel afterwards makes the rows spin until each real
-     * per-server result overwrites it (via updateListAction -> refreshServerLists).
-     */
-    private fun markAllServersTesting() {
-        mainViewModel.serversCache.forEach { MmkvManager.encodeServerTestDelayMillis(it.guid, -2L) }
-        refreshServerLists(-1)
-    }
-
-    /**
      * Rebuilds both lists from the current cache and refreshes the Servers-tab chrome
      * (subtitle counts, protocol chips, empty-state visibility) plus the Home meta bar.
      */
@@ -2704,10 +2693,14 @@ class MainActivity : HelperBaseActivity() {
     }
 
     /**
-     * Runs the latency check over the whole list and puts every row into its testing state.
+     * Runs the latency check over the whole list.
      *
      * Every «Проверить задержку» route lands here: the Серверы header control, the Home meta bar
      * and the recovery actions on the sort / «Удалить недоступные» snackbars.
+     *
+     * Which rows go into the measuring state is decided by [MainViewModel], not here: it is the one
+     * that knows which rows this method can actually address, and a row nothing will measure must
+     * not be shown as being measured.
      *
      * With nothing to measure, none of the four methods behind [MainViewModel.testAllServers]
      * leaves a trace - three iterate an empty list and the real-ping one returns early inside its
@@ -2736,7 +2729,6 @@ class MainActivity : HelperBaseActivity() {
             return
         }
         mainViewModel.testAllServers()
-        markAllServersTesting()
     }
 
     /**

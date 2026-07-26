@@ -6,8 +6,13 @@ import com.v2ray.ang.dto.UrlContentRequest
 import com.v2ray.ang.util.HttpUtil
 import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.util.LogUtil
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.job
+import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 import java.net.InetSocketAddress
@@ -20,11 +25,14 @@ object SpeedtestManager {
 
     private val tcpTestingSockets = ArrayList<Socket?>()
 
-    /** Connect timeout for the TCP rung of [httpPing]; the node's port already refused HTTP(S). */
-    private const val TCP_FALLBACK_TIMEOUT_MS = 2000
-
     private const val PING = "/system/bin/ping"
     private const val PING6 = "/system/bin/ping6"
+
+    /** How often [awaitExit] asks whether the `ping` process has exited. */
+    private const val EXIT_POLL_INTERVAL_MS = 25L
+
+    /** Grace period for the output-drain thread once the process has exited. */
+    private const val DRAIN_JOIN_MS = 500L
 
     // One OkHttpClient shared across direct HTTP probes for connection/thread pool reuse.
     private val httpPingClient: okhttp3.OkHttpClient by lazy {
@@ -33,36 +41,38 @@ object SpeedtestManager {
             .readTimeout(5000, TimeUnit.MILLISECONDS)
             .callTimeout(5000, TimeUnit.MILLISECONDS)
             .followRedirects(false)
+            .followSslRedirects(false)
             .build()
     }
 
     /**
-     * Direct HTTP latency probe (no proxy). Sends a HEAD and measures time-to-first-byte of the
-     * response headers (the method is HEAD, not GET — earlier KDoc and the picker label said GET).
+     * Direct HTTP(S) latency probe against a server's own `host:port` — no proxy, no tunnel.
      *
-     * Per-node mode ([expectAny] = true) is a two-rung ladder on purpose. Rung 1 is HTTP(S) to the
-     * node's own host:port. Most nodes do not speak HTTPS on their transport port (plain
-     * vmess/vless/ss, ws without TLS), so the TLS handshake fails and rung 1 on its own reported
-     * -1 for a node that is perfectly up — the "https://host:port misclassifies non-TLS nodes"
-     * defect. Rung 2 is one TCP connect to the same host:port: if the port completes a handshake
-     * the node *is* reachable and that handshake time is a real measurement of that node, so it is
-     * reported. A node that answers neither rung gets no number at all — -1, painted red as a
-     * failure — because a plausible-looking latency for an unreachable node is worse than no
-     * latency. The two rungs measure different layers (HTTP TTFB includes TLS, a TCP handshake is
-     * one RTT), so this column ranks nodes only roughly, exactly as ping-methods-design.md says of
-     * the direct methods; the proxied real delay stays the only ranker fast-connect trusts.
+     * It measures exactly **one** quantity: time-to-first-byte of the response headers for a HEAD
+     * request — DNS, TCP connect, TLS handshake, request write, first byte back. It used to fall
+     * back to a bare TCP connect whenever HTTP did not answer, which put two different physical
+     * quantities in one unlabelled column: a TLS-less server reported one RTT while an HTTPS one
+     * reported an RTT plus a full handshake, and the list silently ranked them against each other.
+     * A TCP handshake is what [tcping] measures and the picker offers it as its own method, so this
+     * probe no longer borrows it. A server that does not answer HTTP here reports -1 — a failure,
+     * which the list renders as a failed measurement and never as a number.
      *
-     * @param url the target URL.
-     * @param expectAny when true this is a **per-node** reachability probe: any HTTP response
-     *        counts, and a transport failure falls back to a TCP connect. When false this is the
-     *        captive-portal generate_204 connectivity check and only 204/200 counts — a redirect
-     *        or a login page there is a hijack, i.e. a real failure, and no TCP rung runs.
-     * @return latency in ms, or -1 on failure. Never 0: 0 is the "not tested" sentinel that
-     *         [com.v2ray.ang.dto.entities.ServerAffiliationInfo] renders as a blank cell.
+     * A redirect is a failure, not a measurement. 3xx away from the address we dialled is the
+     * signature of a captive portal or a middlebox answering on the server's behalf, so the time
+     * measured belongs to that middlebox, not to the server it would be printed against
+     * (docs/ping-methods-design.md, method B: "a redirect = captive portal = failure").
+     *
+     * Cancellable: cancelling the calling coroutine cancels the in-flight call, so leaving the
+     * screen or starting a second measurement stops the socket work instead of only the
+     * bookkeeping.
+     *
+     * @param url the target URL, built from the server's own address and port.
+     * @return latency in ms, or -1 on failure. Never 0: 0 is the "not measured" sentinel
+     *         ([com.v2ray.ang.dto.entities.ServerAffiliationInfo]) that renders as a blank cell.
      */
-    fun httpPing(url: String, expectAny: Boolean = false): Long {
+    suspend fun httpPing(url: String): Long = withContext(Dispatchers.IO) {
         // Request.Builder.url() parses eagerly and throws IllegalArgumentException on an
-        // out-of-range port or an unparseable host. The per-node callers build this URL from
+        // out-of-range port or an unparseable host. The callers build this URL from
         // profile.serverPort, which is whatever a subscription or a hand-edited profile put there,
         // so the throw is reachable with real data. It must not escape: this runs inside the
         // test scope's children, and an uncaught exception there takes the process down and
@@ -76,22 +86,30 @@ object SpeedtestManager {
                 .build()
         } catch (e: IllegalArgumentException) {
             LogUtil.w(AppConfig.TAG, "httpPing: unusable url $url: ${e.message}")
-            return -1L
+            return@withContext -1L
         }
-        val start = System.nanoTime()
+        val call = httpPingClient.newCall(req)
+        // execute() blocks on a socket, which no amount of coroutine cancellation reaches on its
+        // own; cancelling the call is what actually closes it.
+        val cancelOnDeath = coroutineContext.job.invokeOnCompletion { cause ->
+            if (cause != null) call.cancel()
+        }
         try {
-            httpPingClient.newCall(req).execute().use { r ->
-                val answered =
-                    if (expectAny) r.code in 100..599 else r.code == 204 || r.code == 200
-                if (answered) return elapsedMs(start)
+            val start = System.nanoTime()
+            call.execute().use { r ->
+                if (r.isRedirect) {
+                    LogUtil.w(AppConfig.TAG, "httpPing: $url answered ${r.code}, a redirect: not this server")
+                    -1L
+                } else {
+                    elapsedMs(start)
+                }
             }
-            if (!expectAny) return -1L
         } catch (e: Exception) {
             LogUtil.w(AppConfig.TAG, "httpPing failed: ${e.message}")
-            if (!expectAny) return -1L
+            -1L
+        } finally {
+            cancelOnDeath.dispose()
         }
-        // Rung 2, per-node mode only.
-        return socketConnectTime(req.url.host, req.url.port, TCP_FALLBACK_TIMEOUT_MS)
     }
 
     /**
@@ -104,35 +122,72 @@ object SpeedtestManager {
      * to `ping -6` on builds that ship no `ping6`, and again to the next candidate when a binary
      * answers with a usage error instead of a probe.
      *
+     * Cancellable: each rung runs interruptibly, so cancelling the calling coroutine interrupts the
+     * wait, and the `finally` below destroys the child process instead of leaving it running.
+     *
      * @param host node host or IP; a bracketed IPv6 literal is accepted.
      * @param timeoutSec per-probe timeout in seconds.
      * @return round-trip time in ms, or -1 on failure / no reply. Never 0 (see [httpPing]).
      */
-    fun icmpPing(host: String, timeoutSec: Int = 2): Long {
+    suspend fun icmpPing(host: String, timeoutSec: Int = 2): Long {
+        currentCoroutineContext().ensureActive()
         val target = normalizeIcmpTarget(pickIcmpAddress(host))
         if (target.isEmpty()) return -1L
         for (cmd in pingCommands(target, timeoutSec)) {
+            currentCoroutineContext().ensureActive()
             // null = that binary could not probe at all, so try the next candidate; -1 = it ran
             // and got no reply, which is an answer (filtered or down) and ends the ladder.
-            val rtt = runPing(cmd, timeoutSec)
+            val rtt = runInterruptible(Dispatchers.IO) { runPing(cmd, timeoutSec) }
             if (rtt != null) return rtt
         }
         return -1L
     }
 
-    /** Runs one `ping` invocation. Returns ms, -1 for "ran, no reply", or null for "unusable". */
+    /**
+     * Runs one `ping` invocation. Returns ms, -1 for "ran, no reply", or null for "unusable".
+     *
+     * The pipe is drained on its own thread and the exit is awaited against a deadline. Reading to
+     * EOF on this thread first — which is what this did — made the timeout decorative: a `ping`
+     * that never exits never closes its stdout, so the read never returned, the wait after it was
+     * never reached, and the `destroy()` below never ran. The thread was then lost for good.
+     */
     private fun runPing(cmd: List<String>, timeoutSec: Int): Long? {
         var process: Process? = null
+        val output = StringBuilder()
         return try {
-            process = ProcessBuilder(cmd).redirectErrorStream(true).start()
-            // Read before waitFor: draining the pipe first is what keeps this from deadlocking.
-            val out = process.inputStream.bufferedReader().readText()
-            val exited = process.waitFor(timeoutSec + 2L, TimeUnit.SECONDS)
+            val p = ProcessBuilder(cmd).redirectErrorStream(true).start()
+            process = p
+            val drain = Thread({
+                try {
+                    p.inputStream.bufferedReader().forEachLine { line ->
+                        synchronized(output) { output.append(line).append('\n') }
+                    }
+                } catch (e: IOException) {
+                    // destroy() closes the pipe under the reader: nothing left to read, and the
+                    // output collected so far is still whatever the process managed to print.
+                }
+            }, "icmp-ping-drain").apply { isDaemon = true; start() }
+
+            val exitCode = awaitExit(p, (timeoutSec + 2L) * 1000L)
+            if (exitCode == null) {
+                LogUtil.w(AppConfig.TAG, "icmpPing: ${cmd.first()} did not exit in ${timeoutSec + 2}s")
+                // It ran and never answered. That is a failed measurement of this server, not an
+                // unusable binary, so the ladder ends here rather than trying the next candidate.
+                return -1L
+            }
+            drain.join(DRAIN_JOIN_MS)
+            val out = synchronized(output) { output.toString() }
             when {
-                exited && process.exitValue() == 0 -> parseIcmpRtt(out) ?: -1L
+                exitCode == 0 -> parseIcmpRtt(out) ?: -1L
                 looksLikeUsageError(out) -> null
                 else -> -1L
             }
+        } catch (e: InterruptedException) {
+            // Cancelled. Re-assert the flag and let it out: runInterruptible turns it into the
+            // CancellationException the caller is waiting for. Swallowing it here would report a
+            // failed measurement for a probe that was simply abandoned.
+            Thread.currentThread().interrupt()
+            throw e
         } catch (e: IOException) {
             LogUtil.w(AppConfig.TAG, "icmpPing: ${cmd.first()} unusable: ${e.message}")
             null
@@ -141,6 +196,26 @@ object SpeedtestManager {
             -1L
         } finally {
             process?.destroy()
+        }
+    }
+
+    /**
+     * Waits up to [timeoutMs] for [process] and returns its exit code, or null if it is still
+     * running when the deadline passes.
+     *
+     * Polled rather than `Process.waitFor(timeout, unit)` because that overload is API 26 and this
+     * app ships to API 24. Polling with [Thread.sleep] is also what makes the wait interruptible,
+     * which is how a coroutine cancellation reaches a running `ping`.
+     */
+    private fun awaitExit(process: Process, timeoutMs: Long): Int? {
+        val deadline = System.nanoTime() + timeoutMs * 1_000_000L
+        while (true) {
+            try {
+                return process.exitValue()
+            } catch (e: IllegalThreadStateException) {
+                if (System.nanoTime() - deadline >= 0L) return null
+                Thread.sleep(EXIT_POLL_INTERVAL_MS)
+            }
         }
     }
 

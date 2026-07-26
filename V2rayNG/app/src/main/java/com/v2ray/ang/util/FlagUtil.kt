@@ -6,10 +6,13 @@ import com.v2ray.ang.dto.entities.ProfileItem
  * Resolves a country flag emoji for a server, Happ/Incy style.
  *
  * Layered strategy (cheapest first, all offline):
- *  1. A flag emoji already present in the server remark (e.g. "🇳🇱 Amsterdam").
- *  2. An explicit country marker in the remark — a bracketed "[NL]" code, a known country or
- *     city name, or an upper-case code in the leading token ("NL - Amsterdam").
+ *  1. A flag emoji already present anywhere in the server remark (e.g. "🇳🇱 Amsterdam").
+ *  2. An explicit country marker in the remark — an upper-case bracketed "[NL]" code, a known
+ *     country or city name ("Amsterdam", "Германия"), or an upper-case code opening it ("SE-1").
  *  3. A globe fallback.
+ *
+ * Whatever [resolveFlag] lifts out of the remark, [stripLeadingFlag] takes back out of the name —
+ * the two are one contract, so the tile never shows a flag the name repeats.
  *
  * Rendering a regional-indicator emoji pair in a TextView is zero-asset and matches how
  * Remnawave/Happ/Incy show flags.
@@ -55,22 +58,23 @@ object FlagUtil {
     }
 
     /**
-     * Removes a leading flag emoji (and a following separator) from a remark so the name
-     * doesn't duplicate the flag shown in the tile. No-op when there is no leading flag.
+     * Removes the flag [resolveFlag] displays — wherever it sits in the remark — together with the
+     * punctuation that separated it, so the name beside the tile doesn't show the same flag twice.
+     * Stripping only a *leading* flag left "Amsterdam 🇳🇱" rendering it in the tile and again in the
+     * name. No-op when the remark carries no flag; when the flag is all the remark has, the remark
+     * is returned untouched, because a name that is only a flag beats a name that is nothing.
      */
     fun stripLeadingFlag(remark: String): String {
-        val t = remark.trimStart()
-        if (t.isEmpty()) return remark
-        val cp = t.codePointAt(0)
-        if (cp in REGIONAL_BASE..(REGIONAL_BASE + 25)) {
-            val flag = extractFlagEmoji(t)
-            if (flag != null && t.startsWith(flag)) {
-                return t.substring(flag.length)
-                    .trimStart(' ', '-', '·', '|', ':', '\t')
-                    .ifBlank { remark }
-            }
+        val flag = extractFlagEmoji(remark) ?: return remark
+        var out = remark
+        while (true) {
+            val at = out.indexOf(flag)
+            if (at < 0) break
+            val head = out.substring(0, at).trimEnd(*FLAG_SEPARATORS)
+            val tail = out.substring(at + flag.length).trimStart(*FLAG_SEPARATORS)
+            out = if (head.isEmpty() || tail.isEmpty()) head + tail else "$head $tail"
         }
-        return remark
+        return out.trim().ifBlank { remark }
     }
 
     /**
@@ -90,10 +94,11 @@ object FlagUtil {
     }
 
     /**
-     * Parses a country code from a remark. Only an explicit marker counts — a bracketed code,
-     * a known country/city name (English or Russian), or an upper-case code in the leading token.
-     * Matching any two-letter token turned "No limit" into Norway, "IT support" into Italy and
-     * "in-1" into India — a missing flag is cheaper than a wrong one. Returns ISO-2 or null.
+     * Parses a country code from a remark. Only an explicit marker counts — an upper-case bracketed
+     * code, a known country/city name (English or Russian), or an upper-case code opening the remark
+     * and not followed by a word. Matching any two-letter token turned "No limit" into Norway,
+     * "IT support" into Italy and "in-1" into India — a missing flag is cheaper than a wrong one.
+     * Returns ISO-2 or null.
      */
     fun parseCountryCode(remark: String?): String? {
         if (remark.isNullOrBlank()) return null
@@ -107,19 +112,30 @@ object FlagUtil {
         return leadingCode(remark)
     }
 
-    /** "[NL] Amsterdam" or "Amsterdam (NL)" — the brackets are the marker, so case is free. */
+    /**
+     * "[NL] Amsterdam" or "Amsterdam (US)" — an upper-case code inside *matching* brackets. Case is
+     * not free: "it", "no", "in", "at" and "us" are ordinary words, so a lower-case parenthetical
+     * like "(no)" is prose far more often than a country tag. Mismatched delimiters ("[NL)") are a
+     * typo, not a marker, so they buy no flag either.
+     */
     private fun bracketedCode(remark: String): String? {
         BRACKETED_CODE.findAll(remark).forEach { m ->
-            val c = m.groupValues[1].uppercase()
+            val c = m.groupValues[1].ifEmpty { m.groupValues[2] }
             if (isKnownCode(c)) return normalizeCode(c)
         }
         return null
     }
 
     /**
-     * "NL - Amsterdam", "US·LA", "DE", "US East". The code must open the remark in upper case
-     * and not be glued to a longer word; what follows it may be a separator, nothing, or a
-     * place name — but not prose, which is what makes "IT support" and "NO LIMIT" globes.
+     * "DE", "SE-1", "NL 2", "US2" — the code alone or the code with an index. It must open the
+     * remark in upper case, and the next word-ish thing after it must be a number or nothing.
+     *
+     * A word after the code buys no flag, with or without a separator between them: "IT Support",
+     * "US East", "IT-Support", "US-East" and "IR تهران" are one shape, and offline nothing tells the
+     * place name from the prose inside it — the old case-based guess read "IT Support" as a place
+     * and flew the Italian flag over a helpdesk. Either reading mislabels half the servers that use
+     * the other one, so the shape gets nothing. A place name after a code still counts when the name
+     * table knows it ("NL - Amsterdam", "DE Frankfurt"): that is a marker, not a guess.
      */
     private fun leadingCode(remark: String): String? {
         var start = 0
@@ -129,28 +145,10 @@ object FlagUtil {
         val b = remark[start + 1]
         if (a !in 'A'..'Z' || b !in 'A'..'Z') return null
         var after = start + 2
+        while (after < remark.length && !remark[after].isLetterOrDigit()) after++
         if (after < remark.length && remark[after].isLetter()) return null
-        while (after < remark.length && remark[after].isWhitespace()) after++
-        if (after < remark.length && remark[after].isLetter() && looksLikeProse(remark, after)) return null
         val c = "$a$b"
         return if (isKnownCode(c)) normalizeCode(c) else null
-    }
-
-    /**
-     * Tells "US East"/"DE Berlin"/"IR تهران" (place names) from "IT support"/"NO LIMIT" (prose)
-     * by the word starting at [at]: a lower-case opener or an all-upper word is prose, a
-     * capitalised word with lower-case letters — or a caseless script — is a name.
-     */
-    private fun looksLikeProse(remark: String, at: Int): Boolean {
-        if (remark[at].isLowerCase()) return true
-        var i = at
-        var sawUpper = false
-        while (i < remark.length && remark[i].isLetter()) {
-            if (remark[i].isLowerCase()) return false
-            if (remark[i].isUpperCase()) sawUpper = true
-            i++
-        }
-        return sawUpper
     }
 
     /** Word-boundaried search, so "india" doesn't match "Indiana" nor "usa" "Usain". */
@@ -171,7 +169,10 @@ object FlagUtil {
 
     private fun normalizeCode(code: String) = CODE_ALIASES[code] ?: code
 
-    private val BRACKETED_CODE = Regex("""[\[(]\s*([A-Za-z]{2})\s*[)\]]""")
+    private val BRACKETED_CODE = Regex("""\[\s*([A-Z]{2})\s*\]|\(\s*([A-Z]{2})\s*\)""")
+
+    /** Punctuation panels put between a flag and the name; it goes when the flag goes. */
+    private val FLAG_SEPARATORS = charArrayOf(' ', '\t', '-', '–', '—', '·', '|', ':', ',')
 
     // Common country names (English) → ISO-2. Kept small and offline; extend as needed.
     private val COUNTRY_NAME_TO_CODE = linkedMapOf(

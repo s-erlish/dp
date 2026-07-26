@@ -17,6 +17,7 @@ import com.v2ray.ang.dto.GroupMapItem
 import com.v2ray.ang.dto.SubscriptionUpdateResult
 import com.v2ray.ang.dto.TestServiceMessage
 import com.v2ray.ang.dto.V2rayConfig
+import com.v2ray.ang.dto.entities.ServerAffiliationInfo
 import com.v2ray.ang.dto.entities.ServersCache
 import com.v2ray.ang.dto.entities.SubscriptionCache
 import com.v2ray.ang.enums.EConfigType
@@ -32,6 +33,7 @@ import com.v2ray.ang.handler.SpeedtestManager
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.MessageUtil
 import com.v2ray.ang.util.Utils
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +41,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import com.v2ray.ang.enums.PingMethod
@@ -111,6 +114,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * The servers whose measurement is in flight right now, so the list can show that a row is
+     * being measured without inventing a stored result for it.
+     *
+     * In memory on purpose. This used to be a -2 written into each server's stored delay, and that
+     * had two consequences: a row nothing was going to measure kept its -2 forever (it spun for a
+     * result that was never coming), and every reader that treats a negative delay as "unreachable"
+     * read -2 as a failure — «Удалить недоступные» deleted rows that were merely still measuring.
+     * A display state must not be able to delete a server. Held in the ViewModel it also dies with
+     * the work it describes: whatever kills the coroutines clears the spinners with them.
+     */
+    private val measuringGuids: MutableSet<String> = Collections.synchronizedSet(HashSet<String>())
+
+    /** True while a latency check is in flight for [guid]. Read by the list to show its spinner. */
+    fun isMeasuring(guid: String): Boolean = measuringGuids.contains(guid)
+
+    /**
+     * Whether the real-ping batch this ViewModel is waiting on is still the one running.
+     *
+     * `CoreTestService` reports per-server results and one finish for whichever batch it is running,
+     * and those messages carry no identity. Once we have cancelled a batch and started something
+     * else, its trailing messages are about work nobody is waiting for, and acting on them would
+     * clear the marks belonging to the run that replaced it.
+     */
+    private var awaitingRealPingBatch = false
+
+    // Bounded concurrency for the direct probes, held for the ViewModel's life rather than built
+    // per run: a fresh Semaphore each time would let a restarted check add its own permits on top
+    // of the previous run's still-draining probes, so pressing the button twice would double the
+    // bound the user was promised. One gate per probe kind, because they cost different things:
+    // an HTTP probe holds a connection and a TLS handshake, ICMP forks a process, a TCP connect is
+    // a socket and a wait (64 = the parallelism Dispatchers.IO gave it implicitly before).
+    private val tcpProbeGate = Semaphore(64)
+    private val httpProbeGate = Semaphore(24)
+    private val icmpProbeGate = Semaphore(12)
+
+    /**
      * Refer to the official documentation for [registerReceiver](https://developer.android.com/reference/androidx/core/content/ContextCompat#registerReceiver(android.content.Context,android.content.BroadcastReceiver,android.content.IntentFilter,int):
      * `registerReceiver(Context, BroadcastReceiver, IntentFilter, int)`.
      */
@@ -126,8 +165,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     override fun onCleared() {
         getApplication<AngApplication>().unregisterReceiver(mMsgReceiver)
-        tcpingTestScope.coroutineContext[Job]?.cancelChildren()
-        SpeedtestManager.closeAllTcpSockets()
+        // The real-ping batch is deliberately left alone: it is a foreground service with its own
+        // notification and is meant to outlive this screen.
+        cancelMeasurementsInFlight()
         LogUtil.i(AppConfig.TAG, "Main ViewModel is cleared")
         super.onCleared()
     }
@@ -285,23 +325,98 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Tests the TCP ping for all servers.
+     * Cancels every direct probe in flight and clears the marks that say a row is being measured,
+     * so a restarted check never leaves a row spinning for work nobody is doing any more. The
+     * probes themselves are cancellation-aware, so this stops the sockets and the `ping` processes
+     * too, not only the coroutines counting them.
      */
-    fun testAllTcping() {
+    private fun cancelMeasurementsInFlight() {
         tcpingTestScope.coroutineContext[Job]?.cancelChildren()
         SpeedtestManager.closeAllTcpSockets()
-        MmkvManager.clearAllTestDelayResults(serversCache.map { it.guid }.toList())
+        awaitingRealPingBatch = false
+        measuringGuids.clear()
+    }
 
+    /**
+     * Stops the real-ping batch running in `CoreTestService`, if any.
+     *
+     * Every check starts with this, including the direct ones: the batch writes its results
+     * straight into the same store, so a batch left running would keep dropping proxied numbers
+     * into a list the user has since asked to re-measure some other way.
+     */
+    private fun cancelRealPingBatch() {
+        MessageUtil.sendMsg2TestService(
+            getApplication(),
+            TestServiceMessage(key = AppConfig.MSG_MEASURE_CONFIG_CANCEL)
+        )
+    }
+
+    /**
+     * Shared body of the three direct (no-tunnel) checks.
+     *
+     * Only the rows this run can actually address are marked as being measured: [resolvePingHostPort]
+     * returns null for a group row and for a CUSTOM profile with no parseable address, nothing will
+     * ever probe those, and marking them would leave them spinning for a result that is never
+     * coming. They keep the blank cell that says "not measured", which is the truth.
+     *
+     * @param gate bound on how many probes of this kind run at once.
+     * @param autoRemoveInvalid whether a failure from this probe is grounds for the automatic
+     *        «удалять недоступные после проверки» to delete the server — see [onTestsFinished].
+     * @param probe the measurement itself, run on the test scope for one server.
+     */
+    private fun runDirectTest(
+        gate: Semaphore,
+        autoRemoveInvalid: Boolean,
+        probe: suspend (host: String, port: Int) -> Long,
+    ) {
+        cancelMeasurementsInFlight()
+        cancelRealPingBatch()
         val serversCopy = serversCache.toList()
-        for (item in serversCopy) {
-            val (serverAddress, serverPort) = resolvePingHostPort(item) ?: continue
-            tcpingTestScope.launch {
-                val testResult = SpeedtestManager.tcping(serverAddress, serverPort)
-                launch(Dispatchers.Main) {
-                    MmkvManager.encodeServerTestDelayMillis(item.guid, testResult)
-                    updateListAction.value = getPosition(item.guid)
+        MmkvManager.clearAllTestDelayResults(serversCopy.map { it.guid })
+
+        val targets = serversCopy.mapNotNull { item -> resolvePingHostPort(item)?.let { item.guid to it } }
+        measuringGuids.addAll(targets.map { it.first })
+        updateListAction.value = -1
+
+        tcpingTestScope.launch {
+            // supervisorScope, so one server that throws cannot cancel its siblings, and so this
+            // coroutine resumes only once every probe has finished.
+            supervisorScope {
+                targets.forEach { (guid, address) ->
+                    launch {
+                        val result = try {
+                            gate.withPermit { probe(address.first, address.second) }
+                        } catch (e: CancellationException) {
+                            throw e // abandoned, not failed: publish nothing.
+                        } catch (e: Exception) {
+                            LogUtil.w(AppConfig.TAG, "Delay test failed for $guid: ${e.message}")
+                            ServerAffiliationInfo.FAILED
+                        }
+                        withContext(Dispatchers.Main) { publishMeasurement(guid, result) }
+                    }
                 }
             }
+            withContext(Dispatchers.Main) { onTestsFinished(autoRemoveInvalid) }
+        }
+    }
+
+    /** Stores one server's result, drops its measuring mark and repaints its row. Main thread. */
+    private fun publishMeasurement(guid: String, delayMillis: Long) {
+        measuringGuids.remove(guid)
+        MmkvManager.encodeServerTestDelayMillis(guid, delayMillis)
+        updateListAction.value = getPosition(guid)
+    }
+
+    /**
+     * Tests the TCP ping for all servers.
+     *
+     * A failure here is a refused or unanswered TCP handshake straight from this device, which is
+     * as close to "this server is not reachable" as a direct probe gets — so it is allowed to feed
+     * the automatic removal of unreachable servers.
+     */
+    fun testAllTcping() {
+        runDirectTest(gate = tcpProbeGate, autoRemoveInvalid = true) { host, port ->
+            SpeedtestManager.tcping(host, port)
         }
     }
 
@@ -309,15 +424,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Tests the real ping for all servers.
      */
     fun testAllRealPing() {
-        MessageUtil.sendMsg2TestService(
-            getApplication(),
-            TestServiceMessage(key = AppConfig.MSG_MEASURE_CONFIG_CANCEL)
-        )
-        MmkvManager.clearAllTestDelayResults(serversCache.map { it.guid }.toList())
+        cancelMeasurementsInFlight()
+        cancelRealPingBatch()
+        val serversCopy = serversCache.toList()
+        MmkvManager.clearAllTestDelayResults(serversCopy.map { it.guid })
+        // Every displayed row is measured by the worker: it either builds a throwaway core for that
+        // server or reports the failure, so each one ends with a result and none stays marked.
+        measuringGuids.addAll(serversCopy.map { it.guid })
+        awaitingRealPingBatch = serversCopy.isNotEmpty()
         updateListAction.value = -1
 
         viewModelScope.launch(Dispatchers.Default) {
-            if (serversCache.isEmpty()) {
+            if (serversCopy.isEmpty()) {
                 return@launch
             }
             MessageUtil.sendMsg2TestService(
@@ -325,7 +443,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 TestServiceMessage(
                     key = AppConfig.MSG_MEASURE_CONFIG_START,
                     subscriptionId = subscriptionId,
-                    serverGuids = if (keywordFilter.isNotEmpty()) serversCache.map { it.guid } else emptyList()
+                    serverGuids = if (keywordFilter.isNotEmpty()) serversCopy.map { it.guid } else emptyList()
                 )
             )
         }
@@ -351,53 +469,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Direct HTTP/204 latency test across the current server list (bounded concurrency).
+     * Direct HTTP latency test across the current server list: time to first byte of a HEAD to the
+     * server's own address, no tunnel.
+     *
+     * A failure here says only "nothing spoke HTTP(S) on that port", which most VPN servers do not
+     * and are not meant to — so it must NOT feed the automatic removal of unreachable servers. Set
+     * against the wrong probe that switch would empty the whole list in one press.
      */
     fun testAllDirectHttp() {
-        tcpingTestScope.coroutineContext[Job]?.cancelChildren()
-        SpeedtestManager.closeAllTcpSockets()
-        MmkvManager.clearAllTestDelayResults(serversCache.map { it.guid }.toList())
-
-        val serversCopy = serversCache.toList()
-        val semaphore = Semaphore(24)
-        for (item in serversCopy) {
-            val (host, port) = resolvePingHostPort(item) ?: continue
+        runDirectTest(gate = httpProbeGate, autoRemoveInvalid = false) { host, port ->
             val hostPart = if (host.contains(':') && !host.startsWith('[')) "[$host]" else host
             val url = if (port == 443) "https://$hostPart/" else "https://$hostPart:$port/"
-            tcpingTestScope.launch {
-                semaphore.withPermit {
-                    // Per-node direct reachability: any HTTP response counts as reachable.
-                    val testResult = SpeedtestManager.httpPing(url, expectAny = true)
-                    launch(Dispatchers.Main) {
-                        MmkvManager.encodeServerTestDelayMillis(item.guid, testResult)
-                        updateListAction.value = getPosition(item.guid)
-                    }
-                }
-            }
+            SpeedtestManager.httpPing(url)
         }
     }
 
     /**
-     * ICMP latency test across the current server list (bounded concurrency).
+     * ICMP latency test across the current server list.
+     *
+     * Most servers and CDNs drop ICMP, so a failure here usually means "filtered", not "down"
+     * (docs/ping-methods-design.md, method C: its -1 must not be treated as a dead server). Never
+     * allowed to feed the automatic removal.
      */
     fun testAllIcmp() {
-        tcpingTestScope.coroutineContext[Job]?.cancelChildren()
-        SpeedtestManager.closeAllTcpSockets()
-        MmkvManager.clearAllTestDelayResults(serversCache.map { it.guid }.toList())
-
-        val serversCopy = serversCache.toList()
-        val semaphore = Semaphore(12)
-        for (item in serversCopy) {
-            val (host, _) = resolvePingHostPort(item) ?: continue
-            tcpingTestScope.launch {
-                semaphore.withPermit {
-                    val testResult = SpeedtestManager.icmpPing(host)
-                    launch(Dispatchers.Main) {
-                        MmkvManager.encodeServerTestDelayMillis(item.guid, testResult)
-                        updateListAction.value = getPosition(item.guid)
-                    }
-                }
-            }
+        runDirectTest(gate = icmpProbeGate, autoRemoveInvalid = false) { host, _ ->
+            SpeedtestManager.icmpPing(host)
         }
     }
 
@@ -548,18 +644,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Removes invalid servers.
+     * Removes the servers whose last check failed.
+     *
+     * A server being measured right now is never one of them. `MmkvManager.removeInvalidServer("")`
+     * sweeps the stored delays and deletes everything below zero, which cannot tell a failure from
+     * any other negative value, so the guids are walked here instead and anything still in flight
+     * is skipped. Nothing writes a negative "in progress" value any more (see [measuringGuids]),
+     * and this keeps it that way by construction rather than by convention.
+     *
      * @return The number of removed servers.
      */
     fun removeInvalidServer(): Int {
-        var count = 0
-        if (subscriptionId.isEmpty() && keywordFilter.isEmpty()) {
-            count += MmkvManager.removeInvalidServer("")
+        val candidates = if (subscriptionId.isEmpty() && keywordFilter.isEmpty()) {
+            MmkvManager.decodeAllServerList()
         } else {
-            val serversCopy = serversCache.toList()
-            for (item in serversCopy) {
-                count += MmkvManager.removeInvalidServer(item.guid)
-            }
+            serversCache.map { it.guid }
+        }
+        var count = 0
+        for (guid in candidates.toList()) {
+            if (isMeasuring(guid)) continue
+            count += MmkvManager.removeInvalidServer(guid)
         }
         return count
     }
@@ -666,9 +770,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return config?.subscriptionId
     }
 
-    fun onTestsFinished() {
+    /**
+     * Called once a whole check has finished, whichever method ran it, and nowhere else: this is
+     * what drives «удалять недоступные» / «сортировать» after a test and the fast-connect pick.
+     *
+     * @param autoRemoveInvalid whether this method's failures are evidence that a server is
+     *        unreachable. TCP connect and the proxied real delay say yes. Direct HTTP and ICMP say
+     *        no: their failures are routine for a healthy server (no HTTP on the transport port,
+     *        ICMP filtered), and deleting on that evidence would silently wipe a working list. The
+     *        manual «Удалить недоступные» is a different matter — the user asks for it, sees the
+     *        count and gets an undo; this one runs unattended.
+     */
+    fun onTestsFinished(autoRemoveInvalid: Boolean = true) {
         viewModelScope.launch(Dispatchers.Default) {
-            if (MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_REMOVE_INVALID_AFTER_TEST)) {
+            if (autoRemoveInvalid && MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_REMOVE_INVALID_AFTER_TEST)) {
                 removeInvalidServer()
             }
 
@@ -737,6 +852,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                 AppConfig.MSG_MEASURE_CONFIG_SUCCESS -> {
                     val content = intent.getStringExtra("content")
+                    if (awaitingRealPingBatch) content?.let { measuringGuids.remove(it) }
                     updateListAction.value = getPosition(content ?: "")
                 }
 
@@ -748,7 +864,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                 AppConfig.MSG_MEASURE_CONFIG_FINISH -> {
                     val content = intent.getStringExtra("content")
-                    if (content == "0") {
+                    // Only the batch we are still waiting on, and only when it ran to the end.
+                    // A cancelled batch reports "-1" after the fact, and whoever cancelled it
+                    // already cleared its marks — treating that as "the measurement finished"
+                    // would blank the spinners of the run that replaced it.
+                    if (awaitingRealPingBatch && content == "0") {
+                        awaitingRealPingBatch = false
+                        measuringGuids.clear()
+                        updateListAction.value = -1
                         onTestsFinished()
                     }
                 }

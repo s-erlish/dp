@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name" translatable="false">departament</string>
     <!-- Servers redesign (S3) -->
-    <string name="title_servers">Сервера</string>
+    <string name="title_servers">Серверы</string>
     <string name="servers_count">%d серверов</string>
     <string name="providers_count">%d провайдеров</string>
     <string name="search_hint">Поиск серверов…</string>
@@ -10,9 +10,9 @@
     <string name="servers_add_clipboard">Добавить из буфера</string>
     <string name="servers_section_local">Локальные</string>
     <!-- Home empty state (no servers/subscriptions yet) -->
-    <string name="home_welcome_title">Приветствуем!</string>
-    <string name="home_empty_title">У вас пока не добавлены подписки.</string>
-    <string name="home_empty_subtitle">Добавьте подписку, чтобы начать пользоваться</string>
+    <string name="home_welcome_title">Добро пожаловать</string>
+    <string name="home_empty_title">Подписок пока нет</string>
+    <string name="home_empty_subtitle">Добавьте подписку, чтобы появились серверы.</string>
     <string name="home_empty_add_qr">Добавить по QR-коду</string>
     <string name="home_empty_add_clipboard">Добавить из буфера обмена</string>
     <string name="home_or_sign_in">Или войдите в свой аккаунт</string>
@@ -27,13 +27,13 @@
     <string name="menu_add_title">Добавить</string>
     <string name="menu_add_scan_qr">Сканировать QR-код</string>
     <string name="menu_add_clipboard">Добавить из буфера обмена</string>
-    <string name="menu_add_tv_send">Отправить на TV</string>
+    <string name="menu_add_tv_send">Отправить на телевизор</string>
     <string name="menu_add_manual">Ввести вручную</string>
     <!-- Home meta-bar: delete subscription -->
     <string name="sub_delete">Удалить подписку</string>
     <string name="sub_delete_confirm">Удалить подписку и её серверы?</string>
-    <string name="app_widget_name">Switch</string>
-    <string name="app_tile_name">Switch</string>
+    <string name="app_widget_name">departament</string>
+    <string name="app_tile_name">departament</string>
     <string name="app_tile_first_use">First use of this feature, please use the app to add server</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
@@ -330,7 +330,7 @@
     <string name="ping_method_icmp">ICMP ping (many nodes filter it)</string>
     <string name="title_pref_auto_fallback">Auto-fallback on failure</string>
     <string name="summary_pref_auto_fallback">After connecting, verify the tunnel actually passes traffic and automatically switch to the fastest working server if it does not</string>
-    <string name="auto_fallback_switching">Connection not responding — switching to the fastest working server…</string>
+    <string name="auto_fallback_switching">Connection not responding. Switching to the fastest working server…</string>
     <string name="speed_zero" translatable="false">0 KB/s</string>
     <string name="menu_item_fast_connect">Fast connect (fastest server)</string>
     <string name="bottom_nav_home">Home</string>
@@ -343,7 +343,7 @@
     <string name="sub_days_left" translatable="false">%1$s · %2$dd</string>
     <string name="sub_infinity" translatable="false">∞</string>
     <string name="sub_meta_updated_never">Never</string>
-    <string name="sub_auto_update_label">Auto-update — %1$s</string>
+    <string name="sub_auto_update_label">Auto-update: %1$s</string>
     <string name="sub_auto_update_off">Off</string>
     <string name="sub_update_interval_hours">%1$d h</string>
     <string name="sub_update_interval_minutes">%1$d min</string>
@@ -426,13 +426,13 @@
     <string name="routing_settings_locked">Locked, keep this rule when import presets</string>
     <string name="routing_settings_domain">domain</string>
     <string name="routing_settings_ip">ip</string>
-    <string name="routing_settings_process">process (Package Name — only supported when using Xray TUN, routeOnly enabled, and Android 10+)</string>
+    <string name="routing_settings_process">process (Package Name: only supported when using Xray TUN, routeOnly enabled, and Android 10+)</string>
     <string name="routing_settings_port">port</string>
     <string name="routing_settings_protocol">protocol</string>
     <string name="routing_settings_protocol_tip">[http,tls,bittorrent]</string>
     <string name="routing_settings_network">network</string>
     <string name="routing_settings_network_tip">[udp|tcp]</string>
-    <string name="routing_settings_outbound_tag_hint" translatable="false">proxy / direct / block / &lt;remarks&gt;</string>
+    <string name="routing_settings_outbound_tag_hint" translatable="false">proxy / direct / block / «название сервера»</string>
     <string name="routing_settings_outbound_tag">outboundTag</string>
 
     <string name="connection_test_pending">Check Connectivity</string>
@@ -525,7 +525,7 @@
 
     <string-array name="preset_rulesets">
         <item>Базовый набор</item>
-        <item>Прокси для заблокированного</item>
+        <item>Прокси для заблокированных сайтов</item>
         <item>Весь трафик через прокси</item>
         <item>Белый список Ирана</item>
         <item>Белый список России</item>
@@ -583,7 +583,7 @@
     <string name="settings_ping_method_real">Реальная задержка (через ядро)</string>
     <string name="settings_ping_method_tcp">TCP-соединение</string>
     <string name="settings_ping_method_http">HTTP-запрос</string>
-    <string name="settings_ping_method_icmp">ICMP (системный ping)</string>
+    <string name="settings_ping_method_icmp">ICMP (системный пинг)</string>
     <string name="settings_mux">Мультиплексирование (Mux)</string>
     <string name="settings_mux_sub">Объединяет запросы в один канал соединения</string>
     <string name="settings_mux_concurrency">Число соединений Mux</string>
@@ -604,7 +604,7 @@
     <string name="settings_sub_auto_update_minutes">%1$d мин</string>
     <string name="settings_routing">Маршрутизация</string>
     <string name="settings_assets">Файлы ресурсов</string>
-    <string name="settings_tv_send">Перенести подписку на ТВ</string>
+    <string name="settings_tv_send">Перенести подписку на телевизор</string>
     <string name="settings_tv_receive">Принять подписку</string>
     <string name="settings_about">О приложении</string>
     <string name="settings_backup">Резервное копирование</string>

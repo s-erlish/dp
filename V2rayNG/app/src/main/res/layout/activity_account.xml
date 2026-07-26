@@ -556,5 +556,82 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- ============ Аккаунт и вход: the terminal action, in its own group ============
+             Its own group, not the last row of «Управление» (23-account-rework.md 2): signing
+             out is not managing a subscription, and a terminal action sitting directly under
+             «История платежей» in the same shape invites the mis-tap that costs the session.
+             Row.Destructive per 23-account-rework.md 3.1: no value, no chevron — there is no
+             destination and nothing to state. The TILE STAYS NEUTRAL (styles.xml,
+             Widget.Departament.Row.Destructive): red tile plus red title is the same signal
+             twice. The tile is present because every other row on this surface has one and a
+             surface has exactly one text origin (23-account-rework.md 2, "origin discipline");
+             the reworked tab drops tiles from all four rows at once, not from this one alone. -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_24"
+            android:layout_marginBottom="@dimen/space_8"
+            android:text="@string/account_group_signin"
+            android:textAppearance="@style/TextAppearance.App.Title" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="@dimen/radius_card"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:id="@+id/row_logout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:contentDescription="@string/account_row_logout"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:minHeight="@dimen/row_min_height"
+                android:orientation="horizontal"
+                android:paddingStart="@dimen/screen_gutter"
+                android:paddingEnd="@dimen/screen_gutter"
+                android:paddingVertical="@dimen/space_8">
+
+                <FrameLayout
+                    android:layout_width="@dimen/tile_size"
+                    android:layout_height="@dimen/tile_size"
+                    android:background="@drawable/bg_icon_neutral">
+
+                    <ImageView
+                        android:layout_width="@dimen/tile_glyph"
+                        android:layout_height="@dimen/tile_glyph"
+                        android:layout_gravity="center"
+                        android:importantForAccessibility="no"
+                        app:srcCompat="@drawable/ic_acc_logout"
+                        app:tint="@color/icon_glyph_neutral" />
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/space_16"
+                    android:layout_marginEnd="@dimen/space_8"
+                    android:layout_weight="1"
+                    android:text="@string/account_row_logout"
+                    android:textAppearance="@style/TextAppearance.App.Title.Destructive" />
+
+                <!-- In-flight indicator, shown only once the wipe passes 300ms (00-rules.md 7.3).
+                     The row keeps its height, so nothing reflows when it appears. -->
+                <com.google.android.material.progressindicator.CircularProgressIndicator
+                    android:id="@+id/pb_logout"
+                    style="@style/Widget.Departament.Progress.Circular.Inline"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:importantForAccessibility="no"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

@@ -42,6 +42,15 @@ with the code, it records the resolution in section 19 instead of inventing a th
 **A note on dashes.** `00-rules.md` 1.4.11 forbids em-dashes and en-dashes in UI copy and in these
 documents. This file contains none. Hyphen only. One shipped em-dash is named as a defect in 9.4.
 
+**A note on citations.** Every factual claim below was read out of the source on 2026-07-26. The
+`.kt` and `.axaml.cs` files were **observed changing while this document was being written** - other
+agents are editing both repos right now, and `MainViewModel.kt` grew by 113 lines and
+`MainRecyclerAdapter.kt` by 13 between two reads an hour apart - so claims about those files cite the
+**symbol** (`MainRecyclerAdapter.bindServer()`), which does not drift, rather than a line number,
+which does. Resources, layouts, AXAML markup and token files, which are stable, are cited by line.
+A line citation that no longer matches is evidence the file moved, not that the claim was wrong;
+re-check by symbol before treating it as a correction.
+
 ---
 
 ## 0. How to use this document
@@ -111,19 +120,19 @@ is a defect.
 | `res/drawable/custom_divider.xml` | | **DELETE.** Its inset is `left="44dp"`, which matches no text origin in the product. Replaced by an `ItemDecoration` at the 68 origin |
 | `res/menu/menu_main.xml` `group_server_list` | | **KEEP the actions, MOVE the menu.** The six whole-list items move out of the "+" popup into the header overflow of 3.1 and 10.2, where "add a source" and "act on the whole list" stop sharing one control |
 | `ui/ServerGroupActivity.kt` + `res/layout/activity_server_group.xml` | 170 | **DELETE.** Folded into the one server form (`24-tab-conformance.md` A-13). Its three bare `EditText`s and two `Spinner`s become the library field and the library Select |
-| `MainRecyclerAdapter.setData()`, `removeServerSub()`, the `ItemTouchHelperAdapter` stubs | | **DELETE.** `setData` is a shim with one caller shape, `onItemMove`/`onItemMoveCompleted`/`onItemDismiss` are inert (`:365-372`) and drag arrives properly in 10.4 |
+| `MainRecyclerAdapter.setData()`, `removeServerSub()`, the `ItemTouchHelperAdapter` stubs | | **DELETE.** `setData` is a shim with one caller shape, `onItemMove`/`onItemMoveCompleted`/`onItemDismiss` all return or do nothing and drag arrives properly in 10.4 |
 | `homeAdapter` and `binding.rvHomeServers` (`ui/MainActivity.kt`, `setupServerLists()`) | | **DELETE.** The second instance of this list on Главная is `30-reference-analysis.md` 2.2.8's named IA mistake, inherited. One list, one destination |
 
 **The P0 that ships broken today.** `ui/MainActivity.kt`, `setupServerLists()`, assigns
 `serversAdapter.onItemLongClick` and `homeAdapter.onItemLongClick` to `showServerActions(guid)`.
-`ui/MainRecyclerAdapter.kt` declares `onItemLongClick` with the comment "The long-press server-actions
-menu was removed, so this callback is no longer invoked by the adapter", and `bindServer()` ends with a
-`setOnClickListener` and the line "Long-press server-actions menu removed: long-press is a no-op (no
+`ui/MainRecyclerAdapter.kt` declares `onItemLongClick` with the comment "The long-press
+server-actions menu was removed, so this callback is no longer invoked by the adapter", and
+`bindServer()` ends with a `setOnClickListener` and the line "Long-press server-actions menu removed: long-press is a no-op (no
 listener set)". The two facts are consistent with each other and fatal:
-**`ServerActionsSheet` has no caller in the shipping build**, so a user cannot delete, rename, share,
-duplicate, QR or edit one server. `showServerActions()`, `ServerActionsSheet.kt` (72
-lines, fully written) and `sheet_server_actions.xml` (271 lines, fully styled) are all dead code
-reachable by nothing. Binding one listener restores six actions. **This lands before any of the
+**`ServerActionsSheet` has no caller in the shipping build**, so a user cannot delete, rename,
+share, duplicate, QR or edit one server. `showServerActions()`, `ServerActionsSheet.kt` (72 lines,
+fully written) and `sheet_server_actions.xml` (271 lines, fully styled) are all dead code reachable
+by nothing. Binding one listener restores six actions. **This lands before any of the
 visual work in this document**, as `24-tab-conformance.md` A-15 already schedules it.
 
 ### 2.2 Desktop, and which view is canonical
@@ -481,20 +490,23 @@ width with the trailing slot reserved. Never in the middle, never with the tail 
 
 ### 6.3 The protocol chip
 
-`Chip.Neutral` (`22-components.md` 10): `minHeight` 24, padding 8 horizontal and 4 vertical, radius
-`radius_chip` 12, label `TextAppearance.App.Chip` 11/500 in the brand face, fill
-`?attr/colorSurfaceContainerHighest` `#20242B`, text `?attr/colorOnSurfaceVariant` - **6.00:1**
-(`00-rules.md` 3.5).
+**`@style/Widget.Departament.Chip.Technical`, which already exists** (`res/values/styles.xml:866`,
+parent `Widget.Departament.Chip` at `:843`): `chipMinHeight` 24, `chipStartPadding` /
+`chipEndPadding` `space_8`, `chipStrokeWidth` 0, `ShapeAppearance.Departament.Fitting` (radius 12),
+fill `?attr/colorSurfaceContainerHighest` `#20242B`, label `TextAppearance.App.Chip` 11/500 in the
+brand face, text `?attr/colorOnSurfaceVariant` - **6.00:1** (`00-rules.md` 3.5). The whole chip
+system of `22-components.md` 10 is already implemented in `styles.xml:843-899`; the server row is
+one of the surfaces that has not adopted it.
 
-It replaces `bg_type_chip` + `?attr/chipTypeText`, which is `#4C8DFF` on `colorPrimaryContainer`
-`#17325C`: 4.0:1 at 11sp, a failure, and additionally an accent object competing with the selected
+It replaces the hand-rolled `TextView` + `bg_type_chip` + `?attr/chipTypeText`, which is `#4C8DFF`
+on `colorPrimaryContainer` `#17325C`: 4.0:1 at 11sp, a failure, and additionally an accent object competing with the selected
 row for the screen's one accent (`32-master-plan-android.md` 12.4).
 
 Content: the protocol, upper-case as a technical token in the brand face - `VLESS`, `VMESS`,
 `TROJAN`, `SS`, `SOCKS`, `HY2`, `WG`. A policy group reads `Auto`, a proxy chain reads `Chain`, a
 custom config reads the wrapped outbound's real protocol and falls back to `Custom`
-(`MainRecyclerAdapter.primaryProtocol()`, kept verbatim). The gold `JSON` chip variant is deleted; the word
-already carries the meaning.
+(`MainRecyclerAdapter.primaryProtocol()`, kept verbatim). The gold `JSON` chip variant is deleted;
+the word already carries the meaning.
 
 The chip never shrinks and never ellipsises. It is `wrap_content` and the caption beside it yields.
 
@@ -504,8 +516,8 @@ Two mutually exclusive compositions, both 8 from the chip:
 
 | Row state | Subtitle |
 |---|---|
-| Ordinary | `Chip.Neutral` protocol + 8 + `TextAppearance.App.Subtitle` caption «Reality · TCP» in `?attr/colorOnSurfaceVariant`, weight 1, `ellipsize="end"`, `GONE` when it would render fewer than 6 characters |
-| **This row is carrying the tunnel** | `Chip.Neutral` protocol + 8 + `Chip.Status.Ok` «Подключено» (fill `?attr/colorTertiary` at 18 percent, label `?attr/colorTertiary` `#22C55E`, 7.95:1). The transport caption is dropped for this one row |
+| Ordinary | the protocol chip + 8 + `TextAppearance.App.Subtitle` caption «Reality · TCP» in `?attr/colorOnSurfaceVariant`, weight 1, `ellipsize="end"`, `GONE` when it would render fewer than 6 characters |
+| **This row is carrying the tunnel** | the protocol chip + 8 + `@style/Widget.Departament.Chip.Status.Ok` «Подключено» (fill `?attr/colorTertiaryContainer`, label `@color/color_success_text`, which is `#22C55E` on dark and `#065132` on light per D-10). The transport caption is dropped for this one row |
 
 The transport caption is the least valuable string on the screen and the connected row is the one row
 whose transport the user is currently experiencing rather than choosing. Trading it for the
@@ -1372,7 +1384,7 @@ sets and no others.
 |---|---|
 | `res/values/attrs.xml`, `themes.xml`, `values-night/themes.xml` | Add `colorOutlineControl`, wired to the already-declared `md_theme_outlineControl` in all three themes. This is D-9 finished; the colour exists and the attribute does not |
 | `res/values/dimens.xml` | Add `value_w_ping` **32sp** (sp, so the reserve scales with the text; the comment must say why) |
-| `res/values/styles.xml` | `Widget.Departament.Chip` (`:843`) and `Widget.Departament.Button.Icon` (`:477`) already exist and are used as declared. Add `Widget.Departament.Chip.Protocol`, a `.Technical` sibling whose fill is `?attr/colorSurfaceContainerHighest`, so the protocol chip stops using `colorPrimaryContainer` |
+| `res/values/styles.xml` | **Nothing to add.** `Widget.Departament.Chip` (`:843`), `.Technical` (`:866`), `.Status.Ok` (`:879`) and `Widget.Departament.Button.Icon` (`:477`) all exist and are used exactly as declared. The work is adoption, not authoring |
 | `util/FlagUtil.kt` | `resolveFlag` returns a drawable id instead of an emoji string; `extractFlagEmoji` and `stripLeadingFlag` survive unchanged |
 | `dto/entities/ServerAffiliationInfo.kt` | Add `testedAt: Long`. Delete `getTestDelayString()`, which emits `"-1ms"` and `"48ms"`; formatting moves to the row binder and uses «мс» |
 | `handler/MmkvManager.kt` | `encodeServerTestDelayMillis` writes `testedAt` alongside the value |
