@@ -71,12 +71,18 @@ object HttpUtil {
      */
     fun isHeaderSafe(value: String): Boolean = value.all { it == '\t' || it in ' '..'~' }
 
-    /** [value] when it can travel in a header (see [isHeaderSafe]), else [fallback]. */
-    private fun headerSafeOr(value: String?, fallback: String): String =
+    /**
+     * [value] when it can travel in a header (see [isHeaderSafe]), else [fallback].
+     *
+     * Public for the same reason [isHeaderSafe] is: every caller that builds a request — the
+     * subscription fetch below and the backend API client — has to apply the same guard to the
+     * same OEM-supplied values, or the half that skips it throws for the same devices.
+     */
+    fun headerSafeOr(value: String?, fallback: String): String =
         value?.takeIf { isHeaderSafe(it) } ?: fallback
 
     /** Mirrors [Utils.getDeviceName]'s own blank fallback, for a model name no header can carry. */
-    private const val FALLBACK_DEVICE_MODEL = "Android Device"
+    const val FALLBACK_DEVICE_MODEL = "Android Device"
 
     /**
      * Converts the domain part of a URL string to its IDN (Punycode, ASCII Compatible Encoding) format.

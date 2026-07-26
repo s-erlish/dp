@@ -46,6 +46,9 @@ object SkeletonBinder {
      */
     fun pulse(view: View) {
         RunningAnimators.cancel(view)
+        // A crossfade left over from a previous swap() runs on the ViewPropertyAnimator, which the
+        // animator map does not hold. Stop it too, or it fights this one over the same alpha.
+        view.animate().cancel()
         if (view.reducedMotion()) {
             hold(view)
             return
@@ -65,6 +68,7 @@ object SkeletonBinder {
      */
     fun hold(view: View) {
         RunningAnimators.cancel(view)
+        view.animate().cancel()
         view.alpha = STATIC_ALPHA
     }
 

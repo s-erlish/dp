@@ -2,8 +2,11 @@ package com.v2ray.ang.ui
 
 import android.os.Bundle
 import android.text.InputType
-import android.widget.EditText
+import android.widget.FrameLayout
 import androidx.appcompat.app.AlertDialog
+import androidx.core.widget.doAfterTextChanged
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.BackendConfig
@@ -12,6 +15,7 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
+import com.v2ray.ang.util.HttpUtil
 
 /**
  * "Настройки провайдеров" — provider/subscription settings screen (departament design).
@@ -44,6 +48,12 @@ class ProviderSettingsActivity : BaseActivity() {
         private const val PREF_UPDATE_INTERVAL = "pref_provider_update_interval"
 
         private const val DEFAULT_INTERVAL_MINUTES = 60L
+
+        // TODO(copy): move to res/values/strings_provider.xml as `ps_user_agent_error`
+        // (this wave does not own res/values/**). States the cause, then the fix, per 9.4.
+        private const val USER_AGENT_ERROR =
+            "В заголовке нельзя передать кириллицу и другие не-ASCII символы. " +
+                "Оставьте латиницу, цифры и знаки."
     }
 
     /** Interval options (minutes) offered by the interval picker: 1/2/6/12/24 hours. */
@@ -177,32 +187,74 @@ class ProviderSettingsActivity : BaseActivity() {
 
     /**
      * The User-Agent subscription fetches will actually send: the global override when set,
-     * otherwise the operator default the build ships with. Showing the effective value keeps the
-     * row honest instead of advertising a string the app never sends.
+     * otherwise the operator default the build ships with — put through the same resolution the
+     * fetch uses, so a value the fetch would replace (one an older build stored before this screen
+     * validated its input) is not advertised here as if it were sent.
      */
-    private fun currentUserAgent(): String =
+    private fun currentUserAgent(): String = HttpUtil.resolveSubscriptionUserAgent(
         SettingsManager.getSubscriptionUserAgent() ?: BackendConfig.subscriptionUserAgent
+    )
 
+    /**
+     * Edits the global User-Agent override.
+     *
+     * The value is validated HERE, on entry, and a rejected one is never stored: a User-Agent that
+     * cannot travel in an HTTP header is silently replaced at fetch time, so storing it would put
+     * a string in this row that the app will never send — and the row exists to say what is sent.
+     */
     private fun editUserAgent() {
-        val input = EditText(this).apply {
+        val field = TextInputLayout(this).apply {
+            hint = getString(R.string.ps_user_agent_hint)
+            isErrorEnabled = true
+        }
+        val input = TextInputEditText(field.context).apply {
             // Only the override is prefilled: confirming an untouched dialog must not freeze the
             // operator default into a permanent override that a later build could no longer change.
             // The row itself already shows the User-Agent that is actually sent.
             setText(SettingsManager.getSubscriptionUserAgent().orEmpty())
             setSingleLine()
             inputType = InputType.TYPE_CLASS_TEXT
-            hint = getString(R.string.ps_user_agent_hint)
         }
-        AlertDialog.Builder(this)
+        field.addView(input)
+        val pad = resources.getDimensionPixelSize(R.dimen.space_16)
+        val container = FrameLayout(this).apply {
+            setPadding(pad, pad, pad, 0)
+            addView(field)
+        }
+
+        // Validate on blur, and again on confirm; clear the error as soon as the user edits.
+        input.doAfterTextChanged { field.error = null }
+        input.setOnFocusChangeListener { _, hasFocus -> if (!hasFocus) showUserAgentError(field, input) }
+
+        val dialog = AlertDialog.Builder(this)
             .setTitle(R.string.ps_user_agent)
-            .setView(input)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
+            .setView(container)
+            .setPositiveButton(android.R.string.ok, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            // Own the click so an invalid value keeps the dialog open with the error visible,
+            // instead of dismissing and quietly discarding what was typed.
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                if (showUserAgentError(field, input)) {
+                    input.requestFocus()
+                    return@setOnClickListener
+                }
                 // An empty field clears the override rather than storing a blank User-Agent.
                 MmkvManager.encodeSettings(AppConfig.PREF_SUB_USER_AGENT, input.text.toString().trim())
                 bindState()
+                dialog.dismiss()
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        }
+        dialog.show()
+    }
+
+    /** Shows/clears the inline error. @return true when the value is rejected. */
+    private fun showUserAgentError(field: TextInputLayout, input: TextInputEditText): Boolean {
+        val value = input.text.toString().trim()
+        val invalid = value.isNotEmpty() && !HttpUtil.isHeaderSafe(value)
+        field.error = if (invalid) USER_AGENT_ERROR else null
+        return invalid
     }
 
     // ---------------- СПИСОК СЕРВЕРОВ ----------------

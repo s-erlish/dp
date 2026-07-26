@@ -106,6 +106,9 @@ object ToolbarBinder {
      * This is the only thing about the header that is allowed to change on scroll: no colour, no
      * elevation, no shadow, no collapsing hero, no scroll-driven alpha on anything else
      * (32-master-plan-android.md 7.4).
+     *
+     * Call it once, from `onCreate`. A `RecyclerView` keeps every listener it is given, so calling
+     * it per data load stacks duplicates that all animate the same hairline.
      */
     fun attachTo(root: View, scroller: RecyclerView) {
         val hairline = ToolbarSlots.of(root).hairline

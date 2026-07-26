@@ -35,6 +35,7 @@ import com.v2ray.ang.auth.dto.UpgradeQuoteDto
 import com.v2ray.ang.auth.dto.UpgradeRequestDto
 import com.v2ray.ang.auth.dto.UserProfileDto
 import com.v2ray.ang.handler.SettingsManager
+import com.v2ray.ang.util.HttpUtil
 import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -54,7 +55,9 @@ import java.util.concurrent.TimeUnit
  * OkHttp + Gson implementation of [DepartamentApiClient].
  *
  * A single request interceptor attaches Accept, User-Agent, the Bearer JWT (from
- * [AuthTokenStore]) and an optional X-HWID header. Every failure is mapped to an [ApiError];
+ * [AuthTokenStore]) and an optional X-HWID header — every value of them through
+ * [HttpUtil.isHeaderSafe] first, because OkHttp throws while building the request on anything
+ * else. Every failure is mapped to an [ApiError];
  * tokens and subscription URLs are never logged. All calls throw [ApiError.NotConfigured]
  * when the backend base URL is blank, so the whole layer is inert until configured.
  */
@@ -68,20 +71,35 @@ class DepartamentApiClientImpl(
     companion object {
         private val JSON = "application/json; charset=utf-8".toMediaType()
 
+        /**
+         * Every value here goes through [HttpUtil.isHeaderSafe] before OkHttp sees it, because
+         * OkHttp throws while BUILDING the request on a control or non-ASCII character — from
+         * inside this interceptor, where nothing maps it to an [ApiError]. `Build.MODEL` and
+         * `Build.VERSION.RELEASE` are whatever the OEM wrote and are not guaranteed ASCII, so
+         * unchecked they would take down EVERY backend call on such a device — login included —
+         * not just the one header they appear in. Degrading the panel's device label is the
+         * acceptable half of that trade; losing the account is not. Same guard, same reasons, as
+         * [HttpUtil.attachDeviceHeaders] on the subscription path.
+         */
         private val authInterceptor = Interceptor { chain ->
             val builder = chain.request().newBuilder()
                 .header("Accept", "application/json")
+                // Already header-safe by construction (BackendConfig refuses a value that is not).
                 .header("User-Agent", BackendConfig.subscriptionUserAgent)
-            AuthTokenStore.getToken()?.takeIf { it.isNotBlank() }?.let {
-                builder.header("Authorization", "Bearer $it")
-            }
-            if (SettingsManager.isSendHwid()) {
+            AuthTokenStore.getToken()
+                ?.takeIf { it.isNotBlank() && HttpUtil.isHeaderSafe(it) }
+                ?.let { builder.header("Authorization", "Bearer $it") }
+            val hwid = AuthTokenStore.deviceId().takeIf { HttpUtil.isHeaderSafe(it) }
+            if (SettingsManager.isSendHwid() && hwid != null) {
                 // Stable per-install HWID + real, stable device model so the panel keeps ONE
                 // device entry per physical device and labels it with the actual model.
-                builder.header(AppConfig.HEADER_HWID, AuthTokenStore.deviceId())
+                builder.header(AppConfig.HEADER_HWID, hwid)
                 builder.header(AppConfig.HEADER_DEVICE_OS, "android")
-                builder.header(AppConfig.HEADER_VER_OS, Build.VERSION.RELEASE ?: "")
-                builder.header(AppConfig.HEADER_DEVICE_MODEL, Utils.getDeviceName())
+                builder.header(AppConfig.HEADER_VER_OS, HttpUtil.headerSafeOr(Build.VERSION.RELEASE, ""))
+                builder.header(
+                    AppConfig.HEADER_DEVICE_MODEL,
+                    HttpUtil.headerSafeOr(Utils.getDeviceName(), HttpUtil.FALLBACK_DEVICE_MODEL)
+                )
             }
             chain.proceed(builder.build())
         }

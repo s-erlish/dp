@@ -32,6 +32,7 @@ import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.QRCodeDecoder
 import com.v2ray.ang.util.SubscriptionGuard
 import com.v2ray.ang.util.Utils
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.net.URI
 
 object AngConfigManager {
@@ -781,44 +782,72 @@ object AngConfigManager {
     private fun resolveSecureSubUrl(url: String, sub: SubscriptionItem): String? {
         if (Utils.isValidSubUrl(url)) return url
 
+        // Every refusal below ends the update with the same generic failure count, so the log line
+        // is the only place the reason exists: each one names the subscription, what was refused
+        // and what would fix it. (Surfacing it in the UI needs a reason on SubscriptionUpdateResult,
+        // which this change does not own.)
+        val name = sub.remarks.ifBlank { "(unnamed)" }
+
         if (!sub.locked) {
             // Ordinary subscription: the user's explicit opt-in still governs.
             if (sub.allowInsecureUrl) return url
-            LogUtil.w(AppConfig.TAG, "Subscription update refused: insecure URL, allowInsecureUrl off")
+            LogUtil.w(
+                AppConfig.TAG,
+                "Subscription \"$name\" not updated: its address is cleartext http and "
+                    + "\"allow insecure HTTP address\" is off for it. Turn that switch on in the "
+                    + "subscription editor, or change the address to https."
+            )
             return null
         }
 
         val upgraded = toHttpsUrl(url)
-        if (upgraded == null || !Utils.isValidSubUrl(upgraded)) {
+        if (upgraded == null) {
             LogUtil.w(
                 AppConfig.TAG,
-                "Managed subscription update refused: cleartext URL cannot be upgraded to https"
+                "Managed subscription \"$name\" not updated: its address is neither https nor a "
+                    + "cleartext http address this app can parse, so there is no https address to "
+                    + "try. Re-add the subscription from the account. (\"Allow insecure HTTP "
+                    + "address\" does not apply here: an operator address carries the account "
+                    + "token and is never fetched in cleartext.)"
+            )
+            return null
+        }
+        if (!Utils.isValidSubUrl(upgraded)) {
+            LogUtil.w(
+                AppConfig.TAG,
+                "Managed subscription \"$name\" not updated: its address stays unsafe after the "
+                    + "https upgrade. Re-add the subscription from the account."
             )
             return null
         }
         LogUtil.w(
             AppConfig.TAG,
-            "Managed subscription is on cleartext http; fetching over https instead "
-                + "(allowInsecureUrl does not apply to operator-managed subscriptions)"
+            "Managed subscription \"$name\" is on cleartext http; fetching over https instead. "
+                + "\"Allow insecure HTTP address\" does not apply to operator-managed "
+                + "subscriptions — that address carries the account token."
         )
         return upgraded
     }
 
     /**
      * Rewrites an `http://` URL as `https://`, keeping userinfo, path, query and fragment, and any
-     * explicit port other than the http default. Returns null when [url] is not cleartext http or
-     * carries no parseable host.
+     * explicit port other than the http default. Returns null when [url] is not cleartext http.
+     *
+     * Parsed with OkHttp's [okhttp3.HttpUrl] rather than [java.net.URI] on purpose: URI applies
+     * RFC 2396 host rules and returns a null host for addresses OkHttp accepts and would happily
+     * fetch (an underscore in the hostname is the everyday case), so a URI-based upgrade refused
+     * the retry on addresses that were never the problem. The parser here is the one that performs
+     * the fetch, so what it accepts and what can be fetched cannot drift apart.
      */
     private fun toHttpsUrl(url: String): String? {
-        val uri = runCatching { URI(Utils.fixIllegalUrl(url.trim())) }.getOrNull() ?: return null
-        if (!"http".equals(uri.scheme, ignoreCase = true)) return null
-        val host = uri.host?.takeIf { it.isNotBlank() } ?: return null
-        val userInfo = uri.rawUserInfo?.let { "$it@" } ?: ""
-        val port = if (uri.port == -1 || uri.port == 80) "" else ":${uri.port}"
-        val path = uri.rawPath ?: ""
-        val query = uri.rawQuery?.let { "?$it" } ?: ""
-        val fragment = uri.rawFragment?.let { "#$it" } ?: ""
-        return "https://$userInfo$host$port$path$query$fragment"
+        val parsed = Utils.fixIllegalUrl(url.trim()).toHttpUrlOrNull() ?: return null
+        if (!parsed.scheme.equals("http", ignoreCase = true)) return null
+        val builder = parsed.newBuilder().scheme("https")
+        // Port 80 — implicit or written out — belongs to cleartext: asking for TLS on it only
+        // fails the handshake, so move to the https default. Any other explicit port is the
+        // operator's choice and is kept.
+        if (parsed.port == 80) builder.port(443)
+        return builder.build().toString()
     }
 
     /**

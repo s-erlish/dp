@@ -71,7 +71,16 @@ object RowBinder {
      */
     sealed interface Trailing {
 
-        /** A read-only fact. Not clickable, no ripple, no press feedback, not focusable. */
+        /**
+         * No trailing affordance at all, which is two archetypes depending on `onClick`:
+         *
+         * - with no listener it is **Row.Fact** - a read-only row, not clickable, no ripple, no
+         *   press feedback, not focusable;
+         * - with one it is **Row.Destructive** («Удалить сервер», «Выйти»), where the red title in
+         *   [RowTone.DESTRUCTIVE] is itself the affordance and a chevron would be noise. Per
+         *   00-rules.md 7.5 the default is act plus an undo snackbar, not a confirm dialog; when
+         *   the action really is irreversible, use [Chevron] instead, because it opens a screen.
+         */
         data object None : Trailing
 
         /** Tapping pushes a screen. The 20dp `ic_chevron_right` in `?attr/colorOnSurfaceVariant`. */
@@ -92,7 +101,7 @@ object RowBinder {
          * [contentDescription] is normally null and the glyph is then hidden from TalkBack.
          */
         data class Glyph(
-            @DrawableRes val icon: Int,
+            @param:DrawableRes val icon: Int,
             val contentDescription: CharSequence? = null,
         ) : Trailing
 
@@ -120,7 +129,7 @@ object RowBinder {
          * «Скопировать код», not «Код».
          */
         data class IconAction(
-            @DrawableRes val icon: Int,
+            @param:DrawableRes val icon: Int,
             val contentDescription: CharSequence,
             val onClick: (View) -> Unit,
         ) : Trailing
@@ -168,7 +177,9 @@ object RowBinder {
      * @param haptic normally [Haptic.NONE] - a row tap does not vibrate. A switch does, and the
      *   binder supplies that itself.
      * @param onClick what tapping the row does, routed through [onSingleClick] so a double tap
-     *   cannot fire it twice. MUST be null when the trailing element is itself the action.
+     *   cannot fire it twice. MUST be null when the trailing element is itself the action
+     *   ([Trailing.IconAction], [Trailing.ActionButton]); null with [Trailing.None] is what makes a
+     *   row a read-only fact.
      */
     fun bind(
         root: View,
@@ -184,7 +195,7 @@ object RowBinder {
         haptic: Haptic = Haptic.NONE,
         onClick: ((View) -> Unit)? = null,
     ) {
-        require(onClick == null || !trailing.rowIsInert()) {
+        require(onClick == null || !trailing.trailingOwnsAction()) {
             "Departament row: this trailing element owns the action, so the row itself must not " +
                 "be a target (22-components 8.4). Pass onClick = null."
         }
@@ -222,8 +233,14 @@ object RowBinder {
         }
     }
 
-    private fun Trailing.rowIsInert(): Boolean =
-        this is Trailing.None || this is Trailing.IconAction || this is Trailing.ActionButton
+    /**
+     * True when the trailing control is the action, which is the case 22-components 8.4 settles:
+     * the row then stops being a target, because two targets doing different things is a defect and
+     * not a convenience. [Trailing.None] is deliberately absent - a row with no trailing is inert
+     * only when it is also given no listener.
+     */
+    private fun Trailing.trailingOwnsAction(): Boolean =
+        this is Trailing.IconAction || this is Trailing.ActionButton
 
     private fun bindTile(slots: RowSlots, @DrawableRes glyph: Int, role: TileRole) {
         val tile = slots.tile
@@ -371,6 +388,12 @@ object RowBinder {
     ) {
         val root = slots.root
         root.isEnabled = enabled
+        // isEnabled does NOT cascade to a ViewGroup's children, so a disabled row whose action
+        // lives in the trailing slot would stay tappable. Disable the three interactive slots by
+        // hand; the other trailing elements are glyphs and have nothing to disable.
+        slots.toggle.isEnabled = enabled
+        slots.iconAction.isEnabled = enabled
+        slots.actionButton.isEnabled = enabled
         // R6: disabled is 0.38 on the WHOLE control, on both platforms.
         root.alpha = if (enabled) 1f else DISABLED_ALPHA
         root.isActivated = trailing is Trailing.Marker && trailing.selected
@@ -379,7 +402,7 @@ object RowBinder {
             // An inert row keeps its background: `bg_row` only draws a pressed or focused state,
             // and neither is reachable once the row stops being clickable. Clearing the background
             // instead would leave a recycled row permanently flat when it is next bound clickable.
-            !enabled || trailing.rowIsInert() -> root.clearClick()
+            !enabled || trailing.trailingOwnsAction() -> root.clearClick()
 
             trailing is Trailing.Toggle -> root.onSingleClick(Haptic.TICK) {
                 slots.toggle.isChecked = !slots.toggle.isChecked
@@ -419,6 +442,14 @@ object RowBinder {
             ) {
                 super.onInitializeAccessibilityNodeInfo(host, info)
                 info.isCheckable = checkable
+                // setChecked(Boolean) is deprecated in favour of an int-based tri-state
+                // (unchecked / checked / partially checked), but that overload is NOT in the
+                // androidx.core resolved by this build - the class in the resolved artifact
+                // exposes setChecked and no CHECKED_STATE_* constants, so there is nothing to
+                // migrate to yet. A toggle row genuinely has to announce its checked state or
+                // TalkBack reads it as a plain button, so this is suppressed rather than dropped.
+                // Revisit when androidx.core ships the overload.
+                @Suppress("DEPRECATION")
                 info.isChecked = checked
                 info.isSelected = selected
                 if (checkable) info.className = SWITCH_CLASS

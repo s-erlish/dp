@@ -72,7 +72,10 @@ class SettingsActivity : BaseActivity() {
             else -> R.string.adv_title
         }
 
-        /** Готовый intent на экран целиком или на одну его группу. */
+        /**
+         * Готовый intent на экран целиком или на одну его группу. Вкладка настроек
+         * зовёт его так: `startActivity(SettingsActivity.newIntent(this))`.
+         */
         @JvmStatic
         fun newIntent(context: Context, section: String = SECTION_ADVANCED): Intent =
             Intent(context, SettingsActivity::class.java).putExtra(EXTRA_SECTION, section)

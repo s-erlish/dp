@@ -19,6 +19,10 @@ import java.util.WeakHashMap
  *
  * Nothing here is a component. It exists so the binders below never hard-code a duration, never
  * name a curve of their own, and never animate without checking whether the user wants motion.
+ *
+ * Everything in this file is `internal`: it is the package's own plumbing, not part of the surface a
+ * screen binds against. A screen agent calls [RowBinder], [ToolbarBinder], [EmptyStateBinder],
+ * [ChipBinder], [SkeletonBinder], [SelectionBinder], [SubPage] and [onSingleClick], and nothing else.
  */
 
 /**

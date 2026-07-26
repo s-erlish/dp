@@ -20,6 +20,7 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
+import com.v2ray.ang.util.HttpUtil
 import com.v2ray.ang.util.SubscriptionGuard
 import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +28,14 @@ import kotlinx.coroutines.launch
 
 class SubEditActivity : BaseActivity() {
     private val binding by lazy { ActivitySubEditBinding.inflate(layoutInflater) }
+
+    private companion object {
+        // TODO(copy): move to res/values/strings.xml as `sub_setting_user_agent_error`
+        // (this wave does not own res/values/**). States the cause, then the fix, per 9.4.
+        private const val USER_AGENT_ERROR =
+            "В заголовке нельзя передать кириллицу и другие не-ASCII символы. " +
+                "Оставьте латиницу, цифры и знаки."
+    }
 
     private var del_config: MenuItem? = null
     private var save_config: MenuItem? = null
@@ -65,7 +74,12 @@ class SubEditActivity : BaseActivity() {
         binding.chkEnable.isChecked = subItem.enabled
         binding.autoUpdateCheck.isChecked = subItem.autoUpdate
         binding.etUpdateInterval.text = Utils.getEditable(subItem.updateInterval.toString())
-        binding.allowInsecureUrl.isChecked = subItem.allowInsecureUrl
+        // The fetch does NOT honour this switch on an operator-managed subscription: that URL
+        // carries the account token, so cleartext is refused and retried over https instead
+        // (AngConfigManager.resolveSecureSubUrl). A switch that governs nothing must not keep
+        // looking live — for a locked subscription it reads off and disabled.
+        binding.allowInsecureUrl.isChecked = subItem.allowInsecureUrl && !subItem.locked
+        binding.allowInsecureUrl.isEnabled = !subItem.locked
         binding.etPreProfile.text = Utils.getEditable(subItem.prevProfile)
         binding.etNextProfile.text = Utils.getEditable(subItem.nextProfile)
         return true
@@ -127,7 +141,17 @@ class SubEditActivity : BaseActivity() {
         if (!subItem.locked) {
             subItem.url = binding.etUrl.text.toString()
         }
-        subItem.userAgent = binding.etUserAgent.text.toString()
+        // Validated here, on entry: a User-Agent that cannot travel in an HTTP header is silently
+        // replaced at fetch time, so storing it would leave this field showing a string the app
+        // will never send — and, being non-blank, it would still win over the provider-screen
+        // value instead of falling back to it.
+        val userAgent = binding.etUserAgent.text.toString().trim()
+        if (userAgent.isNotEmpty() && !HttpUtil.isHeaderSafe(userAgent)) {
+            binding.etUserAgent.error = USER_AGENT_ERROR
+            binding.etUserAgent.requestFocus()
+            return false
+        }
+        subItem.userAgent = userAgent
         subItem.filter = binding.etFilter.text.toString()
         subItem.enabled = binding.chkEnable.isChecked
         subItem.autoUpdate = binding.autoUpdateCheck.isChecked
@@ -154,7 +178,11 @@ class SubEditActivity : BaseActivity() {
 
         subItem.prevProfile = binding.etPreProfile.text.toString()
         subItem.nextProfile = binding.etNextProfile.text.toString()
-        subItem.allowInsecureUrl = binding.allowInsecureUrl.isChecked
+        // Locked: the switch is shown disabled and off because it governs nothing here, so reading
+        // it back would overwrite the stored preference with that display state.
+        if (!subItem.locked) {
+            subItem.allowInsecureUrl = binding.allowInsecureUrl.isChecked
+        }
 
         if (TextUtils.isEmpty(subItem.remarks)) {
             toast(R.string.sub_setting_remarks)

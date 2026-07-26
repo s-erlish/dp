@@ -22,6 +22,10 @@
     <!-- ===================================================================== -->
 
     <string name="adv_title">Дополнительно</string>
+    <!-- Подпись строки-входа на вкладке настроек. 12-settings.md 4.2 строка 1.7
+         подписи не требует; строка живёт здесь на случай, если ряду нужен второй
+         уровень, как у остальных строк группы «Подключение». -->
+    <string name="adv_entry_sub">Ядро, туннель, DNS, фрагментация</string>
     <string name="adv_title_dns">DNS</string>
     <string name="adv_title_fragment">Параметры фрагментации</string>
     <string name="adv_title_latency">Проверка задержки</string>
@@ -54,8 +58,8 @@
     <string name="adv_group_tunnel">Туннель</string>
 
     <string name="adv_mtu_title">MTU</string>
-    <string name="adv_mtu_helper">От 576 до 9000, по умолчанию 1500</string>
-    <string name="adv_mtu_error">Введите значение от 576 до 9000.</string>
+    <string name="adv_mtu_helper">От 576 до 9000. По умолчанию 1500</string>
+    <string name="adv_mtu_error">Введите значение от 576 до 9000</string>
 
     <string name="adv_iface_title">Адрес интерфейса</string>
 
@@ -73,7 +77,7 @@
     <string name="adv_fake_dns_summary_locked">Нужен включённый локальный резолвер</string>
 
     <string name="adv_domestic_dns_title">DNS для прямых соединений</string>
-    <string name="adv_domestic_dns_helper">IP-адрес или ссылка DoH, несколько через запятую</string>
+    <string name="adv_domestic_dns_helper">IP-адрес или ссылка DoH, несколько через запятую. По умолчанию 223.5.5.5</string>
     <string name="adv_domestic_dns_error">Нужен IP-адрес или ссылка, которая начинается с https://. Несколько адресов разделите запятой.</string>
 
     <string name="adv_dns_hosts_title">Записи hosts</string>
@@ -109,8 +113,8 @@
     <string name="adv_group_latency">Проверка задержки</string>
 
     <string name="adv_delay_url_title">Адрес проверки</string>
-    <string name="adv_delay_url_helper">Ссылка, по которой измеряется задержка</string>
-    <string name="adv_delay_url_error">Введите ссылку, которая начинается с http:// или https://.</string>
+    <string name="adv_delay_url_helper">Ссылка, по которой измеряется задержка. По умолчанию https://www.gstatic.com/generate_204</string>
+    <string name="adv_delay_url_error">Введите ссылку, которая начинается с http:// или https://</string>
 
     <string name="adv_ping_concurrency_title">Одновременных проверок</string>
 
