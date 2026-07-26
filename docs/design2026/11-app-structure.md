@@ -53,9 +53,35 @@ them.
 
 ## 2. The destination set
 
+### 2.0 Owner decision, 2026-07-26 — desktop has no Серверы destination
+
+**The owner has decided that the desktop must not gain a Серверы tab.** Per `00-rules.md` 0.1 the
+owner's explicit request outranks this document, so section 2.1 below stands for **Android only**.
+
+Desktop keeps **three** destinations: **Главная**, **Аккаунт**, **Настройки**. `Geo.Nav.Servers`
+stays declared and unused, and `Nav_Servers` is not added to `Common/L.Shell.cs`. Section 2.3's
+argument is recorded but overruled; sections 3.2 and 4.2 apply to Android alone, and the desktop rail
+does **not** gain a fourth item at index 1.
+
+The server list therefore stays inside Главная on desktop. That does not make the problems section
+2.3 identified go away, and they are now Главная's to solve there:
+
+- The app still has **no server search on desktop** — the only search field ever written lives in a
+  view nothing instantiates. With 150 servers that is a functional hole. Главная's list needs
+  in-place filtering and a designed no-results state.
+- The **seven per-server actions** are reachable only from a right-click menu, which is a hidden
+  affordance and the app's only route to edit, delete, share and QR. They need a visible control on
+  the row.
+- In compact mode the list starts below a 440px-minimum hero on a 630px window, so **the primary
+  list in the app sits permanently below the fold**. Главная's layout must give the list real estate
+  rather than assume a separate screen will carry it.
+
+Solving those three inside Главная is the desktop work order. Adding a tab is not.
+
 ### 2.1 The decision
 
 **Four destinations, fixed, identical on both platforms, in this order.**
+(Android only — see 2.0. On desktop, drop row 2 and read the set as three.)
 
 | # | Label (RU) | Android icon | Desktop glyph | Owns |
 |---|---|---|---|---|
