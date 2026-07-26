@@ -61,11 +61,23 @@ object SpeedtestManager {
      *         [com.v2ray.ang.dto.entities.ServerAffiliationInfo] renders as a blank cell.
      */
     fun httpPing(url: String, expectAny: Boolean = false): Long {
-        val req = okhttp3.Request.Builder()
-            .url(url)
-            .head()
-            .header("Connection", "close")
-            .build()
+        // Request.Builder.url() parses eagerly and throws IllegalArgumentException on an
+        // out-of-range port or an unparseable host. The per-node callers build this URL from
+        // profile.serverPort, which is whatever a subscription or a hand-edited profile put there,
+        // so the throw is reachable with real data. It must not escape: this runs inside the
+        // test scope's children, and an uncaught exception there takes the process down and
+        // cancels the scope for the rest of its life, turning one bad row into "ping stops
+        // working entirely". A row we cannot even address is simply unreachable: -1.
+        val req = try {
+            okhttp3.Request.Builder()
+                .url(url)
+                .head()
+                .header("Connection", "close")
+                .build()
+        } catch (e: IllegalArgumentException) {
+            LogUtil.w(AppConfig.TAG, "httpPing: unusable url $url: ${e.message}")
+            return -1L
+        }
         val start = System.nanoTime()
         try {
             httpPingClient.newCall(req).execute().use { r ->

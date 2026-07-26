@@ -32,9 +32,11 @@ import com.v2ray.ang.handler.SpeedtestManager
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.MessageUtil
 import com.v2ray.ang.util.Utils
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
@@ -89,7 +91,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         fastConnectEventPending = false
         return v
     }
-    private val tcpingTestScope by lazy { CoroutineScope(Dispatchers.IO) }
+    /**
+     * The scope every latency measurement runs in.
+     *
+     * SupervisorJob and a handler are both load-bearing, not defensive habit. With a plain Job one
+     * server that throws cancels its siblings and then the scope's own Job, and a cancelled Job
+     * never accepts another child - so a single unmeasurable profile would silently disable ping
+     * for the rest of the process, with no error anywhere. Without a handler the same throw reaches
+     * the thread's default handler and takes the app down. One row we cannot measure is a dash in
+     * one cell; it is not the end of measuring.
+     */
+    private val tcpingTestScope by lazy {
+        CoroutineScope(
+            Dispatchers.IO + SupervisorJob() +
+                CoroutineExceptionHandler { _, e ->
+                    LogUtil.w(AppConfig.TAG, "Delay test coroutine failed: ${e.message}")
+                }
+        )
+    }
 
     /**
      * Refer to the official documentation for [registerReceiver](https://developer.android.com/reference/androidx/core/content/ContextCompat#registerReceiver(android.content.Context,android.content.BroadcastReceiver,android.content.IntentFilter,int):
