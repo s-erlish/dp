@@ -46,15 +46,29 @@ object HttpUtil {
      *
      * A value that cannot travel in a header also falls back: the override is free text the user
      * types, and OkHttp throws while building the request on a control or non-ASCII character, so
-     * one stray character would otherwise fail every future update of that subscription with
-     * nothing but a log line to explain it.
+     * one stray character (a Cyrillic client string, say) would otherwise fail every future update
+     * of that subscription with nothing but a log line to explain it.
      */
     private fun resolveSubscriptionUserAgent(userAgent: String?): String =
-        userAgent?.trim()?.takeIf { it.isNotEmpty() && it.isHeaderSafe() }
+        userAgent?.trim()?.takeIf { it.isNotEmpty() && isHeaderSafe(it) }
             ?: DEFAULT_SUBSCRIPTION_USER_AGENT
 
-    /** Mirrors OkHttp's own header-value check: printable ASCII, plus tab. */
-    private fun String.isHeaderSafe(): Boolean = all { it == '\t' || it in ' '..'~' }
+    /**
+     * Mirrors OkHttp's own header-value check: printable ASCII, plus tab.
+     *
+     * Public because every value this app puts in a header has to pass it before OkHttp sees it:
+     * OkHttp throws while BUILDING the request, so an unchecked non-ASCII value does not degrade
+     * the request, it kills it. Callers outside this file need the same test to stay consistent
+     * with what the request builders below accept.
+     */
+    fun isHeaderSafe(value: String): Boolean = value.all { it == '\t' || it in ' '..'~' }
+
+    /** [value] when it can travel in a header (see [isHeaderSafe]), else [fallback]. */
+    private fun headerSafeOr(value: String?, fallback: String): String =
+        value?.takeIf { isHeaderSafe(it) } ?: fallback
+
+    /** Mirrors [Utils.getDeviceName]'s own blank fallback, for a model name no header can carry. */
+    private const val FALLBACK_DEVICE_MODEL = "Android Device"
 
     /**
      * Converts the domain part of a URL string to its IDN (Punycode, ASCII Compatible Encoding) format.
@@ -311,13 +325,21 @@ object HttpUtil {
      * [AppConfig.HEADER_HWID] (stable -> one entry per device, no slot pollution) and labels it
      * from [AppConfig.HEADER_DEVICE_MODEL] (the real model, not a User-Agent guess). All values
      * are stable across calls, so they never register new device entries.
+     *
+     * Every value goes through [isHeaderSafe] first. The model comes from `Build.MODEL`, which is
+     * whatever the OEM wrote there and is not guaranteed ASCII; unchecked, one such device would
+     * throw here and fail every subscription update forever. Degrading the panel's device label is
+     * the acceptable half of that trade, losing the subscription is not.
      */
     private fun attachDeviceHeaders(request: UrlContentRequest, requestBuilder: Request.Builder) {
-        val hwid = request.hwid?.takeIf { it.isNotBlank() } ?: return
+        val hwid = request.hwid?.takeIf { it.isNotBlank() && isHeaderSafe(it) } ?: return
         requestBuilder.addHeader(AppConfig.HEADER_HWID, hwid)
         requestBuilder.addHeader(AppConfig.HEADER_DEVICE_OS, "android")
-        requestBuilder.addHeader(AppConfig.HEADER_VER_OS, Build.VERSION.RELEASE ?: "")
-        requestBuilder.addHeader(AppConfig.HEADER_DEVICE_MODEL, Utils.getDeviceName())
+        requestBuilder.addHeader(AppConfig.HEADER_VER_OS, headerSafeOr(Build.VERSION.RELEASE, ""))
+        requestBuilder.addHeader(
+            AppConfig.HEADER_DEVICE_MODEL,
+            headerSafeOr(Utils.getDeviceName(), FALLBACK_DEVICE_MODEL)
+        )
     }
 
     private fun applyEmbeddedBasicAuthHeader(rawUrl: String, requestBuilder: Request.Builder) {

@@ -91,16 +91,18 @@ object FlagUtil {
 
     /**
      * Parses a country code from a remark. Only an explicit marker counts — a bracketed code,
-     * a known country/city name, or an upper-case code in the leading token. Matching any
-     * two-letter token turned "No limit" into Norway, "IT support" into Italy and "in-1" into
-     * India — a missing flag is cheaper than a wrong one. Returns ISO-2 or null.
+     * a known country/city name (English or Russian), or an upper-case code in the leading token.
+     * Matching any two-letter token turned "No limit" into Norway, "IT support" into Italy and
+     * "in-1" into India — a missing flag is cheaper than a wrong one. Returns ISO-2 or null.
      */
     fun parseCountryCode(remark: String?): String? {
         if (remark.isNullOrBlank()) return null
         bracketedCode(remark)?.let { return it }
         val lower = remark.lowercase()
-        COUNTRY_NAME_TO_CODE.forEach { (name, code) ->
-            if (containsWord(lower, name)) return code
+        NAME_TABLES.forEach { table ->
+            table.forEach { (name, code) ->
+                if (containsWord(lower, name)) return code
+            }
         }
         return leadingCode(remark)
     }
@@ -205,6 +207,48 @@ object FlagUtil {
         "brazil" to "BR",
         "emirates" to "AE", "dubai" to "AE",
     )
+
+    // The same table in Russian, because this deployment's panel is Russian and writes remarks
+    // like "Германия" or "Нидерланды 2" — which had no marker the English table or the upper-case
+    // leading-code rule could see, so every Russian-named host fell through to the globe. Cyrillic
+    // cannot collide with the ASCII prose the leading-code rule exists to reject ("IT support"),
+    // and the match is word-boundaried like the English one, so this adds flags without adding
+    // wrong ones. Declined forms ("Германии") deliberately miss: a globe, not a guess.
+    private val COUNTRY_NAME_TO_CODE_RU = linkedMapOf(
+        "нидерланды" to "NL", "голландия" to "NL", "амстердам" to "NL",
+        "германия" to "DE", "франкфурт" to "DE",
+        "сша" to "US", "америка" to "US",
+        "великобритания" to "GB", "британия" to "GB", "англия" to "GB", "лондон" to "GB",
+        "франция" to "FR", "париж" to "FR",
+        "финляндия" to "FI", "хельсинки" to "FI",
+        "швеция" to "SE", "стокгольм" to "SE",
+        "дания" to "DK",
+        "норвегия" to "NO",
+        "польша" to "PL",
+        "латвия" to "LV",
+        "литва" to "LT",
+        "эстония" to "EE",
+        "россия" to "RU", "москва" to "RU",
+        "украина" to "UA",
+        "турция" to "TR", "стамбул" to "TR",
+        "япония" to "JP", "токио" to "JP",
+        "сингапур" to "SG",
+        "гонконг" to "HK",
+        "корея" to "KR",
+        "канада" to "CA",
+        "швейцария" to "CH",
+        "испания" to "ES",
+        "италия" to "IT",
+        "австрия" to "AT",
+        "чехия" to "CZ",
+        "иран" to "IR",
+        "индия" to "IN",
+        "австралия" to "AU",
+        "бразилия" to "BR",
+        "оаэ" to "AE", "эмираты" to "AE", "дубай" to "AE",
+    )
+
+    private val NAME_TABLES = listOf(COUNTRY_NAME_TO_CODE, COUNTRY_NAME_TO_CODE_RU)
 
     private val ISO2_CODES = setOf(
         "NL", "DE", "US", "GB", "FR", "FI", "SE", "DK", "NO", "PL", "LV", "LT", "EE",

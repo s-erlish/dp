@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Copy for the "+" add menu and the server-list actions menu (res/menu/menu_main.xml,
+    dispatched in MainActivity.onOptionsItemSelected).
+
+    Every name is prefixed `menu_actions_` on purpose: these strings live in their own file so a
+    parallel copy pass on values/strings*.xml cannot collide with them.
+-->
+<resources>
+
+    <!-- ==================== Add a source ("+" on Главная and Серверы) ==================== -->
+    <!-- Renamed from the old «Ввести вручную»: with «Создать вручную» next to it, "вручную"
+         alone no longer says which of the two it is. This one takes a pasted link or config. -->
+    <string name="menu_actions_add_link">Ввести ссылку</string>
+    <string name="menu_actions_add_create">Создать вручную</string>
+    <string name="menu_actions_add_file">Импортировать из файла</string>
+
+    <!-- Protocol picker shown by «Создать вручную» -->
+    <string name="menu_actions_type_title">Тип сервера</string>
+    <string name="menu_actions_type_group">Группа серверов</string>
+    <string name="menu_actions_type_chain">Цепочка прокси</string>
+
+    <!-- ==================== Server-list actions (Серверы) ==================== -->
+    <string name="menu_actions_more_cd">Ещё</string>
+    <string name="menu_actions_sort">Сортировать по задержке</string>
+    <string name="menu_actions_export">Экспортировать в буфер</string>
+    <string name="menu_actions_del_duplicate">Удалить дубликаты</string>
+    <string name="menu_actions_del_invalid">Удалить недоступные</string>
+    <string name="menu_actions_del_all">Удалить все серверы</string>
+
+    <!-- ==================== Results, guards, recovery ==================== -->
+    <string name="menu_actions_sorted">Серверы отсортированы по задержке</string>
+    <string name="menu_actions_no_delay">Задержка ещё не измерена. Проверьте серверы и повторите.</string>
+    <string name="menu_actions_check">Проверить</string>
+
+    <string name="menu_actions_export_done">Серверы скопированы в буфер: %1$d</string>
+    <string name="menu_actions_export_failed">Не удалось скопировать серверы. Повторите попытку.</string>
+
+    <string name="menu_actions_duplicates_deleted">Дубликаты удалены: %1$d</string>
+    <string name="menu_actions_duplicates_none">Дубликатов нет</string>
+    <string name="menu_actions_invalid_deleted">Недоступные серверы удалены: %1$d</string>
+    <string name="menu_actions_invalid_none">Недоступных серверов нет. Сначала проверьте задержку.</string>
+    <string name="menu_actions_undo">Отменить</string>
+    <string name="menu_actions_restored">Серверы восстановлены</string>
+
+    <string name="menu_actions_del_all_body">Список серверов будет очищен. Серверы провайдеров вернутся после обновления подписки, добавленные вручную придётся ввести заново.</string>
+    <string name="menu_actions_del_all_confirm">Удалить все</string>
+    <string name="menu_actions_all_deleted">Серверы удалены: %1$d</string>
+    <string name="menu_actions_cancel">Отмена</string>
+
+    <string name="menu_actions_busy">Нельзя удалять серверы во время подключения. Отключитесь и повторите.</string>
+    <string name="menu_actions_busy_action">Отключить</string>
+
+    <string name="menu_actions_file_failed">Не удалось прочитать файл. Выберите другой файл и повторите.</string>
+
+</resources>

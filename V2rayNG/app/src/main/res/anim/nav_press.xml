@@ -1,31 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Bottom-nav touch feedback: NO ripple/glow. The item scales down slightly
-     under the finger (state_pressed) and springs back to 1.0 on release.
-     Applied via android:stateListAnimator on each nav_* item container. -->
+<!-- Bottom-navigation touch feedback, now on THE one press recipe (D-11 / R4):
+     scale 0.97, in @integer/motion_press_in 90ms ease_out_quart, out
+     @integer/motion_press_out 160ms ease_out_quint. It was 0.92 at hard-coded
+     100/120ms with no interpolator at all, i.e. linear, which 00-rules.md 8.3
+     bans by name; one gesture may not have two numbers.
+
+     Why this still scales at all, given R5's "rows do not scale". The consumers
+     are the four bottom-nav item containers in activity_main.xml (nav_home,
+     nav_servers, nav_settings, nav_account): each is a discrete tappable object
+     in a bar, not a slice of a surface - its background is @null, so there is no
+     fill and no hairline above or below to tear. And 00-rules.md 0.4.8 forbids a
+     ripple glow on the bottom navigation, so scale is the only press feedback
+     this control is allowed; removing it would leave a tap with no
+     acknowledgement inside the 100ms 7.3 requires.
+
+     This file is otherwise identical to @anim/press_scale and exists only so the
+     nav keeps a named animator while its hand-rolled markup is replaced by the
+     M3 navigation bar (22-components.md 15). At that point delete it and its four
+     references together, not before. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_pressed="true">
         <set>
             <objectAnimator
-                android:duration="100"
+                android:duration="@integer/motion_press_in"
+                android:interpolator="@interpolator/ease_out_quart"
                 android:propertyName="scaleX"
-                android:valueTo="0.92"
+                android:valueTo="0.97"
                 android:valueType="floatType" />
             <objectAnimator
-                android:duration="100"
+                android:duration="@integer/motion_press_in"
+                android:interpolator="@interpolator/ease_out_quart"
                 android:propertyName="scaleY"
-                android:valueTo="0.92"
+                android:valueTo="0.97"
                 android:valueType="floatType" />
         </set>
     </item>
     <item>
         <set>
             <objectAnimator
-                android:duration="120"
+                android:duration="@integer/motion_press_out"
+                android:interpolator="@interpolator/ease_out_quint"
                 android:propertyName="scaleX"
                 android:valueTo="1.0"
                 android:valueType="floatType" />
             <objectAnimator
-                android:duration="120"
+                android:duration="@integer/motion_press_out"
+                android:interpolator="@interpolator/ease_out_quint"
                 android:propertyName="scaleY"
                 android:valueTo="1.0"
                 android:valueType="floatType" />

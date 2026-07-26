@@ -1,5 +1,99 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Colour tokens - LIGHT theme, plus the shared Layer 1 primitives and the mono
+  (light base) set. values-night/colors.xml overrides the dark column.
+
+  Three blocks, in this order (10-design-system.md 4.1):
+    LAYER 1  primitives. No meaning, never referenced from a layout.
+    LAYER 2  semantic. What a layout and a theme attribute may name.
+    MONO     the third theme, applied via ThemeOverlay.Mono.
+
+  Two standing rules from 00-rules.md 3 and 6:
+    - A new colour carries a comment saying what it is for AND its measured
+      contrast ratio against the surface it actually sits on. Every ratio in this
+      file was computed (WCAG 2.1 relative luminance), not estimated.
+    - Floors: body text 4.5:1, large text (>=24sp, or >=16sp at 700) 3:1, icons
+      and control boundaries 3:1, placeholder text 4.5:1. Disabled content is
+      exempt (WCAG 1.4.3) and must not be "fixed".
+-->
 <resources>
+    <!-- ============================================================= -->
+    <!-- LAYER 1: PRIMITIVES (10-design-system.md 1.1).                 -->
+    <!-- These carry NO meaning: ink_11 is a near-black, not "the card". -->
+    <!-- Nothing in a layout, a drawable or a style may name one - they  -->
+    <!-- exist so the semantic layer has a closed, auditable palette to  -->
+    <!-- alias, and so a theme change is a re-alias, not a re-invention. -->
+    <!-- Numeric suffix ~= lightness on 0-100. Contrast claims live on   -->
+    <!-- the semantic aliases below, not here.                           -->
+    <!-- ============================================================= -->
+
+    <!-- Ink ramp: the near-black neutrals, dark-theme spine. -->
+    <color name="ink_00">#000000</color>
+    <color name="ink_04">#08090B</color>
+    <color name="ink_06">#0A0B0D</color>
+    <color name="ink_09">#111316</color>
+    <color name="ink_11">#141619</color>
+    <color name="ink_13">#1A1D21</color>
+    <color name="ink_15">#1E2126</color>
+    <color name="ink_17">#20242B</color>
+    <color name="ink_22">#2A2E36</color>
+    <!-- Control boundary, dark: 3.73:1 on ink_06, 3.43:1 on ink_11. See D-9. -->
+    <color name="ink_45">#646C7C</color>
+    <color name="ink_50">#6E7480</color>
+    <color name="ink_68">#9BA1AD</color>
+    <color name="ink_96">#F2F4F8</color>
+
+    <!-- Paper ramp: the light-theme spine. -->
+    <color name="paper_100">#FFFFFF</color>
+    <color name="paper_98">#F7F9FD</color>
+    <color name="paper_96">#F4F7FC</color>
+    <color name="paper_95">#F1F4FA</color>
+    <color name="paper_92">#EAEFF7</color>
+    <color name="paper_91">#E9EEF7</color>
+    <color name="paper_89">#E3EAF4</color>
+    <color name="paper_86">#DCE3EF</color>
+    <color name="paper_78">#C3CCDC</color>
+    <!-- Control boundary, light: 3.45:1 on paper_100, 3.21:1 on paper_96. D-9. -->
+    <color name="paper_50">#7D8BA3</color>
+    <color name="paper_38">#54607A</color>
+    <color name="paper_28">#3C475E</color>
+    <color name="paper_10">#111826</color>
+
+    <!-- Blue: the ONE accent hue. There is no second accent (00-rules 1.4.1). -->
+    <color name="blue_03">#00183A</color>
+    <color name="blue_20">#17325C</color>
+    <color name="blue_30">#14468F</color>
+    <color name="blue_45">#17469A</color>
+    <color name="blue_50">#1E5FC7</color>
+    <color name="blue_54">#3877E0</color>
+    <color name="blue_56">#3D7EF0</color>
+    <!-- The brand blue. Accent, dark theme. -->
+    <color name="blue_60">#4C8DFF</color>
+    <color name="blue_66">#5F9AFF</color>
+    <color name="blue_85">#CFE0FF</color>
+    <color name="blue_90">#D8E4FF</color>
+
+    <!-- Status hues. Never actions, never selection, never a button. -->
+    <color name="green_20">#0C3F22</color>
+    <color name="green_32">#065132</color>
+    <color name="green_45">#0B7D4A</color>
+    <color name="green_60">#22C55E</color>
+    <color name="green_88">#A6F2C4</color>
+    <color name="red_15">#5C1420</color>
+    <color name="red_38">#9B1B23</color>
+    <color name="red_45">#C42B32</color>
+    <color name="red_50">#D93844</color>
+    <color name="red_55">#F04452</color>
+    <color name="red_65">#FF6069</color>
+    <color name="amber_28">#6B5000</color>
+    <color name="amber_40">#8A6300</color>
+    <color name="amber_58">#EAB308</color>
+
+    <!-- ============================================================= -->
+    <!-- LAYER 2: SEMANTIC (light). Pre-existing block, values as       -->
+    <!-- shipped. Names referenced by themes.xml and by layouts.        -->
+    <!-- ============================================================= -->
+
     <!-- Brand: departament VPN blue (sampled from logo) -->
     <color name="brand_blue">#1E5FC7</color>
     <color name="brand_blue_dark">#17469A</color>
@@ -15,7 +109,10 @@
     <color name="color_upload">#1E5FC7</color>
     <color name="color_download">#1E5FC7</color>
 
-    <!-- Colored setting-row icon tints (same in light/dark) -->
+    <!-- Colored setting-row icon tints (same in light/dark).
+         D-5: the coloured tile system is exactly three - accent, destructive,
+         neutral. icon_green / icon_yellow / icon_orange / icon_purple are NOT
+         used by new work; they stay only until their last reference migrates. -->
     <color name="icon_blue">#4C8DFF</color>
     <color name="icon_green">#22C55E</color>
     <color name="icon_purple">#4C8DFF</color>
@@ -34,7 +131,8 @@
     <!-- Latency ping: darkened green for >=4.5:1 on white; red darkened for contrast -->
     <color name="ping_good">#0B7D4A</color>
     <color name="ping_bad">#C42B32</color>
-    <!-- Icon-tile background fills (translucent hue, shared light/dark) -->
+    <!-- Icon-tile background fills (translucent hue, shared light/dark).
+         D-5: only _blue (accent) and _red (destructive) survive for new work. -->
     <color name="icon_tile_blue">#334C8DFF</color>
     <color name="icon_tile_green">#3322C55E</color>
     <color name="icon_tile_orange">#33FB923C</color>
@@ -45,7 +143,8 @@
     <!-- Neutral (non-accent) icon tile: solid surface fill + muted glyph.
          Spends no accent budget so default/utility rows stay quiet and the
          blue reads as the only accent. Light = surfaceContainerHighest tone;
-         night overrides in values-night/. -->
+         night overrides in values-night/. Glyph #54607A on fill #E3EAF4
+         measures 5.21:1, clearing the 3:1 icon floor with headroom. -->
     <color name="icon_tile_neutral">#E3EAF4</color>
     <color name="icon_glyph_neutral">#54607A</color>
 
@@ -96,6 +195,102 @@
     <color name="md_theme_scrim">#000000</color>
 
     <!-- ============================================================= -->
+    <!-- LAYER 2 ADDITIONS (light). 2026-07 token wave: D-9, D-10,      -->
+    <!-- accent interaction steps, selection fill, skeleton.            -->
+    <!-- Wire each into AppThemeBase in themes.xml (10-design 4.7).      -->
+    <!-- Ratios below are computed against the LIGHT surfaces:           -->
+    <!-- surface #FFFFFF, background #F4F7FC, inset #E3EAF4.             -->
+    <!-- ============================================================= -->
+
+    <!-- D-9, ?attr/colorOutlineControl. THE boundary of a control: input field,
+         outlined button, segmented track. Light measures: 3.45:1 on surface
+         #FFFFFF, 3.21:1 on background #F4F7FC - both clear the WCAG 1.4.11 3:1
+         floor for a UI component boundary. It exists because colorOutline
+         #C3CCDC measures 1.62:1 on white and 1.45:1 on the dark ground and may
+         never draw a control edge. On the inset plane #E3EAF4 it is 2.85:1, so a
+         field on P3 in the light theme needs its fill lifted or its border
+         darkened - do not ship that pair as-is.
+         colorOutlineVariant keeps the 1dp hairline role at 1.29:1: structural
+         decoration, not a control boundary, and 1.4.11 does not apply to it. -->
+    <color name="md_theme_outlineControl">@color/paper_50</color>
+
+    <!-- ?attr/colorOnSurfaceDim. The dimmed glyph tone, one step below
+         onSurfaceVariant: a chevron or a decorative glyph that must recede
+         without becoming disabled. 9.31:1 on surface, 8.67:1 on background,
+         7.69:1 on the inset plane. Not for text that must be read as content -
+         that is onSurfaceVariant #54607A (6.30:1 on surface). -->
+    <color name="md_theme_onSurfaceDim">@color/paper_28</color>
+
+    <!-- ?attr/warning. The "истекает" / "ждёт оплаты" hue and nothing else: it
+         never becomes a button, a link or a selection colour (00-rules 1.4.1).
+         5.43:1 on surface, 5.06:1 on background - AA as a glyph or as text on a
+         plain plane. On its own chip fill it is NOT legible: see warning_text. -->
+    <color name="warning">@color/amber_40</color>
+
+    <!-- ?attr/warningContainer. The amber status-chip fill, light. 1.13:1 against
+         surface - a fill delta, not a boundary, so 1.4.11 does not apply. -->
+    <color name="warning_container">#FBF1D3</color>
+
+    <!-- D-10, ?attr/warningText. On light, a status chip's text is NOT the status
+         hue: #8A6300 on its own 18% fill measures 4.24:1 and fails AA. This
+         darkened token measures 6.72:1 on warning_container #FBF1D3 (5.92:1 on a
+         true amber-18%-over-white composite #EAE3D1, also AA). On DARK the chip
+         fill is dark enough that the hue itself clears AA (7.51:1), which is why
+         the two columns of this token differ. -->
+    <color name="color_warning_text">@color/amber_28</color>
+    <!-- Alias: 10-design-system.md 4.1/4.7 spells this warning_text and expects
+         themes.xml to bind ?attr/warningText to it; D-10 spells it
+         color_warning_text. One value, both spellings. -->
+    <color name="warning_text">@color/color_warning_text</color>
+
+    <!-- D-10 success-on-chip text, light. Green #0B7D4A on its own 18% fill is
+         4.04:1 and fails AA; #065132 measures 7.34:1 on the spec's green chip
+         fill #D3E8DE and 7.18:1 on the currently-shipped md_theme_tertiaryContainer
+         #A8F0CE, so it is safe on either. Dark keeps the hue (#22C55E, 6.53:1 on
+         the dark chip fill). Pair with ?attr/pingGood when the themes wiring
+         lands; do NOT use onSurfaceVariant on a tinted fill (00-rules 6.7). -->
+    <color name="color_success_text">@color/green_32</color>
+
+    <!-- D-10 destructive-on-chip text, light. DEVIATION, stated openly: D-10
+         names #C42B32 for this token, but #C42B32 IS the light destructive hue,
+         and on the red chip fill it measures 4.22:1 - the exact failure D-10
+         exists to remove (its own reason line quotes "4.22:1 red ... fails AA").
+         10-design-system.md 1.1.4 defines red_38 #9B1B23 as "red text on a light
+         red chip" and 2.3 measures it at 6.13:1 on the #F4D9DA fill, so the more
+         specific table wins: 6.13:1 on #F4D9DA, 6.31:1 on the currently-shipped
+         md_theme_errorContainer #FFDAD6. If the owner wants D-10's literal hex
+         instead, change this one line to @color/red_45 and accept 4.22:1.
+         Dark uses #FF6069 (5.65:1 on the dark red chip fill). -->
+    <color name="color_destructive_text">@color/red_38</color>
+
+    <!-- Accent interaction steps, light. One step DARKER than the accent, never
+         lighter, never a hue flip. These are fills; the label on them is
+         md_theme_onPrimary #FFFFFF, measuring 7.07:1 on accent_hover and 8.46:1
+         on accent_pressed. As a text or glyph colour on surface they are 7.07:1 /
+         8.46:1. Android has no hover state (00-rules 7.1) - accent_hover is a
+         parity token for pointer devices and desktop, accent_pressed backs the
+         pressed fill of a filled control. -->
+    <color name="accent_hover">#1A54B4</color>
+    <color name="accent_pressed">#17499E</color>
+
+    <!-- 12% accent fill: THE selected-item surface (22-components 18). Composites
+         to #E4ECF8 over surface and #DAE5F6 over background; onSurface #111826 on
+         those measures 14.93:1 and 13.97:1. Selection always carries a second
+         channel (accent glyph + weight 700) - tint alone is never a state. -->
+    <color name="accent_fill_12">#1F1E5FC7</color>
+    <!-- Alias: 10-design-system.md 4.1 and the bg_row_selected drawable spell
+         this state_selected. Same 12% fill. -->
+    <color name="state_selected">@color/accent_fill_12</color>
+    <!-- 10% accent, the Android pressed/ripple overlay. Not a resting fill. -->
+    <color name="state_press">#1A1E5FC7</color>
+
+    <!-- ?attr/colorSkeleton. Loading placeholder bar, pulsing 0.45 <-> 1.0 over
+         motion_pulse 1000ms. Equals the inset plane: 1.21:1 against surface,
+         which is correct - a skeleton is a shape, not text, and onSurface over it
+         is 14.67:1 once real content arrives. -->
+    <color name="skeleton">@color/paper_89</color>
+
+    <!-- ============================================================= -->
     <!-- MONO theme (black & white) - applied via ThemeOverlay.Mono    -->
     <!-- ============================================================= -->
     <color name="mono_primary">#111214</color>
@@ -119,6 +314,29 @@
     <color name="mono_fab_active">#111214</color>
     <color name="mono_fab_inactive">#C7C7CC</color>
     <color name="mono_connected">#111214</color>
+
+    <!-- Mono additions, light base (10-design-system.md 1.1.5 / 2.2). Mono is not
+         a colour strip: it re-aliases the accent to ink and keeps every
+         structural token, so these must exist or a mono input field loses its
+         boundary the moment the accent goes greyscale. -->
+    <!-- D-9 control boundary, mono light: 4.53:1 on mono_surface #FFFFFF,
+         4.12:1 on mono_surfaceContainer #F4F4F5. Clears 3:1 with headroom. -->
+    <color name="mono_outlineControl">#767679</color>
+    <!-- Dimmed glyph, mono light: 10.98:1 on mono_surface. -->
+    <color name="mono_onSurfaceDim">#3C3C40</color>
+    <!-- Warning has no hue in mono; it degrades to the secondary text tone and
+         relies on its word and glyph, per 00-rules 6.3 ("never colour alone").
+         6.87:1 on mono_surface. -->
+    <color name="mono_warning">#5A5A5E</color>
+    <!-- Status-chip text, mono light: ink on the neutral chip fill
+         mono_surfaceContainerHighest #E7E7E9 = 15.18:1. -->
+    <color name="mono_warningText">#111214</color>
+    <color name="mono_successText">#111214</color>
+    <color name="mono_destructiveText">#111214</color>
+    <!-- Neutral chip / skeleton fill, mono light: 1.23:1 against mono_surface,
+         a fill delta by design; ink on it is 15.18:1. -->
+    <color name="mono_warningContainer">#E7E7E9</color>
+    <color name="mono_skeleton">#E7E7E9</color>
 
     <!-- Surface container ramp (blue theme, light) - enables layering & glass depth -->
     <color name="md_theme_surfaceContainerLowest">#FFFFFF</color>

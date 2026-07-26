@@ -757,6 +757,71 @@ object AngConfigManager {
     }
 
     /**
+     * Decides which URL a subscription fetch may actually use, or null when it must not run.
+     *
+     * [Utils.isValidSubUrl] is the transport-safety test: https anywhere, or http to loopback or a
+     * private range (that traffic never leaves the device or the LAN, which is why self-hosted
+     * panels keep working below). `allowInsecureUrl` is the user's opt-out from it — and for an
+     * operator-managed (locked) subscription it is deliberately NOT honoured: that URL carries the
+     * account token and the response is the template we then store encrypted precisely because it
+     * is sensitive, so cleartext would undo both at once.
+     *
+     * A locked subscription that IS on cleartext http is not just dropped. `locked` only becomes
+     * known after the first successful fetch ([TemplateManager.applyLockState]), so a plain refusal
+     * would turn a subscription that worked once into one that fails forever, with only a generic
+     * "update failed" to show for it. Instead the same URL is retried over https — a scheme swap,
+     * dropping a redundant `:80`, since asking for TLS on the cleartext port only fails the
+     * handshake — which is what a real panel behind nginx/Caddy answers on anyway. If https does
+     * not answer, the update fails with the reason in the log; it never falls back to http.
+     *
+     * @param url The subscription URL, already IDN-normalised.
+     * @param sub The subscription being fetched.
+     * @return The URL to fetch, or null to fail the update.
+     */
+    private fun resolveSecureSubUrl(url: String, sub: SubscriptionItem): String? {
+        if (Utils.isValidSubUrl(url)) return url
+
+        if (!sub.locked) {
+            // Ordinary subscription: the user's explicit opt-in still governs.
+            if (sub.allowInsecureUrl) return url
+            LogUtil.w(AppConfig.TAG, "Subscription update refused: insecure URL, allowInsecureUrl off")
+            return null
+        }
+
+        val upgraded = toHttpsUrl(url)
+        if (upgraded == null || !Utils.isValidSubUrl(upgraded)) {
+            LogUtil.w(
+                AppConfig.TAG,
+                "Managed subscription update refused: cleartext URL cannot be upgraded to https"
+            )
+            return null
+        }
+        LogUtil.w(
+            AppConfig.TAG,
+            "Managed subscription is on cleartext http; fetching over https instead "
+                + "(allowInsecureUrl does not apply to operator-managed subscriptions)"
+        )
+        return upgraded
+    }
+
+    /**
+     * Rewrites an `http://` URL as `https://`, keeping userinfo, path, query and fragment, and any
+     * explicit port other than the http default. Returns null when [url] is not cleartext http or
+     * carries no parseable host.
+     */
+    private fun toHttpsUrl(url: String): String? {
+        val uri = runCatching { URI(Utils.fixIllegalUrl(url.trim())) }.getOrNull() ?: return null
+        if (!"http".equals(uri.scheme, ignoreCase = true)) return null
+        val host = uri.host?.takeIf { it.isNotBlank() } ?: return null
+        val userInfo = uri.rawUserInfo?.let { "$it@" } ?: ""
+        val port = if (uri.port == -1 || uri.port == 80) "" else ":${uri.port}"
+        val path = uri.rawPath ?: ""
+        val query = uri.rawQuery?.let { "?$it" } ?: ""
+        val fragment = uri.rawFragment?.let { "#$it" } ?: ""
+        return "https://$userInfo$host$port$path$query$fragment"
+    }
+
+    /**
      * Updates the configuration via a subscription.
      *
      * @param it The subscription item.
@@ -781,18 +846,19 @@ object AngConfigManager {
             if (!Utils.isValidUrl(url)) {
                 return SubscriptionUpdateResult(failureCount = 1)
             }
-            if (!it.subscription.allowInsecureUrl) {
-                if (!Utils.isValidSubUrl(url)) {
-                    return SubscriptionUpdateResult(failureCount = 1)
-                }
-            }
-            LogUtil.i(AppConfig.TAG, url)
+            val fetchUrl = resolveSecureSubUrl(url, it.subscription)
+                ?: return SubscriptionUpdateResult(failureCount = 1)
+            LogUtil.i(AppConfig.TAG, fetchUrl)
             // The panel picks the response format (XRAY_JSON template vs base64 link list) from
             // the User-Agent, so a per-subscription override wins over everything, then the
             // global override from the provider screen, then the operator-configured UA. All
-            // three tiers are resolved here because this is the only fetch point: the scheduled
-            // worker also applies the global override, and a manual refresh that skipped it would
-            // pull a different response format than the automatic one for the same subscription.
+            // three tiers are resolved HERE because this is the only fetch point, and both the
+            // scheduled worker and a manual refresh come through it — resolving the global tier
+            // anywhere else would let the automatic and the manual refresh of one subscription
+            // ask for different response formats. The worker deliberately does not pre-stamp the
+            // item (see SubscriptionUpdater.UpdateTask) and neither does the account import (see
+            // SubscriptionSyncManager): this function persists the item, so a UA set on it there
+            // would silently become that subscription's own override and outlive the global one.
             val userAgent = it.subscription.userAgent?.trim()?.ifBlank { null }
                 ?: SettingsManager.getSubscriptionUserAgent()
                 ?: BackendConfig.subscriptionUserAgent
@@ -805,7 +871,7 @@ object AngConfigManager {
                 val httpPort = SettingsManager.getHttpPort()
                 HttpUtil.getUrlContentWithUserAgentEx(
                     UrlContentRequest(
-                        url = url,
+                        url = fetchUrl,
                         userAgent = userAgent,
                         timeout = 15000,
                         httpPort = httpPort,
@@ -822,7 +888,7 @@ object AngConfigManager {
                 result = try {
                     HttpUtil.getUrlContentWithUserAgentEx(
                         UrlContentRequest(
-                            url = url,
+                            url = fetchUrl,
                             userAgent = userAgent,
                             hwid = hwid
                         )

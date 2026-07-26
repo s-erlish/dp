@@ -49,7 +49,19 @@ class SubscriptionSyncManager {
                 this.url = url
                 enabled = true
                 autoUpdate = true
-                userAgent = BackendConfig.subscriptionUserAgent
+                // No per-subscription User-Agent is stamped here on purpose. The fetch resolves
+                // per-sub -> global (provider screen) -> operator default itself, and the per-sub
+                // tier wins absolutely — so stamping the operator default made the provider
+                // screen's User-Agent row dead UI for exactly the subscriptions this deployment
+                // creates, and overwrote a value typed in SubEditActivity on every sign-in and
+                // account refresh. Leaving it unset resolves to the same operator default, but
+                // now an override can actually reach the request.
+                //
+                // Earlier builds did stamp it: a stored value still equal to that default carries
+                // no user intent, so drop it and let the chain apply. Anything else is the user's
+                // and is kept.
+                userAgent = userAgent
+                    ?.takeIf { it.isNotBlank() && it.trim() != BackendConfig.subscriptionUserAgent }
             }
 
             MmkvManager.encodeSubscription(guid, item)

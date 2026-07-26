@@ -31,10 +31,19 @@ object BackendConfig {
      * counts as "not configured": sending it makes Remnawave answer with a plain link list and the
      * operator's routing/DNS template is never applied. An operator overrides this with whatever
      * client string their panel maps to xray-json.
+     *
+     * A build-time value that cannot travel in a header counts as "not configured" too. This
+     * property is not only a subscription fallback — [DepartamentApiClientImpl] sends it verbatim
+     * as the API `User-Agent` — and OkHttp throws while building the request on a non-ASCII value,
+     * so a Cyrillic string here would take down every backend call, not just format negotiation.
      */
     val subscriptionUserAgent: String
         get() = BuildConfig.SUB_USER_AGENT.trim()
-            .takeIf { it.isNotBlank() && !it.equals(BRANDING_USER_AGENT, ignoreCase = true) }
+            .takeIf {
+                it.isNotBlank()
+                    && !it.equals(BRANDING_USER_AGENT, ignoreCase = true)
+                    && HttpUtil.isHeaderSafe(it)
+            }
             ?: HttpUtil.DEFAULT_SUBSCRIPTION_USER_AGENT
 
     /** True only when a backend base URL has been provided at build time. */

@@ -12,6 +12,9 @@ import android.net.VpnService
 import android.os.Bundle
 import android.os.SystemClock
 import android.text.InputType
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
@@ -19,8 +22,11 @@ import android.widget.EditText
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.DrawableCompat
+import androidx.core.view.MenuCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -242,6 +248,23 @@ class MainActivity : HelperBaseActivity() {
         if (SettingsChangeManager.consumeSetupGroupTab()) {
             mainViewModel.reloadServerList()
         }
+    }
+
+    /**
+     * Launcher for the manual server editors (ServerActivity / ServerGroupActivity /
+     * ServerProxyChainActivity).
+     *
+     * Separate from [requestActivityLauncher] because saving a server sets no
+     * [SettingsChangeManager] flag other than restart-service, so a shared launcher would return
+     * without reloading and the just-created server would stay invisible until some other reload
+     * happened to fire. Here the list is reloaded unconditionally.
+     */
+    private val createServerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (SettingsChangeManager.consumeRestartService() && mainViewModel.isRunning.value == true) {
+            restartV2Ray()
+        }
+        mainViewModel.reloadServerList()
+        updateSelectedServer()
     }
 
 
@@ -687,16 +710,78 @@ class MainActivity : HelperBaseActivity() {
             mainViewModel.testAllServers()
             markAllServersTesting()
         }
-        header.btnAdd.setOnClickListener { showImportMenu(it) }
+        // The Servers tab's single trailing control carries BOTH the add actions and the
+        // whole-list actions (32-master-plan-android.md 12.3 gives this header one trailing
+        // action holding exactly that set), so its accessible name is the menu it opens, not
+        // just "add". The glyph is still "+" until the header is rebuilt; see the report.
+        header.btnAdd.contentDescription = getString(R.string.menu_actions_more_cd)
+        header.btnAdd.setOnClickListener { showImportMenu(it, withListActions = true) }
         header.etSearch.doAfterTextChanged { mainViewModel.filterConfig(it?.toString().orEmpty()) }
     }
 
-    /** Popup with the full import/actions menu, anchored to the header "+" button. */
-    private fun showImportMenu(anchor: android.view.View) {
+    /**
+     * Popup for the header controls, anchored to the tapped button.
+     *
+     * [withListActions] adds the whole-list group (sort / export / the three bulk deletes). Only
+     * the Servers tab passes it: Главная owns adding a source, not managing the list.
+     */
+    private fun showImportMenu(anchor: android.view.View, withListActions: Boolean = false) {
         val popup = androidx.appcompat.widget.PopupMenu(this, anchor)
         popup.menuInflater.inflate(R.menu.menu_main, popup.menu)
+        // Icons in a PopupMenu are hidden unless forced, and the drawables ship in mixed
+        // black/white fills, so each visible item is tinted from the theme below.
+        popup.setForceShowIcon(true)
+        MenuCompat.setGroupDividerEnabled(popup.menu, true)
+        prepareMenu(popup.menu, withListActions)
         popup.setOnMenuItemClickListener { onOptionsItemSelected(it) }
         popup.show()
+    }
+
+    /**
+     * Decides what the popup may offer, so no item in it can be a dead end:
+     *
+     * - the whole-list group is hidden entirely when there is nothing to act on (no servers) or
+     *   when the surface does not own list actions;
+     * - «Экспортировать в буфер» is disabled when every server is operator-locked, because
+     *   `AngConfigManager.shareConfig()` refuses to emit a link for those by design;
+     * - the three deletions are painted in `colorError` (1.4.1: red is destructive only) and sit
+     *   behind the group divider, so the destructive half of the menu is legible before a tap.
+     */
+    private fun prepareMenu(menu: Menu, withListActions: Boolean) {
+        val neutral = themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
+        val destructive = themeColor(androidx.appcompat.R.attr.colorError)
+
+        val hasServers = mainViewModel.serversCache.isNotEmpty()
+        menu.setGroupVisible(R.id.group_server_list, withListActions && hasServers)
+
+        val exportable = mainViewModel.serversCache.any { !TemplateManager.isLocked(it.profile) }
+        menu.findItem(R.id.servers_export)?.isEnabled = exportable
+
+        for (i in 0 until menu.size()) {
+            val item = menu.getItem(i)
+            if (!item.isVisible) continue
+            val isDestructive = item.itemId == R.id.servers_del_duplicate ||
+                item.itemId == R.id.servers_del_invalid ||
+                item.itemId == R.id.servers_del_all
+            paintMenuItem(item, if (isDestructive) destructive else neutral, tintTitle = isDestructive)
+        }
+    }
+
+    /** Tints one menu item's glyph (and its label, for destructive items) from the theme. */
+    private fun paintMenuItem(item: MenuItem, color: Int, tintTitle: Boolean) {
+        item.icon?.let { icon ->
+            val glyph = icon.mutate()
+            DrawableCompat.setTint(glyph, color)
+            // Disabled = 0.38 on the whole control (00-rules.md 7.1); the label is greyed by the
+            // menu itself, the glyph is not.
+            glyph.alpha = if (item.isEnabled) 255 else 97
+            item.icon = glyph
+        }
+        if (tintTitle) {
+            val label = SpannableString(item.title ?: "")
+            label.setSpan(ForegroundColorSpan(color), 0, label.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            item.title = label
+        }
     }
 
     private fun setupEmptyState() {
@@ -2058,10 +2143,10 @@ class MainActivity : HelperBaseActivity() {
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        // No toolbar action menu: the "+" add action lives in the Home scrolling header and the
-        // Servers-tab header (both open the same menu_main PopupMenu via showImportMenu), and the
-        // Settings tab intentionally has no "+". onOptionsItemSelected is still reused by those
-        // PopupMenus, so it stays as-is.
+        // No toolbar action menu: the fixed app bar is hidden on every tab, so the header controls
+        // own the menu. Both open menu_main as a PopupMenu via showImportMenu (Главная: the add
+        // group only; Серверы: add + whole-list actions), and the Settings tab has no control at
+        // all. onOptionsItemSelected is the shared dispatch for those PopupMenus, so it stays.
         return false
     }
 
@@ -2082,10 +2167,46 @@ class MainActivity : HelperBaseActivity() {
         }
 
         R.id.import_manually_vless -> {
-            // "Ввести вручную" — a simple text-input dialog where the user pastes/types a config
+            // «Ввести ссылку» - a simple text-input dialog where the user pastes/types a config
             // or subscription link by hand; the entered text is imported via the same path as
             // pasted clipboard text (importBatchConfig).
             showManualEntryDialog()
+            true
+        }
+
+        R.id.import_create -> {
+            // «Создать вручную» - pick the protocol, then fill in the server by hand.
+            pickManualServerType()
+            true
+        }
+
+        R.id.import_file -> {
+            importConfigLocal()
+            true
+        }
+
+        R.id.servers_sort -> {
+            sortByTestResults()
+            true
+        }
+
+        R.id.servers_export -> {
+            exportAll()
+            true
+        }
+
+        R.id.servers_del_duplicate -> {
+            delDuplicateConfig()
+            true
+        }
+
+        R.id.servers_del_invalid -> {
+            delInvalidConfig()
+            true
+        }
+
+        R.id.servers_del_all -> {
+            delAllConfig()
             true
         }
 
@@ -2097,21 +2218,60 @@ class MainActivity : HelperBaseActivity() {
         else -> super.onOptionsItemSelected(item)
     }
 
+    /**
+     * «Создать вручную»: choose what is being created, then open its editor.
+     *
+     * The editors pick their layout from `createConfigType` and give the user no way to change it
+     * afterwards ([ServerActivity] onCreate maps the type to a layout and finishes silently for a
+     * type it has none for), so the type has to be settled here. Only types with a real editor are
+     * offered: CUSTOM is deliberately absent because [ServerActivity] would open blank for it, and
+     * a raw xray-json body already imports through «Ввести ссылку». A proxy chain is offered only
+     * when there are at least two plain servers to chain, which is what
+     * [ServerProxyChainActivity.saveServer] requires.
+     */
+    private fun pickManualServerType() {
+        val types = mutableListOf(
+            "VLESS" to EConfigType.VLESS,
+            "VMess" to EConfigType.VMESS,
+            "Trojan" to EConfigType.TROJAN,
+            "Shadowsocks" to EConfigType.SHADOWSOCKS,
+            "WireGuard" to EConfigType.WIREGUARD,
+            "Hysteria2" to EConfigType.HYSTERIA2,
+            "SOCKS5" to EConfigType.SOCKS,
+            "HTTP" to EConfigType.HTTP,
+            getString(R.string.menu_actions_type_group) to EConfigType.POLICYGROUP,
+        )
+        val chainable = mainViewModel.serversCache.count { !it.profile.configType.isComplexType() }
+        if (chainable >= 2) {
+            types.add(getString(R.string.menu_actions_type_chain) to EConfigType.PROXYCHAIN)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.menu_actions_type_title)
+            .setItems(types.map { it.first }.toTypedArray()) { dialog, which ->
+                dialog.dismiss()
+                importManually(types[which].second.value)
+            }
+            .setNegativeButton(R.string.menu_actions_cancel, null)
+            .show()
+    }
+
     private fun importManually(createConfigType: Int) {
+        // Launched through createServerLauncher (not startActivity) so the new server appears in
+        // the list the moment the editor returns.
         if (createConfigType == EConfigType.POLICYGROUP.value) {
-            startActivity(
+            createServerLauncher.launch(
                 Intent()
                     .putExtra("subscriptionId", mainViewModel.subscriptionId)
                     .setClass(this, ServerGroupActivity::class.java)
             )
         } else if (createConfigType == EConfigType.PROXYCHAIN.value) {
-            startActivity(
+            createServerLauncher.launch(
                 Intent()
                     .putExtra("subscriptionId", mainViewModel.subscriptionId)
                     .setClass(this, ServerProxyChainActivity::class.java)
             )
         } else {
-            startActivity(
+            createServerLauncher.launch(
                 Intent()
                     .putExtra("createConfigType", createConfigType)
                     .putExtra("subscriptionId", mainViewModel.subscriptionId)
@@ -2290,86 +2450,271 @@ class MainActivity : HelperBaseActivity() {
         return true
     }
 
+    /**
+     * «Экспортировать в буфер»: every shareable server as one newline-separated list of links.
+     *
+     * `AngConfigManager.shareConfig()` returns nothing for an operator-locked profile and for the
+     * complex types (custom json, group, chain), so a partial result is normal and the count is
+     * what the user is told. The menu item is already disabled when nothing at all is shareable.
+     */
     private fun exportAll() {
         showLoading()
         lifecycleScope.launch(Dispatchers.IO) {
             val ret = mainViewModel.exportAllServer()
-            launch(Dispatchers.Main) {
-                if (ret > 0)
-                    toast(getString(R.string.title_export_config_count, ret))
-                else
-                    toastError(R.string.toast_failure)
+            withContext(Dispatchers.Main) {
                 hideLoading()
+                if (ret > 0) {
+                    showActionSnackbar(getString(R.string.menu_actions_export_done, ret))
+                } else {
+                    showActionSnackbar(getString(R.string.menu_actions_export_failed))
+                }
             }
         }
     }
 
+    /**
+     * «Удалить все серверы»: the one bulk deletion that keeps a dialog.
+     *
+     * 00-rules.md 7.5 allows a confirmation only for the genuinely irreversible, and this is it:
+     * `MmkvManager.removeAllServer()` clears the whole profile store, the per-provider indexes and
+     * the selected-server key in one `clearAll()`, so there is no per-item removal left to reverse.
+     * Provider servers come back with «Обновить подписки»; hand-added ones do not come back at all,
+     * which is what the dialog body says.
+     */
     private fun delAllConfig() {
-        AlertDialog.Builder(this).setMessage(R.string.del_config_comfirm)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
+        if (!bulkDeleteAllowed()) return
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.menu_actions_del_all)
+            .setMessage(R.string.menu_actions_del_all_body)
+            .setPositiveButton(R.string.menu_actions_del_all_confirm) { _, _ ->
                 showLoading()
                 lifecycleScope.launch(Dispatchers.IO) {
-                    val ret = mainViewModel.removeAllServer()
-                    launch(Dispatchers.Main) {
+                    // MmkvManager.removeAllServer() wipes the whole MAIN store, which also holds
+                    // the WebDAV backup config - collateral the label does not promise. Carry it
+                    // across. (The subscription id list rebuilds itself from the SUB store on the
+                    // next read, so providers survive.)
+                    val webDav = MmkvManager.decodeWebDavConfig()
+                    // What the user is told is what the user could see. The store-level count can
+                    // be larger (it counts every profile key, including any orphan not listed
+                    // under a provider), and a receipt that overstates the deletion is a lie.
+                    val listed = mainViewModel.serversCache.size
+                    val wiped = mainViewModel.removeAllServer()
+                    webDav?.let { MmkvManager.encodeWebDavConfig(it) }
+                    LogUtil.i(AppConfig.TAG, "delAllConfig: $listed listed servers, $wiped profile entries wiped")
+                    withContext(Dispatchers.Main) {
                         mainViewModel.reloadServerList()
-                        toast(getString(R.string.title_del_config_count, ret))
+                        updateSelectedServer()
                         hideLoading()
+                        showActionSnackbar(getString(R.string.menu_actions_all_deleted, listed))
                     }
                 }
             }
-            .setNegativeButton(android.R.string.cancel) { _, _ ->
-                //do noting
-            }
-            .show()
+            .setNegativeButton(R.string.menu_actions_cancel, null)
+            .create()
+        // 7.5: the confirm is the red button on the right, cancel stays neutral on the left.
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                ?.setTextColor(themeColor(androidx.appcompat.R.attr.colorError))
+        }
+        dialog.show()
     }
 
+    /**
+     * «Удалить дубликаты»: removes immediately and offers undo, per 00-rules.md 7.5 - a duplicate
+     * is a copy of a server that is still in the list, so nothing unique is at stake.
+     */
     private fun delDuplicateConfig() {
-        AlertDialog.Builder(this).setMessage(R.string.del_config_comfirm)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                showLoading()
-                lifecycleScope.launch(Dispatchers.IO) {
-                    val ret = mainViewModel.removeDuplicateServer()
-                    launch(Dispatchers.Main) {
-                        mainViewModel.reloadServerList()
-                        toast(getString(R.string.title_del_duplicate_config_count, ret))
-                        hideLoading()
-                    }
-                }
-            }
-            .setNegativeButton(android.R.string.cancel) { _, _ ->
-                //do noting
-            }
-            .show()
+        if (!bulkDeleteAllowed()) return
+        runBulkDelete(
+            remove = { mainViewModel.removeDuplicateServer() },
+            successText = R.string.menu_actions_duplicates_deleted,
+            emptyResult = { showActionSnackbar(getString(R.string.menu_actions_duplicates_none)) },
+        )
     }
 
+    /**
+     * «Удалить недоступные»: removes the servers whose last latency check failed, with undo.
+     *
+     * "Invalid" means a stored delay below zero, so with no check ever run there is nothing to
+     * remove and the old dialog's «Выполните проверку перед удалением» was the only hint. Instead
+     * of a warning before the fact, the empty outcome now says why and offers the check itself.
+     */
     private fun delInvalidConfig() {
-        AlertDialog.Builder(this).setMessage(R.string.del_invalid_config_comfirm)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                showLoading()
-                lifecycleScope.launch(Dispatchers.IO) {
-                    val ret = mainViewModel.removeInvalidServer()
-                    launch(Dispatchers.Main) {
-                        mainViewModel.reloadServerList()
-                        toast(getString(R.string.title_del_config_count, ret))
-                        hideLoading()
-                    }
-                }
-            }
-            .setNegativeButton(android.R.string.cancel) { _, _ ->
-                //do noting
-            }
-            .show()
+        if (!bulkDeleteAllowed()) return
+        runBulkDelete(
+            remove = { mainViewModel.removeInvalidServer() },
+            successText = R.string.menu_actions_invalid_deleted,
+            emptyResult = {
+                showActionSnackbar(
+                    getString(R.string.menu_actions_invalid_none),
+                    getString(R.string.menu_actions_check),
+                ) { startLatencyCheckAll() }
+            },
+        )
     }
 
+    /**
+     * Shared body of the two undoable bulk deletions: snapshot, delete, report the count with an
+     * «Отменить» action that puts the removed servers back exactly where they were.
+     */
+    private fun runBulkDelete(
+        remove: () -> Int,
+        @StringRes successText: Int,
+        emptyResult: () -> Unit,
+    ) {
+        showLoading()
+        lifecycleScope.launch(Dispatchers.IO) {
+            val snapshot = snapshotServers()
+            val ret = remove()
+            withContext(Dispatchers.Main) {
+                mainViewModel.reloadServerList()
+                updateSelectedServer()
+                hideLoading()
+                if (ret > 0) {
+                    showActionSnackbar(
+                        getString(successText, ret),
+                        getString(R.string.menu_actions_undo),
+                    ) { undoBulkDelete(snapshot) }
+                } else {
+                    emptyResult()
+                }
+            }
+        }
+    }
+
+    /** Everything needed to put a bulk-deleted set of servers back, taken before the deletion. */
+    private class ServersSnapshot(
+        val profiles: Map<String, ProfileItem>,
+        val delays: Map<String, Long>,
+        val order: Map<String, List<String>>,
+        val selected: String?,
+    )
+
+    /**
+     * Reads the current servers into memory: the profile behind each guid, its measured latency,
+     * the per-provider order and the selected guid. Raw xray-json bodies are not captured because
+     * `MmkvManager.removeServer()` leaves the raw store untouched.
+     *
+     * Call from a background dispatcher: this is one json parse per server.
+     */
+    private fun snapshotServers(): ServersSnapshot {
+        val profiles = LinkedHashMap<String, ProfileItem>()
+        val delays = HashMap<String, Long>()
+        // Copied first: the cache itself is rebuilt on the main thread, and this runs on IO.
+        mainViewModel.serversCache.toList().forEach { cached ->
+            MmkvManager.decodeServerConfig(cached.guid)?.let { profiles[cached.guid] = it }
+            MmkvManager.decodeServerAffiliationInfo(cached.guid)?.let {
+                delays[cached.guid] = it.testDelayMillis
+            }
+        }
+        val subIds = (listOf(AppConfig.DEFAULT_SUBSCRIPTION_ID) + MmkvManager.decodeSubsList()).distinct()
+        val order = subIds.associateWith { MmkvManager.decodeServerList(it).toList() }
+        return ServersSnapshot(profiles, delays, order, MmkvManager.getSelectServer())
+    }
+
+    /**
+     * Restores a [ServersSnapshot]: re-encodes the profiles that are gone, puts their latency back,
+     * then rewrites each provider's order from the snapshot with anything added since appended, so
+     * a subscription refresh that landed inside the undo window is not thrown away.
+     */
+    private fun undoBulkDelete(snapshot: ServersSnapshot) {
+        showLoading()
+        lifecycleScope.launch(Dispatchers.IO) {
+            snapshot.profiles.forEach { (guid, profile) ->
+                if (MmkvManager.decodeServerConfig(guid) == null) {
+                    MmkvManager.encodeServerConfig(guid, profile)
+                    snapshot.delays[guid]?.let { MmkvManager.encodeServerTestDelayMillis(guid, it) }
+                }
+            }
+            snapshot.order.forEach { (subId, guids) ->
+                val restored = guids.filter { MmkvManager.decodeServerConfig(it) != null }.toMutableList()
+                MmkvManager.decodeServerList(subId).forEach { guid ->
+                    if (!restored.contains(guid)) restored.add(guid)
+                }
+                MmkvManager.encodeServerList(restored, subId)
+            }
+            // encodeServerConfig() claims the selection when none is set, so put the user's own
+            // choice back if it survived.
+            snapshot.selected
+                ?.takeIf { MmkvManager.decodeServerConfig(it) != null }
+                ?.let { MmkvManager.setSelectServer(it) }
+            withContext(Dispatchers.Main) {
+                mainViewModel.reloadServerList()
+                updateSelectedServer()
+                hideLoading()
+                showActionSnackbar(getString(R.string.menu_actions_restored))
+            }
+        }
+    }
+
+    /**
+     * Bulk deletions are refused while the tunnel is up.
+     *
+     * Deleting the running server would leave the hero labelled with a server that no longer
+     * exists, and emptying the list hides the connect control altogether ([updateHomeEmptyState]),
+     * which would strand the user with a live tunnel and no way to stop it. The per-server delete
+     * already refuses to touch the selected server, so this is the same rule at list scale.
+     */
+    private fun bulkDeleteAllowed(): Boolean {
+        if (mainViewModel.isRunning.value != true) return true
+        showActionSnackbar(
+            getString(R.string.menu_actions_busy),
+            getString(R.string.menu_actions_busy_action),
+        ) { handleFabAction() }
+        return false
+    }
+
+    /**
+     * «Сортировать по задержке»: reorders each provider's group by its measured latency.
+     *
+     * With no measurement there is nothing to sort by and the old code just spun the loader and
+     * changed nothing, so the untested case now says so and offers the check.
+     */
     private fun sortByTestResults() {
+        val measured = mainViewModel.serversCache.toList().any { cached ->
+            (MmkvManager.decodeServerAffiliationInfo(cached.guid)?.testDelayMillis ?: 0L) > 0L
+        }
+        if (!measured) {
+            showActionSnackbar(
+                getString(R.string.menu_actions_no_delay),
+                getString(R.string.menu_actions_check),
+            ) { startLatencyCheckAll() }
+            return
+        }
         showLoading()
         lifecycleScope.launch(Dispatchers.IO) {
             mainViewModel.sortByTestResults()
-            launch(Dispatchers.Main) {
+            withContext(Dispatchers.Main) {
                 mainViewModel.reloadServerList()
                 hideLoading()
+                showActionSnackbar(getString(R.string.menu_actions_sorted))
             }
         }
+    }
+
+    /** Runs the latency check over the whole list and puts every row into its testing state. */
+    private fun startLatencyCheckAll() {
+        mainViewModel.testAllServers()
+        markAllServersTesting()
+    }
+
+    /**
+     * The one feedback surface for these actions: a themed Snackbar, never a Toast (00-rules.md
+     * 1.4.8 - anything the user can act on needs an action). 5s with an action, 3s without
+     * (22-components.md 14). Anchored above the bottom navigation only while it is actually
+     * visible - in the signed-out empty state it is gone, and anchoring to a hidden view would
+     * park the bar in the wrong place.
+     */
+    private fun showActionSnackbar(
+        text: CharSequence,
+        actionLabel: CharSequence? = null,
+        action: (() -> Unit)? = null,
+    ) {
+        val bar = Snackbar.make(binding.mainContent, text, Snackbar.LENGTH_LONG)
+        bar.duration = if (action != null) 5000 else 3000
+        if (binding.bottomNav.isVisible) bar.setAnchorView(binding.bottomNav)
+        if (action != null && actionLabel != null) bar.setAction(actionLabel) { action() }
+        bar.show()
     }
 
     /**
@@ -2387,14 +2732,24 @@ class MainActivity : HelperBaseActivity() {
 
     /**
      * read content from uri
+     *
+     * A file the system hands back can still be unreadable (revoked permission, a directory, a
+     * provider that dies mid-read). That used to fail into the log only, leaving the tap with no
+     * visible outcome at all, so the failure is reported.
      */
     private fun readContentFromUri(uri: Uri) {
         try {
             contentResolver.openInputStream(uri).use { input ->
-                importBatchConfig(input?.bufferedReader()?.readText())
+                val text = input?.bufferedReader()?.readText()
+                if (text.isNullOrBlank()) {
+                    showActionSnackbar(getString(R.string.menu_actions_file_failed))
+                    return
+                }
+                importBatchConfig(text)
             }
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to read content from URI", e)
+            showActionSnackbar(getString(R.string.menu_actions_file_failed))
         }
     }
 
