@@ -70,6 +70,8 @@ It was removed because a spec redesigned the screen. It comes back as it was.
 | F2 | **The Аккаунт tab is unstyled** — it is a bare card floating in an empty pane. Build it to the same standard as the Android account tab. |
 | F3 | **Android is the reference for the desktop, not the other way round.** Where the two disagree on look, the phone wins, and the desktop is brought to it — natively, but one to one in structure, hierarchy and copy. |
 
+| F4 | **Server names are clipped in the desktop list.** «у серверов везде кривой текст». In the screenshot the tops of the capitals are cut off — "Germany", "Latvia", "LTE Белый интернет 1" all lose their ascenders. A TextBlock whose height is fixed below the font's ascent, or a line height set smaller than the face needs, will do this; Cyrillic and Latin caps clip together, so it is metrics, not a glyph gap. Fix the metric, not by nudging a margin. Likely the same root cause as the "font looks too heavy" complaint — a face resolving to something other than the intended one. `Views/ServerListView.axaml`. |
+
 ---
 
 ## The rule this feedback exists to enforce
