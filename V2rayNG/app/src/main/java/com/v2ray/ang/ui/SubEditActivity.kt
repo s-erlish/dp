@@ -253,7 +253,7 @@ class SubEditActivity : BaseActivity() {
 
         MmkvManager.encodeSubscription(editSubId, subItem)
         SubscriptionUpdater.syncOne(subId = editSubId)
-        toastSuccess(R.string.toast_success)
+        toastSuccess(R.string.editor_saved)
         SubPage.close(this)
     }
 

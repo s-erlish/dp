@@ -123,7 +123,7 @@ class UserAssetUrlActivity : BaseActivity() {
         assetItem.remarks = remarks
         assetItem.url = url
         MmkvManager.encodeAsset(assetId, assetItem)
-        toastSuccess(R.string.toast_success)
+        toastSuccess(R.string.editor_saved)
         SubPage.close(this)
     }
 

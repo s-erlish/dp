@@ -335,7 +335,7 @@ class BackupActivity : HelperBaseActivity() {
                 )
                 // The cloud rows depend on this, so they are re-evaluated the moment it changes.
                 bindRows()
-                toastSuccess(R.string.toast_success)
+                toastSuccess(R.string.editor_saved)
             }
             .setNegativeButton(R.string.editor_cancel, null)
             .show()

@@ -169,7 +169,7 @@ class ServerProxyChainActivity : BaseActivity() {
             return
         }
         if (members.size < MIN_CHAIN_MEMBERS) {
-            toastError(R.string.server_proxy_chain_members_insufficient)
+            toastError(R.string.srv_chain_too_few)
             return
         }
 
@@ -178,7 +178,7 @@ class ServerProxyChainActivity : BaseActivity() {
             profile == null || profile.configType.isComplexType()
         }
         if (invalid.isNotEmpty()) {
-            toastError(getString(R.string.server_proxy_chain_members_invalid, invalid.joinToString(", ")))
+            toastError(getString(R.string.srv_chain_invalid_members, invalid.joinToString(", ")))
             return
         }
 
@@ -193,14 +193,14 @@ class ServerProxyChainActivity : BaseActivity() {
 
         MmkvManager.encodeServerConfig(editGuid, config)
         if (isRunning) SettingsChangeManager.makeRestartService()
-        toastSuccess(R.string.toast_success)
+        toastSuccess(R.string.editor_saved)
         SubPage.close(this)
     }
 
     private fun deleteServer() {
         if (editGuid.isEmpty()) return
         if (editGuid == MmkvManager.getSelectServer()) {
-            toastError(R.string.toast_action_not_allowed)
+            toastError(R.string.srv_delete_selected)
             return
         }
         if (MmkvManager.decodeSettingsBool(AppConfig.PREF_CONFIRM_REMOVE)) {

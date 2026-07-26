@@ -330,7 +330,7 @@ class PerAppProxyActivity : BaseActivity() {
             selectProxyApp(content, force = true)
             afterBulkChange()
             applyFilter()
-            toastSuccess(R.string.toast_success)
+            toastSuccess(R.string.editor_done)
         }
     }
 
@@ -339,14 +339,14 @@ class PerAppProxyActivity : BaseActivity() {
         if (TextUtils.isEmpty(content)) return
         selectProxyApp(content, force = false)
         afterBulkChange()
-        toastSuccess(R.string.toast_success)
+        toastSuccess(R.string.editor_done)
     }
 
     private fun exportProxyApp() {
         val header = (currentMode() == Mode.EXCEPT).toString()
         val payload = viewModel.getAll().fold(header) { acc, pkg -> acc + System.lineSeparator() + pkg }
         Utils.setClipboard(applicationContext, payload)
-        toastSuccess(R.string.toast_success)
+        toastSuccess(R.string.editor_done)
     }
 
     private fun selectProxyApp(content: String, force: Boolean): Boolean {

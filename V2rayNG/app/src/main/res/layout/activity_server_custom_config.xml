@@ -34,7 +34,7 @@
         android:layout_marginTop="@dimen/space_8"
         android:paddingStart="@dimen/screen_gutter"
         android:paddingEnd="@dimen/screen_gutter"
-        android:text="@string/server_lab_need_inbound"
+        android:text="@string/srv_config_note"
         android:textAppearance="@style/TextAppearance.App.Caption" />
 
     <TextView
@@ -71,7 +71,7 @@
         android:layout_marginTop="@dimen/space_16"
         android:paddingStart="@dimen/screen_gutter"
         android:paddingEnd="@dimen/screen_gutter"
-        android:text="@string/server_lab_content"
+        android:text="@string/srv_config_label"
         android:textAppearance="@style/TextAppearance.App.Title.Medium" />
 
     <!-- weight 1: the editor owns the leftover height and scrolls its own content,

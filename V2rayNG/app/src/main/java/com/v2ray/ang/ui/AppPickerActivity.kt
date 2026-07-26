@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityAppPickerBinding
@@ -91,6 +92,11 @@ class AppPickerActivity : BaseActivity() {
         )
         ToolbarBinder.attachTo(binding.toolbar.root, binding.recyclerView)
 
+        // Without this the RecyclerView never lays out - it logs «No layout manager attached;
+        // skipping layout» and draws an empty screen, which is what this list did after the
+        // rebuild. The layout declares no app:layoutManager, so it has to be set here.
+        binding.recyclerView.setHasFixedSize(true)
+        binding.recyclerView.layoutManager = LinearLayoutManager(this)
         binding.recyclerView.adapter = adapter
         binding.search.searchInput.setHint(R.string.perapp_search_hint)
         binding.search.searchInput.doAfterTextChanged {
@@ -123,7 +129,7 @@ class AppPickerActivity : BaseActivity() {
                 ?: getDrawable(android.R.drawable.sym_def_app_icon)
         ) { "No fallback drawable available" }
         return AppInfo(
-            appName = getString(R.string.app_picker_unknown_app),
+            appName = getString(R.string.perapp_unknown_app),
             packageName = AppConfig.UNIDENTIFIED_PACKAGE,
             appIcon = icon,
             isSystemApp = false,

@@ -197,7 +197,7 @@ class RoutingEditActivity : BaseActivity() {
         }
 
         SettingsManager.saveRoutingRuleset(position, ruleset)
-        toastSuccess(R.string.toast_success)
+        toastSuccess(R.string.editor_saved)
         SubPage.close(this)
     }
 

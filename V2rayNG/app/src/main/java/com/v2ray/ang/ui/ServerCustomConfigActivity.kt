@@ -119,7 +119,7 @@ class ServerCustomConfigActivity : BaseActivity() {
         MmkvManager.encodeServerConfig(editGuid, config)
         MmkvManager.encodeServerRaw(editGuid, binding.editor.text.toString())
         if (isRunning) SettingsChangeManager.makeRestartService()
-        toastSuccess(R.string.toast_success)
+        toastSuccess(R.string.editor_saved)
         SubPage.close(this)
     }
 

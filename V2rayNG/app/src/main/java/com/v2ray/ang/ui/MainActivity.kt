@@ -399,7 +399,6 @@ class MainActivity : HelperBaseActivity(), MainHost {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
-        setupToolbar(binding.toolbar, false, getString(R.string.app_name))
         applyThemeDecorations()
         setupEdgeToEdge()
 
@@ -413,24 +412,22 @@ class MainActivity : HelperBaseActivity(), MainHost {
         mainViewModel.subscriptionId = ""
         setupHomeServerList()
 
-        setupBottomNav()
-        // Keep the user on the tab they were on when the activity is recreated
-        // (e.g. after a theme or language change) instead of jumping back to Home.
-        val restoredNav = savedInstanceState?.getInt(KEY_SELECTED_NAV, R.id.nav_home) ?: R.id.nav_home
-        if (restoredNav != R.id.nav_home && selectedNavId != restoredNav) {
-            selectNav(restoredNav)
-        }
+        // Keep the user on the tab they were on when the activity is recreated (e.g. after a theme
+        // or language change) instead of jumping back to Home. Handed to setupBottomNav so the
+        // restored tab is the FIRST one painted: selecting Home and then correcting it would run
+        // two fragment transactions and a fade-through the user never asked for.
+        setupBottomNav(savedInstanceState?.getInt(KEY_SELECTED_NAV, R.id.nav_home) ?: R.id.nav_home)
+        // The one BACK handler in the shell: any other tab goes to Главная first, and Главная
+        // minimises. See onKeyDown for why nothing else may handle the key.
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 when {
                     selectedNavId != R.id.nav_home ->
                         selectNav(R.id.nav_home)
 
-                    else -> {
-                        isEnabled = false
-                        onBackPressedDispatcher.onBackPressed()
-                        isEnabled = true
-                    }
+                    // Keep the upstream semantic on Главная: minimise the task, leaving the
+                    // tunnel running and the app in Recents, rather than finishing the activity.
+                    else -> moveTaskToBack(false)
                 }
             }
         })
@@ -479,10 +476,11 @@ class MainActivity : HelperBaseActivity(), MainHost {
     }
 
     /**
-     * Wires the bottom navigation: Home shows the connect hero, Servers shows the
-     * subscription/server list, and Settings shows the custom Incy settings screen.
+     * Wires the bottom navigation and paints [initialNav] as the first tab on screen: Home shows
+     * the connect hero, Servers and Account are fragments in the shared container, and Settings
+     * shows the custom Incy settings screen.
      */
-    private fun setupBottomNav() {
+    private fun setupBottomNav(initialNav: Int) {
         // The custom bar is a plain LinearLayout with no fitsSystemWindows behaviour, so it never
         // auto-pads itself; setupEdgeToEdge's parent listener is the single source of its bottom
         // inset padding. (A no-op listener returning the insets unchanged used to sit here.)
@@ -492,7 +490,19 @@ class MainActivity : HelperBaseActivity(), MainHost {
         // The Account item is a real in-place content tab (AccountFragment), selected like the
         // others; its fragment is attached lazily the first time it is opened (see syncTabFragments).
         binding.navAccount.setOnClickListener { selectNav(R.id.nav_account) }
-        selectNav(R.id.nav_home)
+        // Аккаунт exists only while signed in, so a restored selection of it is honoured only if
+        // that is still true — otherwise the tab would be attached (and would start loading) for a
+        // user updateAccountGate is about to move off it anyway.
+        val start = if (initialNav == R.id.nav_account && !accountAccessAllowed()) {
+            R.id.nav_home
+        } else {
+            initialNav
+        }
+        // Not selectNav: the first paint has nothing to fade FROM, so it takes showTab's instant
+        // path (previous == tab) and lands on the restored tab in one transaction.
+        selectedNavId = start
+        updateNavSelection(start)
+        showTab(start, start)
     }
 
     /** Currently selected bottom-nav tab (replaces BottomNavigationView.selectedItemId). */
@@ -627,8 +637,16 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * Called ONLY when the FragmentManager has no instance under [MainTab.tag] — a tab is built
      * once per process and then kept, so this is not a place to pass per-open arguments.
      *
-     * Аккаунт and Серверы have moved. Moving Главная or Настройки is: add the branch here, and
-     * point that tab's [tabGroup] entry at `binding.tabHost`.
+     * Аккаунт and Серверы have moved. Moving Главная or Настройки is four steps, in this order:
+     * 1. write the fragment as a `BaseFragment<VB>` (it gets `mainViewModel` and `mainHost` from
+     *    there — it does not cast the activity, and it does not own a second `MainViewModel`),
+     * 2. add its branch here,
+     * 3. point that tab's [tabGroup] entry at `binding.tabHost`, and
+     * 4. delete its sibling group from `activity_main.xml` and its entry from [tabGroups], which
+     *    is the list [settleTabs] treats as the complete set of tab-content views.
+     *
+     * Anything the moved screen needs from the shell — the connect actions, the status pill, the
+     * list inset, the row actions — is added to [MainHost], not reached for by casting.
      */
     private fun createTabFragment(tab: MainTab): Fragment? = when (tab) {
         MainTab.ACCOUNT -> AccountFragment()
@@ -698,14 +716,50 @@ class MainActivity : HelperBaseActivity(), MainHost {
         binding.tabHost,
     )
 
+    /**
+     * Id of the tab swap currently in flight, bumped by every swap and by every instant settle.
+     *
+     * A swap started while an earlier one is still fading SUPERSEDES it, and the earlier swap's
+     * end action must not then paint the tab the user has already moved on from. `withEndAction`
+     * cannot be relied on for that: it does not run at all when its animator is cancelled, and the
+     * newer swap's fade-in cancels the older one by touching the same property on the same view.
+     * So the older action still runs and has to recognise, from this counter, that it is stale.
+     */
+    private var tabSwapId = 0
+
+    /**
+     * Takes one tab group off screen and clears whatever a superseded swap left on it — the
+     * running animator, a part-way alpha, the 8dp entrance offset.
+     */
+    private fun hideTabGroup(group: View) {
+        group.animate().cancel()
+        group.alpha = 1f
+        group.translationY = 0f
+        group.isVisible = false
+    }
+
+    /**
+     * The single authority on which tab group is on screen: [visible] is shown at rest and every
+     * other group is hidden and reset. Bumping [tabSwapId] here is what stops an in-flight swap's
+     * end action from repainting over this.
+     */
+    private fun settleTabs(visible: View?) {
+        tabSwapId++
+        tabGroups().forEach { group ->
+            if (group === visible) {
+                group.animate().cancel()
+                group.alpha = 1f
+                group.translationY = 0f
+                group.isVisible = true
+            } else {
+                hideTabGroup(group)
+            }
+        }
+    }
+
     private fun showTab(tab: Int, previous: Int = tab) {
         // Attach/show this tab's fragment before anything reads the container, and hide the rest.
         syncTabFragments(tab)
-        // No tab shows a title or "+" in the top bar, so the fixed AppBarLayout is hidden on ALL
-        // tabs (each tab's content gets the status-bar top inset directly in setupEdgeToEdge). This
-        // removes the empty top band the toolbar left on the Servers/Settings tabs.
-        binding.appbarLayout.isVisible = false
-        supportActionBar?.title = ""
 
         val incoming = tabGroup(tab)
         // Two tabs that live in the same fragment container share one view: syncTabFragments has
@@ -715,19 +769,28 @@ class MainActivity : HelperBaseActivity(), MainHost {
 
         // Instant swap on the initial paint, a same-tab reselect, or reduced motion.
         if (incoming == null || outgoing == null || binding.homeRoot.reducedMotion()) {
-            tabGroups().forEach { it.isVisible = it === incoming }
+            settleTabs(incoming)
             maybeRevealServersTab(tab)
             return
         }
+
+        // Every group that takes no part in THIS swap is settled now, whatever a superseded swap
+        // left it at. Without this a fast A -> B -> C leaves B composited over C for good.
+        tabGroups().forEach { if (it !== incoming && it !== outgoing) hideTabGroup(it) }
 
         // Fade-through: the outgoing group fades out (150ms), then the incoming group fades in
         // while rising 8dp (200ms). A light tick marks the change.
         binding.bottomNav.tickHaptic()
         val dy = 8f * resources.displayMetrics.density
+        val swap = ++tabSwapId
         outgoing.animate().cancel()
         outgoing.animate().alpha(0f).setDuration(150).setInterpolator(easeStandard).withEndAction {
-            outgoing.isVisible = false
-            outgoing.alpha = 1f
+            // The outgoing group is leaving either way — this swap is taking it off screen, and a
+            // newer one is not bringing it back as an incoming without showing it itself.
+            hideTabGroup(outgoing)
+            // Superseded: a later swap owns what is on screen, and painting this one's incoming
+            // now would show the tab the user has already moved off.
+            if (swap != tabSwapId) return@withEndAction
             incoming.alpha = 0f
             incoming.translationY = dy
             incoming.isVisible = true
@@ -748,7 +811,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
 
     /**
      * True edge-to-edge: the home gradient (home_root) draws behind the status and nav
-     * bars; the app bar receives a top inset pad (so the toolbar clears the clock) and the
+     * bars; each tab's content receives the top inset (so it clears the clock) and the
      * bottom nav a bottom inset pad (so items clear the gesture bar). The bars themselves
      * stay transparent (handled by the theme, not touched here).
      */
@@ -756,10 +819,9 @@ class MainActivity : HelperBaseActivity(), MainHost {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         ViewCompat.setOnApplyWindowInsetsListener(binding.homeRoot) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            binding.appbarLayout.updatePadding(top = bars.top)
-            // The fixed toolbar is hidden on every tab, so each tab's content must clear the status
-            // bar itself: the Home scroll header, the Servers header, and the Settings first section
-            // all start just below the clock with no empty band above them.
+            // There is no app bar: every tab draws its own header, so each tab's content clears the
+            // status bar itself — the Home scroll header, and the Settings first section, both start
+            // just below the clock with no empty band above them.
             binding.groupHome.updatePadding(top = bars.top)
             binding.groupSettings.root.updatePadding(top = bars.top)
             // The fragment container is padded once, here, on behalf of every tab it hosts — a tab
@@ -2331,10 +2393,10 @@ class MainActivity : HelperBaseActivity(), MainHost {
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        // No toolbar action menu: the fixed app bar is hidden on every tab, so the header controls
-        // own the menu. Both open menu_main as a PopupMenu via showImportMenu (Главная: the add
-        // group only; Серверы: add + whole-list actions), and the Settings tab has no control at
-        // all. onOptionsItemSelected is the shared dispatch for those PopupMenus, so it stays.
+        // No toolbar action menu: the shell has no app bar at all, so the tab header controls own
+        // the menu. Both open menu_main as a PopupMenu via showImportMenu (Главная: the add group
+        // only; Серверы: add + whole-list actions), and the Settings tab has no control at all.
+        // onOptionsItemSelected is the shared dispatch for those PopupMenus, so it stays.
         return false
     }
 
@@ -3013,9 +3075,23 @@ class MainActivity : HelperBaseActivity(), MainHost {
         }
     }
 
+    /**
+     * BACK is owned by the [OnBackPressedCallback] registered in [onCreate] (tab -> Главная ->
+     * minimise) and must not be handled here as well.
+     *
+     * This used to consume `KEYCODE_BACK` and call `moveTaskToBack(false)` on key-DOWN, which is
+     * the upstream v2rayNG behaviour and pre-empts the dispatcher. With `targetSdk` 37 and no
+     * `enableOnBackInvokedCallback` the two paths coexist and the SAME build navigates
+     * differently per device: on Android 15+ the platform routes BACK to the dispatcher and Back
+     * returns to Главная, while below it the key path won here and Back minimised the app from
+     * every tab. One path only, so every supported version behaves the same.
+     *
+     * Gamepad B still needs routing by hand: it is never delivered through the platform's
+     * back-invoked dispatcher, and the leanback build is a declared target.
+     */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_BUTTON_B) {
-            moveTaskToBack(false)
+        if (keyCode == KeyEvent.KEYCODE_BUTTON_B) {
+            onBackPressedDispatcher.onBackPressed()
             return true
         }
         return super.onKeyDown(keyCode, event)

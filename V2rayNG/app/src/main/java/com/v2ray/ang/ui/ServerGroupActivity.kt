@@ -87,7 +87,7 @@ class ServerGroupActivity : BaseActivity() {
         subIds.clear()
         subNames.clear()
         subIds.add("")
-        subNames.add(getString(R.string.filter_config_all))
+        subNames.add(getString(R.string.srv_group_sub_all))
         MmkvManager.decodeSubscriptions().forEach { sub ->
             subIds.add(sub.guid)
             subNames.add(sub.subscription.remarks.ifBlank { sub.guid })
@@ -175,14 +175,14 @@ class ServerGroupActivity : BaseActivity() {
 
         MmkvManager.encodeServerConfig(editGuid, config)
         if (isRunning) SettingsChangeManager.makeRestartService()
-        toastSuccess(R.string.toast_success)
+        toastSuccess(R.string.editor_saved)
         SubPage.close(this)
     }
 
     private fun deleteServer() {
         if (editGuid.isEmpty()) return
         if (editGuid == MmkvManager.getSelectServer()) {
-            toastError(R.string.toast_action_not_allowed)
+            toastError(R.string.srv_delete_selected)
             return
         }
         AlertDialog.Builder(this)

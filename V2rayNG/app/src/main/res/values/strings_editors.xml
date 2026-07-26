@@ -330,4 +330,39 @@
     <string name="srv_config_invalid">Конфигурация не разобрана. Проверьте JSON и повторите.</string>
     <string name="srv_name_required">Укажите название сервера</string>
 
+    <!-- ==================================================================
+         RUSSIAN REPLACEMENTS FOR THE UPSTREAM ENGLISH THESE SCREENS STILL SHOWED
+
+         Every screen in this file was rebuilt, but sixteen of the messages they
+         raise still came from the upstream res/values/strings.xml - «Success»,
+         «Failure», «Invalid URL», «Update %d configs», «Insufficient members». A
+         Russian-only product (00-rules.md 1.4.10 / 9) cannot answer a save with an
+         English word, so the keys below replace them for these screens. The shared
+         upstream keys stay where they are: other screens still use them and this
+         wave does not own res/values/strings.xml.
+         ================================================================== -->
+    <string name="editor_saved">Сохранено</string>
+    <string name="editor_done">Готово</string>
+    <string name="editor_failed">Не удалось выполнить</string>
+    <string name="editor_url_invalid">Ссылка указана неверно</string>
+
+    <string name="perapp_unknown_app">Неопознанный трафик</string>
+
+    <string name="subs_update_done">Обновлено серверов: %1$d</string>
+    <string name="subs_update_none">Нет подписок для обновления</string>
+    <string name="subs_update_result">Серверов: %1$d · обновлено: %2$d, с ошибкой: %3$d, пропущено: %4$d</string>
+
+    <string name="asset_copy_failed">Не удалось скопировать файл</string>
+    <string name="asset_download_done">Обновлено файлов: %1$d</string>
+
+    <string name="scheme_import_done">Импорт выполнен</string>
+    <string name="scheme_import_failed">Не удалось импортировать</string>
+
+    <string name="srv_group_sub_all">Все подписки</string>
+    <string name="srv_delete_selected">Нельзя удалить выбранный сервер</string>
+    <string name="srv_chain_too_few">В цепочке нужно минимум два шага</string>
+    <string name="srv_chain_invalid_members">Эти серверы нельзя использовать в цепочке: %1$s</string>
+    <string name="srv_config_label">Конфигурация</string>
+    <string name="srv_config_note">Порт входящего подключения должен совпадать с настройками приложения.</string>
+
 </resources>

@@ -41,28 +41,66 @@ The inventories this file is built on: `40-copy-inventory-android.md` (1114 keys
 | Column | Meaning |
 |---|---|
 | **Концепт** | The thing the string names. One concept, one row, both platforms. |
-| **Русский** | The approved Russian string. Sentence case. Copy it exactly, including `·`, `…`, «ёлочки» and the non-breaking space before `₽`. |
+| **Русский** | The approved Russian string. Sentence case. Copy it exactly, including the middle dot `·` (U+00B7, one ordinary space either side), the ellipsis `…` (U+2026, one character) and the «ёлочки» (U+00AB, U+00BB). No row here carries a `₽`: every money string is built by the one formatter (C6), so a price's thin and non-breaking spaces never live in a resource value. |
 | **English** | The English string. On PC it is the second slot of `L.Add(key, ru, en)`. On Android it goes in `res/values-en/`, which does not exist yet (D-S9). |
 | **Android** | The Android resource name. `-` means the platform does not show this concept. |
 | **PC** | The `L` key. `-` means the platform does not show this concept. |
 | **Экраны** | Every surface that renders it. |
-| **Δ** | What has to change. Legend below. |
+| **Текст** | What the platforms render **today**, measured against this row's Русский cell. Derived, see 0.3. |
+| **Ключи** | Whether the named key **exists**, per platform, and under what name. Derived, see 0.3. |
 
-### 0.3 The Δ legend
+### 0.3 The two derived columns
+
+The first edition of this file carried **one** hand-written Δ column, and its `=` code read «both
+platforms already ship exactly this string. Do not touch it.» That claim was false at scale. Ten
+rows carrying `=` were probed against the resource tree: `account_tab_title`,
+`account_name_fallback`, `devices_this_device`, `devices_unknown`, `history_status_paid`,
+`account_health_active`, `home_status_connected`, `servers_title`, `common_cancel` and
+`common_retry` are **absent from every `values*/` folder**. Two of them are not renames either -
+«Это устройство» and «Активна» exist under no key at all - while «Неизвестное устройство» ships as
+`devices_unknown_model` and «Оплачено» as `account_status_paid`. An implementer obeying that legend
+would have skipped every one of those rows and the strings would never have been written.
+
+A hand-maintained column over ~700 rows is not maintainable and was not maintained. It is now two
+columns, both **derived from the two codebases** by
+[`tools/derive-copy-delta.py`](tools/derive-copy-delta.py):
+
+```bash
+python3 docs/design2026/tools/derive-copy-delta.py            # report what would change
+python3 docs/design2026/tools/derive-copy-delta.py --rewrite  # rewrite both columns in place
+python3 docs/design2026/tools/derive-copy-delta.py --check    # exit 1 when the file has drifted
+```
+
+**Текст** - one code per row, the *wording* axis:
 
 | Code | Meaning |
 |---|---|
-| `=` | Both platforms already ship exactly this string. Do not touch it. |
-| `A` | **Android changes** to this string. PC is already right. |
-| `P` | **PC changes** to this string. Android is already right. |
-| `AP` | **Both change.** Neither shipped wording wins; this register writes the string. |
-| `A+` | Android must **gain** this key. The platform shows the concept with no string, or with a literal in Kotlin or XML. |
-| `P+` | PC must **gain** this key. Same. |
-| `N` | New on both platforms. The screen that needs it is being built. |
-| `del` | The key is deleted. Listed so nobody re-creates it. |
+| `=` | Every platform that shows this concept already renders exactly this Russian string |
+| `A` | **Android's wording changes** to it: Android renders something else today, or renders nothing |
+| `P` | **PC's wording changes** to it |
+| `AP` | **Both** platforms' wording changes |
 
-Every `A`, `P` and `AP` row carries its reason in the note under its table. A wording change with no
-stated reason is not a decision, it is a preference, and `00-rules.md` 0.1 puts preference last.
+**Ключи** - two codes per row, one per platform, the *key* axis:
+
+| Code | Meaning |
+|---|---|
+| `A✓` | The key exists today under exactly this name, and `values/` carries this Russian |
+| `A✓†` | The key exists, but the Russian lives only in `values-ru/`; `values/` still ships upstream English, which D-S9 fixes |
+| `A←old_name` | `old_name` already carries this exact Russian string, so this row is a **rename**, not a new string |
+| `A+` | The key does not exist and must be created |
+| `A-` | Android does not show this concept |
+| `A≡` | The row reuses a key declared on another row; the Экраны column names both surfaces |
+
+The same six shapes carry a `P` prefix for the desktop.
+
+The old one-letter codes map onto the pair without loss: `N` is `AP` + `A+ P+`, the old `A+` is `A` +
+`A+ P✓`, and the old `=` is `=` + `A✓ P✓` **only when the keys actually exist**, which is the
+distinction the first edition could not express and therefore got wrong. Deletions are not a Δ code:
+they are named in prose under the table that used to own them.
+
+Every `A`, `P` and `AP` row still carries its **reason** in the note under its table. A wording
+change with no stated reason is not a decision, it is a preference, and `00-rules.md` 0.1 puts
+preference last. The derived column says *that* a platform changes; the note says *why*.
 
 ### 0.4 Where the strings live
 
@@ -82,19 +120,34 @@ collisions that appeared and vanished inside one 20-minute audit, because two ag
 
 **Android's default locale becomes Russian** (D-S9, `01-inventory-android.md` 5.4). Today `values/`
 is half Russian and half English, so a device set to English shows English chrome around Russian
-product copy. After the copy pass: `values/` is Russian, `values-en/` carries the English column of
-this register, and the other locale folders (`values-vi`, `values-zh-rCN`, `values-zh-rTW`,
-`values-bn`, `values-ar`) are deleted along with the upstream keys they translate.
+product copy. After the copy pass, `values/` is Russian and `values-en/` carries the English column
+of this register.
+
+**Seven locale folders carry strings, not five.** `ls -d values-*/` returns `values-ar`,
+`values-bn`, `values-bqi-rIR`, `values-fa`, `values-vi`, `values-zh-rCN` and `values-zh-rTW`
+(`values-night` and `values-sw360dp-v13` are not locales and carry no `strings*.xml`). All **seven**
+are deleted with the upstream keys they translate. The first edition named five and silently left
+`values-fa/` and `values-bqi-rIR/` standing, which would have given a Persian device Persian upstream
+copy for the keys those two files cover and Russian for everything else - the exact half-translated
+shell D-S9 exists to end.
+
+**`values-ru/` is deleted too, and last.** It holds 768 entries: 393 already byte-identical to their
+`values/` twin, 375 the Russian of a key whose `values/` twin is still English, and none that
+`values/` does not declare. The moment `values/` is Russian, every one of those 768 is a duplicate,
+and a duplicate is where the next copy edit silently diverges - the edit lands in one file and the
+Russian device keeps reading the other. Order matters: `values/` becomes Russian **first**, then
+`values-ru/` is removed in the same commit, so no intermediate build ships English chrome. W-25 and
+W-27 carry the two halves.
 
 ---
 
-## 1. The law this register enforces, and the eight rules it adds
+## 1. The law this register enforces, and the nine rules it adds
 
 `00-rules.md` 9.1-9.7 stands in full: direct calm voice, sentence case, active verbs, no exclamation
 marks, no ALL-CAPS, no em-dash and no en-dash, `…` as one character, «ёлочки», no final period on
 labels, thin space for thousands and a non-breaking space before `₽`.
 
-These eight are additions. They are enforceable by grep, and section 8 shows how.
+These nine are additions. They are enforceable by grep, and section 8 shows how.
 
 ### C1 - One noun per concept, extended
 
@@ -105,11 +158,13 @@ each of them shipped in two or more forms.
 |---|---|---|---|
 | A connection of any kind | **подключение** | соединение, коннект, конект | 9.3 already locks it for the tunnel. The product must not use a second noun for a TCP connection, a Mux channel or a latency probe: a user does not know they are different things. Affects 6 shipped strings. |
 | Removing a device from the account | **отвязать** | удалить, отключить | «Удалить» is the destructive verb for a server, a provider, a rule and a file. Reusing it for a device makes the device look destroyable. 9.4's own text says «Отвяжите одно из устройств». PC is right, Android changes. |
+| The relation between a device and the account | **привязано** | подключено, подключённое | The counterpart of «отвязать». «Подключено» is the tunnel's word and the product's single most prominent status; a Devices screen that counts «Подключено 3 из 5» under a row button reading «Отвязать устройство» names one relation two ways on one screen. Affects `devices_count_line`, `devices_count_line_unlimited`, `devices_subtitle`. |
+| The picture on the account head | **фото** | аватар, изображение, картинка | Three nouns shipped inside one six-row sheet: «Сменить фото», «Аватар обновлён», «…Выберите другое изображение». The confirmation must name what the three actions produce. |
 | Deleting an object | **удалить** | стереть, очистить (except «Очистить журнал» and «Очистить поиск», which clear a buffer, not an object) | - |
 | Buying | **Купить** | Купить тариф, Выбрать тариф, Оформить, Приобрести | 9.3 locks «Купить». Three variants shipped on the account card alone. |
 | The expiry of a subscription | **Активна до %1$s** | Действует до, До, до 12.06.2026 | Four wordings shipped on PC alone (`Account_ValidUntil`, `Account_ActiveUntil`, `Account_ExpiresUntil`, `Sub_Until`). «Активна до» is the one that agrees with the health chips «Активна» / «Истекает» / «Истекла». |
 | The disconnected state | **Отключено** | Не подключено, Соединение разорвано | It pairs with «Подключено», «Подключение…», «Отключение…». One paradigm, four states. |
-| Exiting the app vs signing out | **Закрыть** (app) / **Выйти** (account) | «Выход» for both | Two actions one letter apart is worse than two unrelated words. |
+| Dismissing, quitting, signing out | **Закрыть** (a sheet, a dialog, a window) / **Завершить работу** (quit the process, tray only) / **Выйти** (sign out of the account) | «Выход» for any of the three; «Закрыть» for quitting | Three different consequences. Splitting «Закрыть» from «Выйти» is not enough on its own: a tray item «Закрыть» collides with the desktop setting «Сворачивать в трей при закрытии», so on one product «закрытие» would mean minimise in one place and quit in another. «Завершить работу» is the only one of the three that ends the process, and it appears in exactly one menu. |
 
 The eleven locks from 9.3 are unchanged and are not restated here.
 
@@ -176,9 +231,38 @@ typing. Every field in this register has a label row, and the watermark column i
 ### C8 - The brand is written one way
 
 The wordmark asset and the app name are lowercase **`departament`**. Inside a Russian sentence the
-brand is capitalised: «серверам Departament». The site is `departament.site`. The internal codename
+brand is capitalised: «серверам Departament», «Запустите Departament от имени администратора». The
+site is `departament.site`, lowercase, because it is a domain and not a word. The internal codename
 `INCY` never appears in shipped copy - it is currently the watermark of the User-Agent field
 (`ProviderSettingsPage.axaml:127`).
+
+The first edition broke this rule three times in its own tables («не от departament», «Открывать
+departament при входе», «Запустите departament от имени администратора»); all three are corrected
+above, and 8.1 gains the grep that would have caught them.
+
+### C9 - One voice, and one way to close an error
+
+`00-rules.md` 9.1 fixes the register (direct, calm, no marketing, no apologies). This adds the
+grammatical person, because the first edition drifted across three of them inside one screen.
+
+- **First person plural only where the app genuinely acts on the user's behalf** and the user is not
+  the actor: a charge («%1$s спишем %2$s»), an email («Отправим ссылку для входа на этот адрес»), a
+  background job the user started («Проверяем оплату…», «Добавляем аккаунт»). It is a promise or a
+  progress report, never a decoration.
+- **Impersonal everywhere else.** A label, a row subtitle, a state, a consequence: «Продление
+  вручную», «Доплата зависит от оставшегося срока», «Улучшать нечего».
+- **«Вы» is never the subject of a sentence.** «Вы на максимальном тарифе» becomes «Улучшать
+  нечего»; «у вас старший тариф» becomes «это старший тариф». The second person survives only as a
+  possessive where the object genuinely belongs to the user («ваша подписка»), and as the imperative,
+  which is the product's default mood.
+- **One promise shape for one promise.** «Отправим ссылку…» before it is sent, «Мы отправили ссылку
+  на %1$s» after. Not «Пришлём», not «Вышлем».
+- **One closing for an error: «Повторите попытку.»** The first edition shipped four - «…и
+  повторите.», «Повторите.», «Повторите попытку.», «Повторите попытку позже.» - of which «Повторите.»
+  standing alone is clipped machine-speak. Where the sentence already names what to check, the
+  closing joins it with «и»: «Проверьте сеть и повторите попытку.» Where a button next to the
+  sentence says «Повторить», the sentence does **not** also say «позже»: the button is available now,
+  and C3 makes the button part of the string's contract.
 
 ---
 
@@ -193,7 +277,7 @@ referenced from the tables as **R-n**.
 | R-2 | **«подключение»** is the only noun for a connection | 6 strings using «соединение» | C1, 9.3 |
 | R-3 | A device is **отвязано**, never удалено | Android's 5 `devices_delete_*` strings | C1, 9.4 |
 | R-4 | The settings group for provider feeds is **«Провайдеры»**, and its auto-update row is **«Автообновление провайдеров»** | `12-settings.md` 4.4 / 11.1 «Подписки» / «Автообновление подписок» | 9.3 locks провайдер for a feed. The spec's own justification («the one place the two senses touch») is precisely the exception the lock forbids. `00-rules.md` 0.1: the spec is the bug |
-| R-5 | Buying is **«Купить»** (button), **«Купить подписку»** (row and screen title), **«Выберите тариф»** (section header inside the buy screen). Nothing else | «Купить тариф», «Выбрать тариф», «Оформить» | C1 |
+| R-5 | **The object of «купить» is the тариф, never the подписка.** «Купить» bare on a button where the object is obvious; **«Купить тариф»** wherever the object must be named (row, screen title, gate, empty-state action); **«Выберите тариф»** as the section header inside the buy screen; **«Покупка тарифа»** in the history. Nothing else | «Купить подписку», «Выбрать тариф», «Оформить» | 9.3 + C1. See the note under this table |
 | R-6 | The trial chip is **«Пробный»** | PC's «Пробный период», Android's ALL-CAPS «ПРОБНЫЙ» | 9.2, 0.4.3 |
 | R-7 | No plans available is an empty **state**, not a sentence: «Тарифов пока нет» + «Список обновляется автоматически, загляните позже.» + «Повторить» | Android's one-string `buy_empty`, PC's `Buy_NoPlans` | 9.5 |
 | R-8 | The shield status stays **two words** («Не удалось подключиться») and the recovery sentence («Сервер не отвечает. Выберите другой сервер или повторите позже.») lives in the status strip below it | collapsing them into one | 9.4 needs the sentence; `13-start-screen.md` 6 needs the status line to fit |
@@ -209,6 +293,24 @@ referenced from the tables as **R-n**.
 | R-18 | The device row shows **platform and last-active**, never an identifier | `devices_hwid` «ID: %1$s», `Devices_Id` | 9.3 bans HWID as a user-facing word; the id is useless to a user |
 | R-19 | Nav labels are Russian in the default locale: «Главная», «Серверы», «Аккаунт», «Настройки» | `bottom_nav_home` = `Home`, `bottom_nav_servers` = `Servers`, `bottom_nav_more` = `More` | 1.4.10 |
 | R-20 | The disconnected state is **«Отключено»** | «Не подключено» | C1 |
+| R-21 | **One condition, one sentence, one key.** A failure or a note that can occur on two surfaces is written once and referenced twice; the second surface does not get a paraphrase | `err_provider_refresh` vs `strip_provider_failed`, `strip_devices` vs `devices_limit`, `strip_silent` vs `err_server_silent`, `pay_estimate_note` vs `devices_add_note` | C2, 9.4 |
+| R-22 | The `depv://` scheme labels use **the product's own verbs**: «Подключить», «Отключить», «Открыть приложение», «Закрыть приложение», «Переключить подключение» | «Запустить туннель», «Отключиться» | C1, C2 |
+| R-23 | **No string tells a desktop user about a phone.** «на этом устройстве», never «на этом телефоне»; «Выбрать файл» on PC where Android says «Выбрать из галереи» | `auth_link_hint`, `auth_sent_magic_body`, `account_avatar_gallery` marked `P`/`P+` | 0.1.1, C3 |
+| R-24 | The tray's quit item is **«Завершить работу»** | «Выход», «Закрыть» | C1 |
+| R-25 | **A permission is explained before it is requested.** Every system consent the product triggers - notifications on Android 13+, the VPN consent dialog - has a rationale string naming what the user gets, and a refusal string naming what to do | nothing: neither platform has any rationale copy today | 9.4, C3 |
+| R-26 | **A bulk deletion states its count and confirms**, or it offers an undo. «Удалить недоступные» and «Удалить дубликаты» are not exempt because they sound small | both shipping with neither | `00-rules.md` 7.5, `16-servers.md` 8.3 |
+
+**The note R-5 needs.** `00-rules.md` 9.3 defines **тариф** as «the paid plan» and **подписка** as
+«the user's active service». You buy a plan; what you then have is a service. «Купить подписку»
+therefore names the wrong object, and it collides inside a single empty state: 3.8's «Устройства, no
+subscription» shipped the line «Купите тариф, чтобы подключать устройства.» under a button reading
+«Купить подписку». One screen, two objects, one verb. 9.5's own table already says «Купите тариф»
+and labels the action «Купить», so this decision agrees with the law rather than overruling it; what
+it overrules is `23-account-rework.md` 8.2, `13-start-screen.md` 13.1 and the first edition of this
+register, all of which wrote «Купить подписку». Section 7 records the correction. The keys change
+name with the string: `account_row_buy` / `home_gate_buy` / `Common_BuySubscription` become
+`account_row_buy_plan` / `home_gate_buy_plan` / `Common_BuyPlan`, because a key named for the wrong
+noun is the next reader's excuse to write it back.
 
 ---
 
@@ -221,57 +323,112 @@ that desktop does not gain a Серверы tab (`11-app-structure.md` 2.0), so 
 inside Главная there. Every `Servers_*` key below therefore exists on both platforms; only the
 *destination* differs.
 
+**3.1.1 The shared namespace.** A string that appears on more than one surface is declared **once**,
+in the `common_*` / `Common_*` namespace (`strings_common.xml`, `L.Common.cs`), and every screen that
+shows it references that key. The Экраны column names every one of those surfaces; if a surface is
+not listed there, it is not allowed to declare its own copy of the word. This is C2 made operational,
+and it is why so many per-screen keys below read `common_*` rather than `servers_*` or `account_*`.
+
 | Концепт | Русский | English | Android | PC | Экраны | Δ |
 |---|---|---|---|---|---|---|
-| App name / wordmark | departament | departament | `app_name` | `Common_AppName` | launcher, toolbar wordmark, tray tooltip, notification title, window title | `=` |
-| Window title (PC) | departament VPN | departament VPN | - | `Shell_WindowTitle` | window chrome | `P+` |
-| Tab: home | Главная | Home | `nav_home` | `Nav_Home` | bottom nav (Android), rail (PC) | `A` |
-| Tab: servers | Серверы | Servers | `nav_servers` | - | bottom nav (Android only) | `A` |
-| Tab: account | Аккаунт | Account | `nav_account` | `Nav_Account` | bottom nav, rail | `=` |
-| Tab: settings | Настройки | Settings | `nav_settings` | `Nav_Settings` | bottom nav, rail | `=` |
-| Collapse the rail | Свернуть панель | Collapse panel | - | `Nav_CollapsePanel` | PC rail | `=` |
-| Expand the rail | Развернуть панель | Expand panel | - | `Nav_ExpandPanel` | PC rail | `=` |
-| Back | Назад | Back | `common_back` | `Common_Back` | every sub-page toolbar, every sheet; also the Android back button's `contentDescription` | `A+` |
-| Close | Закрыть | Close | `common_close` | `Common_Close` | sheets, dialogs, the QR view | `A+` |
-| Cancel | Отмена | Cancel | `common_cancel` | `Common_Cancel` | every confirm dialog and sheet | `A` |
-| Save | Сохранить | Save | `common_save` | `Common_Save` | rule editor, MTU field, rename sheet, WebDAV | `A` |
-| Delete | Удалить | Delete | `common_delete` | `Common_Delete` | destructive confirms | `=` |
-| Retry | Повторить | Try again | `common_retry` | `Common_Retry` | every error state and every error strip in the product | `AP` |
-| Undo | Отменить | Undo | `common_undo` | `Common_Undo` | snackbar / toast after a delete | `A+` |
-| Add | Добавить | Add | `common_add` | `Common_Add` | server list, assets, routing sets | `=` |
-| Edit | Изменить | Edit | `common_edit` | `Common_Edit` | per-item sheets | `=` |
-| Copy | Копировать | Copy | `common_copy` | `Common_Copy` | referral code, URL schemes, about details | `=` |
-| Open | Открыть | Open | `common_open` | `Common_Open` | about links, payment history from a strip | `=` |
-| Refresh | Обновить | Refresh | `common_refresh` | `Common_Refresh` | provider group header, app list, payment poll | `=` |
-| More | Ещё | More | `common_more` | `Common_More` | overflow affordance `contentDescription` | `A` |
-| Copied | Скопировано | Copied | `common_copied` | `Common_Copied` | transient after any copy action | `=` |
-| Search (settings) | Поиск по настройкам | Search settings | `set_search_hint` | `Settings_SearchHint` | Настройки hub | `N` |
-| Search (servers) | Поиск серверов | Search servers | `servers_search_hint` | `Servers_SearchHint` | Серверы; PC Главная list band | `AP` |
-| Search (apps) | Поиск по приложениям | Search apps | `set_perapp_search` | `PerApp_Search` | Прокси по приложениям | `AP` |
-| Clear search | Очистить поиск | Clear search | `servers_search_clear_cd` | `Servers_SearchClearCd` | every search field's trailing glyph | `N` |
-| On | Вкл | On | `common_on` | `Common_On` | A2 value rows | `=` |
-| Off | Выкл | Off | `common_off` | `Common_Off` | A2 value rows | `=` |
-| Default value | По умолчанию | Default | `common_default` | `Common_Default` | DNS chip, core picker | `=` |
-| Custom value | Свой | Custom | `common_custom` | `Common_Custom` | DNS chip | `=` |
-| Not set | Не задан | Not set | `common_not_set` | `Settings_NotSet` | SOCKS5 username and password watermarks | `A+` |
+| App name / wordmark | departament | departament | `app_name` | `Common_AppName` | launcher, toolbar wordmark, tray tooltip, notification title, quick tile label, window title | - |
+| Window title (PC) | departament VPN | departament VPN | - | `Shell_WindowTitle` | window chrome | - |
+| Tab: home | Главная | Home | `nav_home` | `Nav_Home` | bottom nav (Android), rail (PC) | - |
+| Servers | Серверы | Servers | `common_servers` | `Common_Servers` | bottom nav (Android), Серверы header, Главная ledger row, launcher shortcut, PC list band header | - |
+| Account | Аккаунт | Account | `common_account` | `Common_Account` | bottom nav, rail, Аккаунт header, Главная account chip | - |
+| Settings | Настройки | Settings | `common_settings` | `Common_Settings` | bottom nav, rail, Настройки hub header | - |
+| Collapse the rail | Свернуть панель | Collapse panel | - | `Nav_CollapsePanel` | PC rail | - |
+| Expand the rail | Развернуть панель | Expand panel | - | `Nav_ExpandPanel` | PC rail | - |
+| Back | Назад | Back | `common_back` | `Common_Back` | every sub-page toolbar, every sheet; also the Android back button's `contentDescription` | - |
+| Close | Закрыть | Close | `common_close` | `Common_Close` | sheets, dialogs, the QR view. Never the tray's quit item | (R-24) |
+| Cancel | Отмена | Cancel | `common_cancel` | `Common_Cancel` | every confirm dialog and sheet | - |
+| Save | Сохранить | Save | `common_save` | `Common_Save` | rule editor, MTU field, rename sheet, WebDAV | - |
+| Delete | Удалить | Delete | `common_delete` | `Common_Delete` | destructive confirms | - |
+| Retry | Повторить | Try again | `common_retry` | `Common_Retry` | every error state and every error strip in the product | - |
+| Undo | Отменить | Undo | `common_undo` | `Common_Undo` | the snackbar after a delete or an unlink | - |
+| Add | Добавить | Add | `common_add` | `Common_Add` | server list, add-sheet title, assets, routing sets | - |
+| Edit | Изменить | Edit | `common_edit` | `Common_Edit` | per-item sheets, server actions | - |
+| Copy | Копировать | Copy | `common_copy` | `Common_Copy` | referral code, URL schemes, about details | - |
+| Copy the link | Скопировать ссылку | Copy link | `common_copy_link` | `Common_CopyLink` | server actions sheet, Устройства row | - |
+| Open | Открыть | Open | `common_open` | `Common_Open` | about links, payment history from a strip, notification action | - |
+| Refresh | Обновить | Refresh | `common_refresh` | `Common_Refresh` | provider group header, provider kebab, app list, payment poll | - |
+| More | Ещё | More | `common_more` | `Common_More` | every overflow affordance's `contentDescription` | - |
+| Copied | Скопировано | Copied | `common_copied` | `Common_Copied` | the one transient after **any** copy: a link, a referral code, a link code, device details | - |
+| Select all | Выбрать все | Select all | `common_select_all` | `Common_SelectAll` | app picker, PC multi-select | - |
+| Clear the selection | Снять выделение | Clear selection | `common_clear_selection` | `Common_ClearSelection` | app picker, PC multi-select | - |
+| Search (settings) | Поиск по настройкам | Search settings | `set_search_hint` | `Settings_SearchHint` | Настройки hub | - |
+| Search (servers) | Поиск серверов | Search servers | `servers_search_hint` | `Servers_SearchHint` | Серверы; PC Главная list band | - |
+| Search (apps) | Поиск по приложениям | Search apps | `set_perapp_search` | `PerApp_Search` | Прокси по приложениям | (R-9) |
+| Clear search | Очистить поиск | Clear search | `common_search_clear_cd` | `Common_SearchClearCd` | every search field's trailing glyph | - |
+| On | Включено | On | `common_on` | `Common_On` | A2 value rows | - |
+| Off | Выключено | Off | `common_off` | `Common_Off` | A2 value rows, the auto-update interval when it is off | - |
+| Default value | По умолчанию | Default | `common_default` | `Common_Default` | DNS chip, core picker, provider sort | - |
+| Custom value | Свой | Custom | `common_custom` | `Common_Custom` | DNS chip | - |
+| Not set | Не задан | Not set | `common_not_set` | `Common_NotSet` | the **value slot** of the SOCKS5 username and password rows while they are empty | (C7) |
+| Advanced | Дополнительно | Advanced | `common_advanced` | `Common_Advanced` | Настройки hub row, Дополнительно title, DNS section header | - |
+| System (masculine) | Системный | System | `common_system` | `Common_System` | Язык value, DNS provider value | - |
+| From a QR code | Из QR-кода | From a QR code | `common_from_qr` | `Common_FromQr` | routing import sheet, assets add sheet | - |
+| Name | Название | Name | `common_name` | `Common_Name` | rename sheet field, rule editor field | - |
+| Password | Пароль | Password | `common_password` | `Common_Password` | sign-in field, sign-in method label, SOCKS5 field | - |
+| Domains | Домены | Domains | `common_domains` | `Common_Domains` | routing section header, rule editor field | - |
+| Errors | Ошибки | Errors | `common_errors` | `Common_Errors` | log level, log filter | - |
+| Support | Поддержка | Support | `common_support` | `Common_Support` | О приложении section header, PC provider header | - |
+| Devices | Устройства | Devices | `common_devices` | `Common_Devices` | Аккаунт row, Устройства title, strip action, Данные section header | - |
+| Payment | Оплата | Payment | `common_payment` | `Common_Payment` | Аккаунт group header, pay sheet title | - |
+| Payment history | История платежей | Payment history | `common_payment_history` | `Common_PaymentHistory` | Аккаунт row, sub-page title | - |
+| Subscription | Подписка | Subscription | `common_subscription` | `Common_Subscription` | Главная ledger row, Аккаунт group header | - |
+| Sign in | Войти | Sign in | `common_signin` | `Common_SignIn` | Главная gate, sign-in form CTA | - |
+| Sign in with Telegram | Войти через Telegram | Sign in with Telegram | `common_signin_telegram` | `Common_SignInTelegram` | Главная gate, Аккаунт gate, auth surface A | - |
+| Sign in with email | Войти по почте | Sign in with email | `common_signin_email` | `Common_SignInEmail` | Главная gate, Аккаунт gate, auth surface A | - |
+| Add a provider | Добавить провайдера | Add a provider | `common_add_provider` | `Common_AddProvider` | Главная gate, add sheet, Серверы empty state | - |
+| Buy a plan | Купить тариф | Buy a plan | `common_buy_plan` | `Common_BuyPlan` | Главная gate, Аккаунт row, Купить title, Устройства empty state | (R-5) |
+| Link Telegram | Привязать Telegram | Link Telegram | `common_link_telegram` | `Common_LinkTelegram` | Аккаунт row, Способы входа, auth surface E, empty-state action | - |
+| Create an account | Создать аккаунт | Create an account | `common_create_account` | `Common_CreateAccount` | register CTA, the mode switch on the sign-in form | - |
+| Another way to sign in | Другой способ входа | Another way to sign in | `common_other_signin` | `Common_OtherSignIn` | gate action, method sheet title | - |
+| Refresh providers | Обновить провайдеров | Refresh providers | `common_refresh_providers` | `Common_RefreshProviders` | Серверы header overflow, PC shortcut | (R-4) |
+| Sort: provider order | Как у провайдера | Provider order | `common_sort_provider` | `Common_SortProvider` | sort sheet, Настройки → Провайдеры | - |
+| Sort: latency | По задержке | By latency | `common_sort_ping` | `Common_SortPing` | sort sheet, Настройки → Провайдеры | - |
+| Sort: name | По названию | By name | `common_sort_name` | `Common_SortName` | sort sheet, Настройки → Провайдеры | - |
+| Upgrade the plan | Улучшить тариф | Upgrade plan | `common_upgrade_plan` | `Common_UpgradePlan` | Аккаунт card overflow, upgrade sheet title | - |
+| Top up the balance | Пополнение баланса | Balance top-up | `common_topup_title` | `Common_TopUpTitle` | top-up sheet title, pay-sheet subject, history row kind | - |
 
 **Notes.**
 
-- `A` on the four nav labels: `values/strings.xml` ships `Home`, `Servers`, `More` in the default
-  locale (R-19). `bottom_nav_more` is dead (`menu_bottom_nav.xml` is referenced by nothing, the bar
-  is drawn by hand in `activity_main.xml`) and is deleted with the menu file. The three surviving
-  keys are also **renamed** `bottom_nav_*` to `nav_*`, because the desktop draws the same four
-  labels in a side rail and a key named for a bottom bar is a key that will be duplicated the moment
-  a tablet layout appears.
-- `Dns_Advanced` («Дополнительно») is kept as the DNS section header; `Dns_AdvancedHint`, which
-  currently carries the FakeIP explanation and names sing-box inside it, is retired in favour of
-  `Dns_FakeIpHint` on the row that actually owns the behaviour (3.6.4).
-- `AP` on «Повторить»: Android has four keys for it and PC has two, whose English halves disagree
+- **The nav labels.** `values/strings.xml` ships `Home`, `Servers`, `More` in the default locale
+  (R-19), which is why the Ключи column marks them `←bottom_nav_*†`: the Russian exists, but only in
+  `values-ru/`. `bottom_nav_more` is dead (`menu_bottom_nav.xml` is referenced by nothing, the bar is
+  drawn by hand in `activity_main.xml`) and is deleted with the menu file. The survivors are
+  **renamed** out of the `bottom_nav_*` prefix, because the desktop draws the same labels in a side
+  rail and a key named for a bottom bar is a key that will be duplicated the moment a tablet layout
+  appears.
+- **«Вкл» / «Выкл» become «Включено» / «Выключено».** They are abbreviations, and this file deletes
+  «дн.» with the words «an abbreviation 9.2 wants a word»; it cannot then ship two of its own.
+  3.6.1 separately shipped the unabbreviated «Выключено» for the auto-update interval, so the
+  product had both forms already. One key now serves both surfaces.
+- **«Не задан» is a value, not a watermark.** C7 is three rows above it: a watermark may only carry
+  an example value. The SOCKS5 username and password rows carry their names as persistent labels
+  (3.6.10) and show «Не задан» in the row's value slot while they are empty.
+- **«Повторить».** Android has four keys for it and PC has two, whose English halves disagree
   («Retry» vs «Try again»). One key, English **Try again**.
-- `A+` on «Назад»: `res/layout/view_toolbar.xml:70` hardcodes `android:contentDescription="Назад"`,
-  and that toolbar is shared, so the literal is spoken on every sub-page in the app.
-- `AP` on the two search placeholders: R-9 removes the ellipsis on both platforms and gives PC's
-  generic `Common_SearchPlaceholder` («Поиск…») a scope. That key is deleted.
+- **«Назад».** `res/layout/view_toolbar.xml:70` hardcodes `android:contentDescription="Назад"`, and
+  that toolbar is shared, so the literal is spoken on every sub-page in the app.
+- **The search placeholders.** R-9 removes the ellipsis on both platforms and gives PC's generic
+  `Common_SearchPlaceholder` («Поиск…») a scope. That key is deleted.
+- `Dns_Advanced` is not a separate key: the DNS section header is `common_advanced`, the same string
+  the hub row and the Дополнительно screen title carry. `Dns_AdvancedHint`, which currently carries
+  the FakeIP explanation and names sing-box inside it, is retired in favour of `Dns_FakeIpHint` on
+  the row that actually owns the behaviour (3.6.4).
+
+**3.1.2 The two exemptions.** Everything else in this register that reads the same in two places is
+one key. These two are not, and the reason is recorded here so that a later reader does not "fix"
+them:
+
+| Strings | Why they stay apart |
+|---|---|
+| `common_account` «Аккаунт» (the surface) and `account_name_fallback` «Аккаунт» (the head's name slot when no name is known) | One word, two concepts. Merging them means a future edit to the tab label silently renames every user whose display name is unknown. C2 forbids one key with two concepts more strongly than it forbids two keys with one word. |
+| `home_status_no_subscription` «Подписки нет» and `account_empty_title` «Подписки пока нет» | Recorded in full in 3.8. The first names a condition in a two-word status slot; the second opens an empty state, and «пока» is what makes it an invitation rather than a verdict. |
+
+Nothing else in the product is allowed to be two strings, or two keys, for one concept.
 
 ### 3.2 Connect and status - Главная
 

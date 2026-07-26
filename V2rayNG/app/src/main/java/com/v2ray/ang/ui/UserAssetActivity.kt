@@ -145,13 +145,13 @@ class UserAssetActivity : HelperBaseActivity() {
                 val assetItem = AssetUrlItem(getCursorName(uri) ?: uri.toString(), "file")
                 val assetList = MmkvManager.decodeAssetUrls()
                 if (assetList.any { it.assetUrl.remarks == assetItem.remarks && it.guid != assetId }) {
-                    toast(R.string.msg_remark_is_duplicate)
+                    toastError(R.string.asset_name_duplicate)
                 } else {
                     MmkvManager.encodeAsset(assetId, assetItem)
                     copyFile(uri)
                 }
             }.onFailure {
-                toastError(R.string.toast_asset_copy_failed)
+                toastError(R.string.asset_copy_failed)
                 MmkvManager.removeAssetUrl(assetId)
             }
         }
@@ -162,7 +162,7 @@ class UserAssetActivity : HelperBaseActivity() {
         contentResolver.openInputStream(uri).use { inputStream ->
             targetFile.outputStream().use { fileOut ->
                 inputStream?.copyTo(fileOut)
-                toastSuccess(R.string.toast_success)
+                toastSuccess(R.string.editor_saved)
                 refreshData()
             }
         }
@@ -189,7 +189,7 @@ class UserAssetActivity : HelperBaseActivity() {
 
     private fun importAsset(url: String?) {
         if (!Utils.isValidUrl(url)) {
-            toastError(R.string.toast_invalid_url)
+            toastError(R.string.editor_url_invalid)
             return
         }
         SubPage.open(
@@ -213,7 +213,7 @@ class UserAssetActivity : HelperBaseActivity() {
             downloading = false
             bindDownloadRow()
             if (result.successCount > 0) {
-                toastSuccess(getString(R.string.title_update_config_count, result.successCount))
+                toastSuccess(getString(R.string.asset_download_done, result.successCount))
             } else {
                 toastError(R.string.asset_download_failed)
             }

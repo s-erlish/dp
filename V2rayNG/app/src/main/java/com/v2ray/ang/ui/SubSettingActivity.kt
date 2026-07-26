@@ -119,14 +119,14 @@ class SubSettingActivity : BaseActivity() {
 
             when {
                 result.successCount + result.failureCount + result.skipCount == 0 ->
-                    toast(R.string.title_update_subscription_no_subscription)
+                    toast(R.string.subs_update_none)
 
                 result.successCount > 0 && result.failureCount + result.skipCount == 0 ->
-                    toast(getString(R.string.title_update_config_count, result.configCount))
+                    toast(getString(R.string.subs_update_done, result.configCount))
 
                 else -> toast(
                     getString(
-                        R.string.title_update_subscription_result,
+                        R.string.subs_update_result,
                         result.configCount, result.successCount, result.failureCount, result.skipCount
                     )
                 )

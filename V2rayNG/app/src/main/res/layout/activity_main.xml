@@ -8,22 +8,11 @@
     android:background="@drawable/bg_home_gradient"
     android:orientation="vertical">
 
-        <!-- Edge-to-edge: the gradient (home_root) draws behind the status bar; the
-             app bar receives a top inset pad at runtime so the toolbar clears the clock. -->
-        <com.google.android.material.appbar.AppBarLayout
-            android:id="@+id/appbar_layout"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@android:color/transparent"
-            app:elevation="0dp">
-
-            <com.google.android.material.appbar.MaterialToolbar
-                android:id="@+id/toolbar"
-                android:layout_width="match_parent"
-                android:layout_height="?attr/actionBarSize"
-                app:titleTextAppearance="@style/ToolbarBrandTitle" />
-
-        </com.google.android.material.appbar.AppBarLayout>
+        <!-- No app bar: every tab draws its own 56dp header on the ground plane, so the shell has
+             nothing to put in one. The AppBarLayout that used to sit here was inflated, given the
+             status-bar inset and then set GONE on every single tab switch — a measure pass that
+             rendered nothing. Edge-to-edge: the gradient (home_root) draws behind the status bar and
+             each tab's content takes the top inset itself (setupEdgeToEdge). -->
 
         <!-- Content + overlaid bottom nav: the nav floats over the content so the
              server list scrolls UNDER a faint scrim rather than sitting on a solid bar. -->

@@ -46,9 +46,25 @@
         android:textAppearance="@style/TextAppearance.App.Title"
         tools:text="Действия" />
 
-    <LinearLayout
-        android:id="@+id/sheet_rows"
+    <!--
+        THE ROWS SCROLL. Four of the five callers fill this sheet from a list whose length
+        is the user's data, not a constant: every stored profile remark (the chain step, the
+        subscription's prev/next profile, the routing rule's outbound tag) and every
+        subscription group. Past ~8 rows that list is taller than the sheet, and a plain
+        LinearLayout in a BottomSheetDialog does not scroll - the rows below the fold are
+        simply unreachable. A NestedScrollView is what makes the sheet draggable AND
+        scrollable, and it costs nothing on a three-row sheet: wrap_content up to the
+        height the sheet is allowed, then scroll.
+    -->
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical" />
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/sheet_rows"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </androidx.core.widget.NestedScrollView>
 </LinearLayout>
