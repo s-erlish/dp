@@ -99,6 +99,46 @@ Go through the Android client for the small courtesies the desktop lacks and bri
 
 Audit the desktop against each and list what is missing before fixing, so the list is the record.
 
+## H. The desktop does not connect at all — blocker
+
+«на пк версии не подключается к впн, не знаю в чем причина»
+
+What I traced, so whoever picks this up starts from evidence rather than from scratch:
+
+- On Windows, TUN is gated on being elevated: `StatusBarViewModel.AllowEnableTun()` returns
+  `Utils.IsAdministrator()`. When it is false, `TunModeItem.TunUnavailable` becomes true, and
+  `EnableTunEffective` (= `EnableTun && !TunUnavailable`) becomes false.
+- A recent change repointed the config builder at the effective flag:
+  `CoreConfigContextBuilder` now reads `EnableTunEffective` where it read `EnableTun`, in two places
+  including the Custom-node pre-socks branch. That change is correct in intent — build what the
+  process can actually run — but its consequence is that an unelevated run now silently produces a
+  **core config with no tunnel**. The app starts, reports itself running, and carries no VPN traffic.
+- `app.manifest` does declare `requestedExecutionLevel level="requireAdministrator"` and the csproj
+  does reference it, so elevation should be requested. **Verify it survives the single-file
+  self-contained publish the CI produces** — that is the first thing to check, and the release audit
+  already flagged elevation as a source of trouble on this platform.
+- A string exists for this exact case — `Home_TunUnavailable`, «Режим "весь трафик" недоступен без
+  прав администратора» — and the owner says he does not know the reason. So either it is not shown,
+  or it is shown somewhere he did not look. **A VPN that cannot tunnel must say so, loudly, on the
+  screen with the connect button.**
+
+Whatever the root cause turns out to be, two things are required: the desktop must connect, and when
+it genuinely cannot, it must explain why instead of pretending to run.
+
+## I. Port the template fix to the desktop — same defect, same shape
+
+«там есть фикс по шаблонам у серверов где первый есть прокси тег и второй прокси тег есть, на пк
+версии это ваще не пофикшено»
+
+Already listed as A3 and assigned; restating it here because the owner raised it twice, which means it
+matters more than its line count suggests. Android resolves which outbound actually carries traffic by
+walking the config's routing rules; the desktop still takes the first proxy-protocol outbound. A
+template whose leading entry is a decoy therefore reports the decoy's protocol, pings a host that is
+not the server, and measures the wrong outbound. See
+`/home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/dto/V2rayConfig.kt` and its tests at
+`app/src/test/java/com/v2ray/ang/dto/ProxyOutboundResolutionTest.kt` — port the resolution and the
+tests.
+
 ---
 
 ## The rule this feedback exists to enforce
