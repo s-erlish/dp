@@ -324,3 +324,458 @@ split is what lets copy work run in parallel with layout work. Assignment:
 | `strings_manual_add.xml` | 1 | Wave 6, A-SRV |
 | `strings_ui_polish.xml` | 1 | Wave 9, A-COPY (single `toast_updated`; likely deleted with the Toast sweep) |
 | `strings.xml` | 485 | Wave 9, A-COPY, and nobody before |
+
+---
+
+## 3. The wave plan
+
+### 3.0 Numbering, and how it maps to the two specs
+
+This brief keeps `32-master-plan-android.md` 26's numbering where it can, and inserts W4 because the
+shell split is large enough to be its own shippable change rather than a preamble to Главная.
+
+| This brief | `32` 26 | `24` 6.2 | Visible change |
+|---|---|---|---|
+| W1 tokens | wave 1 | wave 0 | **done, on disk** |
+| W2 foundation completion: themes, attrs, component layouts, gallery | wave 1 remainder + wave 2 | wave 0 + wave 1 | none |
+| W3 functional unblock | wave 3 | inside wave 0 | small, overdue |
+| W4 shell | inside wave 4 | wave 2 | structural, not stylistic |
+| W5 Вход + Главная | wave 4 | wave 4 (+ 3 partial) | large, the first impression |
+| W6 Серверы | wave 5 | wave 5 | large |
+| W7 Настройки | wave 6 | wave 6 | large |
+| W8 Аккаунт + commerce | wave 7 | wave 3 | large |
+| W9 editors, tail, copy, accessibility | waves 8 + 9 | wave 7 | medium |
+| W10 audit | wave 10 | gate | none |
+
+Three rules from `24` 6.1 are adopted verbatim and bind every wave here: **family atomicity** (a tab
+ships with its sub-pages), **no orphan component** (the library gains it first, with all its states),
+and **delete in the same change as the replacement** (no file is "kept for now").
+
+### 3.1 How to read an agent row
+
+`Owns` is exclusive: within a wave, no path appears in two agents' lists. A path that appears with a
+`*` is created by that agent and did not exist before. `Reads` is everything else the agent may open
+but not modify. An agent blocked on a file it does not own writes the request into its report and
+stops - it does not edit.
+
+---
+
+### W2 - Foundation completion. Invisible, and it unblocks every later wave
+
+**Goal.** Close the theme hole (0.1), build the component layouts and binders that do not exist
+(0.2), and stand up a gallery so a component can be looked at in three themes at 200% font scale
+before any screen consumes it. Visible change: **none**. The app must look pixel-identical at the end
+of this wave.
+
+**Serialisation inside the wave.** T1 lands first and alone. C1-C4 start only after T1's build is
+green, because every component layout resolves attrs T1 declares. This is the one intra-wave
+dependency in the whole plan and it is worth the half-day it costs.
+
+| Agent | Goal | Owns (exclusive) | Reads |
+|---|---|---|---|
+| **T1** theme wiring | Declare the missing attrs and install every `Widget.Departament.*` as a Material component default | `res/values/themes.xml`, `res/values-night/themes.xml`, `res/values/attrs.xml` | `res/values/styles.xml`, `colors.xml`, `dimens.xml`, `00-rules.md` 3.5/6.8/11.1, `22-components.md` |
+| **C1** row + header + card | The universal 56dp row at the 68dp text origin, all five archetypes | `res/layout/view_row.xml`*, `view_row_toggle.xml`*, `view_row_value.xml`*, `view_section_header.xml`*, `ui/component/RowBinder.kt`*, `res/drawable/bg_row_group.xml`*, `divider_row.xml`* | `styles.xml` `Widget.Departament.Row*` / `.Tile` / `.Card`, `32` 8.1-8.3 |
+| **C2** feedback + states | The one feedback channel and the state surfaces that replace `Toast` and blank screens | `res/layout/view_status_strip.xml`*, `view_empty_state.xml`*, `view_skeleton_row.xml`*, `view_skeleton_card.xml`*, `ui/component/StatusStrip.kt`*, `ui/component/Skeleton.kt`* | `styles.xml` `Widget.Departament.EmptyState.*` / `.Skeleton.*` / `.Snackbar`, `00-rules.md` 9.4/9.5/9.6/15, `32` 8.8-8.10 |
+| **C3** chrome | The seamless sub-page toolbar and the search field, the two things ~30 screens share | `res/layout/view_toolbar.xml`*, `view_search_field.xml`*, `ui/component/SeamlessToolbar.kt`*, `res/anim/subpage_enter.xml`*, `res/anim/subpage_exit.xml`* | `styles.xml` `Widget.Departament.Toolbar*`, `motion.xml`, `00-rules.md` 4.8, `32` 8.6, 8.15 |
+| **C4** small parts | Chip, meter, segmented, stepper | `res/layout/view_chip.xml`*, `view_meter.xml`*, `view_segmented.xml`*, `view_stepper.xml`*, `ui/component/Meter.kt`* | `styles.xml` `Widget.Departament.Chip*` / `.SegmentGroup` / `.Segment` / `.Progress.*`, `32` 8.4, 8.11, 8.13, 8.14 |
+| **G1** gallery | A debug-only screen that renders every component in every state, in dark, light and mono, at 100% and 200% | `ui/GalleryActivity.kt`*, `res/layout/activity_gallery.xml`*, `AndroidManifest.xml` (the one `<activity>` block, debug flavour only) | everything |
+
+**Contested-file handling in W2.** `styles.xml` has one reader-with-append-rights: T1. If C1-C4 need
+a style, they file it with T1 and T1 appends. `dimens.xml` and `colors.xml` are frozen; a component
+that cannot be built from the 57 dimens and 268 colours on disk reports that as a spec gap.
+
+**Gate.** `verify-build.sh android` green with `NEW WARNINGS: 0` and `COMPILER: ran`. The gallery
+opens and shows every component in three themes. **A screenshot diff of Главная, Серверы, Настройки
+and Аккаунт before and after this wave shows no change.** If installing the component defaults moved
+a pixel on a shipped screen, the default is wrong or the screen was relying on a Material default
+that the spec replaces; either way it is investigated, not accepted.
+
+---
+
+### W3 - Functional unblock. Small, visible, and overdue
+
+**Goal.** Fix what is broken on today's UI, without changing the visual language. Every item here is
+a defect a user can hit right now. Parallel by construction: the three agents share no file.
+
+| Agent | Goal | Owns (exclusive) | Reads |
+|---|---|---|---|
+| **F1** long-press P0 | Restore the only route to rename, delete, share, QR and edit a server | `ui/MainRecyclerAdapter.kt` | `ui/MainActivity.kt` `:674`, `:683`, `ui/ServerActionsSheet.kt`, `24` A-15, `32` 12.9 |
+| **F2** Back | One Back handler, predictive Back declared | `AndroidManifest.xml`, and **only** these two regions of `ui/MainActivity.kt`: `onKeyDown` at `:2859-2876` (delete) and the `OnBackPressedCallback` at `:296-308` | `00-rules.md` 11.3, `32` 9.3, `docs/agents/verify-back-key-tab-navigation.md` |
+| **F3** feedback channel | Replace the top `Toast` sites with the status strip C2 built | `res/layout/toast_status.xml` (delete), plus a named list of `Toast` call sites agreed with the wave lead before starting | `ui/component/StatusStrip.kt`, `00-rules.md` 1.4.8, `24` A-39 |
+
+**The `MainActivity.kt` contest in W3 is real and is handled by line-range assignment, not by file
+assignment.** F2 owns two named regions; F3 owns the call sites it lists in advance; F1 does not open
+the file. If F3's list and F2's regions overlap, F3's list changes. This is the only wave in the plan
+where two agents touch one file, and it is allowed only because the regions are tiny, named in
+advance, and the file is about to be split anyway.
+
+**Gate.** Build green. Long-press a server row: `ServerActionsSheet` opens. Back from Серверы goes to
+Главная; Back from Главная finishes the activity. No `Toast` remains in the files F3 listed.
+
+---
+
+### W4 - The shell. Structural, and behaviour-neutral
+
+**Goal.** Turn `MainActivity` from a four-screens-in-one-layout monolith into a container with four
+Fragment hosts, one inset strategy and a real `BottomNavigationView`. **Each Fragment initially
+inflates the markup it inflates today.** Nothing is restyled in this wave. That is what makes it
+verifiable: the app looks the same and the file structure is the target one.
+
+**One agent, deliberately.** The split cannot be parallelised: every cut moves `binding.*` references
+that another cut also touches.
+
+| Agent | Goal | Owns (exclusive) | Reads |
+|---|---|---|---|
+| **S1** shell | The split of 2.2, executed once | `ui/MainActivity.kt`, `res/layout/activity_main.xml`, `res/layout/activity_base.xml`, `res/layout/fragment_home.xml`*, `fragment_servers.xml`*, `fragment_settings.xml`*, `ui/HomeFragment.kt`*, `ui/ServersFragment.kt`*, `ui/SettingsFragment.kt`*, `ui/AccountFragment.kt`, `ui/BaseFragment.kt`, `res/menu/menu_bottom_nav.xml`, `res/color/bottom_nav_item_color.xml`, `res/values/strings_nav.xml`, `AndroidManifest.xml` | everything |
+| **S2** parity log | Record what W4 changed on Android that desktop has not, as numbered gaps | `docs/design2026/24-tab-conformance.md` section 7.3 only | everything |
+
+**S2 is not optional.** `00-rules.md` 13 is a parity contract; a wave that changes the navigation
+model on one platform and logs nothing has broken it silently.
+
+**What S1 must preserve verbatim, and the plan says so because these are the load-bearing fixes:**
+
+- `setSelectServer()` at `MainActivity.kt:1537` and `promptApplySelectedServer()` at `:1562` - fixed
+  defect 1 (tap selects, never connects).
+- `scheduleHealthCheckIfEnabled()` / `healthCheckConfirming` / `healthRecheckRunnable` around
+  `MainActivity.kt:2075` and the field block at `:175-195` - fixed defect 7 (auto-fallback waits for
+  a confirming re-probe). The comment at `:177-181` explains why one negative probe is not evidence;
+  do not "simplify" it.
+- `connectWatchdogRunnable` at `:195-205` and `scheduleConnectWatchdog()` at `:2106` - the recovery
+  path from a core that dies without broadcasting.
+- `serversAdapter.syncSelection()` / `homeAdapter.syncSelection()` in `onResume()` at `:2128-2135` -
+  fixed defect 3 (two rows painted as selected). The comment says exactly why it is in `onResume`.
+
+**Gate.** Build green. `MainActivity.kt` is under 1 000 lines. All four tabs open, keep scroll
+position across tab switches, and survive rotation and a font-scale change. The connect flow works
+from a cold start: connect, switch to Серверы, come back, the timer is still counting.
+`grep -c 'private fun' ui/MainActivity.kt` fell by roughly two thirds.
+
+---
+
+### W5 - Вход and Главная. The two screens the owner named
+
+**Goal.** `00-rules.md` 0.4.10. Both screens rebuilt from scratch, together, in one release, because
+Главная's first-run state is what replaces `layout_home_empty.xml` - which is today the real sign-in
+screen for every new user (`32` 10.2). Every gradient, glow and ring drawable is deleted in the same
+change; there is no interim state where half of them survive.
+
+| Agent | Goal | Owns (exclusive) | Reads |
+|---|---|---|---|
+| **A-AUTH** Вход | `32` 10, `14-auth.md` | `res/layout/activity_login.xml`, `ui/LoginActivity.kt`, `res/values/strings_auth.xml` | `auth/**` (read-only: `AccountSession.kt`, `AuthTokenStore.kt`, `AuthManager.kt`), `32` 10.3-10.7 |
+| **A-HOME** Главная | `32` 11, `13-start-screen.md` | `res/layout/fragment_home.xml`, `ui/HomeFragment.kt`, `res/layout/layout_home_empty.xml` (delete), `layout_home_account.xml` (delete), `layout_subscription_meta_bar.xml` (delete), `ui/HomeMetaPagerAdapter.kt` (delete), `res/values/strings_home_shell.xml` | `32` 11.3-11.10, `22-components.md` |
+| **A-CARD** subscription card | The card is a component, not a screen part: Главная and Аккаунт both consume it (`32` 11.6, 15.3) | `res/layout/view_subscription_card.xml`*, `ui/component/SubscriptionCardBinder.kt`*, `res/layout/item_subscription_card.xml` (rebuild), `ui/SubscriptionPagerAdapter.kt` | `32` 11.6, `23-account-rework.md` |
+| **A-DECOR** decoration purge | Delete every gradient, glow and ring the two screens carried, and their mono variants, in the same change | `res/drawable/bg_home_gradient.xml`, `bg_home_gradient_mono.xml`, `bg_connect_glow.xml`, `bg_connect_glow_mono.xml`, `bg_connect_ring.xml`, `bg_connect_ring_mono.xml`, `bg_bottom_nav_scrim.xml`, `res/anim/connect_confirm.xml`, `res/anim/shield_assemble.xml` | `00-rules.md` 1.4.3, `32` 11.2 |
+
+**Why A-CARD is a separate agent.** `24` 6.1 rule 4: no orphan components. If A-HOME builds the card
+inside `fragment_home.xml`, W8's Аккаунт agent rebuilds it. Naming it a component now costs one agent
+and saves one screen.
+
+**Contested.** `res/values/strings_nav.xml` was closed by S1 in W4 and is not reopened.
+`res/anim/nav_press.xml` is **not** in any list: its own header comment says to delete it together
+with its four references when the hand-rolled nav is replaced by the M3 bar, which happened in W4, so
+it is S1's deletion and if S1 missed it the wave-4 gate missed it too. Flag rather than fix.
+
+**Gate.** All of section 5, plus: `grep -rn 'gradient\|Gradient' res/drawable/ res/layout/` returns
+nothing outside the launcher icon. The first frame after cold start is Главная in every account
+state, never a sign-in screen (`32` 9.4, decision D-A4).
+
+---
+
+### W6 - Серверы
+
+**Goal.** `32` 12, 13, 14. The list, the row, the sticky section header, search (which the product has
+never had), the sort control, the empty states, the add-source sheet, the scanner, the QR sheet.
+
+| Agent | Goal | Owns (exclusive) | Reads |
+|---|---|---|---|
+| **A-SRV** list | The tab and its row | `res/layout/fragment_servers.xml`, `ui/ServersFragment.kt`, `res/layout/item_recycler_main.xml`, `item_section_header.xml`, `layout_servers_header.xml`, `layout_servers_empty.xml`, `item_recycler_footer.xml`, `ui/MainRecyclerAdapter.kt`, `res/values/strings_menu_actions.xml`, `strings_manual_add.xml` | `32` 12.3-12.8 |
+| **A-SRV-ACT** actions | The per-item sheet and the whole-list menu, converted to a sheet | `res/layout/sheet_server_actions.xml`, `ui/ServerActionsSheet.kt`, `res/menu/menu_main.xml`, `res/values/strings_server_actions.xml`, `res/layout/item_qrcode.xml`, `res/layout/dialog_config_filter.xml` (delete, `32` 23) | `32` 12.9, 13, 14.3 |
+| **A-SCAN** scanner and import | The app's own scan screen currently has zero branding and zero instruction (`32` 14.2) | `ui/ScannerActivity.kt`, `ui/ScScannerActivity.kt`, `res/layout/activity_none.xml`, `res/menu/menu_scanner.xml`, `ui/UrlSchemeActivity.kt`, `ui/UrlSchemeListActivity.kt`, `res/layout/activity_url_scheme_list.xml` | `32` 14.4, 14.5, 22.6, `24` A-43 |
+| **A-SRV-ICON** unified server icon | `00-rules.md` 0.4.7 and 10.5: one treatment everywhere a server appears - list row, connect hero, sheet header, notification | `util/FlagUtil.kt`, the flag raster set, `res/drawable/ic_server_*.xml`* | `32` 6.3, and every surface that draws a server |
+| **A-SUB** provider merge | `24` A-17: sub setting merges and its screens are deleted | `res/layout/activity_sub_setting.xml`, `activity_sub_edit.xml`, `item_recycler_sub_setting.xml`, `res/menu/action_sub_setting.xml`, `ui/SubSettingActivity.kt`, `SubEditActivity.kt`, `SubSettingRecyclerAdapter.kt` | `32` 20.8, `24` A-17, A-24 |
+
+**Contested.** `res/drawable/bg_search_pill.xml` (radius 14) and `bg_server_row.xml` are both named by
+`32` 12.2. Assign both to A-SRV, since the search field is a W2 component and the row is A-SRV's.
+
+**Gate.** Section 5, plus: long-press and overflow both reach every action; search filters in place
+and never navigates (`00-rules.md` 4.6); the empty result state is designed, not a blank list; the
+unified server icon is the same in the row, the hero, the sheet and the notification.
+
+---
+
+### W7 - Настройки, hub and all sub-pages
+
+**Goal.** `32` 19 and 20. The largest single conversion: one hub plus fourteen sub-pages. This is also
+where the 29 preferences with no editing UI get a home or a recorded cut.
+
+**Sequencing inside the wave** follows `32` 26 wave 6 exactly, because each later page reuses the
+pattern the earlier one set. The two simplest pages go first and their agent's output is the template
+the others copy.
+
+| Agent | Pages | Owns (exclusive) | Reads |
+|---|---|---|---|
+| **A-SET-HUB** | The hub | `res/layout/fragment_settings.xml`, `ui/SettingsFragment.kt`, `res/layout/layout_settings_content.xml` (delete), `layout_setting_row.xml` (delete), `layout_setting_toggle_row.xml` (delete), `res/values/strings_settings_hub.xml` | `32` 19.3-19.5, `12-settings.md` |
+| **A-SET-LOOK** | Оформление, Язык (`32` 20.11, 20.12). **Goes first; its page is the template** | `ui/AppearanceActivity.kt`*, `res/layout/activity_appearance.xml`*, `ui/LanguageActivity.kt`*, `res/layout/activity_language.xml`* | `MainActivity.pickAppearance()` at `:3209`, `pickLanguage()` at `:3246` (logic to port) |
+| **A-SET-NET** | Режим подключения, DNS, Проверка серверов, Локальный прокси (`32` 20.1, 20.4, 20.6, 20.7) | `ui/ConnectionSettingsActivity.kt`*, `res/layout/activity_connection_settings.xml`*, `ui/DnsSettingsActivity.kt`*, `res/layout/activity_dns_settings.xml`*, `ui/PingSettingsActivity.kt`*, `res/layout/activity_ping_settings.xml`*, `ui/LocalProxyActivity.kt`, `res/layout/activity_local_proxy.xml`, `res/values/strings_local_proxy.xml` | `MainActivity` `:2988-3200` (logic to port), `docs/agents/verify-local-proxy-port-silent-reject.md` |
+| **A-SET-ROUTE** | Обход блокировок, Маршрутизация and the rule editor (`32` 20.3, 20.5) | `ui/RoutingSettingActivity.kt`, `RoutingEditActivity.kt`, `RoutingSettingRecyclerAdapter.kt`, `res/layout/activity_routing_setting.xml`, `activity_routing_edit.xml`, `item_recycler_routing_setting.xml`, `res/menu/menu_routing_setting.xml`, `ui/CircumventionActivity.kt`*, `res/layout/activity_circumvention.xml`* | `32` 20.3, 20.5, `docs/circumvention-settings-design.md` |
+| **A-SET-APPS** | Прокси по приложениям and the app picker (`32` 20.2) | `ui/PerAppProxyActivity.kt`, `PerAppProxyAdapter.kt`, `AppPickerActivity.kt`, `AppSelectorAdapter.kt`, `res/layout/activity_app_picker.xml`, `activity_bypass_list.xml`, `item_recycler_bypass_list.xml`, `res/menu/menu_app_picker.xml`, `menu_bypass_list.xml`, `res/values/strings_perapp.xml` | `32` 20.2, `24` A-18, A-19 |
+| **A-SET-PROV** | Провайдеры, Что настроил провайдер, Файлы ресурсов (`32` 20.8, 20.9) | `ui/ProviderSettingsActivity.kt`, `res/layout/activity_provider_settings.xml`, `ui/UserAssetActivity.kt`, `UserAssetUrlActivity.kt`, `UserAssetAdapter.kt`, `res/layout/activity_user_asset.xml`, `activity_user_asset_url.xml`, `item_recycler_user_asset.xml`, `res/menu/menu_asset.xml`, `res/values/strings_provider.xml` | `32` 20.8, 20.9, fixed defects 5 and 8 |
+| **A-SET-DATA** | Резервное копирование and WebDAV (`32` 20.13) | `ui/BackupActivity.kt`, `res/layout/activity_backup.xml`, `res/layout/dialog_webdav.xml` | `32` 20.13, `24` A-29, A-30 |
+| **A-SET-ABOUT** | О приложении, Журнал, Схемы URL (`32` 20.14) | `ui/AboutActivity.kt`, `LogcatActivity.kt`, `LogcatRecyclerAdapter.kt`, `res/layout/activity_about.xml`, `activity_logcat.xml`, `item_recycler_logcat.xml`, `res/menu/menu_logcat.xml`, `res/values/strings_deeplink.xml` | `32` 20.14 |
+| **A-SET-KILL** | The deletion, **last in the wave and only after every other agent has reported** | `ui/SettingsActivity.kt` (delete), `res/xml/pref_settings.xml` (delete), `res/layout/activity_settings.xml` (delete), `preference_with_help_link.xml` (delete), `ui/CheckUpdateActivity.kt` (delete), `res/layout/activity_check_update.xml` (delete), `AndroidManifest.xml` | The inventory it is deleting |
+
+**A-SET-KILL is the wave's most dangerous agent and its rule is explicit:** it may delete
+`pref_settings.xml` only after producing a table with one row per preference key in it and a column
+naming the new surface or the recorded cut. `32` 26 wave 6 says the same: "Delete
+`layout_settings_content.xml`, `SettingsActivity`, `pref_settings.xml` and `CheckUpdateActivity` at
+the end of this wave, not before: every preference must have its new home first."
+
+**Contested.** `AndroidManifest.xml` is touched by A-SET-LOOK, A-SET-NET, A-SET-ROUTE (new
+activities) and A-SET-KILL (deletions). **Resolution: A-SET-KILL owns the file for the whole wave.**
+The other agents write their `<activity>` block into their report; A-SET-KILL applies all of them in
+one edit at the end. This costs one round trip and removes the wave's worst merge hazard.
+
+**Gate.** Section 5, plus: every key in the deleted `pref_settings.xml` appears in A-SET-KILL's table
+with a home or a cut; zero single-choice `AlertDialog`s remain in the settings tree (`32` 20 preamble);
+`grep -rn 'Spinner' res/layout/` returns nothing in settings layouts.
+
+---
+
+### W8 - Аккаунт and commerce
+
+**Goal.** `32` 15-18, `15-account-tab.md`, `23-account-rework.md`. Аккаунт, Купить, Устройства,
+История платежей, the payment-method sheet, the top-up sheet. Owner requests 0.4.5 (tightened
+account, tariff badge), 0.4.9 (explicit «Купить» and «Привязать Telegram») land here.
+
+| Agent | Goal | Owns (exclusive) | Reads |
+|---|---|---|---|
+| **A-ACC** Аккаунт | `32` 15 | `res/layout/activity_account.xml` -> `fragment_account.xml`, `ui/AccountFragment.kt`, `res/values/strings_account.xml`, `strings_templates.xml` | `viewmodel/AccountViewModel.kt` (read-only), `view_subscription_card.xml` from W5 |
+| **A-BUY** Купить + payment | `32` 16 | `res/layout/activity_buy_tariff.xml`, `item_buy_tariff.xml`, `item_buy_option.xml`, `ui/BuyTariffActivity.kt`, `res/layout/sheet_payment_method.xml`, `item_payment_method.xml`, `ui/PaymentMethodSheet.kt`, `res/layout/dialog_top_up.xml`, `res/values/strings_buy.xml`, `strings_pay.xml` | `32` 16.3-16.7, 15.8, 15.9 |
+| **A-DEV** Устройства + История | `32` 17, 18 | `res/layout/activity_devices.xml`, `item_device.xml`, `ui/DeviceManagementActivity.kt`, `ui/adapter/DeviceAdapter.kt`, `res/layout/activity_payment_history.xml`, `item_payment.xml`, `ui/PaymentHistoryActivity.kt`, `ui/adapter/PaymentsAdapter.kt`, `res/values/strings_devices.xml`, `strings_history.xml` | `32` 17.3, 18.3 |
+| **A-ACC-WIRE** unreachable features | Give «Выйти», «Привязать Telegram» and the referral row real call sites | Only `viewmodel/AccountViewModel.kt` and a named list of call-site insertions agreed with A-ACC before starting | `32` 15.3, 15.6, `docs/agents/verify-link-telegram-cta-unreachable.md` |
+
+**What must survive this wave, verbatim:**
+
+- `BuyTariffActivity.currentTotal()` - `32` 16.2 calls it "the single source for both the displayed
+  total and the charged amount - **this contract must survive**". A rebuild that recomputes the
+  displayed total separately from the charged amount is a money bug.
+- `AccountFragment`'s four-state hero machine and its cache-first loads - `32` 15.2 calls it "the best
+  state machine in the app".
+- The payment poll in both `AccountFragment` and `BuyTariffActivity`.
+
+**Contested.** A-ACC and A-ACC-WIRE both want `AccountFragment.kt`. **A-ACC owns the file;
+A-ACC-WIRE owns only `AccountViewModel.kt` and hands A-ACC a patch list.** A-ACC-WIRE exists as a
+separate agent because "did this wave silently drop a feature" is the review question that matters
+most here, and the features at risk (logout, Telegram linking, referral) have zero call sites today,
+so nobody would notice their absence.
+
+**Gate.** Section 5, plus: `grep -rn 'logout()' --include=*.kt` returns at least one call site outside
+`AccountViewModel.kt`; the terminology lock 9.3 holds on every visible string («Купить», not
+«Оформить»; «Привязать Telegram», not «Подключить Telegram»); `₽` never "RUB" or "руб.".
+
+---
+
+### W9 - Editors, the long tail, copy and accessibility
+
+**Goal.** `32` 21-24. The four shared form includes and the nine editor screens, the surfaces outside
+the app window, then the two whole-product sweeps.
+
+| Agent | Goal | Owns (exclusive) | Reads |
+|---|---|---|---|
+| **A-FORM** shared includes | Rebuild four files and nine screens are fixed at once (`32` 21.2) | `res/layout/layout_address_port.xml`, `layout_transport.xml`, `layout_tls.xml`, `layout_tls_hysteria2.xml` | `32` 21.3 |
+| **A-EDIT** editors | The nine protocol editors on top of A-FORM's includes | `res/layout/activity_server_vmess.xml`, `_vless.xml`, `_trojan.xml`, `_shadowsocks.xml`, `_socks.xml`, `_hysteria2.xml`, `_wireguard.xml`, `activity_server_custom_config.xml`, `activity_server_group.xml`, `activity_server_proxy_chain.xml`, `item_recycler_proxy_chain_member.xml`, `res/menu/action_server.xml`, `ui/ServerActivity.kt`, `ServerCustomConfigActivity.kt`, `ServerGroupActivity.kt`, `ServerProxyChainActivity.kt`, `ServerProxyChainMemberAdapter.kt` | `32` 21, fixed defect 4 (`V2rayConfig.getProxyOutbound()`) |
+| **A-TAIL** outside surfaces | Tasker, widget, QS tile, shortcuts, notification, TV transfer (`32` 22) | `ui/TaskerActivity.kt`, `res/layout/activity_tasker.xml`, `res/layout/widget_switch.xml`, `res/xml/app_widget_provider.xml`, `res/xml/shortcuts.xml`, `ui/ScStartActivity.kt`, `ScStopActivity.kt`, `ScSwitchActivity.kt`, `ui/TvSendActivity`-related layouts `activity_tv_send.xml`, `activity_tv_receive.xml`, `res/values/strings_tv.xml`, `tv/**` | `32` 22, `24` A-31, A-32, A-42, A-44 |
+| **A-COPY** the copy sweep | `00-rules.md` 9 across every string file | `res/values/strings.xml`, `res/values/strings_ui_polish.xml`, all of `res/values-ru/`, `values-ar/`, `values-bn/`, `values-fa/`, `values-vi/`, `values-zh-rCN/`, `values-zh-rTW/`, `values-bqi-rIR/` | every `strings_*.xml` (read-only; their owners already swept them) |
+| **A-A11Y** accessibility | `00-rules.md` 14 and 16 | No file exclusively; it files defects against the owning agent of each file, and owns only `docs/agents/` reports | everything |
+
+**A-A11Y owns no code on purpose.** It runs last in the wave, on a frozen tree, and its output is a
+defect list. Giving it edit rights across every file would make it the one agent that can collide
+with all the others.
+
+**Gate.** Section 5, plus: `grep -rn -e '—' -e '–' res/values*/strings*.xml` returns **0** (from 23);
+`grep -rn '\.\.\.' res/values*/strings*.xml` returns **0** (from 10); every icon-only control has a
+`contentDescription`; the 321 keys with no `values-ru` entry are either translated or recorded as
+intentionally default-only.
+
+---
+
+### W10 - The audit
+
+**Goal.** `00-rules.md` 17.1. One agent per screen family, scoring 0-4 on the five dimensions of
+`audit.native.md`. Ship bar **>= 18/20, no dimension below 3**. Owns nothing but `docs/agents/`
+reports. Anything below the bar goes back to the wave that built it, named.
+
+---
+
+## 4. Per screen: files, spec, states, and what "done" means
+
+**State legend**, from `00-rules.md` 15. A screen implements every state marked for it; a marked
+state that is not implemented is at least P1 by `00-rules.md` 17.2.
+
+`Def` default - `FR` first run - `Ld` loading - `Emp` empty - `Err` error - `Off` offline -
+`Par` partial - `Lng` long content - `Sht` short content - `Gat` disabled/gated - `Suc` success
+
+### 4.1 Shell and chrome
+
+| Screen | Layouts | Kotlin | Spec | States | Done means |
+|---|---|---|---|---|---|
+| Shell | `activity_main.xml` (705 -> ~30) | `ui/MainActivity.kt` | `32` 9.3, `11-app-structure.md` | Def, Ld (cold start), Off | Four Fragment hosts, one inset strategy, one Back handler, `enableOnBackInvokedCallback` declared, bottom nav with four permanent destinations, `MainActivity.kt` under 1 000 lines, tab switch preserves scroll and search state |
+| Sub-page host | `activity_base.xml` (41) | `ui/BaseActivity.kt`, `ui/HelperBaseActivity.kt` | `00-rules.md` 4.8, `24` A-38 | Def | Seamless 56dp toolbar sharing `?attr/colorBackground`, no elevation, no divider, 24dp back at the gutter, `android:fitsSystemWindows` removed so one inset strategy remains |
+| Bottom navigation | inside `activity_main.xml`, `res/menu/menu_bottom_nav.xml`, `res/color/bottom_nav_item_color.xml` | `MainActivity.setupBottomNav()` at `:358` | `32` 8.7, `00-rules.md` 0.4.8 | Def, Suc | Real `BottomNavigationView`, four items always present signed in or out (`32` 9.1 change 2), «Серверы» not «Сервера», no ripple glow, the bar never disappears (`updateBottomNavVisibility()` at `:848` is deleted) |
+| Cold start | `AndroidManifest.xml`, `res/values/themes.xml` | - | `32` 9.4 | Ld | `androidx.core.splashscreen`, background `?attr/colorBackground`, static icon, no custom exit; the first frame after the splash is **always Главная**, never sign-in, never onboarding |
+
+### 4.2 W5 - the two screens the owner named
+
+| Screen | Layouts | Kotlin | Spec | States | Done means |
+|---|---|---|---|---|---|
+| Вход | `activity_login.xml` (314, rebuild from scratch) | `ui/LoginActivity.kt` (415) | `32` 10, `14-auth.md` | Def, FR, Ld, Err, Off, Lng, Suc | One obvious primary route, every alternative demoted to text. The Telegram poll, the token exchange and the 2FA exchange survive the view-layer rewrite (`32` 10.2). Copy from `32` 10.5. Wrong-credentials copy is exactly `Неверная почта или пароль.` (`00-rules.md` 9.4) |
+| Главная | `fragment_home.xml`* (from `activity_main.xml:42-455`); deletes `layout_home_empty.xml` (139), `layout_home_account.xml` (155), `layout_subscription_meta_bar.xml` (257) | `ui/HomeFragment.kt`*; deletes `ui/HomeMetaPagerAdapter.kt` | `32` 11, `13-start-screen.md` | **all eleven** | Every gate state renders on this screen rather than as a different screen: `нет аккаунта`, `нет подписки`, `подписка истекает`, `подписка истекла`, `триал`, `нет серверов`, `подключение`, `подключено`, `отключение`, `ошибка туннеля`, `лимит устройств`. First-run state teaches «Войти» and «Подключить» by showing them. No gradient, no glow, no ring |
+| Subscription card | `view_subscription_card.xml`*, `item_subscription_card.xml` (75, fixed 152dp removed) | `ui/component/SubscriptionCardBinder.kt`*, `ui/SubscriptionPagerAdapter.kt` | `32` 11.6, `23-account-rework.md` | Def, Ld, Emp, Err, Lng, Sht, Gat | Tariff badge present (owner request 0.4.5). Height is `minHeight`, never fixed (`00-rules.md` 3.3 R2). `Subscription.isTrial` comes from the backend flag and is never inferred from tariff name or squad. Consumed unchanged by Аккаунт in W8 |
+
+### 4.3 W6 - Серверы
+
+| Screen | Layouts | Kotlin | Spec | States | Done means |
+|---|---|---|---|---|---|
+| Серверы | `fragment_servers.xml`*, `item_recycler_main.xml` (130), `item_section_header.xml` (49), `layout_servers_header.xml` (108), `layout_servers_empty.xml` (67), `item_recycler_footer.xml` | `ui/ServersFragment.kt`*, `ui/MainRecyclerAdapter.kt` | `32` 12, `24` 3.2 | Def, Ld, Emp, Err, Off, Par, Lng, Sht, Suc | Search filters in place and never navigates; the no-results state is designed. Section headers sticky. `RecyclerView` + `ListAdapter` + `DiffUtil`. 40-character server names wrap or ellipsise at the end, never mid-string. Selection reads on two axes, not tint alone |
+| Server actions sheet | `sheet_server_actions.xml` (271) | `ui/ServerActionsSheet.kt` | `32` 12.9, `24` A-15 | Def, Gat | Reachable by long-press **and** by an explicit affordance; neutral tiles only (`00-rules.md` 3.6 D-5); locked-template state handled (`template/TemplateManager.isLocked`) |
+| Add source | `res/menu/menu_main.xml` -> a sheet | `MainActivity.showImportMenu()` at `:728` moves to `ServersFragment` | `32` 14.3 | Def, Err, Suc | All six add routes present; no route silently lost in the menu-to-sheet conversion |
+| Scanner | `activity_none.xml` (an empty `RelativeLayout`), `res/menu/menu_scanner.xml` (two items with `android:title=""`) | `ui/ScannerActivity.kt`, `ui/ScScannerActivity.kt` | `32` 14.4 | Def, Ld, Err, Gat (no camera permission) | The screen has branding, an instruction line and a framing rectangle. `24` A-16 |
+| QR sheet | `item_qrcode.xml` | `MainActivity.showQRCode()` at `:1467` moves to `ServersFragment` | `32` 13, `24` A-40 | Def, Err, Lng | QR readable in all three themes; the string under it wraps |
+| Deep-link confirm | - | `ui/UrlSchemeActivity.kt` | `32` 14.5, 22.6, `24` A-43 | Def, Err | `depv://import/{base64}` no longer mutates the server list without a confirmation surface |
+
+### 4.4 W7 - Настройки
+
+| Screen | Layouts | Kotlin | Spec | States | Done means |
+|---|---|---|---|---|---|
+| Настройки hub | `fragment_settings.xml`*; deletes `layout_settings_content.xml` (1 536), `layout_setting_row.xml`, `layout_setting_toggle_row.xml` | `ui/SettingsFragment.kt`* | `32` 19, `12-settings.md`, `24` 3.4 | Def, Off, Gat | Data-driven rows over a `RecyclerView`, not 1 536 lines of hand-written markup. 16 rows in 4 groups. Every row declares what tapping it will do before it is touched |
+| Режим подключения | `activity_connection_settings.xml`* | `ui/ConnectionSettingsActivity.kt`* | `32` 20.1 | Def, Err, Suc | Absorbs the Режим dialog (`MainActivity.pickMode()` at `:2988`), IPv6, bypass-LAN, Always-on and six hidden preferences. No single-choice `AlertDialog` |
+| Прокси по приложениям | `activity_app_picker.xml`, `activity_bypass_list.xml`, `item_recycler_bypass_list.xml`, `res/menu/menu_app_picker.xml`, `menu_bypass_list.xml` | `ui/PerAppProxyActivity.kt`, `PerAppProxyAdapter.kt`, `AppPickerActivity.kt`, `AppSelectorAdapter.kt` | `32` 20.2, `24` A-18, A-19 | Def, Ld, Emp, Lng, Sht | App picker merges into the page (`24` A-19); list virtualised; icons loaded off the main thread (`00-rules.md` 11.5) |
+| Маршрутизация + правило | `activity_routing_setting.xml`, `activity_routing_edit.xml`, `item_recycler_routing_setting.xml`, `res/menu/menu_routing_setting.xml` | `ui/RoutingSettingActivity.kt`, `RoutingEditActivity.kt`, `RoutingSettingRecyclerAdapter.kt` | `32` 20.3, `24` A-20, A-21 | Def, Emp, Err, Lng, Sht, Suc | The first form page; sets the form pattern the editors reuse in W9. Two levels below the tab, never three (`32` 9.2 depth law) |
+| DNS | `activity_dns_settings.xml`* | `ui/DnsSettingsActivity.kt`* | `32` 20.4, `24` A-22 | Def, Err, Suc | Absorbs `MainActivity.editDns()` at `:3102` and `editDnsCustom()` at `:3130`; validation on blur, error below the field |
+| Обход блокировок | `activity_circumvention.xml`* | `ui/CircumventionActivity.kt`* | `32` 20.5 | Def, Suc | The inline-reveal pattern; absorbs `toggleMux()` `:3150`, `editMuxConcurrency()` `:3160`, `toggleFragment()` `:3179` |
+| Проверка серверов | `activity_ping_settings.xml`* | `ui/PingSettingsActivity.kt`* | `32` 20.6, `24` A-23 | Def, Err, Suc | Absorbs `pickPingMethod()` at `:3038`; the segmented control replaces the dialog |
+| Локальный прокси | `activity_local_proxy.xml` (**75 off-scale dp, the worst file in the tree**) | `ui/LocalProxyActivity.kt` | `32` 20.7, `24` A-28 | Def, Err, Suc | Off-scale dp in this file goes to **zero**. A rejected port tells the user why (`docs/agents/verify-local-proxy-port-silent-reject.md`) |
+| Провайдеры | `activity_provider_settings.xml` (62 off-scale dp) | `ui/ProviderSettingsActivity.kt` | `32` 20.8, `24` A-24 | Def, Ld, Emp, Err, Off, Par, Lng, Sht, Suc | The provider merge; every provider toggle drives real behaviour (fixed defect 8) |
+| Что настроил провайдер | `activity_operator_settings.xml`* | `ui/OperatorSettingsActivity.kt`* | `32` 20.9 | Def, Emp | Every provider-applied setting is listed **and revertable**. `32` 27: "the whole objection to a managed VPN is that someone else controls your connection and every competitor answers that by hiding the control" |
+| Файлы ресурсов | `activity_user_asset.xml`, `activity_user_asset_url.xml`, `item_recycler_user_asset.xml`, `res/menu/menu_asset.xml` | `ui/UserAssetActivity.kt`, `UserAssetUrlActivity.kt`, `UserAssetAdapter.kt` | `32` 20.14, `24` A-25, A-26 | Def, Emp, Err, Sht | Add-URL is a sheet over the page, not a third level (`32` 9.2) |
+| Оформление / Язык | `activity_appearance.xml`*, `activity_language.xml`* | `ui/AppearanceActivity.kt`*, `ui/LanguageActivity.kt`* | `32` 20.11, 20.12 | Def, Suc | The two simplest `Row.Selectable` pages; **built first and used as the template** for the rest of the wave. All three themes selectable and each verified |
+| Резервное копирование | `activity_backup.xml` (26 off-scale dp), `dialog_webdav.xml` | `ui/BackupActivity.kt` | `32` 20.13, `24` A-29, A-30 | Def, Ld, Err, Suc | WebDAV becomes a sub-page, not a dialog |
+| О приложении / Журнал / Схемы URL | `activity_about.xml`, `activity_logcat.xml`, `item_recycler_logcat.xml`, `activity_url_scheme_list.xml` (37 off-scale dp), `res/menu/menu_logcat.xml` | `ui/AboutActivity.kt`, `LogcatActivity.kt`, `LogcatRecyclerAdapter.kt`, `UrlSchemeListActivity.kt` | `32` 20.14, `24` A-33, A-34, A-35 | Def, Emp, Lng | Журнал is wired from О приложении (`24` A-35 says "RESTYLE + WIRE") |
+| Deleted at the end of W7 | `activity_settings.xml` (16), `res/xml/pref_settings.xml` (354), `preference_with_help_link.xml`, `activity_check_update.xml` | `ui/SettingsActivity.kt` (309), `ui/CheckUpdateActivity.kt` | `32` 19.2, `24` A-36, A-37 | - | Deleted **only after** A-SET-KILL's key-by-key table shows a home or a recorded cut for every one of the ~48 preferences |
+
+### 4.5 W8 - Аккаунт and commerce
+
+| Screen | Layouts | Kotlin | Spec | States | Done means |
+|---|---|---|---|---|---|
+| Аккаунт | `activity_account.xml` (560, 17 off-scale dp) -> `fragment_account.xml` | `ui/AccountFragment.kt` (691) | `32` 15, `15-account-tab.md`, `23-account-rework.md`, `24` 3.3 | **all eleven** | One card (the subscription) plus rows (`00-rules.md` 4.4). Tightened per owner request 0.4.5. «Купить» and «Привязать Telegram» present where the state calls for them (0.4.9). «Выйти» has a call site. The four-state hero machine and the cache-first loads survive |
+| Купить | `activity_buy_tariff.xml` (309), `item_buy_tariff.xml` (75), `item_buy_option.xml` | `ui/BuyTariffActivity.kt` (662) | `32` 16, `24` A-08 | Def, Ld, Emp, Err, Off, Lng, Sht, Gat, Suc | `currentTotal()` remains the single source of both the shown total and the charged amount. Tariff becomes a selectable **row**, not a card (`32` 16.2). `tv_group_emoji` in `item_buy_tariff.xml` is deleted, not left `GONE` |
+| Payment method | `sheet_payment_method.xml` (51), `item_payment_method.xml` | `ui/PaymentMethodSheet.kt` | `32` 15.9, `24` A-11 | Def, Ld, Err, Sht | One payment grammar shared with Купить and top-up |
+| Пополнить | `dialog_top_up.xml` (28) -> a sheet | inside `AccountFragment` | `32` 15.8, `24` A-12 | Def, Err, Suc | A sheet, not a dialog (`00-rules.md` 1.4.9) |
+| Устройства | `activity_devices.xml` (85), `item_device.xml` | `ui/DeviceManagementActivity.kt`, `ui/adapter/DeviceAdapter.kt` | `32` 17, `24` A-09 | Def, Ld, Emp, Err, Off, Lng, Sht, Gat, Suc | `лимит устройств` is a designed gated state with the unlock action, not an error. Empty copy is `Устройств пока нет` / `Устройства появятся после первого подключения.` with no action (`00-rules.md` 9.5). End-user diagnostic dialogs deleted (`32` 26 wave 3.3) |
+| История платежей | `activity_payment_history.xml` (83), `item_payment.xml` | `ui/PaymentHistoryActivity.kt`, `ui/adapter/PaymentsAdapter.kt` | `32` 18, `24` A-10 | Def, Ld, Emp, Err, Off, Lng, Sht | Empty copy `Платежей пока нет` / `Здесь появится история покупок и продлений.`, no action. Raw HTTP codes never shown (`32` 26 wave 3.3). Amounts use the Numeric role, `₽`, thin-space thousands |
+
+### 4.6 W9 - editors and tail
+
+| Screen | Layouts | Kotlin | Spec | States | Done means |
+|---|---|---|---|---|---|
+| Server form, 9 screens | `layout_address_port.xml`, `layout_transport.xml`, `layout_tls.xml`, `layout_tls_hysteria2.xml` (the four shared includes), then `activity_server_vmess.xml`, `_vless.xml`, `_trojan.xml`, `_shadowsocks.xml`, `_socks.xml`, `_hysteria2.xml`, `_wireguard.xml`, `activity_server_custom_config.xml`, `activity_server_group.xml`, `activity_server_proxy_chain.xml`, `item_recycler_proxy_chain_member.xml`, `res/menu/action_server.xml` | `ui/ServerActivity.kt` (32 KB), `ServerCustomConfigActivity.kt`, `ServerGroupActivity.kt`, `ServerProxyChainActivity.kt`, `ServerProxyChainMemberAdapter.kt` | `32` 21 | Def, Err, Lng, Suc | Rebuild the four includes and nine screens are fixed at once. Label above, error below, validate on blur, no placeholder-as-label (`00-rules.md` 7.4). `V2rayConfig.getProxyOutbound()` behaviour preserved (fixed defect 4) |
+| Tasker / widget / QS tile / shortcuts / notification | `activity_tasker.xml`, `widget_switch.xml`, `res/xml/app_widget_provider.xml`, `res/xml/shortcuts.xml` | `ui/TaskerActivity.kt`, `ui/ScStartActivity.kt`, `ScStopActivity.kt`, `ScSwitchActivity.kt` | `32` 22, `24` A-42, A-44 | Def, Err | The unified server icon (0.4.7) is the same in the notification as in the list |
+| Перенести подписку / TV | `activity_tv_send.xml`, `activity_tv_receive.xml` | `tv/**` | `32` 20.10, `24` A-31, A-32 | Def, Ld, Err, Suc | Restyled to tokens; the TV shell keeps its own receive screen |
+
+---
+
+## 5. Verification protocol, run at the end of every wave
+
+Four parts. All four, every wave. A wave that skips one is not verified, it is hoped for.
+
+### 5.1 The build gate
+
+```bash
+bash /home/user/dp/docs/agents/verify-build.sh android
+```
+
+**Pass is all three of these lines, and no fewer:**
+
+| Line | Required value | Why |
+|---|---|---|
+| `BUILD:` | `SUCCESSFUL` | the obvious one |
+| `COMPILER:` | `ran (Kotlin recompiled)` | `verify-build.sh:52-58` prints `COMPILER: UP-TO-DATE - nothing recompiled, so this run proves nothing.` when Gradle skipped `:app:compileFdroidDebugKotlin`. A green run whose compiler never executed is not evidence. If it says UP-TO-DATE, touch the changed files or use `--rerun-tasks` and run again |
+| `NEW WARNINGS:` | `0` | compared against `docs/agents/.baseline-warnings.txt` (21 entries) with `:line:col` normalised away, so a line shift is not a regression |
+
+The script serialises Gradle behind `flock /tmp/dep-android-build.lock` (`verify-build.sh:41`), so
+parallel agents queue rather than corrupt the build tree. Waiting is correct; running Gradle outside
+the script is not.
+
+A resource-only wave still runs the full `assembleFdroidDebug`, not `compileFdroidDebugKotlin`:
+`assemble` is what compiles layouts and links the APK, so a malformed layout only fails there.
+
+### 5.2 The mechanical greps, scoped to the files the wave touched
+
+Run from `/home/user/dp/V2rayNG/app/src/main/res`. Scope them to the wave's file list, not to the
+whole tree: the whole-tree numbers are debt that other waves retire, and mixing the two makes it
+impossible to tell whether this wave made things worse.
+
+```bash
+# 00-rules.md 1.5 - raw colour literals. Whole tree is 0 today; keep it 0.
+grep -rnE '(android:(textColor|background|tint|backgroundTint|strokeColor)|app:tint|app:strokeColor)="#' <touched layouts>
+# all-caps labels. Whole tree is 0 today; keep it 0.
+grep -rn 'textAllCaps="true"' <touched layouts> values/
+# a face or a size chosen in a layout instead of by the ramp role (D-2)
+grep -rn 'android:fontFamily\|android:textSize' <touched layouts>
+# off-scale spacing
+grep -rnoE '"(-?[0-9]+)dp"' <touched layouts> | grep -vE '"(0|1|2|4|8|12|16|20|22|24|28|32|36|40|44|48|52|56|64|72|80|100|120|152|160|176|212|230)dp"'
+# nested cards
+grep -rn -A40 '<com.google.android.material.card.MaterialCardView' <touched layouts> | grep -c 'MaterialCardView'
+# 00-rules.md 9.7 - dashes and three-dot ellipses in shipped copy
+grep -rn -e '—' -e '–' <touched strings files>
+grep -rn '\.\.\.' <touched strings files>
+# emoji in shipped copy
+python3 -c "import glob,re;p=re.compile('[\U0001F300-\U0001FAFF☀-➿]');[print(f,i,l.strip()[:80]) for f in glob.glob('values*/strings*.xml') for i,l in enumerate(open(f,encoding='utf-8'),1) if p.search(l)]"
+```
+
+**The bar for the touched files is zero, not "fewer"** (`32` 26, "the four checks that gate every
+wave", check 2). The two greps whose whole-tree count is already 0 - raw hex and `textAllCaps` - stay
+at 0 tree-wide; a wave that introduces one has regressed the baseline, not inherited debt.
+
+Record the before/after numbers for the touched files in the wave report. `00-rules.md` 17.3: "A
+clean grep is a floor, never a verdict."
+
+### 5.3 The state walk
+
+For each screen the wave touched, open it in each state marked for it in section 4 and look at it.
+`00-rules.md` 15 and `32` 26 check 3. The four axes that catch the most, run per screen:
+
+- three themes: dark, light, mono;
+- font scale 100% and 200%;
+- width 320dp and 600dp;
+- the longest real Russian string in every label, plus a 40-character server name and a 60-character
+  Telegram display name.
+
+### 5.4 The review question that matters most
+
+**Did this wave silently drop a feature?**
+
+This is the question a second agent asks, and it does not trust the first agent's report;
+`CONTINUE-HERE.md` 5 records that this method already caught a wrong root cause, an incomplete
+User-Agent precedence chain and a crash on a Cyrillic User-Agent. The mechanics:
+
+1. The reviewer lists every user-reachable action on the screen **before** the wave, from the old
+   layout and the old Kotlin, not from the wave's report.
+2. It matches each one against the new surface.
+3. Anything unmatched is either present under a new name, or a **deliberate cut recorded in the
+   wave report with a spec reference**, or a defect.
+
+This project has already lost features exactly this way twice, and both are on record:
+
+- `CONTINUE-HERE.md` 4.1: "A compile error was resolved by deleting the `when` branches rather than
+  restoring the menu ids, so the implementations are live but unreachable dead code." Nineteen
+  actions. (Since restored - see 0.4.)
+- `MainRecyclerAdapter.kt:56`: `onItemLongClick` declared, assigned by the Activity at
+  `MainActivity.kt:674-675`, and **never invoked**. Five per-server actions and nine editor
+  activities unreachable, with no compile error and no warning to announce it.
+
+Neither would be caught by a build gate or by a grep. Only the question catches them.
+
+A second review question, cheaper and worth asking anyway: **does this wave's screen pass the seven
+questions of the Departament slop test** (`00-rules.md` 2.4), answered out loud with the screenshot in
+front of you. A "yes" on any of 1-6 or a "no" on 7 is rework, not polish.
