@@ -1,5 +1,37 @@
 # How to verify Android changes in this environment
 
+## Fresh container: run the setup once
+
+A new container has **no** Android SDK, no .NET SDK, no submodule and no libv2ray stub. One command
+installs all of it, idempotently:
+
+```bash
+bash /home/user/dp/docs/agents/setup-env.sh
+```
+
+Then the single gate for both platforms - build plus a normalised diff against the recorded
+warning baselines:
+
+```bash
+bash /home/user/dp/docs/agents/verify-build.sh both      # or: android | desktop
+```
+
+Pass means `BUILD: SUCCESSFUL` **and** `NEW WARNINGS: 0` on the platform you touched. The script
+also prints whether the compiler actually ran: an `UP-TO-DATE` compile emits no warnings and
+proves nothing, so a green line there is not verification.
+
+Two environment facts that cost time to rediscover:
+
+- The SDK package for `compileSdk = 37` is **`platforms;android-37.0`**. `platforms;android-37`
+  does not exist and `sdkmanager` fails with "Failed to find package".
+- `github.com` is **not reachable** from this environment, so the real `libv2ray.aar` cannot be
+  downloaded from `2dust/AndroidLibXrayLite` releases the way CI does. `setup-env.sh` generates the
+  type-check stub instead, and that stub's exact class surface is recorded there. If a build ever
+  fails on a missing `libv2ray` member, add the member to the stub in `setup-env.sh`; never reshape
+  app code to fit the stub.
+
+---
+
 The Android app **compiles here**. Any agent changing Kotlin or resources must verify before finishing.
 
 ```bash
