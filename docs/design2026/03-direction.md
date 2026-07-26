@@ -318,9 +318,11 @@ just a palette rule.
 The current build breaks this most visibly on Home, where the accent appears in the page gradient,
 the glow, the ring, the sweep and the sonar simultaneously, and on the settings surfaces, where
 `res/values/colors.xml` defines six coloured icon tiles (`icon_tile_blue/green/orange/purple/red/
-yellow`) that turn a settings list into a paint chart. Coloured tiles are a **category system**
-with at most four categories, or they are noise; `icon_tile_neutral` `#20242B` with
-`icon_glyph_neutral` `#9BA1AD` is the default and covers most rows.
+yellow`) that turn a settings list into a paint chart. Since **D-5** the coloured tile system is
+**exactly three** - accent, destructive, neutral (`00-rules.md` 3.6) - and no new work uses the
+purple, orange, yellow or green fills; they stay in the colour file only until the last layout that
+references them migrates. `icon_tile_neutral` `#20242B` with `icon_glyph_neutral` `#9BA1AD` is the
+default and covers most rows.
 
 **The corollary that makes it strict.** The wordmark is not blue. `@style/ToolbarBrandTitle`
 already sets `?attr/colorOnBackground`; keep it. The brand does not spend its one accent on
@@ -373,7 +375,7 @@ new is **what each plane is allowed to mean**.
 |---|---|---|---|
 | P0 Ground | `#0A0B0D` | `#F4F7FC` | The screen itself, and the toolbar, which shares it |
 | P1 Object | `#141619` | `#FFFFFF` | A card, a sheet body, a dialog body. A discrete thing the user acts on as a unit |
-| P2 Raised | `#1A1D21` | `#EAEFF7` | Transient raise only: desktop hover, pressed row, drag |
+| P2 Raised | `#1A1D21` | `#EAEFF7` | Transient raise only: desktop hover (this plane, or the equivalent 6% overlay of D-8), pressed row, drag |
 | P3 Inset | `#20242B` | `#E3EAF4` | Something recessed into a plane: input field, chip fill, neutral icon tile, selected row |
 
 Two reads follow from this table and both are directional:
@@ -382,8 +384,10 @@ Two reads follow from this table and both are directional:
   touching it, it is wrong. This is what keeps a settings screen from turning into a stack of
   grey slabs.
 - **P3 is inset, not elevated.** A chip and an input field are holes in the panel, not objects on
-  top of it. This is why they share a tone and a 12dp radius, and it is why a chip never carries a
-  hairline border as well as a fill (that would be a hole with a rim).
+  top of it. This is why they share a tone, and it is why a chip never carries a hairline border as
+  well as a fill (that would be a hole with a rim). They no longer share a radius: since D-7 a chip
+  is 12 and a field is 16, because the field is a control you type into and takes the control radius
+  and the 1dp `color_outline_control` boundary (D-9), while a chip is a fitting.
 
 ### 4.2 The plane budget
 
@@ -424,14 +428,24 @@ ripple glow (owner request 0.4.8). The active destination is marked by
 The values are fixed in `00-rules.md` 3.2. The direction assigns them meaning so that a new
 component picks its radius by asking what it is, not by eye:
 
-- **Pill (100)**: things you press that are the point. Primary CTA, the connect disc, a segmented
-  thumb.
-- **20**: objects. Cards, dialogs, sheet bodies.
-- **12**: fittings. Chips, tiles, inputs, badges, flags.
+- **12**: fittings. Chips, tiles, badges, flags, the segmented thumb.
+- **16**: things you press or type into. All five button variants, inputs, the search field, the
+  price option, the segmented track.
+- **20**: objects. Cards, dialogs, flyout and sheet bodies.
 - **24 top only**: the bottom sheet lip.
+- **Full round (100)**: circles and tracks only. The connect disc, avatars, page dots, the sheet
+  handle, the progress meter, the switch track, an icon-only button.
 
-Anything that is not one of those four is a defect. A 26dp pill (currently in the sign-in card)
+Anything that is not one of those five is a defect. A 26dp pill (currently in the sign-in card)
 and an 18dp card (currently in per-app proxy) are both defects by this rule, not matters of taste.
+
+**Note, 2026-07-26.** This section previously read "Pill (100): things you press that are the point.
+Primary CTA, the connect disc, a segmented thumb" and put inputs at 12. Both lines were replaced by
+decisions **D-6** and **D-7** in `00-rules.md` section 18: the owner rejected the capsule CTA in
+writing at `Assets/GlobalStyles.axaml:3-14`, and under `00-rules.md` 0.1.1 the owner's word outranks
+both files. The button is a 16dp rounded rectangle; the input shares that 16 so a field and the
+button under it do not read as two systems. Pill survives for circles and tracks, never for a wide
+capsule with a label in it.
 
 ### 4.6 The AMOLED / mono theme
 
@@ -462,8 +476,8 @@ Per screen: **one** filled accent surface, plus at most **three** further accent
 element, the screen has more than one primary action and the screen is wrong.
 
 Measured as area: on a 1080 x 2400 phone screen, accent pixels stay under about 6% of the visible
-surface. The 52dp pill CTA at full width is roughly 2.5%; the connect disc ring is under 1%. There
-is room for one of those and nothing more.
+surface. The 52dp full-width CTA is roughly 2.5%; the connect disc ring is under 1%. There is room
+for one of those and nothing more.
 
 ### 5.3 What the other colours are, and why they are not accents
 
@@ -498,9 +512,13 @@ Never colour alone (`colorize.md`, WCAG, and 8% of men). The permitted pairs:
 
 ### 5.6 Focus
 
-2dp accent ring, 2dp offset, radius following the control. Always rendered on desktop (pointer and
-keyboard), rendered on Android for keyboard and TV D-pad only. The ring is accent, and it is one of
-the three permitted extra accent elements in 5.2.
+2dp accent ring, 2dp offset, radius following the control (control radius + 2 when the ring is drawn
+outside). **Rendered on every focusable control on both platforms**, per `00-rules.md` 7.1 as amended
+by R7: the earlier "Android only for keyboard and TV D-pad" wording read as a scope limit and worked
+as an excuse, and the app ships exactly one `state_focused` drawable including on its two D-pad-only
+TV activities. On a filled control the ring is drawn **inside**, in the control's own on-colour at
+40%, because an accent ring on an accent fill is invisible. The ring is accent, and it is one of the
+three permitted extra accent elements in 5.2.
 
 ### 5.7 Where accent is banned outright
 
@@ -520,7 +538,7 @@ the measurement in 1.1 leaves no alternative.
 | | Face | Carries | Weights |
 |---|---|---|---|
 | **Brand / figure face** | Space Grotesk (variable, `wght` 300-700) | Digits, units, currency, Latin technical tokens (`VLESS`, `Reality`, `WS`, `TCP`, host names, ports), the wordmark, chip labels | 500, 700 |
-| **UI face** | one Cyrillic-capable grotesque, identical on all four operating systems | All Russian prose: titles, labels, buttons, subtitles, captions, errors, empty states | 400, 500, 700 |
+| **UI face** | **Golos Text**, static 400 / 500 / 700, the same binaries on all four operating systems | All Russian prose: titles, labels, buttons, subtitles, captions, errors, empty states | 400, 500, 700 |
 
 **Why this is a legitimate pairing and not the banned "two similar sans".** `typeset.md` forbids
 pairing two faces that are similar but not identical, because the reader sees an inconsistency
@@ -529,30 +547,35 @@ line inside a sentence, and are partitioned by script, which is the one partitio
 perceives as intentional. The pairing axis is geometric-mono (figures) against humanist
 (prose), which is exactly the contrast axis `typeset.md` sanctions.
 
-**Which Cyrillic face.** This needs an owner decision (D-1, section 11). The direction's
-recommendation, in order:
+**Which Cyrillic face: decided.** The owner chose **Golos Text** (D-1, `00-rules.md` section 18,
+2026-07-26). It is OFL, Cyrillic-first, designed for Russian UI, and humanist-leaning, which gives
+real contrast against the geometric figures instead of the near-miss similarity `typeset.md` warns
+about. The alternatives the direction had put up - Onest, and a pinned platform stack - are closed.
+Inter was never a candidate by default (`typeset.md` anti-reflex, taste-skill 4.1).
 
-1. **Golos Text** (OFL, variable, Cyrillic-first, designed for Russian UI). Humanist-leaning
-   neo-grotesque, which gives real contrast against the geometric figures instead of the
-   near-miss similarity `typeset.md` warns about. Vendored to `res/font/` and `Assets/Fonts/`,
-   subset to Cyrillic plus Latin plus punctuation.
-2. **Onest** (OFL, variable, Cyrillic) if a slightly more neutral voice is wanted.
-3. **Fallback if no new binary is allowed:** the platform face, pinned explicitly. Android:
-   `sans-serif` (Roboto). Desktop: an explicit per-OS stack rather than the current implicit one,
-   so that Windows, Linux and macOS stop rendering three different products. Inter is *not*
-   chosen by default (`typeset.md` anti-reflex, taste-skill 4.1); if it is chosen it must be
-   because someone argued for it.
+The binaries are vendored and verified (all 66 Russian letters plus Ё/ё, `₽`, `…`, «»):
 
-**What must stop immediately either way.** `Assets/GlobalStyles.axaml` currently sets
-`FontFamily="{DynamicResource Font.Grotesk}"` in sixteen places, including body text classes.
-Since the file has no Cyrillic, those setters do nothing for Russian text except hand the
-decision to the OS. The UI face must be its own token (`Font.Ui` / a Cyrillic-capable
-`@font/` family), and `Font.Grotesk` must be applied only to the slots in the table above.
+- Android `res/font/golos_text_regular.ttf` (400), `golos_text_medium.ttf` (500),
+  `golos_text_bold.ttf` (700), plus `GOLOS-TEXT-LICENSE.txt`.
+- Desktop `Assets/Fonts/GolosText-Regular.ttf`, `-Medium.ttf`, `-Bold.ttf`.
+
+**Static instances, deliberately, not the variable font.** `fontVariationSettings` needs API 26 and
+minSdk here is 24, so a variable UI face would render at its default instance on the oldest devices -
+the exact failure 6.3 documents for the brand face. Three real masters remove the question.
+
+**What must stop immediately.** `Assets/GlobalStyles.axaml` currently sets
+`FontFamily="{DynamicResource Font.Grotesk}"` in sixteen places, including body text classes, three
+of them blanket setters on `TopLevel`, `TextBlock` and `TemplatedControl` (lines 257-265). Since the
+file has no Cyrillic, those setters do nothing for Russian text except hand the decision to the OS.
+The UI face is its own token (`Font.Ui` on desktop; on Android the family XML `@font/ui_sans`, whose
+three entries point at the Golos files above), the brand face is
+renamed `Font.Brand`, and it is applied only to the slots in the table above.
 
 ### 6.2 Weights, and the ban on everything between
 
-Three weights, and the file supplies real masters for all three (`wght` axis 300-700, named
-instances Light 300 / Regular 400 / Medium 500 / Bold 700):
+Three weights, and both faces supply real masters for all three - Space Grotesk through its `wght`
+axis 300-700 (named instances Light 300 / Regular 400 / Medium 500 / Bold 700), Golos Text as three
+static files:
 
 | Weight | Used for | Never used for |
 |---|---|---|
@@ -560,9 +583,10 @@ instances Light 300 / Regular 400 / Medium 500 / Bold 700):
 | **500** | Chip labels, selected states, values, the Numeric role, inactive nav labels | Body prose |
 | **700** | Display, headline, title, section header, active nav label, the wordmark | Body prose, subtitles, more than one element per row |
 
-**600 does not exist.** **300 does not exist in the UI** even though the file's default instance is
-Light. **Italic does not exist**: the variable font carries a `wght` axis only, no italic axis and
-no companion italic file, so any italic in the product would be a synthetic oblique. Emphasis is
+**600 does not exist.** **300 does not exist in the UI** even though the brand file's default
+instance is Light. **Italic does not exist**: the brand file carries a `wght` axis only, no italic
+axis and no companion italic file, and no italic Golos Text binary is vendored, so any italic in the
+product would be a synthetic oblique. Emphasis is
 weight or the next step up the ramp, never slant, never colour, never a second family.
 
 ### 6.3 The variable-font verification item (P1, do before any type work)
@@ -593,9 +617,10 @@ weight at all (`res/values/styles.xml:122-127`) while `00-rules.md` 3.4 specifie
 
 `typeset.md`: light-on-dark needs compensation on three axes (line height, tracking, weight). The
 ramp in `00-rules.md` 3.4 and 5.6 already carries it: Display -0.02em, Headline -0.01em, Title 0,
-Body and Subtitle +0.01em, Caption +0.02em, Chip +0.04em. Do not add more per screen, and never add
-tracking to make a label "look designed". Tracking above +0.02em at a heading size is the eyebrow
-tell and is banned.
+Body and Subtitle +0.01em, Caption +0.02em, Chip +0.04em. Since D-12 the ramp also declares the line
+height of every role as an absolute number (`00-rules.md` 3.4), so all three axes are now declared
+rather than left to the platform. Do not add more per screen, and never add tracking to make a label
+"look designed". Tracking above +0.02em at a heading size is the eyebrow tell and is banned.
 
 ### 6.5 Numerals, in full
 
@@ -734,10 +759,12 @@ tint, the nav bar does not react.
 
 ### 8.5 What never moves
 
-No looping animation exists in this product except a genuine indeterminate progress indicator
-during real work. No parallax, no scroll-linked transforms, no animated gradients (there are no
-gradients), no pulsing glow (there is no glow), no shimmer on anything that is not a skeleton, no
-staggered section entrances, no cross-fade on tab switch beyond the 220ms state tempo, and no
+No looping animation exists in this product except two, both of which run only while real work is
+in flight and stop the instant it resolves: a genuine indeterminate progress indicator
+(`motion_spin` 1100, the one linear curve in the product) and the skeleton pulse (`motion_pulse`
+1000, opacity 0.45 to 1.0). No parallax, no scroll-linked transforms, no animated gradients (there
+are no gradients), no pulsing glow (there is no glow), no shimmer on anything that is not a skeleton,
+no staggered section entrances, no cross-fade on tab switch beyond the 220ms state tempo, and no
 animated splash beyond the platform default.
 
 List stagger is 40ms per item, capped at 400ms total, and only for freshly loaded siblings. It is
@@ -777,7 +804,7 @@ repeated. Tier two is what **this direction** adds, with the rewrite in every ca
 | F17 | Security theatre in copy or iconography: padlocks, globes, shields beyond the one connect object, «военный уровень», «100% анонимность» | 1.10, and it is the category's own reflex | State facts |
 | F18 | Trend vocabulary as a design argument: bento, glass, neumorphism, mesh gradient, aurora, neon, 3D globe, blob | None survives a settings list; each is a documented AI tell | Argue from the ten properties in section 1 |
 | F19 | An em-dash or an en-dash anywhere in UI copy, code comments visible to users, or these docs | `00-rules.md` 9.2 and taste-skill 9.G | Hyphen, comma, colon, full stop, or a line break |
-| F20 | A new radius, a new duration, a new grey, a new size step | The token set is closed | Add to the token file first with a comment and a contrast ratio, or use what exists |
+| F20 | A new radius, a new duration, a new grey, or a new size step **invented in a screen** | The token set is closed to screens. It is extended only by a `00-rules.md` section 18 decision, which is how D-6 to D-12 added `radius_button` 16, the button and field heights, `color_outline_control`, the three status-text tokens, `motion_pulse` and `motion_spin` | Add to the token file first with a comment and a contrast ratio, or use what exists |
 
 ---
 
@@ -800,11 +827,12 @@ What the direction produces:
   illustration.
 - **One heading in the UI face**, 24sp/700: «Вход». One subtitle, 13sp/400: «Почта и пароль, или
   Telegram».
-- **Two inputs**, P3 inset, radius 12, label above the field, never placeholder-as-label. Error
-  text below the field in `#FF6069`, formula "what happened, why, what to do".
-- **One lit element**: the pill CTA «Войти», full width at the gutter, accent fill, 52 tall.
-  Desktop already has `Size.CtaTall` 52; Android has no mirrored token, so per F20 add
-  `<dimen name="cta_height">52dp</dimen>` to `res/values/dimens.xml` **before** using it.
+- **Two inputs**, P3 inset, `field_min_height` 56, radius 16 (D-7), a 1dp `color_outline_control`
+  boundary (D-9), label above the field, never placeholder-as-label. Error text below the field in
+  `#FF6069`, formula "what happened, why, what to do".
+- **One lit element**: the CTA «Войти», a 16dp rounded rectangle (D-6), full width at the gutter,
+  accent fill, `btn_height_tall` 52 as a `minHeight`. Both platforms take the mirrored token pair
+  `@dimen/btn_height_tall` / `Size.BtnTall` from `00-rules.md` 3.3, which now carries it.
 - **Everything else is a text button**: «Войти через Telegram», «Забыли пароль?»,
   «Создать аккаунт». Three text buttons stacked with 12 between, at 48 tall each. They do not
   compete with the CTA because they are not filled.
@@ -858,18 +886,27 @@ What the direction produces:
   `bg_home_gradient_mono.xml`, `bg_connect_glow.xml`, `bg_connect_glow_mono.xml`,
   `bg_nav_header.xml`, `bg_bottom_nav_scrim.xml`, and the orphan `font/montserrat_thin.ttf`.
 
-### 11.2 Needs an owner decision, in `00-rules.md` section 18 row format
+### 11.2 Ratified by the owner on 2026-07-26 (`00-rules.md` section 18)
+
+These five were the open questions this document raised. All five are now decided, in the rows of
+`00-rules.md` section 18, and the rule bodies there are updated. The resolutions:
 
 | Date | Decision | Rule affected |
 |---|---|---|
-| pending | **D-1.** The Russian UI face is `<Golos Text / Onest / platform face>`, vendored identically to Android and desktop, because the vendored Space Grotesk binary contains zero Cyrillic codepoints and the Russian UI is currently rendered by an undeclared per-OS fallback | 5.1, 3.4 |
-| pending | **D-2.** Space Grotesk is scoped to digits, units, currency, Latin technical tokens, chip labels and the wordmark, and is never applied to a Russian string | 5.1, 3.4 |
-| pending | **D-3.** The `zero` (slashed zero) feature is on for technical figures and off for currency, identically on both platforms, replacing the current desktop-only use | 5.5 |
-| pending | **D-4.** `TextAppearance.App.Numeric` gains `android:textFontWeight="500"` to match the ramp, and `res/font/space_grotesk.xml` gains explicit `android:fontVariationSettings` per entry if the 6.3 verification confirms the default-instance risk | 3.4, 5.4 |
-| pending | **D-5.** Coloured icon tiles are a closed category system of at most four categories; every other row uses `icon_tile_neutral`. `icon_tile_purple` / `icon_purple` are deleted: they resolve to the same hex as blue (`#334C8DFF` / `#4C8DFF`), so the 10+ rows using `@drawable/bg_icon_purple` in `layout_settings_content.xml`, `activity_local_proxy.xml`, `activity_provider_settings.xml` and `activity_backup.xml` are a category that does not exist | 3.6 |
+| 2026-07-26 | **D-1.** The Russian UI face is **Golos Text**, vendored identically to Android and desktop as static 400 / 500 / 700 instances, because the vendored Space Grotesk binary contains zero Cyrillic codepoints and the Russian UI was being rendered by an undeclared per-OS fallback | 5.1, 3.4 |
+| 2026-07-26 | **D-2.** Space Grotesk is scoped to digits, units, currency, Latin technical tokens, chip labels and the wordmark, and is never applied to a Russian string | 5.1, 3.4 |
+| 2026-07-26 | **D-3.** The `zero` (slashed zero) feature is on for technical figures and off for currency, identically on both platforms, replacing the current desktop-only use | 5.5 |
+| 2026-07-26 | **D-4.** `TextAppearance.App.Numeric` gains `android:textFontWeight="500"` to match the ramp; `res/font/space_grotesk.xml` gains explicit `android:fontVariationSettings` per entry if the 6.3 verification confirms the default-instance risk | 3.4, 5.4 |
+| 2026-07-26 | **D-5.** Coloured icon tiles are a closed system of **exactly three**: accent, destructive, neutral. Purple / orange / yellow / green are not used by new work; their resources survive only until the last screen that references them migrates, so nothing is deleted out from under a live layout | 3.6 |
 
-Nothing in 11.2 is implemented until the row is pasted into `00-rules.md` section 18 and the rule
-body is updated there.
+Seven further decisions were ratified in the same batch and are law in `00-rules.md` section 18:
+**D-6** buttons are a 16dp rounded rectangle, **D-7** inputs and the segmented track share that 16,
+**D-8** desktop hover is a 6% overlay, **D-9** `color_outline_control`, **D-10** the light-theme
+status-text tokens, **D-11** press scale 0.97, **D-12** the declared line-height column. D-6 and D-7
+are what changed 4.5 and 10.1 of this document; the note in 4.5 records why.
+
+Nothing is implemented from a table like this until the row is in `00-rules.md` section 18 and the
+rule body is updated there. For all twelve rows, that has happened.
 
 ---
 
@@ -892,7 +929,7 @@ grep -rLn "fontFeatureSettings" $(grep -rl "App.Numeric" res/layout/)     # F6: 
 
 # Desktop, from /home/user/v2rayN/v2rayN/v2rayN.Desktop
 grep -rn "LinearGradientBrush\|BoxShadow\|ExperimentalAcrylic" Views/ Assets/
-grep -rn "FontFamily=\"{DynamicResource Font.Grotesk}\"" Views/          # F5: only in brand slots
+grep -rn "FontFamily=" Views/                                            # F5: the ramp class sets the face, never a view
 grep -rn "—\|–" Views/ Assets/
 ```
 
@@ -929,8 +966,8 @@ Departament VPN is an instrument, not a storefront. Pure near-black planes with 
 gradients; one blue, spent on the single thing the screen wants you to press, and spent nowhere at
 all on most screens; a 56dp hairline-ruled row at a 68dp text origin as the repeating unit of the
 entire product on both platforms; every quantity set in Space Grotesk at fixed tabular 620/1000
-advances so numbers are the brand and never move; all Russian prose in one Cyrillic-capable
-grotesque, because the brand face physically cannot draw Cyrillic; a comfortable density with a
+advances so numbers are the brand and never move; all Russian prose in Golos Text, because the brand
+face physically cannot draw Cyrillic; a comfortable density with a
 four-value spacing melody instead of a uniform 16dp drone; and motion that acknowledges in 90ms,
 changes state in 220ms, and performs exactly once in the whole product, at the instant the tunnel
 confirms.

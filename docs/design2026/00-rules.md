@@ -45,7 +45,10 @@ recorded in section 18.
 > one bright blue accent, Space Grotesk, Russian sentence-case), leaning toward **Material 3
 > theming on Android and a hand-owned Avalonia token layer on desktop**.
 
-That read is fixed. It is not re-negotiated per screen.
+That read is fixed. It is not re-negotiated per screen. One clarification the read predates: "Space
+Grotesk" in that sentence is the **figure** face. Since D-1 and D-2 (section 18) the Russian text is
+set in **Golos Text**, because the Space Grotesk binary carries no Cyrillic and never drew a Russian
+letter in the first place. Everything else in the read stands as written.
 
 **Register consequence** (from `reference/product.md`, verbatim):
 
@@ -88,7 +91,11 @@ Read the file before you design the thing. Do not design from memory of it.
 Every one of these is already a decision. Do not re-litigate, do not "improve" past them.
 
 1. Incy language: **pure dark surface, ONE bright blue accent**. Red is destructive only.
-2. Brand font **Space Grotesk** for display, titles, chips and numerals.
+2. Brand font **Space Grotesk** for the figures, chips and the wordmark; **Golos Text** for every
+   Russian string. The original request read "Space Grotesk for display, titles, chips and
+   numerals", written before anyone measured that the vendored binary maps zero Cyrillic
+   codepoints. The owner's choice of Golos Text (D-1, section 18) is the newer request and it wins;
+   Space Grotesk keeps everything it can actually draw.
 3. **Russian UI, sentence case.** No ALL-CAPS labels anywhere.
 4. **₽** for currency, never "RUB", never "руб.".
 5. **Tightened Account/profile screen**; tariff badge on the subscription card.
@@ -148,9 +155,10 @@ Web wording, native consequences. Each row is a defect if found.
 > - Heavy color or full-saturation accents on inactive states.
 > - Modal as first thought. Modals are usually laziness. Exhaust inline / progressive alternatives first.
 
-Note the third line against 0.4.2: Space Grotesk is this product's **UI** face, not a display
-face. It is a grotesque, it is legible at 11sp, and it is used at real weights. That satisfies the
-ban. What the ban forbids here is introducing a *second*, decorative family for headings.
+Note the third line against 0.4.2: **neither** of this product's two faces is a display face. Golos
+Text is a Russian UI face used at real weights; Space Grotesk is a grotesque, legible at 11sp, used
+at real weights, and scoped to figures, chips and the wordmark. That satisfies the ban. What the ban
+forbids here is introducing a *third*, decorative family for headings.
 
 ### 1.4 Departament-specific bans
 
@@ -158,9 +166,12 @@ Additive. Same enforcement weight as 1.1.
 
 1. **No second accent hue.** Blue (`#4C8DFF` dark, `#1E5FC7` light) is the only accent. Green
    (`#22C55E`) is a *status* colour for "подключено" / "оплачено" only. Red (`#F04452`) is
-   destructive and error only. Yellow and orange exist only as pre-existing icon-tile fills and
-   as the "истекает" warning chip; they never become buttons, links, or selection colour.
-   No purple. `icon_purple` and `Brush.Tile.Purple` are aliases of blue and must stay so.
+   destructive and error only. Amber (`color_warning` `#EAB308` dark, `#8A6300` light) exists only
+   as the "истекает" / "ждёт оплаты" warning chip; it never becomes a button, a link, or a
+   selection colour. No purple. Since D-5 the coloured **icon tile** system is exactly three -
+   accent, destructive, neutral (3.6) - so orange, yellow, green and purple tiles are not used by
+   new work; `icon_purple` and `Brush.Tile.Purple` remain aliases of blue and must stay so for as
+   long as anything still references them.
 2. **No nested cards.** A `MaterialCardView` inside a `MaterialCardView`, or a `Border.Card`
    inside a `Border.Card`, is a defect. Inside a card, group with spacing and one hairline.
 3. **No decorative gradients or glows.** Includes: drop shadows used as glow, `elevation` above
@@ -170,7 +181,10 @@ Additive. Same enforcement weight as 1.1.
    states, not in notifications, not in toasts. Emoji may appear only inside user-supplied
    content (a server remark the user typed, a Telegram display name).
 5. **No off-scale spacing.** Any dp/px value not in the scale of section 3.1 is a defect. This
-   includes 6dp, 10dp, 14dp, 18dp, 20dp, 28dp.
+   includes 6dp, 10dp, 14dp, 18dp, 20dp, 28dp. This bans off-scale **spacing** - gaps, padding,
+   margins, insets. Sizes come from 3.3 and radii from 3.2, so a declared token there
+   (`meter_height` 6, `btn_min_width` 96, `radius_button` 16) is not an off-scale spacing value; a
+   raw literal used as a gap is, whatever its number.
 6. **No raw colour literals in layouts or views.** Android layouts use `?attr/...` theme
    attributes; AXAML uses `{DynamicResource ...}`. Hex belongs in `res/values*/colors.xml` and
    `Assets/GlobalResources.axaml` and nowhere else. The single tolerated exception is the icon
@@ -201,6 +215,8 @@ Android, from `/home/user/dp/V2rayNG/app/src/main/res`:
 grep -rnE '(android:(textColor|background|tint|backgroundTint|strokeColor)|app:tint|app:strokeColor)="#' layout/ menu/
 # all-caps labels
 grep -rn 'textAllCaps="true"' layout/ values/
+# a face chosen in a layout instead of by the ramp role (D-2 enforcement)
+grep -rn 'android:fontFamily\|android:textSize' layout/
 # off-scale spacing (allow 4/8/12/16/24/32/40/48/56/64)
 grep -rnoE '"(-?[0-9]+)dp"' layout/ | grep -vE '"(0|1|2|4|8|12|16|20|22|24|28|32|36|40|44|48|52|56|64|72|80|100|120|152|160|176|212|230)dp"'
 # em/en dash in shipped copy (literal form; the PCRE \x{2014} form fails in this environment)
@@ -222,6 +238,10 @@ grep -rnoE '(Margin|Padding|Spacing)="[0-9, ]+"' Views/
 grep -rn -e '—' -e '–' Common/L.*.cs
 # StaticResource where theme-switching requires DynamicResource
 grep -rn 'StaticResource Brush\.' Views/
+# a face or a size chosen in a view instead of by the ramp class (D-2 enforcement)
+grep -rn 'FontFamily=\|FontSize=' Views/
+# the brand face must not be a blanket setter (GlobalStyles.axaml:257-265)
+grep -rn 'Font.Brand\|Font.Grotesk' Assets/GlobalStyles.axaml
 ```
 
 **Baseline scan, 2026-07-26.** Already clean and to be kept clean: raw colour literals in Android
@@ -291,10 +311,13 @@ first, with a comment saying what it is for, and only then use it.
 Files:
 - Android: `res/values/dimens.xml`, `res/values/colors.xml`, `res/values-night/colors.xml`,
   `res/values/styles.xml`, `res/values/themes.xml`, `res/values-night/themes.xml`,
-  `res/values/motion.xml`, `res/interpolator/*.xml`, `res/anim/*.xml`
+  `res/values/attrs.xml`, `res/values/motion.xml`, `res/interpolator/*.xml`, `res/anim/*.xml`,
+  `res/font/*.xml` and the vendored faces (`golos_text_regular|medium|bold.ttf`,
+  `space_grotesk*`, plus `GOLOS-TEXT-LICENSE.txt`)
 - Desktop: `Assets/GlobalResources.axaml` (tokens), `Assets/GlobalStyles.axaml` (component
   styles), `Common/Motion.cs` (C# mirror of the motion scale), `Common/MotionState.cs`
-  (reduced-motion broadcast)
+  (reduced-motion broadcast), `Assets/Fonts/*` (`GolosText-Regular|Medium|Bold.ttf`,
+  `SpaceGrotesk.ttf`)
 
 ### 3.1 Spacing scale (the ONLY spacing values)
 
@@ -322,17 +345,30 @@ window width >= 1000px (desktop). Nothing else in the scale changes.
 
 | Token (Android) | Token (Desktop) | Value | Applies to |
 |---|---|---|---|
-| `@dimen/radius_chip` | `Radius.Chip` | 12dp | Chips, badges, small pills that are not fully round |
+| `@dimen/radius_chip` | `Radius.Chip` | 12dp | Chips, badges, small pills that are not fully round, segmented-control thumb |
 | `@dimen/radius_tile` | `Radius.Tile` | 12dp | 40dp icon tiles, flag tiles, avatar squares |
-| `@dimen/radius_card` | `Radius.Card` | 20dp | Cards, dialogs, elevated panels, bottom-sheet body |
+| `@dimen/radius_button` | `Radius.Button` | 16dp | **Every button variant that carries a label**, input field, search field, price option, segmented-control track, snackbar action hit shape (D-6, D-7) |
+| `@dimen/radius_card` | `Radius.Card` | 20dp | Cards, dialogs, flyout bodies, elevated panels, bottom-sheet body, toast surface, empty-state tile |
 | `@dimen/radius_sheet` | `Radius.Sheet` | 24dp top only | Bottom sheet / drawer top corners |
-| `@dimen/radius_pill` | `Radius.Pill` | 100dp | Full-round: primary CTA, segmented control thumb, connect disc |
-| (n/a) | `Radius.Search` | 14px | Desktop search field only, already in use |
-| (n/a) | `Radius.Traffic` | 8px | Desktop traffic meter bar only, already in use |
+| `@dimen/radius_pill` | `Radius.Pill` | 100dp | Full-round, and **only** where width == height or the shape is intrinsically a track: icon-only buttons, avatars, page dots, sheet drag handle, connect disc, progress meter ends, switch track, the M3 navigation active indicator |
+| (n/a) | `Radius.Search` | 14px | Desktop search field. **Retired by D-7**: new work uses `Radius.Button` 16. The key stays in the token file until the last reference migrates |
+| (n/a) | `Radius.Traffic` | 8px | Desktop traffic meter bar. **Retired by D-7**: a meter uses `Radius.Pill`, which clamps to half its own 6px height and gives true round ends. The key stays until the last reference migrates |
 
-**Shape consistency lock:** buttons are pill, cards are 20, chips and tiles are 12, inputs are 12.
-That is the documented rule. Anything else is a defect. Do not mix a 16dp card in among 20dp cards
-"because it looked better".
+**Shape consistency lock (D-6, D-7).** Four live radii and one lip:
+
+- **12** - fittings: chips, badges, icon tiles, flag tiles, avatar squares, the segmented thumb.
+- **16** - controls you press or type into: all five button variants, inputs, the search field, the
+  price option, the segmented track.
+- **20** - objects: cards, dialogs, flyout and sheet bodies, the toast surface.
+- **24 top only** - the bottom-sheet lip.
+- **Full round** - circles and tracks only, per the `radius_pill` row above.
+
+The teachable line: **pill is for circles and tracks, never for a wide capsule with a label in it.**
+A 52x342 stadium CTA is the shape the owner rejected; a 48x48 round icon button is not that shape
+and is not affected. **Concentricity:** an inner radius is the outer radius minus the padding
+between them - a 16 track with 4 padding holds a 12 thumb, a 20 card with 16 padding holds a 16
+button. Never place a 20 radius inside a 16. Anything outside this list is a defect. Do not mix a
+16dp card in among 20dp cards "because it looked better".
 
 ### 3.3 Size tokens
 
@@ -342,34 +378,62 @@ That is the documented rule. Anything else is a defect. Do not mix a 16dp card i
 | `@dimen/tile_glyph` | `Size.Glyph` | 22 | The glyph inside that tile |
 | `@dimen/row_min_height` | `Size.Row` | 56 | Minimum height of any list row |
 | `@dimen/view_height_dp48` | (n/a) | 48 | Minimum touch target on Android |
+| `@dimen/btn_height` | `Size.Btn` | 48 | **Default button height.** Everything in flow (R2) |
+| `@dimen/btn_height_tall` | `Size.BtnTall` | 52 | The screen's one full-width primary CTA, the `.Tall` modifier (R2) |
+| `@dimen/btn_min_width` | `Size.BtnMinWidth` | 96 | Minimum button width, so a two-word label never draws a stub |
+| `@dimen/field_min_height` | `Size.Field` | 56 | Input field. Deliberately the same number as `row_min_height`, so a form and a list share one rhythm and Material's `OutlinedBox` 56dp minimum is not fought (R10) |
+| `@dimen/toolbar_height` | `Size.SubToolbar` | 56 | Seamless sub-page toolbar (4.8). Replaces `?attr/actionBarSize` |
+| `@dimen/meter_height` | `Size.Meter` | 6 | Determinate progress / traffic meter bar |
 | (n/a) | `Size.IconButton` | 40 | Desktop icon button hit box |
-| (n/a) | `Size.CtaTall` | 52 | Desktop primary CTA height |
-| (n/a) | `Size.SubToolbar` | 56 | Desktop sub-page toolbar height |
+| (n/a) | `Size.CtaTall` | 52 | The existing desktop CTA-height key. Superseded by `Size.BtnTall`; it stays until the last reference migrates |
 | `@dimen/sub_card_height` | (n/a) | 152 | Subscription carousel card |
 | `@dimen/dot_size` / `_active` / `dot_gap` | `Dot` / `Dot.Active` / `Dot.Gap` | 6 / 8 / 8 | Carousel page dots |
 
+**Heights are minimums, never fixed** (R2). Every one of the control heights above is declared as
+`android:layout_height="wrap_content"` plus `android:minHeight`, and as Avalonia `MinHeight` -
+never `android:layout_height="52dp"`, never `Height="48"`. A fixed height clips a two-line label at
+font scale 200% or 200% DPI, which is a P1 accessibility defect by 14.5.
+
+**Every Departament button style sets `android:insetTop="0dp"` and `android:insetBottom="0dp"`**
+(R2). `Widget.Material3.Button` carries 6dp insets top and bottom, which is why Android's declared
+52dp CTAs draw at 40dp. This one line is what makes the shipped button match the layout that
+declares it.
+
 ### 3.4 Type ramp
 
-One family for display and structure (Space Grotesk, variable, real weights via
-`android:textFontWeight` / `FontWeight`), the system face for reading sizes. Never a synthetic
-bold: no `android:textStyle="bold"` on a Space Grotesk style.
+**Two faces, split by script** (D-1, D-2). **Golos Text** is the UI face and draws every Russian
+string. **Space Grotesk** is the brand / figure face and draws digits, units, currency, Latin
+technical tokens, chip labels and the wordmark, and nothing else. Golos Text ships as three **static
+instances** at 400 / 500 / 700 (`res/font/golos_text_regular|medium|bold.ttf` behind
+`@font/ui_sans`; `Assets/Fonts/GolosText-*.ttf` behind `Font.Ui`) - static rather than variable
+because `fontVariationSettings` needs API 26 and minSdk is 24. Real weights only, on either face:
+never a synthetic bold, never `android:textStyle="bold"`.
 
-| Role | Android style | Desktop class | Size | Weight | Colour | Use |
-|---|---|---|---|---|---|---|
-| Display | `TextAppearance.App.Display` | `TextBlock.Display` | 34sp/34px | 700 | onSurface | One hero figure per screen: balance, connected timer, big status |
-| Headline | `TextAppearance.App.Headline` | `TextBlock.Headline` | 24sp/24px | 700 | onSurface | Screen title on a scroll-title screen, welcome, empty-state title |
-| Title | `TextAppearance.App.Title` | `TextBlock.Title` | 16sp/16px | 700 | onSurface | Row titles, card titles, section headers |
-| Title medium | `TextAppearance.App.Title.Medium` | `TextBlock.TitleMedium` | 16sp/16px | 500 | onSurface | A softer title inside a dense card |
-| Body | `TextAppearance.App.Body` | `TextBlock.Body` | 14sp/14px | 400 | onSurface | Primary reading copy, dialog body |
-| Subtitle | `TextAppearance.App.Subtitle` | `TextBlock.Subtitle` | 13sp/13px | 400 | onSurfaceVariant | Row subtitles, supporting line |
-| Caption | `TextAppearance.App.Caption` | `TextBlock.Caption` | 12sp/12px | 400 | onSurfaceVariant | Metadata, timestamps, helper text |
-| Chip | `TextAppearance.App.Chip` | `TextBlock.Chip` | 11sp/11px | 500 | contextual | Chip and badge labels only |
-| Numeric | `TextAppearance.App.Numeric` | `TextBlock.Numeric` | inherits | 500 | onSurface | Any live-updating number |
-| Section header | `@style/SettingsSectionLabel` | `TextBlock.SectionHeader` | 16sp/16px | 700 | onSurface | Group headers in settings and account |
-| Toolbar brand | `@style/ToolbarBrandTitle` | (desktop uses `Title`) | 20sp | 700 | onBackground | The wordmark only |
+Face column below: **ui** = Golos Text, **brand** = Space Grotesk.
+
+| Role | Android style | Desktop class | Face | Size | Weight | Line height | Colour | Use |
+|---|---|---|---|---|---|---|---|---|
+| Display | `TextAppearance.App.Display` | `TextBlock.Display` | brand | 34sp/34px | 700 | 40 (1.18) | onSurface | One hero **figure** per screen: balance, connected timer, days left. A Russian word never uses Display; a word-sized hero is Headline in the ui face |
+| Headline | `TextAppearance.App.Headline` | `TextBlock.Headline` | ui | 24sp/24px | 700 | 28 (1.17) | onSurface | Screen title on a scroll-title screen, welcome, empty-state title |
+| Title | `TextAppearance.App.Title` | `TextBlock.Title` | ui | 16sp/16px | 700 | 20 (1.25) | onSurface | Row titles, card titles, Primary and Destructive button labels |
+| Title medium | `TextAppearance.App.Title.Medium` | `TextBlock.TitleMedium` | ui | 16sp/16px | 500 | 20 (1.25) | onSurface | A softer title inside a dense card; Secondary and Tertiary button labels |
+| Body | `TextAppearance.App.Body` | `TextBlock.Body` | ui | 14sp/14px | 400 | 20 (1.43) | onSurface | Primary reading copy, dialog body |
+| Subtitle | `TextAppearance.App.Subtitle` | `TextBlock.Subtitle` | ui | 13sp/13px | 400 | 18 (1.38) | onSurfaceVariant | Row subtitles, supporting line |
+| Caption | `TextAppearance.App.Caption` | `TextBlock.Caption` | ui | 12sp/12px | 400 | 16 (1.33) | onSurfaceVariant | Metadata, timestamps, helper text |
+| Chip | `TextAppearance.App.Chip` | `TextBlock.Chip` | brand | 11sp/11px | 500 | 14 (1.27) | contextual | Chip and badge labels only |
+| Numeric | `TextAppearance.App.Numeric` | `TextBlock.Numeric` | brand | inherits | 500 | inherits | onSurface | Any live-updating number. The 500 is declared (D-4) |
+| Section header | `@style/SettingsSectionLabel` | `TextBlock.SectionHeader` | ui | 16sp/16px | 700 | 20 (1.25) | onSurface | Group headers in settings and account |
+| Toolbar brand | `@style/ToolbarBrandTitle` | `TextBlock.Wordmark` | brand | 20sp/20px | 700 | 24 (1.20) | onBackground | The wordmark only |
 
 Ratio between adjacent steps is 1.15-1.4 which is correct for product UI (`typeset.md`: 1.125-1.2
 typical, tighter than brand). **Do not add a step.** 15sp does not exist. 18sp does not exist.
+
+**Line height is declared, not inherited from the platform** (D-12). The numbers in the column above
+are absolute sp/px and they are part of the ramp style, not the layout: Android sets it in the
+`TextAppearance` (`android:lineHeight`, with AppCompat's `app:lineHeight` as the pre-API-28 path),
+desktop sets `LineHeight` on the ramp class. Before this decision neither platform declared leading
+at all, so the same screen had different rhythm on Android and on Windows. A layout that sets its
+own line spacing is a defect.
 
 ### 3.5 Colour roles (dark, the default theme)
 
@@ -387,13 +451,20 @@ Values from `res/values-night/colors.xml` and the `Dark` theme dictionary in
 | On surface variant | `?attr/colorOnSurfaceVariant` | `Brush.OnSurfaceVariant` | `#9BA1AD` | `#54607A` |
 | Accent | `?attr/colorPrimary` | `Brush.Accent` | `#4C8DFF` | `#1E5FC7` |
 | On accent | `?attr/colorOnPrimary` | `Brush.OnAccent` | `#00183A` | `#FFFFFF` |
+| Accent hover | (desktop only) | `Brush.AccentHover` | `#3D7EF0` | `#1A54B4` |
+| Accent pressed | (desktop only) | `Brush.AccentPressed` | `#3877E0` | `#17499E` |
+| Accent fill 12% (selection) | `@color/accent_fill_12` | `Brush.SelectedFill` | `#1F4C8DFF` | `#1F1E5FC7` |
 | Accent container | `?attr/colorPrimaryContainer` | `Brush.AccentContainer` | `#17325C` | `#D8E4FF` |
 | On accent container | `?attr/colorOnPrimaryContainer` | `Brush.OnAccentContainer` | `#CFE0FF` | `#14468F` |
 | Success / connected | `?attr/colorTertiary` | `Brush.Green` | `#22C55E` | `#0B7D4A` |
+| Success text on a chip (`color_success_text`) | `?attr/pingGood` | `Brush.Ping.Good` | `#22C55E` | `#065132` |
 | Destructive / error | `?attr/colorError` | `Brush.Red` | `#F04452` | `#C42B32` |
-| Error text on surface | (use `@color/ping_bad`) | `Brush.RedText` | `#FF6069` | `#C42B32` |
+| Destructive / error text (`color_destructive_text`) | `?attr/pingBad` (`@color/ping_bad`) | `Brush.RedText` | `#FF6069` | `#C42B32` |
+| Warning / expiring (`color_warning`) | `?attr/warning` | `Brush.Amber` | `#EAB308` | `#8A6300` |
+| Warning text on a chip (`color_warning_text`) | `?attr/warningText` | `Brush.AmberText` | `#EAB308` | `#6B5000` |
 | Outline | `?attr/colorOutline` | `Brush.Outline` | `#2A2E36` | `#C3CCDC` |
 | Outline variant (hairline) | `?attr/colorOutlineVariant` | `Brush.OutlineVariant` | `#20242B` | `#DCE3EF` |
+| **Control outline** (`color_outline_control`) | `?attr/colorOutlineControl` | `Brush.OutlineControl` | `#646C7C` | `#7D8BA3` |
 | Scrim | `?attr/colorScrim` @ 60% | `Brush.Scrim` | `#000000` 0.6 | `#000000` 0.6 |
 
 **Verified contrast (dark theme, computed, WCAG 2.1):**
@@ -411,14 +482,36 @@ Values from `res/values-night/colors.xml` and the `Dark` theme dictionary in
 | red `#F04452` on surface `#141619` | 4.88:1 | AA body, **only just** |
 | redText `#FF6069` on surface `#141619` | 6.15:1 | AA body, use this for error *text* |
 | onAccentContainer `#CFE0FF` on accentContainer `#17325C` | 9.57:1 | AAA |
+| warning `#EAB308` on background `#0A0B0D` | 10.27:1 | AAA |
+| **outlineControl `#646C7C` on background `#0A0B0D`** | 3.73:1 | Clears the 3:1 control-boundary floor (D-9) |
+| **outlineControl `#646C7C` on surface `#141619`** | 3.43:1 | Clears it |
+| outline `#2A2E36` on background `#0A0B0D` | 1.45:1 | **Fails** 1.4.11. This is why D-9 exists: `colorOutline` may not draw a control boundary |
+| onSurface on the 12% accent fill over ground (`#121B2A`) | 15.68:1 | AAA |
 
 **Light theme is verified too** (onSurface 17.76:1, onSurfaceVariant 6.30:1 on white and 5.87:1 on
-background, accent 5.97:1, onAccentContainer 7.15:1, green 5.19:1, red 5.62:1). Both themes ship.
-Neither is an afterthought. Mono theme inherits the same structure through
-`ThemeOverlay.Mono`.
+background, accent 5.97:1, onAccentContainer 7.15:1, green 5.19:1, red 5.62:1, warning 5.43:1,
+outlineControl `#7D8BA3` 3.45:1 on surface and 3.21:1 on background). Both themes ship. Neither is an
+afterthought. Mono theme inherits the same structure through `ThemeOverlay.Mono`, where
+`color_outline_control` is `#6A6A6E` dark (3.90:1) and `#767679` light (4.53:1).
+
+**Light-theme status text is a separate token (D-10).** On light, a status chip's text is **not** the
+status colour: the hue on its own 18% fill measures **4.05:1** green, **4.22:1** red and **4.82:1**
+amber and fails AA. Use `color_success_text` `#065132` (7.34:1 on the green chip fill),
+`color_destructive_text` `#C42B32` and `color_warning_text` `#6B5000` (6.72:1 on the amber chip
+fill). On dark the chip fill is dark enough that the status colour itself clears AA (green 6.60,
+red text 5.65, amber 7.51), which is why the dark and light columns of those three tokens differ.
 
 **Rule:** `#F04452` is fine as a fill or an icon. For error *text* on a dark surface use
 `@color/ping_bad` / `Brush.RedText`. Never introduce a new red.
+
+**Rule (R11): the accent keys live inside the theme dictionaries.** `Brush.Accent`, `Brush.OnAccent`,
+every `Brush.Tile.*`, `Brush.SelectedFill` and every `Brush.StatusChip.*` are declared **outside**
+`ResourceDictionary.ThemeDictionaries` in `Assets/GlobalResources.axaml` today (lines 39-51,
+226-258), so the light theme keeps `#4C8DFF` and measures **2.98:1** on `#F4F7FC` - below even the
+3:1 UI floor. That single mistake draws every light-theme focus ring, every checked segment label and
+17 `LinkAction` buttons at that ratio. Light accent is `#1E5FC7`. Moving those keys inside the `Dark`
+and `Light` dictionaries is **the only P1 accessibility defect in the whole token system** and it is
+fixed before any component work.
 
 ### 3.6 Accent budget
 
@@ -434,6 +527,23 @@ Everything else is neutral. Settings rows use the **neutral** icon tile
 `Brush.Tile.Neutral`) unless the row is genuinely a coloured category. Coloured tiles are not
 decoration; they are a category system, and a screen where every row has a different coloured tile
 has no category system, only noise.
+
+**The coloured tile system is exactly three (D-5):**
+
+| Tile | Fill | Glyph | When |
+|---|---|---|---|
+| Accent | `?attr/iconTileBgBlue` / `Brush.Tile.Blue` (accent @20%) | accent | The one lit row on a screen, if any |
+| Destructive | `?attr/iconTileBgRed` / `Brush.Tile.Red` (red @20%) | `colorError` | Delete, unlink, reset |
+| Neutral | `@color/icon_tile_neutral` / `Brush.Tile.Neutral` | `@color/icon_glyph_neutral` | Everything else, which is most rows |
+
+Three, and at most three coloured tiles visible on one screen. The purple, orange, yellow and green
+tile colours are **not used by new work**; their resources stay in the colour files until the last
+screen that references them migrates. Live reference count, measured 2026-07-26: Android
+`icon_purple` 12, `icon_orange` 10, `icon_green` 15, `icon_yellow` 4, the four `icon_tile_*` colours
+1 each, the four `bg_icon_*` drawables 11 / 8 / 12 / 2, the four `iconTileBg*` theme attrs 4 each;
+desktop `Brush.Tile.Purple` 3, `.Orange` 3, `.Green` 4, `.Yellow` 3, `Brush.Icon.Orange` 4,
+`Brush.Icon.Yellow` 3. Reaching for a fourth tile colour means the screen is trying to encode a
+category system that does not exist.
 
 ### 3.7 Motion tokens
 
@@ -452,9 +562,33 @@ them 1:1.
 | (n/a) / `Dur.Slow` | 450 | `Ease.OutExpo` (0.16,1,0.3,1) | The single auth -> home hand-off |
 | `motion_stagger` / `Dur.Stagger` | 40 | n/a | Per-item list delay, cap total at 400ms |
 | `motion_emphasis` / `Dur.Emphasis` | 600 | `Ease.OutQuint` | The single hero moment: connect sonar |
+| `motion_pulse` / `Dur.Pulse` | 1000 | `ease_standard` / `Ease.Standard` | Skeleton pulse, opacity 0.45 to 1.0 each way, infinite reverse |
+| `motion_spin` / `Dur.Spin` | 1100 | linear | One revolution of the 20dp inline spinner arc |
+| `input_debounce` / `Dur.Debounce` | 500 | n/a | Re-entry guard on a tap that is not command-gated |
 | (n/a) / `Dur.Instant` | 0 | n/a | Reduced-motion fallback: snap to end state |
 
 **Exit is 75% of enter.** State reverse = 165ms, reveal reverse = 225ms.
+
+**Press scale is 0.97, everywhere (D-11)**, in over `motion_press_in` 90 and out over
+`motion_press_out` 160. One gesture, one number, both platforms. Today `res/anim/press_scale.xml`
+uses 0.96, `res/anim/nav_press.xml` uses 0.92 at hard-coded 100ms with no interpolator (so: linear,
+which 8.3 bans), and desktop uses 0.97 at 120ms in both directions. All four are defects against
+this row, not variants.
+
+**Why `motion_pulse`, `motion_spin` and `input_debounce` are not violations of section 8.** Section
+8.1 permits motion that conveys state and 8.4 reserves 600ms for the single hero moment.
+
+- `motion_pulse` is **loading feedback**, which is a state, and at 1000ms it is slower than the hero
+  moment rather than competing with it. It replaces the off-token 900ms `AccelerateDecelerate` pulse
+  that exists in no scale, and it is the only looping opacity animation in the product. Reduced
+  motion holds the skeleton static at opacity 0.7.
+- `motion_spin` is linear because it is a **continuous rotation, not a state transition**. The
+  ease-out law in 8.3 governs transitions between two states; a spinner has no end state to settle
+  into, and an eased revolution visibly stutters once per turn. This is the one linear exemption in
+  the product and it applies to nothing else.
+- `input_debounce` is not an animation at all. It is a 500ms re-entry window that makes a
+  double-press impossible by construction (R9), and it is in this table because it is a duration and
+  durations live here.
 
 ---
 
@@ -569,24 +703,53 @@ that is the only permitted variant.
 
 ## 5. Typography law
 
-1. **Two faces, no more.** Space Grotesk (variable, `res/font/space_grotesk.xml`,
-   `Assets/Fonts/SpaceGrotesk.ttf`) for Display / Headline / Title / Chip / Numeric. System face
-   for Body / Subtitle / Caption. This is a deliberate contrast pairing (geometric grotesque vs
-   system humanist), not two similar sans faces, which `typeset.md` forbids.
+1. **Two faces, no more, and they are split by script** (D-1, D-2).
+   - **Golos Text** is the **UI face** and draws every Russian string: Headline, Title, Title
+     medium, Body, Subtitle, Caption, Section header, and every button label.
+     `res/font/golos_text_regular.ttf` / `_medium.ttf` / `_bold.ttf` (400 / 500 / 700, static
+     instances) behind the family XML `@font/ui_sans`, and `Assets/Fonts/GolosText-Regular|Medium|Bold.ttf`
+     behind `Font.Ui`. Verified coverage: all 66 Russian letters plus Ё/ё, `₽`, `…`, «».
+   - **Space Grotesk** is the **brand / figure face** and draws Display figures, Chip labels, the
+     Numeric role, the wordmark, units, currency and Latin technical tokens (`VLESS`, `Reality`,
+     `WS`, `TCP`, host names, ports). `res/font/space_grotesk.xml`,
+     `Assets/Fonts/SpaceGrotesk.ttf`.
+   - This is a deliberate contrast pairing (geometric-mono figures against a humanist Russian
+     face), not two similar sans faces, which `typeset.md` forbids. The two never occupy the same
+     role and never appear on the same line inside a sentence.
+   - **A Russian string never gets Space Grotesk.** The measured reason: the vendored binary maps
+     735 codepoints and **zero** in U+0400-U+04FF, so every `fontFamily="@font/space_grotesk"` on
+     a Russian string has always been a no-op that handed the choice to Roboto on Android and to
+     whatever the OS picked on desktop - the same screen set in three faces on three operating
+     systems. Enforcement, mechanical: the face is a property of the **ramp style**, so no layout
+     and no view sets a family at all. `grep -rn 'android:fontFamily' res/layout/` returns
+     nothing; `grep -rn 'FontFamily=' Views/` returns nothing; and the three blanket setters at
+     `Assets/GlobalStyles.axaml:257-265` (`TopLevel`, `TextBlock`, `TemplatedControl`), which
+     currently apply the Cyrillic-free brand face to every string in the desktop app, carry the UI
+     face instead. A Russian string found in the brand face is a P1 defect, not a polish item.
 2. **Roles, not sizes.** Text is styled by applying a ramp style from 3.4. A layout that sets
    `android:textSize` directly, or a `TextBlock` that sets `FontSize` directly, is a defect.
 3. **sp on Android, never dp, for text.** Layouts must survive font scale 200%. Any layout that
    clips at 200% is a P1 accessibility defect.
-4. **Real weights only.** 400 / 500 / 700. No 600. No synthetic bold on Space Grotesk.
+4. **Real weights only.** 400 / 500 / 700, on both faces, from real masters. No 600. No italic. No
+   synthetic bold: `android:textStyle="bold"` on a ramp style is a defect. `TextAppearance.App.Numeric`
+   declares `android:textFontWeight="500"` (D-4); it declared no weight at all before.
 5. **Numbers.** Every live-updating number (traffic, speed, ping, balance, price, uptime, device
-   count) uses the Numeric role: Space Grotesk with `tnum` and `lnum` on (desktop adds `zero`).
-   This stops digit jitter. Prices are `1 290 ₽` (non-breaking space before ₽, thin space as
-   thousands separator).
+   count) uses the Numeric role: Space Grotesk with `tnum` and `lnum` on, plus `zero` (slashed
+   zero) **on for technical figures and off for currency, identically on both platforms** (D-3) -
+   a slashed zero in a price reads as a symbol. This stops digit jitter. Prices are `1 290 ₽`
+   (non-breaking space before ₽, thin space as thousands separator). One exception: a figure inside
+   a running Russian sentence («Осталось 3 дня») is set in the UI face like the rest of the
+   sentence. A sentence never ripples between two faces.
 6. **Letter-spacing** is what the ramp says and nothing else: Display -0.02em, Headline -0.01em,
    Title 0, Body/Subtitle +0.01em, Caption +0.02em, Chip +0.04em. No per-screen tuning.
-7. **Line height**: titles 1.2, body and subtitle 1.45, caption 1.35. Light-on-dark needs the
-   compensation `typeset.md` describes, and the ramp already carries it in the tracking values;
-   do not add more.
+7. **Line height is a declared number from the 3.4 ramp, not a ratio and not a platform default**
+   (D-12): 40 / 28 / 20 / 20 / 20 / 18 / 16 / 14 / 20 / 24 for Display / Headline / Title / Title
+   medium / Body / Subtitle / Caption / Chip / Section header / Toolbar brand, with Numeric
+   inheriting its host. The ratios that fall out are 1.18 / 1.17 / 1.25 / 1.25 / 1.43 / 1.38 /
+   1.33 / 1.27, which supersedes the old "titles 1.2, body 1.45, caption 1.35" wording; that
+   wording was never declared anywhere in either codebase, which is precisely the defect D-12
+   fixes. Light-on-dark needs the compensation `typeset.md` describes, and the ramp carries it in
+   the tracking values; do not add more.
 8. **Measure.** Any paragraph longer than one line is capped at roughly 60 characters on phone
    and 65-70 on desktop. On desktop that means a `MaxWidth` on the `TextBlock`, not on the panel.
 9. **Truncation is a last resort.** Prefer 2 lines and wrap. If a primary label truncates, the
@@ -618,12 +781,21 @@ that is the only permitted variant.
    flat colours at alpha, not gradients.
 6. **No shadows as glow.** See 4.7.
 7. **Grey text never sits on a coloured background.** On the accent container use
-   `onAccentContainer`; on a green chip use a darkened green text or the theme's on-colour. Never
-   `onSurfaceVariant` on a tinted fill.
+   `onAccentContainer`. On a status chip in the **light** theme use the dedicated darkened text
+   token - `color_success_text` `#065132`, `color_destructive_text` `#C42B32`, `color_warning_text`
+   `#6B5000` (D-10) - because the status hue on its own fill measures 4.05 / 4.22 / 4.82:1 and
+   fails AA. On dark the status colour itself clears AA on the dark fill and no second token is
+   needed. Never `onSurfaceVariant` on a tinted fill.
 8. **Contrast floors:** body text 4.5:1, large text (>=18sp or >=14sp bold) 3:1, icons and UI
    component boundaries 3:1, placeholder text 4.5:1 (not the muted grey default). Verify with the
    ratios in 3.5 before inventing a new pair. If you introduce a colour, compute the ratio and put
    it in the token comment.
+   **The boundary of a control is drawn with `color_outline_control`** (D-9): 3.43:1 on the dark
+   surface, 3.45:1 on light. `colorOutline` measures 1.45:1 on the dark ground and may never draw
+   an input, an outlined button or a segmented track. The 1dp `colorOutlineVariant` hairline keeps
+   its role on row separators and card borders at 1.16:1: that is structural decoration, not a
+   control boundary, and WCAG 1.4.11 does not apply to it. Knowing which of the two a given line is
+   is the single most-missed accessibility point in the current build.
 9. **Three themes ship**: dark (default), light, mono. Every new component is checked in all
    three before it is done. Mono is not a colour-strip: it remaps the accent to ink and must keep
    the same hierarchy.
@@ -643,14 +815,26 @@ a set is not a component.
 | State | Android | Desktop |
 |---|---|---|
 | Default | Ramp style + theme attrs | Class style + `DynamicResource` |
-| Hover | Does not exist. Do not design for it | `:pointerover` -> `Brush.Hover` overlay (dark: black 0.32; light: black 0.06) or one surface step up, 150ms `Ease.Standard` |
-| Focus | Only for hardware keyboard and TV. `android:focusable` + 2dp `colorPrimary` outline, offset 2dp | **Mandatory.** `:focus-visible` -> 2px `Brush.Accent` ring, 2px offset, never removed |
-| Pressed | `android:stateListAnimator="@anim/press_scale"` -> scale 0.97, 90ms in `ease_out_quart`, 160ms out `ease_out_quint`; plus `?attr/selectableItemBackground` ripple, except bottom nav (0.4.8) | `:pressed` -> `scale(0.97)`, `Dur.PressIn` 90 / `Dur.PressOut` 160 |
+| Hover | Does not exist. Do not design for it | `:pointerover` -> `Brush.Hover` overlay: **white 6% on dark, black 6% on light** (D-8), or one surface step up to `color_surface_raised` `#1A1D21` per 4.7. 150ms `Ease.Standard`. The overlay covers the whole row or control, never just the label |
+| Focus | **Mandatory on every focusable control** (R7). `android:focusable` + a 2dp ring: filled controls (Primary, Destructive, filled icon buttons) draw it **inside**, in the control's own on-colour at 40%, at the control's own radius; everything else draws it **outside**, 2dp `colorPrimary` at 2dp offset, radius = control radius + 2 | **Mandatory.** `:focus-visible` -> the same two-case ring, 2px wide (`Brush.OnAccent` at 40% inside a filled control, `Brush.Accent` outside everything else), 2px offset, never removed. The `FocusAdorner` is **not** suppressed under `.lite`: accessibility outranks motion reduction |
+| Pressed | `android:stateListAnimator="@anim/press_scale"` -> **scale 0.97** (D-11), 90ms in `ease_out_quart`, 160ms out `ease_out_quint`; plus `?attr/selectableItemBackground` ripple, except bottom nav (0.4.8). **Rows do not scale, objects do** (R5): a row inside a card or group steps its background to `colorSurfaceContainerHigh` instead, because scaling a slice of a surface tears the hairlines above and below it | `:pressed` -> `scale(0.97)`, `Dur.PressIn` 90 / `Dur.PressOut` 160, asymmetric (the transition lives on the `:pressed` selector for the in, on the base selector for the out). Same row-versus-object rule |
 | Selected | Accent text/icon + weight 700 + a 2-3dp accent indicator or an 12% accent fill (`Brush.SelectedFill`). Two axes minimum, never tint alone | Same, `.active` class |
-| Disabled | Alpha 0.38 on content, no ripple, `isEnabled=false` | `:disabled` -> Opacity 0.38, no pointer cursor, `IsEnabled=False` |
-| Loading | Inline: control keeps its size, label swaps for a 20dp indeterminate indicator in `onAccent`; control is disabled. Screen-level: skeleton, never a centred spinner | Same, `Size.SkeletonCard` skeletons already exist |
+| Disabled | **0.38 on the whole control** (R6), not on the label alone: a `ColorStateList` carrying `android:alpha="0.38"` on the `state_enabled="false"` item for `backgroundTint`, `textColor`, `iconTint` and `strokeColor`, because a MaterialButton style cannot set a state-dependent `android:alpha`. No ripple, `isEnabled=false` | `:disabled` -> `Opacity` 0.38 on the control, no pointer cursor, `IsEnabled=False` |
+| Loading | **Holds the width, hides the label, spins a 20dp arc, and is not the disabled look** (R8): the control keeps its exact size, the label goes to alpha 0 (never to `wrap_content` of nothing), a 20dp indeterminate arc in `onAccent` rotates at `motion_spin` 1100 linear, the control is not tappable but is not drawn at 0.38. Screen-level: skeleton at `motion_pulse` 1000, never a centred spinner | Same, `Ellipse.Spinner`; `Size.SkeletonCard` skeletons already exist |
 | Error | Inline under the field, `Brush.RedText`, 12sp, plus a red 1dp border on the field | Same |
 | Success | 220ms tint to green plus the word. No confetti, no checkmark flourish | Same |
+
+**State priority**, highest first: **disabled > loading > pressed > focus > selected > hover >
+default.** A disabled control shows no hover and no focus ring.
+
+**Why the Android focus rule changed (R7).** This row used to read "only for hardware keyboard and
+TV", which sounded like a scope limit and worked as an excuse: Android ships exactly **one**
+`state_focused` drawable in the whole app (`res/drawable/bg_server_row.xml`) - including on the two
+D-pad-only TV activities, so the one platform the old wording carved out is the one it failed.
+External keyboards, tablet keyboard cases, TV D-pads and switch access all move focus on Android, and
+14.4 already requires that focus is never lost. A control that can take focus and does not draw it is
+unreachable in practice. So: focus is drawn on **every** focusable control, on both platforms, with
+the two-case ring above.
 
 ### 7.2 Touch and pointer targets
 
@@ -668,6 +852,8 @@ pressed control with no response.
 
 ### 7.4 Forms
 
+- The field is `field_min_height` 56 tall (as a **minimum**, per 3.3), radius `radius_button` 16
+  (D-7), with a 1dp `color_outline_control` border (D-9) and a `color_surface_inset` fill.
 - Label **above** the input, always visible. Placeholder is never the label.
 - Helper text below, present in the markup even when empty so the layout does not jump.
 - Validate on **blur**, not per keystroke. Exception: password strength.
@@ -722,7 +908,10 @@ Order of preference, always: **inline > expandable row > bottom sheet (Android) 
 2. **The scale in 3.7 is the whole vocabulary.** No other durations. No other curves.
 3. **Ease-out only.** `ease_out_quart` for press, `ease_out_quint` for reveal and settle,
    `ease_standard` for two-way tint and crossfade, `ease_out_expo` reserved for the one auth ->
-   home hand-off. **No bounce, no elastic, no spring overshoot, no linear** on UI transitions.
+   home hand-off. **No bounce, no elastic, no spring overshoot, no linear** on UI transitions. The
+   single exemption is `motion_spin`, the continuous rotation of the indeterminate spinner arc,
+   which is not a transition between two states and stutters once per revolution if it is eased
+   (3.7). It applies to that one drawable and to nothing else.
 4. **One hero moment in the whole product**: the connect confirmation (Android
    `res/anim/connect_confirm.xml` + `shield_assemble.xml`, desktop `ConnectHeroView`), at
    `motion_emphasis` 600ms. Nothing else gets 600ms. Chrome never gets it.
@@ -896,9 +1085,9 @@ cleanup.
 
 | Need | Use | Not |
 |---|---|---|
-| Primary action | `MaterialButton` filled, pill radius, 52dp tall | Custom `TextView` with a background drawable |
-| Secondary action | `MaterialButton` tonal (`colorSecondaryContainer`) | A second filled accent button |
-| Tertiary action | `MaterialButton` text | An underlined `TextView` |
+| Primary action | `MaterialButton` filled, `radius_button` 16, `btn_height_tall` 52 as `minHeight`, `insetTop`/`insetBottom` 0 | Custom `TextView` with a background drawable; a pill; a fixed `layout_height` |
+| Secondary action | `MaterialButton` tonal (`colorSecondaryContainer`), `radius_button` 16, `btn_height` 48 | A second filled accent button; an outlined accent button |
+| Tertiary action | `MaterialButton` text, `btn_height` 48 | An underlined `TextView` |
 | Toggle | `MaterialSwitch` | Custom switch, checkbox for a setting |
 | Choice among 2-4 | `MaterialButtonToggleGroup` (segmented) | A spinner |
 | Choice among many | Bottom sheet list with radio | `Spinner`, `AlertDialog` single-choice for > 6 items |
@@ -960,8 +1149,9 @@ touch. The rules below are the desktop equivalent of section 11; the *design* is
 - `:pointerover` is a real state here and must be designed for every clickable surface (rows,
   cards, nav items, chips, icon buttons). Use `Brush.Hover` or one step up the surface ramp,
   150ms `Ease.Standard`.
-- **Keyboard focus is mandatory**, not optional: a visible 2px `Brush.Accent` ring with 2px
-  offset on every focusable control. Tab order follows visual order. Nothing is reachable only by
+- **Keyboard focus is mandatory**, not optional: a visible 2px ring on every focusable control -
+  `Brush.Accent` outside the control at 2px offset, or inside it in the control's own on-colour at
+  40% when the control is filled (7.1). Tab order follows visual order. Nothing is reachable only by
   mouse.
 - Standard shortcuts work: Esc closes a flyout or modal, Enter submits a form, Ctrl+F focuses
   search, Ctrl+, opens settings.
@@ -1023,9 +1213,9 @@ window chrome, and any platform capability the other does not have.
 | Interrupting decision | Material dialog | Modal window, same layout |
 | Selection among many | Bottom sheet list | Flyout list |
 | Back | System Back / predictive Back | Back button in the sub-toolbar + Esc + mouse button 4 |
-| Press feedback | Ripple + scale 0.97 | Scale 0.97 (no ripple) |
-| Hover | none | `:pointerover` |
-| Focus ring | keyboard/TV only | always |
+| Press feedback | Ripple + scale 0.97 (rows step their background instead, R5) | Scale 0.97, no ripple (same row rule) |
+| Hover | none | `:pointerover`, 6% overlay |
+| Focus ring | always, on every focusable control | always, on every focusable control |
 
 When a feature exists on one platform and not the other, it is a **parity gap logged in the
 platform's spec file**, not a silently different design.
@@ -1037,7 +1227,9 @@ platform's spec file**, not a silently different design.
 Non-negotiable. Each item is a P1 defect when missing.
 
 1. **Contrast**: body >= 4.5:1, large text >= 3:1, icons and control boundaries >= 3:1,
-   placeholders >= 4.5:1. Verified in all three themes.
+   placeholders >= 4.5:1. Verified in all three themes. A control boundary is drawn with
+   `color_outline_control` (D-9), never with `colorOutline`; the 1dp `colorOutlineVariant` hairline
+   on row separators and card borders is structural decoration and is exempt from WCAG 1.4.11.
 2. **Touch/pointer targets**: 48dp Android, 32px desktop minimum, 8dp separation.
 3. **Names**: every interactive element has an accessible name; every icon-only control has an
    explicit one; every image that carries meaning has a description, and decorative images are
@@ -1088,8 +1280,12 @@ and `audit.native.md`.
 **Tokens and system**
 - [ ] Zero raw hex in layouts / views (1.5 greps clean)
 - [ ] Zero off-scale spacing values (1.5 greps clean)
-- [ ] Every text element uses a ramp style; no inline `textSize` / `FontSize`
-- [ ] Radii follow the shape lock: pill buttons, 20 cards, 12 chips and tiles, 12 inputs
+- [ ] Every text element uses a ramp style; no inline `textSize` / `FontSize`; no inline font family
+- [ ] Radii follow the shape lock (3.2): 12 chips, tiles and the segmented thumb; **16 buttons,
+      inputs, search field, price option and segmented track**; 20 cards, dialogs and sheet bodies;
+      24 the sheet lip; pill only where width == height or the shape is a track
+- [ ] Control heights are `minHeight` / `MinHeight`, never a fixed height, and every button style
+      sets `insetTop`/`insetBottom` 0
 - [ ] No new token invented without a comment stating its purpose and its contrast ratio
 
 **Bans**
@@ -1108,21 +1304,32 @@ and `audit.native.md`.
 - [ ] Body >= 4.5:1, large >= 3:1, icons >= 3:1, placeholders >= 4.5:1 in every theme
 - [ ] Colour never the only signal
 - [ ] Inactive and disabled states desaturated
-- [ ] Numbers use the Numeric role with tabular figures
+- [ ] Numbers use the Numeric role with tabular figures, `zero` on for technical figures and off
+      for currency
+- [ ] No Russian string set in the brand face; no layout or view sets a font family at all
+- [ ] Line height comes from the ramp on every text element; no platform-default leading
+- [ ] Control boundaries use `color_outline_control`; hairlines use `colorOutlineVariant`
+- [ ] Light-theme status-chip text uses the darkened `*_text` tokens, not the status hue
 - [ ] Longest real Russian string fits
 
 **Interaction**
-- [ ] Every interactive element has: default, pressed, disabled, plus hover (desktop) and focus (desktop mandatory, Android for keyboard/TV)
+- [ ] Every interactive element has: default, pressed (scale 0.97, or a background step if it is a
+      row), disabled (0.38 on the whole control), focus (**mandatory on both platforms**), plus
+      hover on desktop (6% overlay)
 - [ ] Selected state reads on two axes, not tint alone
 - [ ] Touch targets 48dp Android / 32px desktop, 8dp apart
-- [ ] Feedback within 100ms; loading state after 300ms
+- [ ] Feedback within 100ms; loading state after 300ms, holding the control's width and hiding its
+      label rather than wearing the disabled look
+- [ ] Every action button is command-gated or wrapped in the `input_debounce` 500ms guard
 - [ ] Forms: label above, error below, validate on blur, no placeholder-as-label
 - [ ] Destructive actions use undo, or a dialog only when irreversible
 - [ ] Back / Esc always works, restores scroll and filter state
 
 **Motion**
 - [ ] Every duration and curve comes from the token scale
-- [ ] Ease-out only; no bounce, elastic or linear
+- [ ] Ease-out only; no bounce, elastic or linear, the one exemption being `motion_spin`'s
+      continuous rotation
+- [ ] Press scale is 0.97, in 90 / out 160, everywhere it applies
 - [ ] Exit is 75% of enter
 - [ ] Only one 600ms hero moment exists in the product, and this is not a new one
 - [ ] Reduced motion honoured through `MotionUtils` / `MotionState`, verified by toggling it
@@ -1197,5 +1404,17 @@ This file changes only by owner decision. When it does:
 |---|---|---|
 | 2026-07-26 | Initial rule set established from `.claude/skills/` and the existing token layer in both repos | all |
 | 2026-07-26 | Dynamic Color (Material You) is off; the single brand blue wins over wallpaper theming | 6.10 |
-| 2026-07-26 | Space Grotesk is the UI face, not a decorative display face; the product-register "no display fonts in UI" ban is satisfied by using it at real weights and legible sizes | 1.3, 5.1 |
+| 2026-07-26 | Space Grotesk is the UI face, not a decorative display face; the product-register "no display fonts in UI" ban is satisfied by using it at real weights and legible sizes (**narrowed the same day by D-1 and D-2 below**: it is one of two UI faces and it does not draw Russian) | 1.3, 5.1 |
 | 2026-07-26 | Red `#F04452` may fill and tint, but error *text* on dark uses `#FF6069` (`Brush.RedText` / `@color/ping_bad`) because `#F04452` measures 4.88:1 | 3.5, 7.1 |
+| 2026-07-26 | **D-1.** The Russian UI face is **Golos Text**, vendored to both platforms as static 400 / 500 / 700 instances, because the owner chose it and the Space Grotesk binary maps 735 codepoints with **zero** in U+0400-U+04FF, so every Russian string set in the brand face has always been drawn by an undeclared per-OS fallback | 0.2, 0.4.2, 1.3, 3.4, 5.1 |
+| 2026-07-26 | **D-2.** Space Grotesk is scoped to digits, units, currency, Latin technical tokens, chip labels and the wordmark, and is never applied to a Russian string, because a face that cannot draw the script must not be given the role | 3.4, 5.1, 5.5 |
+| 2026-07-26 | **D-3.** Numerals: `zero` on for technical figures and off for currency, `tnum` and `lnum` on wherever the Numeric role is used, identically on both platforms, because a slashed zero in a price reads as a symbol and an untabulated live figure reflows on every tick | 3.4, 5.5 |
+| 2026-07-26 | **D-4.** `TextAppearance.App.Numeric` carries `android:textFontWeight="500"`, because the style declares no weight at all today while the ramp specifies 500 | 3.4, 5.4 |
+| 2026-07-26 | **D-5.** Coloured icon tiles are a closed system of exactly three - accent, destructive, neutral - because purple / orange / yellow / green encode a category system the product does not have; the old colour resources stay in the files until the last screen that references them migrates, and no new work uses them | 1.4.1, 3.6 |
+| 2026-07-26 | **D-6.** Buttons are a **16dp rounded rectangle** (`radius_button` / `Radius.Button`), not a pill; `radius_pill` survives only where width == height or the shape is intrinsically a track, on the strength of the owner's recorded rejection of capsule CTAs at `Assets/GlobalStyles.axaml:3-14`, which outranks this file under 0.1.1. Supersedes 3.2's "buttons are pill" and 16's "pill buttons" | 3.2, 11.2, 16, and `03-direction.md` 4.5 |
+| 2026-07-26 | **D-7.** Inputs, the search field, the price option and the segmented track share the button radius **16**, because that collapses nine radii in use to four and a 12dp field beside a 16dp button reads as two systems. Supersedes 3.2's "inputs are 12"; retires `Radius.Search` 14 and `Radius.Traffic` 8 | 3.2, 7.4, 16 |
+| 2026-07-26 | **D-8.** Desktop hover is a **6% white overlay on dark and a 6% black overlay on light**, replacing the 32% black scrim, because 32% black over the `#0A0B0D` ground yields `#070709`, a 1.16:1 delta that is invisible | 7.1, 12.2 |
+| 2026-07-26 | **D-9.** New semantic colour `color_outline_control` (`#646C7C` dark, `#7D8BA3` light, `#6A6A6E` / `#767679` mono) for input, outlined-button and segmented-track boundaries, because `color_outline` measures 1.45:1 on the dark ground and fails the WCAG 1.4.11 3:1 floor for UI component boundaries; `color_outline_variant` keeps its 1dp hairline role, which is structural decoration and exempt | 3.5, 6.8, 14.1 |
+| 2026-07-26 | **D-10.** Light-theme status-chip **text** uses dedicated darkened tokens (`color_success_text` `#065132`, `color_destructive_text` `#C42B32`, `color_warning_text` `#6B5000`), because the status hue on its own 18% fill measures 4.05:1 green, 4.22:1 red and 4.82:1 amber and fails AA | 3.5, 6.7, 6.8 |
+| 2026-07-26 | **D-11.** Press scale is **0.97 everywhere**, 90ms in `ease_out_quart` and 160ms out `ease_out_quint`, because one gesture is currently drawn four ways: `press_scale.xml` 0.96, `nav_press.xml` 0.92 at hard-coded 100/120ms with no interpolator, desktop 0.97 at 120ms both directions | 3.7, 7.1, 8.3, 13 |
+| 2026-07-26 | **D-12.** The type ramp gains a **declared line-height column** (40 / 28 / 20 / 20 / 20 / 18 / 16 / 14 / 20 / 24), because neither platform declares leading today, so the ramp's stated ratios are unenforced and the two platforms render different leading | 3.4, 5.7 |
