@@ -2,27 +2,26 @@
 <!--
   ============================================================================
   ГЛАВНАЯ - every visible string on the start screen.
-  13-start-screen.md 13.1, docs/agents/audit2026/android-home.md 11.1.
   ============================================================================
 
   Russian, sentence case, no final period on a label or a button, full stops
-  inside sentences, «ёлочки», U+2026 as ONE character, hyphen only (00-rules.md
-  1.4.11 forbids the em- and en-dash).
+  inside sentences, «ёлочки», U+2026 as ONE character, hyphen only.
+
+  THE OWNER'S WORDS, and they overrule every terminology lock in the specs:
+
+    * a подписка is a «подписка», never a «провайдер». Every string that used to
+      say провайдер says подписка, including the add action.
+    * «departament» is lowercase, always, in every string on every screen.
 
   Mirrored verbatim into res/values-ru/strings_home.xml. values/ is the fallback
-  for every locale and 01-inventory-android.md 5.4 makes it Russian, so the two
-  files carry the same text on purpose: whichever one a device resolves, the
-  screen reads the same.
-
-  The three plural sets are the only ones this screen needs. Russian takes
-  one / few / many / other and all four are declared: dropping "many" prints
-  «5 сервера».
+  for every locale, so the two files carry the same Russian on purpose:
+  whichever one a device resolves, Главная reads the same.
 -->
 <resources>
 
     <!-- ===================================================================== -->
-    <!-- The status line under the disc (13 s. 6). The WORD carries the state; -->
-    <!-- its colour only reinforces it, and there is no status dot (S-1).      -->
+    <!-- The status line under the connect object. The WORD carries the state;  -->
+    <!-- its colour only reinforces it, and there is no status dot.             -->
     <!-- ===================================================================== -->
     <string name="home_status_disconnected">Отключено</string>
     <string name="home_status_connecting">Подключение…</string>
@@ -34,85 +33,74 @@
     <string name="home_status_no_subscription">Подписки нет</string>
     <string name="home_status_expired">Подписка истекла</string>
     <string name="home_detail_retry">Нажмите, чтобы повторить</string>
-    <string name="home_detail_pick_server">Выберите сервер в разделе «Серверы»</string>
+    <!-- The list is on this screen now, so the hint points at it and not at a
+         destination the owner removed. -->
+    <string name="home_detail_pick_server">Выберите сервер в списке ниже</string>
+    <!-- The server identity under the object: name, then the live latency once a
+         probe has landed. U+00B7, never a hyphen. -->
+    <string name="home_server_latency">%1$s · %2$d мс</string>
 
     <!-- ===================================================================== -->
-    <!-- The numeric strip (13 s. 7). The UNIT lives in the label so the value  -->
-    <!-- stays a pure figure and the column's reserve never has to grow for it. -->
+    <!-- The top strip: отдача · время сессии · приём, in that order, on the     -->
+    <!-- same line as the add action. The UNIT lives in the label so the value   -->
+    <!-- stays a pure figure and its reserved width never has to grow for it.    -->
     <!-- ===================================================================== -->
-    <string name="home_strip_down_label">Приём, Мбит/с</string>
     <string name="home_strip_up_label">Отдача, Мбит/с</string>
-    <string name="home_strip_ping_label">Задержка, мс</string>
+    <string name="home_strip_uptime_label">Время сессии</string>
+    <string name="home_strip_down_label">Приём, Мбит/с</string>
+    <string name="home_speed_zero" translatable="false">0,0</string>
+    <string name="home_uptime_zero" translatable="false">00:00:00</string>
+    <string name="home_uptime_format" translatable="false">%1$02d:%2$02d:%3$02d</string>
+
+    <!-- The add action, top right. B1: he calls this thing a подписка. -->
+    <string name="home_add_subscription">Добавить подписку</string>
 
     <!-- ===================================================================== -->
-    <!-- The two ledger rows (13 s. 8.1).                                      -->
-    <!-- ===================================================================== -->
-    <string name="home_row_servers">Серверы</string>
-    <!-- «15 серверов · 2 провайдера». U+00B7, never a hyphen and never a dash. -->
-    <string name="home_row_servers_value">%1$s · %2$s</string>
-    <string name="home_row_subscription">Подписка</string>
-
-    <string name="home_sub_active">Действует до %1$s</string>
-    <string name="home_sub_trial">Пробный период до %1$s</string>
-    <string name="home_sub_expired">Истекла %1$s</string>
-    <string name="home_sub_none">Не оформлена</string>
-    <string name="home_sub_stale">Не удалось обновить</string>
-
-    <string name="home_chip_expiring">Истекает</string>
-    <string name="home_chip_expired">Истекла</string>
-
-    <!-- ===================================================================== -->
-    <!-- The header row (13 s. 10). Signed out it is a NAVIGATION row, never a  -->
-    <!-- call to action: the verb lives on the gate primary, exactly once.      -->
+    <!-- The header row. Signed out it is a NAVIGATION row, never a call to     -->
+    <!-- action: the verb lives on the gate primary, exactly once.              -->
     <!-- ===================================================================== -->
     <string name="home_account_title">Аккаунт</string>
     <string name="home_account_subtitle">Вход, подписка, устройства</string>
     <string name="home_account_manage">Управление аккаунтом</string>
 
     <!-- ===================================================================== -->
-    <!-- The gate block (13 s. 8.2 / 8.3). One filled surface, one text button. -->
+    <!-- The gate block, shown INSTEAD of the subscription card and the server  -->
+    <!-- list when there is not one server to connect to. Never beside them.    -->
     <!-- ===================================================================== -->
-    <string name="home_gate_signin_caption">Войдите, чтобы получить серверы Departament.</string>
+    <string name="home_gate_signin_caption">Войдите, чтобы получить серверы departament.</string>
     <string name="home_gate_signin">Войти</string>
-    <string name="home_gate_add_provider">Добавить провайдера</string>
+    <string name="home_gate_add_subscription">Добавить подписку</string>
     <!-- The build with no backend configured: signing in is meaningless there, so
-         adding a provider is the primary and there is no secondary. -->
-    <string name="home_gate_provider_caption">Добавьте провайдера, чтобы получить серверы.</string>
+         adding a подписка is the primary and there is no secondary. -->
+    <string name="home_gate_subscription_caption">Добавьте подписку, чтобы получить серверы.</string>
     <string name="home_gate_buy_caption">Осталось выбрать тариф.</string>
     <string name="home_gate_buy">Купить подписку</string>
+    <!-- Offered under the buy CTA while the account has no Telegram attached. It
+         is the only live entry point to linking Telegram on this screen, and it
+         went missing when the onboarding card was replaced; it is back. -->
+    <string name="home_gate_link_telegram">Привязать Telegram</string>
     <string name="home_gate_sync_caption">Подписка активна, серверы ещё не загружены.</string>
     <string name="home_gate_sync">Загрузить серверы</string>
     <string name="home_gate_sync_failed_caption">Не удалось загрузить серверы. Проверьте соединение.</string>
     <string name="home_gate_retry">Повторить</string>
 
     <!-- ===================================================================== -->
-    <!-- The inline status strip (13 s. 9). A CONDITION, not an event: at most  -->
-    <!-- one is shown and the priority order lives in HomeFragment.             -->
+    <!-- The inline status strip. A CONDITION, not an event: at most one is     -->
+    <!-- shown and the priority order lives in HomeFragment.                    -->
     <!-- ===================================================================== -->
     <string name="home_condition_expired">Подписка истекла. Продлите её, чтобы подключаться.</string>
     <string name="home_condition_expiring">Подписка заканчивается %1$s.</string>
-    <!-- Row 2 of 13 s. 9 («Достигнут лимит устройств.» / «Устройства») and row 6 (TUN requested
-         but unavailable / «Как исправить») have NO producer on Android yet: the live connected-
-         device count comes from GET /client/devices, which nothing on this screen calls, and the
-         TUN cause is not modelled at all. Their keys are deliberately absent rather than declared
-         with no reader; add them back with the code that resolves them. -->
     <string name="home_condition_offline">Нет сети. Показаны последние данные.</string>
-    <string name="home_condition_silent">Сервер не отвечает. Выберите другой сервер.</string>
-    <!-- Not in 13 s. 9's six rows. The shell reports every subscription import,
-         refresh and export through MainHost's loading hooks, and the connect sweep
-         is no longer allowed to stand in for them (13 s. 5.3: the sweep means the
-         core is negotiating and nothing else). Lowest priority, so a real condition
-         always wins the single strip. -->
+    <string name="home_condition_silent">Сервер не отвечает. Выберите другой в списке ниже.</string>
     <string name="home_condition_loading">Обновляем данные…</string>
     <string name="home_stale_hint">Данные могли устареть</string>
 
     <string name="home_action_renew">Продлить</string>
     <string name="home_action_retry">Повторить</string>
-    <string name="home_action_change_server">Сменить сервер</string>
 
     <!-- ===================================================================== -->
-    <!-- Accessible names for the connect disc (13 s. 14): STATE and ACTION,    -->
-    <!-- never just the verb.                                                  -->
+    <!-- Accessible names for the connect object: STATE and ACTION, never just  -->
+    <!-- the verb.                                                              -->
     <!-- ===================================================================== -->
     <string name="home_cd_connect">Отключено. Нажмите, чтобы подключить</string>
     <string name="home_cd_cancel">Подключение. Нажмите, чтобы отменить</string>
@@ -120,16 +108,54 @@
     <string name="home_cd_locked">Недоступно. Нет подписки</string>
 
     <!-- ===================================================================== -->
+    <!-- THE SUBSCRIPTION CARD under the connect object - the pill, the meta    -->
+    <!-- line, the operator's notice and the card's own actions. It is a CARD   -->
+    <!-- on this screen, not a row that navigates away.                         -->
+    <!-- ===================================================================== -->
+    <!-- Last resort only: the account nickname, then the provider's own title,
+         then the subscription's remark all come first. -->
+    <string name="home_sub_untitled">Подписка</string>
+    <!-- «09.07.2026 07:08 · Автообновление: 1 ч» -->
+    <string name="home_sub_meta">%1$s · %2$s</string>
+    <string name="home_sub_updated_never">Ещё не обновлялась</string>
+    <string name="home_sub_auto_update">Автообновление: %1$s</string>
+    <string name="home_sub_auto_update_off">выкл</string>
+    <string name="home_sub_interval_hours">%1$d ч</string>
+    <string name="home_sub_interval_minutes">%1$d мин</string>
+    <string name="home_sub_traffic_used" translatable="false">%1$s / %2$s</string>
+    <string name="home_sub_traffic_unlimited" translatable="false">%1$s / ∞</string>
+    <string name="home_sub_infinity" translatable="false">∞</string>
+    <string name="home_sub_expires">до %1$s</string>
+    <string name="home_sub_expired">истекла</string>
+
+    <string name="home_sub_cd_expand">Показать серверы</string>
+    <string name="home_sub_cd_collapse">Скрыть серверы</string>
+    <string name="home_sub_cd_ping">Проверить задержку серверов</string>
+    <string name="home_sub_cd_refresh">Обновить подписку</string>
+    <string name="home_sub_cd_pin">Закрепить подписку</string>
+    <string name="home_sub_cd_unpin">Открепить подписку</string>
+    <string name="home_sub_cd_support">Поддержка</string>
+    <string name="home_sub_cd_telegram">Открыть Telegram</string>
+
+    <string name="home_sub_delete_title">Удалить подписку?</string>
+    <string name="home_sub_delete_message">Подписка и её серверы будут удалены с этого устройства.</string>
+    <string name="home_sub_delete_confirm">Удалить</string>
+    <string name="home_sub_deleted">Подписка удалена</string>
+    <string name="home_sub_refresh_failed">Не удалось обновить подписки</string>
+
+    <!-- What the status strip says when a refresh failed and the screen keeps its
+         last values rather than emptying. -->
+    <string name="home_sub_stale">Не удалось обновить</string>
+
+    <!-- ===================================================================== -->
     <!-- Dates. «14 августа» inside the current year, «14 августа 2027»         -->
-    <!-- otherwise. Never a numeric date on this screen (13 s. 13.1).           -->
-    <!--                                                                        -->
-    <!-- The month name is a resource rather than SimpleDateFormat("d MMMM"),   -->
-    <!-- because that formatter follows the DEVICE locale: on an English phone  -->
-    <!-- it prints «Действует до 14 August», a Russian sentence with an English -->
-    <!-- word in it. The genitive forms below are the ones a date takes.        -->
+    <!-- otherwise. The month name is a resource rather than                    -->
+    <!-- SimpleDateFormat("d MMMM"), because that formatter follows the DEVICE  -->
+    <!-- locale: on an English phone it prints «Действует до 14 August».        -->
     <!-- ===================================================================== -->
     <string name="home_date_short">%1$d %2$s</string>
     <string name="home_date_full">%1$d %2$s %3$d</string>
+    <string name="home_date_numeric_time" translatable="false">dd.MM.yyyy HH:mm</string>
     <string-array name="home_months_genitive">
         <item>января</item>
         <item>февраля</item>
@@ -145,22 +171,4 @@
         <item>декабря</item>
     </string-array>
 
-    <plurals name="home_servers_count">
-        <item quantity="one">%d сервер</item>
-        <item quantity="few">%d сервера</item>
-        <item quantity="many">%d серверов</item>
-        <item quantity="other">%d сервера</item>
-    </plurals>
-    <plurals name="home_providers_count">
-        <item quantity="one">%d провайдер</item>
-        <item quantity="few">%d провайдера</item>
-        <item quantity="many">%d провайдеров</item>
-        <item quantity="other">%d провайдера</item>
-    </plurals>
-    <plurals name="home_sub_days_left">
-        <item quantity="one">Остался %d день</item>
-        <item quantity="few">Осталось %d дня</item>
-        <item quantity="many">Осталось %d дней</item>
-        <item quantity="other">Осталось %d дня</item>
-    </plurals>
 </resources>

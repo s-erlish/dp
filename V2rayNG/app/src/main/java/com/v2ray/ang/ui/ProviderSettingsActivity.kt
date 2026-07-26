@@ -2,6 +2,7 @@ package com.v2ray.ang.ui
 
 import android.os.Bundle
 import android.text.InputType
+import android.view.View
 import android.widget.FrameLayout
 import androidx.appcompat.app.AlertDialog
 import androidx.core.widget.doAfterTextChanged
@@ -18,9 +19,12 @@ import com.v2ray.ang.handler.SubscriptionUpdater
 import com.v2ray.ang.util.HttpUtil
 
 /**
- * "Настройки провайдеров" — provider/subscription settings screen (departament design).
+ * «Настройки подписок» — the settings that belong to the subscription feeds, not to one подписка.
  *
- * Groups four cards that mirror the Incy provider screen:
+ * The word is the owner's: what this app used to call a «провайдер» is a **подписка** on every
+ * surface, so the screen, its title and its copy say подписка.
+ *
+ * Groups four cards:
  *  1. ОБНОВЛЕНИЕ    — auto-update toggle + interval picker + update notification toggle.
  *  2. ПРИ ЗАПУСКЕ    — update-on-launch / ping-on-launch / ping-on-update toggles.
  *  3. СЕТЬ           — HWID toggle + subscription User-Agent editor.
@@ -43,17 +47,20 @@ class ProviderSettingsActivity : BaseActivity() {
     private val binding by lazy { ActivityProviderSettingsBinding.inflate(layoutInflater) }
 
     companion object {
-        // Screen-local: remembers the chosen interval even when no subscription is present yet.
-        // The interval that actually schedules work lives on each SubscriptionItem.
-        private const val PREF_UPDATE_INTERVAL = "pref_provider_update_interval"
-
+        /**
+         * Fallback shown when nothing has an interval yet - the same default a fresh
+         * [com.v2ray.ang.dto.entities.SubscriptionItem] carries.
+         *
+         * There is no screen-local key any more. This screen used to keep the chosen interval in a
+         * private `pref_provider_update_interval`, which nothing else in the app read: the value
+         * that actually schedules work is `SubscriptionItem.updateInterval`, and a second copy of it
+         * could disagree with the scheduler the moment the interval was changed anywhere else. The
+         * row reads the real one now.
+         */
         private const val DEFAULT_INTERVAL_MINUTES = 60L
 
-        // TODO(copy): move to res/values/strings_provider.xml as `ps_user_agent_error`
-        // (this wave does not own res/values/**). States the cause, then the fix, per 9.4.
-        private const val USER_AGENT_ERROR =
-            "В заголовке нельзя передать кириллицу и другие не-ASCII символы. " +
-                "Оставьте латиницу, цифры и знаки."
+        /** 0.38 - the disabled alpha of the row grammar. */
+        private const val ALPHA_DISABLED = 0.38f
     }
 
     /** Interval options (minutes) offered by the interval picker: 1/2/6/12/24 hours. */
@@ -98,10 +105,29 @@ class ProviderSettingsActivity : BaseActivity() {
         bindState()
     }
 
+    /**
+     * A подписка can be added or deleted while this screen sits in the back stack (the list is two
+     * taps away), and that changes whether the update rows can do anything at all. Re-read on the
+     * way back rather than showing what was true when the screen opened.
+     */
+    override fun onResume() {
+        super.onResume()
+        bindState()
+    }
+
     /** Reflect all persisted values/toggle states into the rows. */
     private fun bindState() {
-        binding.switchAutoUpdate.isChecked = isAutoUpdateOn()
-        binding.valueInterval.text = intervalLabel(storedIntervalMinutes())
+        // With no подписка stored there is nothing for a schedule to apply to: toggling the switch
+        // wrote to an empty list and looked like it had worked. The two rows say so instead.
+        val hasSubscriptions = MmkvManager.decodeSubscriptions().isNotEmpty()
+        setRowEnabled(binding.rowAutoUpdate, hasSubscriptions)
+        setRowEnabled(binding.rowInterval, hasSubscriptions)
+        binding.switchAutoUpdate.isChecked = hasSubscriptions && isAutoUpdateOn()
+        binding.valueInterval.text = if (hasSubscriptions) {
+            intervalLabel(storedIntervalMinutes())
+        } else {
+            getString(R.string.ps_no_subs_value)
+        }
         binding.switchNotify.isChecked = SettingsManager.isNotifyOnSubscriptionUpdate()
 
         binding.switchUpdateOnLaunch.isChecked = SettingsManager.isUpdateSubscriptionOnLaunch()
@@ -120,17 +146,30 @@ class ProviderSettingsActivity : BaseActivity() {
     private fun isAutoUpdateOn(): Boolean =
         MmkvManager.decodeSubscriptions().any { it.subscription.autoUpdate }
 
-    private fun storedIntervalMinutes(): Long =
-        MmkvManager.decodeSettingsString(PREF_UPDATE_INTERVAL, DEFAULT_INTERVAL_MINUTES.toString())
-            ?.toLongOrNull() ?: DEFAULT_INTERVAL_MINUTES
+    /**
+     * The interval that is actually scheduled: the one on the first auto-updating подписка, or the
+     * one the first подписка carries, or the shipped default when there is nothing to read.
+     */
+    private fun storedIntervalMinutes(): Long {
+        val subs = MmkvManager.decodeSubscriptions()
+        val item = subs.firstOrNull { it.subscription.autoUpdate }?.subscription
+            ?: subs.firstOrNull()?.subscription
+            ?: return DEFAULT_INTERVAL_MINUTES
+        return item.updateInterval.takeIf { it > 0L } ?: DEFAULT_INTERVAL_MINUTES
+    }
 
+    /**
+     * A подписка can carry an interval that is not one of the five offered here - the form in
+     * `SubEditActivity` takes any number of minutes. Such a value is shown as it is; the old `else`
+     * branch fell back to «1 ч» and so reported an interval the scheduler was not using.
+     */
     private fun intervalLabel(minutes: Long): String = when (minutes) {
         60L -> getString(R.string.ps_interval_1h)
         120L -> getString(R.string.ps_interval_2h)
         360L -> getString(R.string.ps_interval_6h)
         720L -> getString(R.string.ps_interval_12h)
         1440L -> getString(R.string.ps_interval_24h)
-        else -> getString(R.string.ps_interval_1h)
+        else -> getString(R.string.settings_sub_auto_update_minutes, minutes)
     }
 
     /**
@@ -161,7 +200,6 @@ class ProviderSettingsActivity : BaseActivity() {
             .setTitle(R.string.ps_interval)
             .setSingleChoiceItems(entries, idx) { dialog, which ->
                 val minutes = intervalValues[which]
-                MmkvManager.encodeSettings(PREF_UPDATE_INTERVAL, minutes.toString())
                 MmkvManager.decodeSubscriptions().forEach { cache ->
                     val item = cache.subscription
                     item.autoUpdate = true
@@ -253,7 +291,7 @@ class ProviderSettingsActivity : BaseActivity() {
     private fun showUserAgentError(field: TextInputLayout, input: TextInputEditText): Boolean {
         val value = input.text.toString().trim()
         val invalid = value.isNotEmpty() && !HttpUtil.isHeaderSafe(value)
-        field.error = if (invalid) USER_AGENT_ERROR else null
+        field.error = if (invalid) getString(R.string.ps_user_agent_error) else null
         return invalid
     }
 
@@ -287,6 +325,17 @@ class ProviderSettingsActivity : BaseActivity() {
     }
 
     // ---------------- helpers ----------------
+
+    /**
+     * A row that cannot do anything is not presented as if it could: it stops taking taps and
+     * drops to the disabled alpha of the row grammar, and its value states the reason.
+     */
+    private fun setRowEnabled(row: View, enabled: Boolean) {
+        row.isEnabled = enabled
+        row.isClickable = enabled
+        row.isFocusable = enabled
+        row.alpha = if (enabled) 1f else ALPHA_DISABLED
+    }
 
     /** Flip a boolean pref and reflect it on its switch. [current] carries the default. */
     private fun toggleBool(

@@ -21,6 +21,7 @@ import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -47,9 +48,11 @@ import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.util.AvatarManager
 import com.v2ray.ang.util.reducedMotion
 import com.v2ray.ang.viewmodel.AccountViewModel
+import com.v2ray.ang.viewmodel.MainViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Calendar
 import java.util.Locale
 
 /**
@@ -68,12 +71,22 @@ class AccountFragment : Fragment() {
 
     private val viewModel: AccountViewModel by viewModels()
 
+    /**
+     * The shell's shared server state, scoped to the ACTIVITY — the same instance the Главная and
+     * Серверы lists read. Signing out removes the account's подписки and their серверы from the
+     * store, and this is what makes the lists on the other tabs stop showing them (A1).
+     */
+    private val mainViewModel: MainViewModel by activityViewModels()
+
     /** Adapter backing the subscription carousel (one page per sub). */
     private lateinit var subAdapter: SubscriptionPagerAdapter
 
     /** Last subscription list published; the first page is the active/root sub. */
     private var currentSubs: List<SubInfoDto> = emptyList()
     private var latestProfile: UserProfileDto? = null
+
+    /** Carousel page the hero time block describes. Every sub has its own expiry. */
+    private var selectedSubIndex: Int = 0
 
     // True until the FIRST real load result lands (a non-null profile, a non-empty sub list, or an
     // error). Gates the loading skeleton so a genuinely-empty account resolves to the empty state
@@ -137,6 +150,14 @@ class AccountFragment : Fragment() {
         binding.scrollRoot.updatePadding(bottom = (96 * resources.displayMetrics.density).toInt())
         setupPager()
         wireActions()
+        // The payment-method pick arrives as DATA, re-delivered to whichever view is alive when it
+        // lands (D11). The sheet used to call a lambda that had captured this fragment's binding;
+        // rotating with the sheet open and then picking a method invoked it against a view tree
+        // that no longer existed.
+        parentFragmentManager.setFragmentResultListener(
+            REQUEST_TOP_UP_METHOD,
+            viewLifecycleOwner,
+        ) { _, bundle -> onTopUpMethodPicked(bundle) }
         observeState()
         renderHeroState()
         loadAll()
@@ -183,7 +204,13 @@ class AccountFragment : Fragment() {
                 },
             )
             registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
-                override fun onPageSelected(position: Int) = updateDotSelection(position)
+                override fun onPageSelected(position: Int) {
+                    selectedSubIndex = position
+                    updateDotSelection(position)
+                    // The hero figure belongs to the subscription the user is looking at, not to
+                    // whichever one happens to be first.
+                    renderTimeBlock()
+                }
             })
         }
     }
@@ -243,6 +270,9 @@ class AccountFragment : Fragment() {
                     }
                 }
                 launch { viewModel.payments.collect { renderHistoryValue(it) } }
+                // A top-up in flight owns the «Пополнить» control until the provider answers, so
+                // a slow connection cannot be mistaken for a dead button and paid for twice (D10).
+                launch { viewModel.paymentInFlight.collect { renderTopUpBusy(it) } }
                 // Skeleton is driven by loading (+ the first-load gate) via renderHeroState.
                 launch { viewModel.loading.collect { renderHeroState() } }
                 launch { viewModel.error.collect { renderError(it) } }
@@ -299,6 +329,7 @@ class AccountFragment : Fragment() {
         needsColdLoad = true
         latestProfile = null
         currentSubs = emptyList()
+        selectedSubIndex = 0
         subAdapter.submit(emptyList())
         binding.llSubDots.removeAllViews()
         binding.llSubDots.isVisible = false
@@ -306,6 +337,18 @@ class AccountFragment : Fragment() {
         binding.tvRowValueHistory.visibility = View.GONE
         renderProfile(null)
         renderHeroState()
+
+        // A1. The sign-out wipe has already removed this account's подписки and their серверы from
+        // the store (AccountSession.wipe -> SubscriptionSyncManager.removeAllManaged); what it
+        // cannot do is repaint a list it does not own. Without this the Главная and Серверы tabs
+        // went on showing — and offering to select — серверы that no longer exist anywhere but in
+        // an in-memory cache, until something else happened to reload it.
+        //
+        // Safe on the OTHER route into this method too. An expired token takes
+        // AccountSession.endSession, which deliberately deletes nothing; re-reading the store then
+        // paints back exactly the same list. That distinction is the whole point of the two
+        // methods and this call does not blur it: it re-reads, it never removes.
+        mainViewModel.reloadServerList()
     }
 
     // Context-scoped toast helpers so the ported (Context.toast) calls work from a Fragment.
@@ -386,6 +429,8 @@ class AccountFragment : Fragment() {
 
     private fun renderSubscriptions(list: List<SubInfoDto>) {
         currentSubs = list
+        // A shorter list must not leave the hero pointing past its end.
+        if (selectedSubIndex >= list.size) selectedSubIndex = 0
         if (list.isNotEmpty()) pendingFirstLoad = false
         subAdapter.submit(list)
 
@@ -489,6 +534,137 @@ class AccountFragment : Fragment() {
         binding.groupSubCarousel.isVisible = state == Hero.CAROUSEL
         binding.groupAccountError.isVisible = state == Hero.ERROR
         if (state == Hero.SKELETON) startSkeletonPulse() else stopSkeletonPulse()
+        renderTimeBlock()
+    }
+
+    /**
+     * The tab's ONE Display figure, and it is time — not money (23-account-rework.md 1.2). The user
+     * opens Аккаунт because the подписка is running out; the wallet answers that question only
+     * indirectly, so the balance dropped to a labelled value and this took the hero slot.
+     *
+     * The silhouette is CONSTANT in every variant that has a date — label, figure + word, optional
+     * detail — and only the COLOUR changes with health, so the card does not reflow as an account
+     * ages. Above 30 days it states the date and stops; from 8 to 30 it adds the count as a detail
+     * line; at 7 and below the count BECOMES the figure and the date drops to the detail, because
+     * that is the window in which time turns into a decision.
+     *
+     * Perpetual and unknown have no date to set, so they render two text lines instead and the tab
+     * shows no Display figure at all — the only two states in which that is true.
+     */
+    private fun renderTimeBlock() {
+        val b = _binding ?: return
+        val sub = currentSubs.getOrNull(selectedSubIndex) ?: currentSubs.firstOrNull()
+        if (sub == null || !b.groupSubCarousel.isVisible) {
+            b.llTimeBlock.isVisible = false
+            return
+        }
+        b.llTimeBlock.isVisible = true
+
+        val onSurface = resolveThemeColor(com.google.android.material.R.attr.colorOnSurface)
+        val amber = resolveThemeColor(R.attr.warning)
+        val red = ContextCompat.getColor(requireContext(), R.color.color_destructive_text)
+
+        val date = parseYmd(sub.expireAtIso)
+        val daysLeft = date?.let { daysUntil(it) }
+
+        // Two-line variants: nothing to set as a figure.
+        if (date == null || daysLeft == null) {
+            renderTimeLines(R.string.account_time_unknown, R.string.account_time_unknown_sub, onSurface)
+            return
+        }
+        if (date.year >= PERPETUAL_YEAR || daysLeft > PERPETUAL_DAYS) {
+            renderTimeLines(R.string.account_time_perpetual, R.string.account_time_perpetual_sub, onSurface)
+            return
+        }
+
+        b.tvTimeLabel.isVisible = true
+        b.tvTimeFigure.isVisible = true
+
+        val dateWord = monthWord(date)
+        when {
+            daysLeft < 0 -> {
+                b.tvTimeLabel.setText(R.string.account_time_expired)
+                b.tvTimeLabel.setTextColor(red)
+                b.tvTimeFigure.text = date.day.toString()
+                b.tvTimeWord.text = dateWord
+                b.tvTimeDetail.isVisible = false
+                tintFigure(red)
+            }
+
+            daysLeft == 0 -> {
+                b.tvTimeLabel.setText(R.string.account_time_today)
+                b.tvTimeLabel.setTextColor(amber)
+                b.tvTimeFigure.text = date.day.toString()
+                b.tvTimeWord.text = dateWord
+                b.tvTimeDetail.setText(R.string.account_time_detail_today)
+                b.tvTimeDetail.isVisible = true
+                tintFigure(amber)
+            }
+
+            daysLeft <= URGENT_DAYS -> {
+                b.tvTimeLabel.setText(R.string.account_time_left)
+                b.tvTimeLabel.setTextColor(amber)
+                b.tvTimeFigure.text = daysLeft.toString()
+                b.tvTimeWord.text = resources.getQuantityString(R.plurals.account_days, daysLeft)
+                b.tvTimeDetail.text = getString(R.string.account_time_detail_until, longDate(date))
+                b.tvTimeDetail.isVisible = true
+                tintFigure(amber)
+            }
+
+            else -> {
+                b.tvTimeLabel.setText(R.string.account_time_active)
+                b.tvTimeLabel.setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
+                b.tvTimeFigure.text = date.day.toString()
+                b.tvTimeWord.text = dateWord
+                if (daysLeft <= COUNTDOWN_FROM_DAYS) {
+                    val count = resources.getQuantityString(R.plurals.account_days, daysLeft)
+                    b.tvTimeDetail.text = getString(R.string.account_time_detail_left, daysLeft, count)
+                    b.tvTimeDetail.isVisible = true
+                } else {
+                    b.tvTimeDetail.isVisible = false
+                }
+                tintFigure(onSurface)
+            }
+        }
+    }
+
+    /** The date-less variants: a Title line and a Subtitle line, no figure, no label. */
+    private fun renderTimeLines(titleRes: Int, subtitleRes: Int, color: Int) {
+        val b = _binding ?: return
+        b.tvTimeLabel.isVisible = false
+        b.tvTimeFigure.isVisible = false
+        b.tvTimeWord.setText(titleRes)
+        b.tvTimeWord.setTextColor(color)
+        b.tvTimeDetail.setText(subtitleRes)
+        b.tvTimeDetail.isVisible = true
+    }
+
+    /** Colour is the state channel here, so the figure and its word always move together. */
+    private fun tintFigure(color: Int) {
+        val b = _binding ?: return
+        b.tvTimeFigure.setTextColor(color)
+        b.tvTimeWord.setTextColor(color)
+    }
+
+    /**
+     * The word beside the figure: a genitive month, plus the year when it is not this one. Set in
+     * the UI face, never the figure face — Space Grotesk carries no Cyrillic at all
+     * (23-account-rework.md 4.2), so a Russian month in it would render as fallback glyphs.
+     */
+    private fun monthWord(date: Ymd): String {
+        val months = resources.getStringArray(R.array.account_months_genitive)
+        val name = months.getOrNull(date.month - 1) ?: return date.year.toString()
+        val thisYear = Calendar.getInstance().get(Calendar.YEAR)
+        return if (date.year == thisYear) name else getString(R.string.account_month_year, name, date.year)
+    }
+
+    /** «3 августа» — one phrase, one face, for the detail line. */
+    private fun longDate(date: Ymd): String = getString(R.string.account_date_long, date.day, monthWord(date))
+
+    private fun resolveThemeColor(attr: Int): Int {
+        val tv = android.util.TypedValue()
+        requireContext().theme.resolveAttribute(attr, tv, true)
+        return tv.data
     }
 
     /**
@@ -622,26 +798,58 @@ class AccountFragment : Fragment() {
      * Lets the user pick a Platega payment method (СБП / карта) for the entered top-up amount.
      * The balance option is deliberately withheld (balanceLabel = null): a top-up ADDS to the
      * balance, so paying it FROM the balance would be circular.
+     *
+     * The amount rides ALONG with the pick rather than being captured in a callback, so the charge
+     * is right even if this fragment's view is rebuilt while the sheet is open (D11).
      */
     private fun showPaymentMethodSheet(amount: Double) {
         val methods = viewModel.publicConfig.value?.plategaMethods?.map { it.id to it.label } ?: emptyList()
+        if (methods.isEmpty()) {
+            toastError(R.string.account_checkout_no_browser)
+            return
+        }
         PaymentMethodSheet.show(
             parentFragmentManager,
+            REQUEST_TOP_UP_METHOD,
             getString(R.string.account_top_up_title),
             null,
             methods,
-        ) { id ->
-            if (id == "balance") {
-                viewModel.payWithBalance(PaymentRequestDto(amount = amount, currency = "RUB")) {
-                    toastSuccess(R.string.account_top_up_success)
-                    viewModel.refreshProfile()
-                    viewModel.loadSubscriptions()
-                }
-            } else {
-                awaitingPaymentError = true
-                viewModel.buy(PaymentRequestDto(amount = amount, currency = "RUB", paymentMethod = id.toIntOrNull()), ::openCheckout)
-            }
+            Bundle().apply { putDouble(EXTRA_TOP_UP_AMOUNT, amount) },
+        )
+    }
+
+    private fun onTopUpMethodPicked(result: Bundle) {
+        val id = result.getString(PaymentMethodSheet.RESULT_METHOD_ID) ?: return
+        val amount = result.getDouble(EXTRA_TOP_UP_AMOUNT, 0.0)
+        if (amount <= 0.0) {
+            toastError(R.string.account_top_up_invalid)
+            return
         }
+        if (viewModel.paymentInFlight.value) return
+        if (id == PaymentMethodSheet.ID_BALANCE) {
+            viewModel.payWithBalance(PaymentRequestDto(amount = amount, currency = "RUB")) {
+                toastSuccess(R.string.account_top_up_success)
+                viewModel.refreshProfile()
+                viewModel.loadSubscriptions()
+            }
+        } else {
+            awaitingPaymentError = true
+            viewModel.buy(
+                PaymentRequestDto(amount = amount, currency = "RUB", paymentMethod = id.toIntOrNull()),
+                onInit = ::openCheckout,
+            )
+        }
+    }
+
+    /**
+     * «Пополнить» while a charge is in flight: it stops taking taps and says what it is doing, so
+     * a slow provider is never mistaken for a dead control (D10). The request itself refuses to
+     * run twice regardless — see [AccountViewModel.paymentInFlight].
+     */
+    private fun renderTopUpBusy(busy: Boolean) {
+        val b = _binding ?: return
+        b.btnTopUp.isEnabled = !busy
+        b.btnTopUp.text = getString(if (busy) R.string.account_pay_in_progress else R.string.account_top_up)
     }
 
     private fun copyReferralCode() {
@@ -845,6 +1053,63 @@ class AccountFragment : Fragment() {
     }
 
     // endregion
+
+    private companion object {
+        /** Fragment-result key for the top-up method pick. */
+        const val REQUEST_TOP_UP_METHOD = "account_top_up_method"
+
+        /** The amount travels with the pick, so a rebuilt view still charges the right sum. */
+        const val EXTRA_TOP_UP_AMOUNT = "extra_top_up_amount"
+
+        /** Mirror of the desktop's IsEffectivelyPerpetual: a sentinel expiry, not a real date. */
+        const val PERPETUAL_YEAR = 2099
+        const val PERPETUAL_DAYS = 3650
+
+        /** At and below this the day COUNT becomes the hero figure (23-account-rework.md 4.3). */
+        const val URGENT_DAYS = 7
+
+        /** Above this a count is machine output — the card states the date and stops. */
+        const val COUNTDOWN_FROM_DAYS = 30
+    }
+}
+
+/** A calendar date, which is the granularity the user reads an expiry at. */
+private data class Ymd(val year: Int, val month: Int, val day: Int)
+
+/**
+ * Takes the DATE part of an ISO-8601 timestamp and reads it as a local calendar date.
+ *
+ * Deliberately not an instant: the card says «Активна до 3 августа», and the day a подписка ends is
+ * what the user is counting, not the wall-clock moment inside it. Parsing the offset would buy
+ * precision nobody reads and a timezone bug on every device that is not on the backend's clock.
+ */
+private fun parseYmd(iso: String?): Ymd? {
+    if (iso.isNullOrBlank()) return null
+    val parts = iso.substringBefore('T').substringBefore(' ').split('-')
+    if (parts.size != 3) return null
+    val year = parts[0].toIntOrNull() ?: return null
+    val month = parts[1].toIntOrNull() ?: return null
+    val day = parts[2].toIntOrNull() ?: return null
+    if (month !in 1..12 || day !in 1..31) return null
+    return Ymd(year, month, day)
+}
+
+/**
+ * Whole days from today to [target] in the device's own zone: negative once it is past, 0 on the
+ * day itself. Both ends are snapped to midnight and the quotient is rounded, so the hour a DST
+ * change adds or removes cannot move a boundary by a day.
+ */
+private fun daysUntil(target: Ymd): Int {
+    val cal = Calendar.getInstance()
+    cal.set(Calendar.HOUR_OF_DAY, 0)
+    cal.set(Calendar.MINUTE, 0)
+    cal.set(Calendar.SECOND, 0)
+    cal.set(Calendar.MILLISECOND, 0)
+    val todayMs = cal.timeInMillis
+    cal.set(target.year, target.month - 1, target.day, 0, 0, 0)
+    cal.set(Calendar.MILLISECOND, 0)
+    val targetMs = cal.timeInMillis
+    return Math.round((targetMs - todayMs).toDouble() / 86_400_000.0).toInt()
 }
 
 private fun formatMoney(amount: Double, currency: String): String {

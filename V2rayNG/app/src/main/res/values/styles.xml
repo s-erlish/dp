@@ -375,6 +375,27 @@
         PRIMARY — the one thing the screen wants you to do. AT MOST ONE PER SCREEN,
         and never on the same screen as a full-strength connect control (00-rules.md 3.6).
         onPrimary #00183A on accent #4C8DFF = 5.51:1.
+
+        THE FOREGROUND IS THE BUTTON'S DEPTH, and it is here rather than in the
+        background because MaterialButton will not accept a background from a style:
+        MaterialButtonHelper.createBackground() builds its own MaterialShapeDrawable
+        and replaces whatever the View constructor read, and app:backgroundTint takes
+        a ColorStateList, which is flat by definition. So the fill stays the tint and
+        @drawable/btn_overlay_primary lays a modelled light source over it — a rim
+        along the top arc, a wash falling off above the label, a settle beneath it,
+        inverted on press and cross-faded on the 90/160ms press clock that
+        @anim/press_scale already runs the 0.97 squeeze on.
+
+        That answers the owner directly — «кнопки должны все быть проработанные
+        такие, а не просто сплошной цвет, может градиент какой-то, может даже
+        анимированный» — and it is the one place 00-rules.md's gradient ban is lifted
+        (OWNER-FEEDBACK D1). The ban still holds for page backgrounds and for
+        decorative glows behind screens; this is a control, and the ramp is pure
+        luminance, not a second hue.
+
+        The 5.51:1 survives ALL FIVE STATES by construction, not by luck: both ramps
+        are spent clear of the label band (see @drawable/btn_gloss_rest), disabled
+        drops the overlay entirely, and loading only removes the label it is hiding.
     -->
     <style name="Widget.Departament.Button.Primary" parent="Widget.Departament.Button">
         <item name="backgroundTint">@color/btn_primary_container</item>
@@ -382,6 +403,7 @@
         <item name="iconTint">@color/btn_primary_content</item>
         <item name="strokeColor">@color/btn_focus_inner_on_accent</item>
         <item name="rippleColor">@color/ripple_on_accent</item>
+        <item name="android:foreground">@drawable/btn_overlay_primary</item>
     </style>
 
     <!-- The screen's ONE full-width CTA. 52 as a minimum, never as a height. -->
@@ -394,6 +416,13 @@
         NEUTRAL tonal fill (colorSurfaceContainerHighest), deliberately not
         colorSecondaryContainer: a second accent-tinted fill would spend the accent
         budget twice on one screen. Label onSurface = 14.14:1. Up to two per screen.
+
+        It carries the same bevel as the Primary. A fill is a fill: leaving the
+        neutral one flat next to a modelled accent one would say the secondary
+        action is a different KIND of control rather than a quieter one, and on a
+        near-black background a flat #20242B slab has nothing separating it from the
+        surface at all. Because the ramp is luminance and not hue, one drawable
+        serves both.
     -->
     <style name="Widget.Departament.Button.Secondary" parent="Widget.Departament.Button">
         <item name="backgroundTint">@color/btn_secondary_container</item>
@@ -402,6 +431,7 @@
         <item name="android:textAppearance">@style/TextAppearance.App.Title.Medium</item>
         <item name="strokeColor">@color/btn_focus_outer_accent</item>
         <item name="rippleColor">@color/ripple_accent</item>
+        <item name="android:foreground">@drawable/btn_overlay_secondary</item>
     </style>
 
     <style name="Widget.Departament.Button.Secondary.Tall" parent="Widget.Departament.Button.Secondary">
@@ -414,6 +444,16 @@
         inside a row, and when it does, the row itself is not clickable — two targets
         doing different things is the layout_subscription_meta_bar mistake.
         Padding is space_12, not space_24: a text button is a label, not a slab.
+
+        NO BEVEL — there is no fill to bevel, and painting a rounded slab over a
+        transparent container would invent a button that is not there. What it gains
+        instead is a real pressed STATE: @color/btn_quiet_container puts a 10% accent
+        plate under the label while the finger is down. Until now the only feedback a
+        Tertiary had was the ripple, and a ripple is a radial animation that is
+        already fading when the finger lifts — and does not draw at all when the
+        system animator scale is 0 (reduced motion, battery saver, several OEM
+        "performance" modes). The app's quietest button was therefore its least
+        responsive one.
     -->
     <style name="Widget.Departament.Button.Tertiary" parent="Widget.Material3.Button.TextButton">
         <item name="android:insetTop">0dp</item>
@@ -434,13 +474,18 @@
         <item name="strokeColor">@color/btn_focus_outer_accent</item>
         <item name="rippleColor">@color/ripple_accent</item>
         <item name="elevation">0dp</item>
+        <item name="backgroundTint">@color/btn_quiet_container</item>
     </style>
 
     <!-- The destructive text action: a dialog's confirm, a row's «Удалить».
-         @color/color_destructive_text #FF6069 = 6.15:1, not the 4.88:1 fill red. -->
+         @color/color_destructive_text #FF6069 = 6.15:1, not the 4.88:1 fill red.
+
+         Its press plate is destructive-toned too: an accent-blue plate under a red
+         label says two different things about one tap. -->
     <style name="Widget.Departament.Button.Tertiary.Destructive" parent="Widget.Departament.Button.Tertiary">
         <item name="android:textColor">@color/color_destructive_text</item>
         <item name="iconTint">@color/color_destructive_text</item>
+        <item name="backgroundTint">@color/btn_quiet_container_danger</item>
     </style>
 
     <!--
@@ -448,6 +493,12 @@
         the >=3:1 LARGE-text floor only because the label is 16sp/700; that is why
         this style pins TextAppearance.App.Title and a layout may never shrink it.
         Confirm copy says what it does («Удалить подписку»), never «OK».
+
+        It is beveled like the Primary, and that matters more here than anywhere: a
+        destructive confirm that reads flatter than the cancel beside it reads as
+        DISABLED, which is exactly the defect the owner reported on the desktop
+        (OWNER-FEEDBACK D3). Same modelled light, so the confirm carries the same
+        weight as any other filled action.
     -->
     <style name="Widget.Departament.Button.Destructive" parent="Widget.Departament.Button">
         <item name="backgroundTint">@color/btn_destructive_container</item>
@@ -455,6 +506,7 @@
         <item name="iconTint">@color/btn_destructive_content</item>
         <item name="strokeColor">@color/btn_focus_inner_on_error</item>
         <item name="rippleColor">@color/ripple_on_accent</item>
+        <item name="android:foreground">@drawable/btn_overlay_destructive</item>
     </style>
 
     <style name="Widget.Departament.Button.Destructive.Tall" parent="Widget.Departament.Button.Destructive">
@@ -473,6 +525,11 @@
         android:contentDescription is MANDATORY on every instance and states the
         ACTION, not the object: «Обновить список», «Отвязать устройство». A missing
         one is a P1. A style cannot supply it — that is on the layout.
+
+        Its press plate (@color/btn_icon_container) is neutral, not accent: an icon
+        button is chrome, and 3.6 spends the accent budget on the screen's one
+        primary action rather than on its toolbar. The plate draws inside the pill,
+        so what appears under the finger is a disc.
     -->
     <style name="Widget.Departament.Button.Icon" parent="Widget.Material3.Button.IconButton">
         <item name="android:insetTop">0dp</item>
@@ -487,21 +544,28 @@
         <item name="strokeColor">@color/btn_focus_outer_accent</item>
         <item name="rippleColor">@color/ripple_neutral</item>
         <item name="elevation">0dp</item>
+        <item name="backgroundTint">@color/btn_icon_container</item>
     </style>
 
     <!-- Filled icon button: a neutral disc. R7 lists filled icon buttons in the INNER
-         focus case, so the ring goes inside in the control's own on-colour at 40%. -->
+         focus case, so the ring goes inside in the control's own on-colour at 40%.
+         Being filled, it gets the bevel — on @dimen/radius_pill, so the modelled
+         light follows the disc instead of a slab's corners. -->
     <style name="Widget.Departament.Button.Icon.Filled" parent="Widget.Departament.Button.Icon">
         <item name="backgroundTint">@color/btn_secondary_container</item>
         <item name="strokeColor">@color/btn_focus_inner_on_neutral</item>
+        <item name="android:foreground">@drawable/btn_overlay_icon_filled</item>
     </style>
 
     <style name="Widget.Departament.Button.Icon.Accent" parent="Widget.Departament.Button.Icon">
         <item name="iconTint">@color/btn_icon_glyph_accent</item>
     </style>
 
+    <!-- Destructive glyph on no fill: the press plate goes destructive with it, so
+         the disc under the finger says the same thing the glyph does. -->
     <style name="Widget.Departament.Button.Icon.Danger" parent="Widget.Departament.Button.Icon">
         <item name="iconTint">@color/btn_icon_glyph_danger</item>
+        <item name="backgroundTint">@color/btn_quiet_container_danger</item>
     </style>
 
     <!-- The back affordance of the seamless sub-page toolbar: 24dp nav glyph, not 22. -->
@@ -1095,9 +1159,15 @@
         <item name="android:minWidth">@dimen/btn_min_width</item>
     </style>
 
-    <!-- The destructive confirm. -->
+    <!-- The destructive confirm. It must read as the ACTION of the dialog, never as
+         a disabled control sitting next to a solid cancel — that was the owner's D3
+         finding on the desktop and the same shape of mistake is one missing state
+         away here. So the whole control goes destructive: label, glyph and the plate
+         that appears under the finger. -->
     <style name="Departament.Dialog.Button.Destructive" parent="Departament.Dialog.Button">
         <item name="android:textColor">@color/color_destructive_text</item>
+        <item name="iconTint">@color/color_destructive_text</item>
+        <item name="backgroundTint">@color/btn_quiet_container_danger</item>
     </style>
 
     <!-- ========================================================================= -->
@@ -1230,6 +1300,28 @@
         (never to wrap_content of nothing), the control stops accepting input but
         STAYS AT OPACITY 1.0 — a faded spinner reads as "broken", not "working" — and
         contentDescription becomes "<label>, загрузка".
+
+        HOW A BUTTON ENTERS THAT STATE, now that the states are built rather than
+        described. Two lines, and no other change:
+
+            button.isActivated = true      // loading on
+            button.isClickable = false     // and it stops accepting input
+
+        isActivated, not isEnabled: disabled is a different state with a different
+        meaning and it drops the whole control to 0.38, which is the "broken" read R8
+        forbids. state_activated is picked up by every button ColorStateList
+        (@color/btn_primary_content and its five siblings), which take the label AND
+        the icon to alpha 0 — so THE LABEL IS STILL MEASURED, the button keeps the
+        exact width it had a frame earlier, and it cannot jump. The
+        @drawable/btn_overlay_* foregrounds hold the resting bevel on the same state,
+        ahead of their pressed row, so a working control never reads as pressed.
+
+        Nothing else on the app sets isActivated on a MaterialButton, and no layout
+        declares duplicateParentState, so no selected row can push a button into this
+        state by accident.
+
+        This style is the arc that goes over it: match the tone to the variant and
+        centre it on the button.
     -->
     <style name="Widget.Departament.Progress.Circular.Inline" parent="Widget.Material3.CircularProgressIndicator.ExtraSmall">
         <item name="indicatorSize">@dimen/glyph_20</item>
@@ -1239,9 +1331,27 @@
         <item name="android:indeterminate">true</item>
     </style>
 
-    <!-- The same arc drawn on a filled accent surface, e.g. inside a Primary button. -->
+    <!-- On a filled accent surface: inside a Primary button. -->
     <style name="Widget.Departament.Progress.Circular.Inline.OnAccent" parent="Widget.Departament.Progress.Circular.Inline">
         <item name="indicatorColor">?attr/colorOnPrimary</item>
+    </style>
+
+    <!-- On the neutral tonal fill: inside a Secondary button or a filled icon disc.
+         onSurface, the same tone the label is already using. -->
+    <style name="Widget.Departament.Progress.Circular.Inline.OnSurface" parent="Widget.Departament.Progress.Circular.Inline">
+        <item name="indicatorColor">?attr/colorOnSurface</item>
+    </style>
+
+    <!-- On the filled red: inside a Destructive button. -->
+    <style name="Widget.Departament.Progress.Circular.Inline.OnError" parent="Widget.Departament.Progress.Circular.Inline">
+        <item name="indicatorColor">?attr/colorOnError</item>
+    </style>
+
+    <!-- On no fill, for a destructive TEXT action: the 6.15:1 text red, not the
+         4.88:1 fill red (00-rules.md 3.5) — the arc replaces a label and has to
+         carry a label's contrast. -->
+    <style name="Widget.Departament.Progress.Circular.Inline.Destructive" parent="Widget.Departament.Progress.Circular.Inline">
+        <item name="indicatorColor">@color/color_destructive_text</item>
     </style>
 
     <!-- ========================================================================= -->
@@ -1266,12 +1376,23 @@
         call sites keep drawing a legal control boundary
         (@color/md_theme_outlineControl, 3.43:1) until they migrate to Secondary.
         Its stroke doubles as the focus ring, so R7 still holds.
+
+        It inherits Secondary and must therefore UNDO Secondary's bevel: with no fill
+        under it, that overlay would draw a modelled slab inside an outline and make
+        the shim look like a filled button, which is the opposite of what it is for.
+        It takes the quiet treatment instead — the accent press plate, nothing
+        painted at rest.
+
+        The cancel is an explicit transparent drawable, not @null: an attribute whose
+        value is @null is skipped by TypedArray, so View never calls setForeground()
+        and the inherited overlay would survive.
     -->
     <style name="Widget.App.Button.Outlined" parent="Widget.Departament.Button.Secondary">
-        <item name="backgroundTint">@android:color/transparent</item>
+        <item name="backgroundTint">@color/btn_quiet_container</item>
         <item name="strokeColor">@color/btn_outlined_stroke</item>
         <item name="android:textColor">@color/btn_tertiary_content</item>
         <item name="iconTint">@color/btn_tertiary_content</item>
+        <item name="android:foreground">@android:color/transparent</item>
     </style>
 
     <style name="Widget.App.Card" parent="Widget.Departament.Card" />

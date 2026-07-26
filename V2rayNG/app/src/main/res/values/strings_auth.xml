@@ -67,6 +67,8 @@
 
     <!-- ===================== errors (14-auth.md 13.1) ===================== -->
     <string name="auth_email_invalid">Введите корректный email, например name@example.com</string>
+    <!-- Field line, not a screen error: «Готово» on an empty password used to do nothing at all. -->
+    <string name="auth_password_required">Введите пароль</string>
     <string name="auth_err_credentials">Неверная почта или пароль. Проверьте и повторите.</string>
     <string name="auth_err_gone">Ссылка устарела. Начните вход заново.</string>
     <string name="auth_err_rate_limited">Слишком много попыток. Повторите через минуту.</string>
@@ -77,7 +79,10 @@
     <string name="auth_err_not_configured">Вход сейчас недоступен. Повторите попытку позже.</string>
     <string name="auth_err_generic">Что-то пошло не так. Повторите попытку.</string>
     <string name="auth_err_telegram_missing">Telegram не установлен. Войдите по почте.</string>
-    <string name="auth_err_browser_missing">Не нашли браузер, чтобы открыть сайт.</string>
+    <!-- The same failure during «Привязать Telegram», where «войдите по почте» would be nonsense:
+         that account is already signed in, and Telegram is the only thing this errand needs. -->
+    <string name="auth_err_link_telegram_missing">Telegram не установлен. Установите приложение и повторите привязку.</string>
+    <string name="auth_err_browser_missing">Не нашли браузер, чтобы открыть сайт. Зайдите на departament.site с другого устройства.</string>
 
     <!-- ===================== a11y ===================== -->
     <!-- R8: a loading control keeps its width, drops its label and announces

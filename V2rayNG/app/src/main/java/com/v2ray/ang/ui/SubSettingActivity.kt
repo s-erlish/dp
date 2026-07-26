@@ -10,7 +10,6 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.contracts.BaseAdapterListener
 import com.v2ray.ang.databinding.ActivitySubSettingBinding
@@ -18,7 +17,6 @@ import com.v2ray.ang.databinding.ItemQrcodeBinding
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.AngConfigManager
-import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.helper.SimpleItemTouchHelperCallback
 import com.v2ray.ang.ui.component.EmptyStateBinder
 import com.v2ray.ang.ui.component.RowBinder
@@ -33,7 +31,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * A-17 - the subscription group list. H3 header, R3 rhythm.
+ * A-17 - the subscription list. H3 header, R3 rhythm.
  *
  * Both of its actions were toolbar menu items on the ActionBar A-38 removes: «Добавить» is the
  * header's one trailing action and «Обновить все» is a visible row that reports its own progress.
@@ -42,6 +40,22 @@ import kotlinx.coroutines.withContext
  * The per-group overflow replaces the row's four competing targets. «Поделиться» used to open an
  * untranslated `setItems` list («QRcode» / «Export to clipboard»); the two options are named rows in
  * the shared sheet now, in Russian.
+ *
+ * **A2, «удалять почему-то я тоже не могу подписки на телефоне».** Deletion here was never broken -
+ * it was unreachable. This activity is declared in the manifest and was launched from nowhere: the
+ * settings tab had rows for auto-update, routing, assets and the provider settings, and no row for
+ * the list itself. The entry point is `settings_subs_list` on the Настройки tab
+ * (`SettingsTabFragment`), and it is what makes «Удалить подписку» tappable at all.
+ *
+ * Two things about the delete itself, both visible to the user:
+ *
+ *  - it **names what it will destroy** - the confirm carries the подписка's own name in the title -
+ *    and it always asks. The old branch asked only when `PREF_CONFIRM_REMOVE` was set, and nothing
+ *    in this app ever writes that key, so the branch was dead and the delete happened on the tap;
+ *  - it **says it happened**. `SettingsManager.removeSubscriptionWithDefault` recreates an empty
+ *    «Default» container when the last подписка goes, so the list is never empty; without a message
+ *    a user who deletes his only подписка sees a row where his подписка was and concludes nothing
+ *    was deleted. [SubSettingRecyclerAdapter] makes that container read as what it is.
  */
 class SubSettingActivity : BaseActivity() {
 
@@ -141,8 +155,10 @@ class SubSettingActivity : BaseActivity() {
         val entry = viewModel.getAll().getOrNull(position) ?: return
         val subItem = entry.subscription
         val hasUrl = subItem.url.isNotBlank()
+        // One name for this подписка across the row, this sheet and the delete confirmation.
+        val name = SubSettingRecyclerAdapter.displayName(this, subItem)
 
-        EditorActionsSheet(this, subItem.remarks)
+        EditorActionsSheet(this, name)
             .action(
                 labelRes = if (subItem.enabled) R.string.subs_action_disable else R.string.subs_action_enable,
                 glyph = R.drawable.ic_power_settings,
@@ -161,7 +177,7 @@ class SubSettingActivity : BaseActivity() {
                 toastSuccess(R.string.editor_copied)
             }
             .destructive(R.string.subs_action_delete) {
-                confirmRemove(subId)
+                confirmRemove(subId, name)
             }
             .show()
     }
@@ -176,20 +192,32 @@ class SubSettingActivity : BaseActivity() {
             .show()
     }
 
-    private fun confirmRemove(subId: String) {
-        if (MmkvManager.decodeSettingsBool(AppConfig.PREF_CONFIRM_REMOVE)) {
-            AlertDialog.Builder(this)
-                .setMessage(R.string.subs_delete_confirm)
-                .setPositiveButton(R.string.editor_delete) { _, _ ->
-                    viewModel.remove(subId)
-                    refreshData()
-                }
-                .setNegativeButton(R.string.editor_cancel, null)
-                .show()
-        } else {
-            viewModel.remove(subId)
-            refreshData()
-        }
+    /**
+     * Deleting a подписка, always confirmed, always naming the подписка in the title so the user
+     * knows which one is going. Cancelling changes nothing and reports nothing.
+     */
+    private fun confirmRemove(subId: String, name: String) {
+        val title = name.trim().ifEmpty { getString(R.string.subs_title) }
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(R.string.subs_delete_confirm)
+            .setPositiveButton(R.string.editor_delete) { _, _ -> remove(subId) }
+            .setNegativeButton(R.string.editor_cancel, null)
+            .show()
+    }
+
+    /**
+     * Removes the подписка and says so. The message matters: the store recreates an empty local
+     * container when the last подписка is deleted, so «the list still has a row» is not evidence
+     * that the delete failed - and this is exactly what the owner read as «удалять не могу».
+     */
+    private fun remove(subId: String) {
+        val removed = viewModel.remove(subId)
+        refreshData()
+        // Same wording the Главная card uses for the same act - one register, two surfaces.
+        // `removed == false` means the guid was already gone (a refresh landed between the tap and
+        // the confirm); the list has just been repainted without it, so there is nothing to report.
+        if (removed) toastSuccess(R.string.home_sub_deleted)
     }
 
     // -------------------------------------------------------------- states
@@ -220,7 +248,10 @@ class SubSettingActivity : BaseActivity() {
     private inner class ActivityAdapterListener : BaseAdapterListener {
         override fun onEdit(guid: String, position: Int) = openEditor(guid)
 
-        override fun onRemove(guid: String, position: Int) = confirmRemove(guid)
+        override fun onRemove(guid: String, position: Int) {
+            val item = viewModel.getAll().firstOrNull { it.guid == guid }?.subscription ?: return
+            confirmRemove(guid, SubSettingRecyclerAdapter.displayName(this@SubSettingActivity, item))
+        }
 
         override fun onShare(url: String) = showQrCode(url)
 

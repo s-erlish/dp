@@ -199,6 +199,21 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         _state.value = AuthUiState.Idle
     }
 
+    /**
+     * Abandons whatever is in flight and returns the machine to [AuthUiState.Idle] **without**
+     * raising a failure: the user navigated away, and a navigation is not an error. Used when the
+     * form is left while a submit is running — the answer to a request nobody is waiting for must
+     * not arrive on a surface that has moved on.
+     */
+    fun cancelPending() {
+        loginJob?.cancel()
+        loginJob = null
+        openedDeepLink = null
+        saved.remove<String>(KEY_TEMP_TOKEN)
+        _error.value = null
+        _state.value = AuthUiState.Idle
+    }
+
     /** Raises a failure the UI produced itself, e.g. no Telegram and no browser to fall back to. */
     fun failLocally(@StringRes message: Int, surface: Surface) {
         loginJob?.cancel()

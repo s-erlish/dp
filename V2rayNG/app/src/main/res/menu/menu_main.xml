@@ -1,20 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    The one menu behind the header "+" controls. Inflated into a PopupMenu by
-    MainActivity.showImportMenu(); MainActivity.prepareMenu() decides per surface which groups
-    are visible, so there are two menus in one resource:
+    «Добавить подписку» — the whole menu, and it is two items.
 
-      Главная "+"  ->  group_import only (adding a source is the only list action Главная owns)
-      Серверы "+"  ->  group_import + group_server_list (the whole-list actions of
-                       32-master-plan-android.md 12.3, hidden while the list is empty)
+    Inflated as a PopupMenu by MainActivity.showImportMenu(), anchored to Главная's add control.
+    The owner cut it to this on 2026-07-27: «Tapping "Добавить подписку" offers scan QR, clipboard,
+    enter link, create manually, import from file, send to TV. It must offer QR and clipboard, and
+    nothing else.» A customer of departament adds a подписка by scanning the bot's QR or by pasting
+    the link the bot sent — those are the two, and a menu of six made the two hard to find.
 
-    Both groups stay flat: tapping the control lists every action directly, no wrapper submenu.
+    Where the other four went:
+
+      «Отправить на телевизор»  -> Настройки · Устройства (SettingsTabFragment.rowTvSend). It was
+                                   already there; this entry was a duplicate.
+      «Ввести ссылку»           -> MainHost.showAdvancedAddMethods(), the power-user picker. The
+      «Создать вручную»            three still work, unchanged; only their entry point moved off
+      «Импортировать из файла»     the add menu, which is a subscription action, not a lab.
+
+    The `group_server_list` group that used to sit below — locate / sort / export / three bulk
+    deletes — is gone with the Серверы destination the owner removed on 2026-07-26. Its handlers
+    went with the tab, so every one of those items had become an id nothing dispatched.
+
     Item ids are consumed by MainActivity.onOptionsItemSelected.
 -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- ==================== Add a source ==================== -->
     <group android:id="@+id/group_import">
         <item
             android:id="@+id/import_qrcode"
@@ -25,63 +35,6 @@
             android:id="@+id/import_clipboard"
             android:icon="@drawable/ic_dl_copy"
             android:title="@string/menu_add_clipboard"
-            app:showAsAction="never" />
-        <item
-            android:id="@+id/import_manually_vless"
-            android:icon="@drawable/ic_edit_24dp"
-            android:title="@string/menu_actions_add_link"
-            app:showAsAction="never" />
-        <item
-            android:id="@+id/import_create"
-            android:icon="@drawable/ic_add_24dp"
-            android:title="@string/menu_actions_add_create"
-            app:showAsAction="never" />
-        <item
-            android:id="@+id/import_file"
-            android:icon="@drawable/ic_file_24dp"
-            android:title="@string/menu_actions_add_file"
-            app:showAsAction="never" />
-        <item
-            android:id="@+id/tv_send"
-            android:icon="@drawable/ic_tv_24dp"
-            android:title="@string/menu_add_tv_send"
-            app:showAsAction="never" />
-    </group>
-
-    <!-- ==================== Act on the whole list ==================== -->
-    <group android:id="@+id/group_server_list">
-        <!-- Carries the same check glyph the list paints on the selected row, so the item and
-             the thing it finds are visibly the same fact. prepareMenu() hides it when there is
-             no selected server left to find. -->
-        <item
-            android:id="@+id/servers_locate"
-            android:icon="@drawable/ic_action_done"
-            android:title="@string/menu_actions_locate"
-            app:showAsAction="never" />
-        <item
-            android:id="@+id/servers_sort"
-            android:icon="@drawable/ic_ps_sort"
-            android:title="@string/menu_actions_sort"
-            app:showAsAction="never" />
-        <item
-            android:id="@+id/servers_export"
-            android:icon="@drawable/ic_share_24dp"
-            android:title="@string/menu_actions_export"
-            app:showAsAction="never" />
-        <item
-            android:id="@+id/servers_del_duplicate"
-            android:icon="@drawable/ic_delete_24dp"
-            android:title="@string/menu_actions_del_duplicate"
-            app:showAsAction="never" />
-        <item
-            android:id="@+id/servers_del_invalid"
-            android:icon="@drawable/ic_delete_24dp"
-            android:title="@string/menu_actions_del_invalid"
-            app:showAsAction="never" />
-        <item
-            android:id="@+id/servers_del_all"
-            android:icon="@drawable/ic_delete_24dp"
-            android:title="@string/menu_actions_del_all"
             app:showAsAction="never" />
     </group>
 

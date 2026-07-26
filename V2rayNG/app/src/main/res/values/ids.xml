@@ -9,6 +9,11 @@
 <resources>
     <!-- R9, the double-press guard: the SystemClock.elapsedRealtime() of the last
          accepted click, stashed on the view itself so the input_debounce 500ms
-         re-entry window survives recycling and needs no per-screen state. -->
+         re-entry window survives recycling and needs no per-screen state.
+
+         Consumed by ui/component/SingleClick.kt — View.acceptClick() reads and writes
+         it, View.clearClick() nulls it. It was declared before that file existed and
+         spent a while as an id nothing read (D24); it is read now, and this note is
+         here so the next sweep does not re-file it as dead. -->
     <item name="tag_last_click" type="id" />
 </resources>

@@ -285,17 +285,29 @@ class SubEditActivity : BaseActivity() {
         field.requestFocus()
     }
 
+    /**
+     * Deleting from the form, always confirmed, with the подписка named in the title.
+     *
+     * It used to ask only when `PREF_CONFIRM_REMOVE` was set - a key nothing in this app writes, so
+     * the branch was dead and «Удалить подписку» destroyed the подписка and its servers on the first
+     * tap, with no way back. A destructive action names what it will destroy (00-rules.md 7.5).
+     */
     private fun confirmDelete() {
         if (editSubId.isEmpty()) return
-        if (MmkvManager.decodeSettingsBool(AppConfig.PREF_CONFIRM_REMOVE)) {
-            AlertDialog.Builder(this)
-                .setMessage(R.string.subs_delete_confirm)
-                .setPositiveButton(R.string.editor_delete) { _, _ -> removeSubscription() }
-                .setNegativeButton(R.string.editor_cancel, null)
-                .show()
-        } else {
-            removeSubscription()
-        }
+        // The STORED name, not the one being typed: what gets destroyed is the подписка as it is
+        // saved, and an unsaved rename in the field would name something that does not exist.
+        val stored = MmkvManager.decodeSubscription(editSubId)
+        val name = stored
+            ?.let { SubSettingRecyclerAdapter.displayName(this, it) }
+            ?.trim()
+            .orEmpty()
+            .ifEmpty { getString(R.string.subs_ed_title_edit) }
+        AlertDialog.Builder(this)
+            .setTitle(name)
+            .setMessage(R.string.subs_delete_confirm)
+            .setPositiveButton(R.string.editor_delete) { _, _ -> removeSubscription() }
+            .setNegativeButton(R.string.editor_cancel, null)
+            .show()
     }
 
     private fun removeSubscription() {
@@ -303,6 +315,7 @@ class SubEditActivity : BaseActivity() {
             withContext(Dispatchers.IO) {
                 SettingsManager.removeSubscriptionWithDefault(editSubId)
             }
+            toastSuccess(R.string.home_sub_deleted)
             SubPage.close(this@SubEditActivity)
         }
     }

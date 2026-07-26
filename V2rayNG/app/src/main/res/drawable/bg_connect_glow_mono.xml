@@ -1,9 +1,0 @@
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
-    <!-- Neutral grey halo, reads on both black and white mono backgrounds. -->
-    <gradient
-        android:type="radial"
-        android:gradientRadius="115dp"
-        android:startColor="#40808080"
-        android:centerColor="#1A808080"
-        android:endColor="#00808080" />
-</shape>

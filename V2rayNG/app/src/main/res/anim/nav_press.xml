@@ -6,8 +6,8 @@
      bans by name; one gesture may not have two numbers.
 
      Why this still scales at all, given R5's "rows do not scale". The consumers
-     are the four bottom-nav item containers in activity_main.xml (nav_home,
-     nav_servers, nav_settings, nav_account): each is a discrete tappable object
+     are the three bottom-nav item containers in activity_main.xml (nav_home,
+     nav_account, nav_settings): each is a discrete tappable object
      in a bar, not a slice of a surface - its background is @null, so there is no
      fill and no hairline above or below to tear. And 00-rules.md 0.4.8 forbids a
      ripple glow on the bottom navigation, so scale is the only press feedback
@@ -16,7 +16,7 @@
 
      This file is otherwise identical to @anim/press_scale and exists only so the
      nav keeps a named animator while its hand-rolled markup is replaced by the
-     M3 navigation bar (22-components.md 15). At that point delete it and its four
+     M3 navigation bar (22-components.md 15). At that point delete it and its three
      references together, not before. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_pressed="true">

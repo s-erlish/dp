@@ -5,9 +5,6 @@ import android.animation.ValueAnimator
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.text.SpannableString
-import android.text.Spanned
-import android.text.style.ForegroundColorSpan
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
@@ -18,10 +15,8 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.IdRes
-import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.core.graphics.drawable.DrawableCompat
-import androidx.core.view.MenuCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -50,7 +45,7 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SubscriptionUpdater
 import com.v2ray.ang.template.TemplateManager
-import com.v2ray.ang.tv.TvSendActivity
+import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.util.FlagUtil
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.Utils
@@ -63,19 +58,23 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * The four bottom-navigation destinations, in bar order.
+ * The three bottom-navigation destinations, in bar order: Главная · Аккаунт · Настройки.
+ *
+ * There is deliberately no Серверы destination. The owner decided on 2026-07-26 that both clients
+ * carry these three and no more (`docs/design2026/11-app-structure.md` 2.0), which overrules the
+ * four-destination set that document's 2.1 still describes, and the tab's own capabilities were NOT
+ * relocated anywhere — «функции из вкладки сервера не надо никуда пихать».
  *
  * This is the shared vocabulary between the shell and its tab fragments. [navId] is the bar item's
  * view id — the same value [MainActivity] persists across a theme/language recreate — and [tag] is
  * the `FragmentManager` tag the tab's fragment is added under, which is how a restored instance is
  * found again on recreate instead of being rebuilt from scratch.
  *
- * Every tab is a fragment in the one `tab_host` container now; `activity_main.xml` holds no tab
- * content of its own.
+ * Every tab is a fragment in the one `tab_host` container; `activity_main.xml` holds no tab content
+ * of its own.
  */
 enum class MainTab(@get:IdRes val navId: Int) {
     HOME(R.id.nav_home),
-    SERVERS(R.id.nav_servers),
     ACCOUNT(R.id.nav_account),
     SETTINGS(R.id.nav_settings),
     ;
@@ -94,7 +93,7 @@ enum class MainTab(@get:IdRes val navId: Int) {
  * What a tab fragment is allowed to ask of the shell.
  *
  * [MainActivity] keeps the window, the insets, the bottom bar, the tab switch, the selected server
- * and the import/whole-list actions; a tab owns its own content and reaches the shell only through
+ * and the import actions; a tab owns its own content and reaches the shell only through
  * this interface — never by casting to `MainActivity` and calling into its internals. Shared *state*
  * does not come through here: every tab reads the one `MainViewModel` scoped to the activity
  * (`BaseFragment.mainViewModel`).
@@ -148,31 +147,50 @@ interface MainHost {
 
     /**
      * The per-server row actions — select, edit, share, remove. ONE instance for every server list
-     * in the app, because a row must behave the same in the Серверы tab and in the Главная preview,
-     * which are two adapters over the same servers.
+     * in the app, so a row behaves identically wherever it is drawn.
+     *
+     * Главная's inline list is that list today: `HomeFragment.setupServerList` builds its
+     * `MainRecyclerAdapter` with exactly this listener. It stays an interface rather than a direct
+     * call into the activity so a second list can be plugged in without either screen learning the
+     * other's internals.
      */
     val serverActions: MainAdapterListener
 
-    /** Opens the server-actions sheet for one server (the row long-press entry point). */
+    /**
+     * Opens the server-actions sheet for one server — edit, share, QR, duplicate, make default,
+     * delete.
+     *
+     * Reached by a long press on a row of Главная's inline list
+     * (`HomeFragment.setupServerList` -> `onItemLongClick`). It is the ONLY route to edit, share,
+     * QR and delete for a single server, so it is not something a later change may quietly drop:
+     * removing the long press removes the whole per-server action set with it.
+     */
     fun showServerActions(guid: String)
 
     /**
-     * Opens the add-source popup anchored to [anchor]. [withListActions] adds the whole-list group
-     * (sort / export / the three bulk deletes) — only the Серверы header passes it.
+     * «Добавить подписку»: the add popup, anchored to [anchor]. **Two items — scan a QR code, or
+     * take the link from the clipboard — and nothing else.**
+     *
+     * The owner cut it to those two on 2026-07-27. A departament customer adds a подписка the way
+     * the bot hands it over, and the four other ways of getting a config into the app were burying
+     * the two that matter. See `menu_main.xml` for where each of the four went.
      */
-    fun showAddMenu(anchor: View, withListActions: Boolean)
+    fun showAddMenu(anchor: View)
+
+    /**
+     * The three add methods «Добавить подписку» no longer carries: a typed link, a hand-built
+     * server, a config file. Unchanged in behaviour — only their entry point left the add menu.
+     *
+     * **Nothing calls this yet**, exactly as [showServerActions] is kept with no caller: the owner
+     * removed them from the add menu and said where they belong next is his to say. They are one
+     * row away from a home — a «Другие способы добавления» row in the Настройки tab's ПОДПИСКА
+     * section calling this — and until that row exists the capability is preserved rather than
+     * deleted. Do not inline these back into the add menu.
+     */
+    fun showAdvancedAddMethods()
 
     /** «Обновить подписки»: re-fetches every subscription and reloads the list. */
     fun refreshSubscriptions()
-
-    /** «Проверить задержку» across the whole list, with the recovery actions for an empty one. */
-    fun startLatencyCheckAll()
-
-    /** Imports whatever the clipboard holds: a share link, a subscription URL or a raw config. */
-    fun importFromClipboard()
-
-    /** Opens the QR scanner and imports what it reads. */
-    fun importFromQrCode()
 
     /**
      * Opens a settings sub-screen and applies whatever it changed on the way back: a theme or
@@ -213,23 +231,6 @@ class MainActivity : HelperBaseActivity(), MainHost {
      */
     private val homeFragment: HomeFragment?
         get() = supportFragmentManager.findFragmentByTag(MainTab.HOME.tag) as? HomeFragment
-
-    /**
-     * The Серверы tab's fragment, or null until that tab has been opened for the first time — every
-     * tab but Главная is added lazily (see [syncTabFragments]).
-     */
-    private val serversFragment: ServersFragment?
-        get() = supportFragmentManager.findFragmentByTag(MainTab.SERVERS.tag) as? ServersFragment
-
-    /**
-     * The Серверы tab's adapter, or null while that tab has no view.
-     *
-     * The shell owns the selected server, because Главная renders the same servers from a second
-     * adapter and one selection has to reach both lists. This is the Серверы half of that mirror;
-     * the Главная half is reached through [HomeFragment.onSelectedServerChanged].
-     */
-    private val serversAdapter: MainRecyclerAdapter?
-        get() = serversFragment?.listAdapter
 
     /**
      * The one row-action listener shared by every server list (see [MainHost.serverActions]).
@@ -303,7 +304,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
         // or language change) instead of jumping back to Home. Handed to setupBottomNav so the
         // restored tab is the FIRST one painted: selecting Home and then correcting it would run
         // two fragment transactions and a tab swap the user never asked for.
-        setupBottomNav(savedInstanceState?.getInt(KEY_SELECTED_NAV, R.id.nav_home) ?: R.id.nav_home)
+        setupBottomNav(restoreSelectedNav(savedInstanceState))
         // The one BACK handler in the shell: any other tab goes to Главная first, and Главная
         // minimises. See onKeyDown for why nothing else may handle the key.
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -334,6 +335,21 @@ class MainActivity : HelperBaseActivity(), MainHost {
     }
 
     /**
+     * The tab to paint first: the one that was on screen before the recreate, or Главная.
+     *
+     * The stored value is validated against the destination set rather than trusted, because a
+     * saved selection can name a tab that no longer exists — the removed Серверы destination is
+     * exactly that case, and so is any id an older build wrote. An id with no tab behind it would
+     * otherwise reach [showTab], find no fragment to add and no group to show, and leave the shell
+     * on an empty container with nothing selected in the bar. Anything unrecognised falls back to
+     * Главная, which is also the only tab guaranteed to exist.
+     */
+    private fun restoreSelectedNav(savedInstanceState: Bundle?): Int {
+        val stored = savedInstanceState?.getInt(KEY_SELECTED_NAV, R.id.nav_home) ?: R.id.nav_home
+        return MainTab.fromNavId(stored)?.navId ?: R.id.nav_home
+    }
+
+    /**
      * Wires the bottom navigation and paints [initialNav] as the first tab on screen. Every tab is
      * a fragment in the shared container; Главная is attached here whichever tab is showing.
      */
@@ -341,12 +357,16 @@ class MainActivity : HelperBaseActivity(), MainHost {
         // The custom bar is a plain LinearLayout with no fitsSystemWindows behaviour, so it never
         // auto-pads itself; setupEdgeToEdge's parent listener is the single source of its bottom
         // inset padding. (A no-op listener returning the insets unchanged used to sit here.)
-        binding.navHome.setOnClickListener { selectNav(R.id.nav_home) }
-        binding.navServers.setOnClickListener { selectNav(R.id.nav_servers) }
-        binding.navSettings.setOnClickListener { selectNav(R.id.nav_settings) }
+
+        // onSingleClick, not setOnClickListener: the 500ms guard is what stops a hammered bar
+        // queueing three tab swaps in one frame (D03). Haptic.NONE here because showTab already
+        // ticks on a real change — a tab switch buzzes once, whether the bar or a fragment asked
+        // for it.
+        binding.navHome.onSingleClick { selectNav(R.id.nav_home) }
+        binding.navSettings.onSingleClick { selectNav(R.id.nav_settings) }
         // The Account item is a real in-place content tab (AccountFragment), selected like the
         // others; its fragment is attached lazily the first time it is opened (see syncTabFragments).
-        binding.navAccount.setOnClickListener { selectNav(R.id.nav_account) }
+        binding.navAccount.onSingleClick { selectNav(R.id.nav_account) }
         // Аккаунт exists only while signed in, so a restored selection of it is honoured only if
         // that is still true — otherwise the tab would be attached (and would start loading) for a
         // user refreshNavGates is about to move off it anyway.
@@ -365,12 +385,31 @@ class MainActivity : HelperBaseActivity(), MainHost {
     /** Currently selected bottom-nav tab (replaces BottomNavigationView.selectedItemId). */
     private var selectedNavId = R.id.nav_home
 
-    /** Selects a bottom-nav tab: repaints the custom bar and swaps the visible tab content. */
+    /**
+     * Selects a bottom-nav tab: swaps the visible tab content, then repaints the custom bar.
+     *
+     * **That order is the fix for D03, and it is the whole rule of this method: the content moves
+     * first and the highlight follows it, never the other way round.** The bar used to be
+     * repainted up front and the transaction attempted afterwards — and [syncTabFragments]
+     * legitimately refuses to commit once `onSaveInstanceState` has run, so a tap that arrived in
+     * that window moved the blue pill under one tab and left another tab's content on screen, with
+     * nothing to correct it. On Аккаунт that was terminal: the item hides itself the moment the
+     * session ends, so the app sat on a tab with no way back to it.
+     *
+     * A re-tap of the current tab is a no-op rather than a rebuild — there is nothing to swap, and
+     * a haptic with no consequence teaches the user the bar is unreliable.
+     */
     private fun selectNav(navId: Int) {
         val previous = selectedNavId
+        if (navId == previous) return
         selectedNavId = navId
+        if (!showTab(navId, previous)) {
+            // The content could not move, so the bar must not either. The activity is on its way
+            // to a recreate; it repaints the persisted tab from onCreate.
+            selectedNavId = previous
+            return
+        }
         updateNavSelection(previous)
-        showTab(navId, previous)
     }
 
     // ==================== MainHost ====================
@@ -410,19 +449,30 @@ class MainActivity : HelperBaseActivity(), MainHost {
     override val serverActions: MainAdapterListener
         get() = adapterListener
 
-    override fun showAddMenu(anchor: View, withListActions: Boolean) =
-        showImportMenu(anchor, withListActions)
+    override fun showAddMenu(anchor: View) = showImportMenu(anchor)
+
+    override fun showAdvancedAddMethods() {
+        val labels = arrayOf(
+            getString(R.string.menu_actions_add_link),
+            getString(R.string.menu_actions_add_create),
+            getString(R.string.menu_actions_add_file),
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.add_other_methods_title)
+            .setItems(labels) { dialog, which ->
+                dialog.dismiss()
+                when (which) {
+                    0 -> showManualEntryDialog()
+                    1 -> pickManualServerType()
+                    else -> importConfigLocal()
+                }
+            }
+            .setNegativeButton(R.string.menu_actions_cancel, null)
+            .show()
+    }
 
     override fun refreshSubscriptions() {
         importConfigViaSub()
-    }
-
-    override fun importFromClipboard() {
-        importClipboard()
-    }
-
-    override fun importFromQrCode() {
-        importQRcode()
     }
 
     override fun launchSettingsScreen(intent: Intent) {
@@ -457,10 +507,9 @@ class MainActivity : HelperBaseActivity(), MainHost {
         val inactive = themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
         val items = listOf(
             Triple(R.id.nav_home, binding.navHomeIcon, binding.navHomeLabel),
-            Triple(R.id.nav_servers, binding.navServersIcon, binding.navServersLabel),
-            Triple(R.id.nav_settings, binding.navSettingsIcon, binding.navSettingsLabel),
             // The Account tab tints blue when selected, exactly like the other tabs.
             Triple(R.id.nav_account, binding.navAccountIcon, binding.navAccountLabel),
+            Triple(R.id.nav_settings, binding.navSettingsIcon, binding.navSettingsLabel),
         )
         val animate = animationsEnabled() && previousNavId != selectedNavId
         items.forEach { (id, icon, label) ->
@@ -487,9 +536,8 @@ class MainActivity : HelperBaseActivity(), MainHost {
     /** The active-tab indicator pill under a nav item (null for an unknown id). */
     private fun navDot(navId: Int): View? = when (navId) {
         R.id.nav_home -> binding.navHomeDot
-        R.id.nav_servers -> binding.navServersDot
-        R.id.nav_settings -> binding.navSettingsDot
         R.id.nav_account -> binding.navAccountDot
+        R.id.nav_settings -> binding.navSettingsDot
         else -> null
     }
 
@@ -539,7 +587,6 @@ class MainActivity : HelperBaseActivity(), MainHost {
     private fun createTabFragment(tab: MainTab): Fragment = when (tab) {
         MainTab.HOME -> HomeFragment()
         MainTab.ACCOUNT -> AccountFragment()
-        MainTab.SERVERS -> ServersFragment()
         MainTab.SETTINGS -> SettingsTabFragment()
     }
 
@@ -563,12 +610,15 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * On a theme/language recreate the FragmentManager restores each tab's fragment (and its
      * hidden flag) under the same tag before this runs, so the lookup finds the restored instance
      * and [createTabFragment] is never called for it.
+     *
+     * @return whether the container now shows [navId]. False means the transaction was refused and
+     *   the caller must not paint the bar as if it had happened — see [selectNav].
      */
-    private fun syncTabFragments(navId: Int) {
+    private fun syncTabFragments(navId: Int): Boolean {
         val fm = supportFragmentManager
         // After onSaveInstanceState a commit is illegal; the restored activity will re-run this
         // from its own onCreate, so there is nothing to lose by skipping it.
-        if (fm.isStateSaved) return
+        if (fm.isStateSaved) return false
         val tx = fm.beginTransaction()
         var changed = false
         for (candidate in MainTab.values()) {
@@ -597,17 +647,16 @@ class MainActivity : HelperBaseActivity(), MainHost {
         // commitNow, not commit: the tab swap below reads the container in this same frame, and a
         // posted transaction would show it empty for one frame first.
         if (changed) tx.commitNow()
+        return true
     }
 
     /**
-     * The tab-content view for a nav id (null for an unknown id). All four tabs are fragments in
+     * The tab-content view for a nav id (null for an unknown id). All three tabs are fragments in
      * the one container, so this answers the same view for each — it stays a lookup because
      * [showTab] must still tell a real tab id from an unknown one.
      */
-    private fun tabGroup(navId: Int): View? = when (navId) {
-        R.id.nav_home, R.id.nav_servers, R.id.nav_settings, R.id.nav_account -> binding.tabHost
-        else -> null
-    }
+    private fun tabGroup(navId: Int): View? =
+        if (MainTab.fromNavId(navId) != null) binding.tabHost else null
 
     /** Every tab-content view the shell can show, so exactly one is left visible. */
     private fun tabGroups(): List<View> = listOf(binding.tabHost)
@@ -624,28 +673,21 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * Swaps the tab content: the incoming tab's fragment is added or shown and every other one is
      * hidden, in a single transaction.
      *
-     * There is no crossfade left to run. With all four tabs inside `tab_host` the outgoing and
+     * There is no crossfade left to run. With all three tabs inside `tab_host` the outgoing and
      * incoming views are the same container, so the old group-level fade had nothing to fade
      * between; the pair of fragments inside it can be crossfaded instead, but that is a motion
      * change and belongs to the stage that owns motion (32-master-plan-android.md 9.3 asks for a
      * simultaneous 220 ms crossfade for every tab switch). The tick haptic that marked a switch is
      * kept, so the change is still felt.
+     *
+     * @return false when the transaction could not be committed, in which case nothing on screen
+     *   moved and neither did the haptic — [selectNav] rolls the selection back.
      */
-    private fun showTab(tab: Int, previous: Int = tab) {
-        val incoming = tabGroup(tab)
-        syncTabFragments(tab)
-        settleTabs(incoming)
+    private fun showTab(tab: Int, previous: Int = tab): Boolean {
+        if (!syncTabFragments(tab)) return false
+        settleTabs(tabGroup(tab))
         if (previous != tab) binding.bottomNav.tickHaptic()
-        maybeRevealServersTab(tab)
-    }
-
-    /**
-     * First time the Servers tab is shown with rows, plays the reveal stagger (once only). The
-     * once-only flag and the stagger itself live with the list, in [ServersFragment]; this is only
-     * the moment the tab comes on screen, which the shell is the one to know.
-     */
-    private fun maybeRevealServersTab(tab: Int) {
-        if (tab == R.id.nav_servers) serversFragment?.maybeRevealList()
+        return true
     }
 
     /**
@@ -681,22 +723,20 @@ class MainActivity : HelperBaseActivity(), MainHost {
             // because a fragment was added, and a fragment added later reads the field itself.
             navListPadding = navPad
             homeFragment?.applyListInsets()
-            serversFragment?.applyListInsets()
             insets
         }
     }
 
     /**
      * The shell's own ViewModel wiring: the service broadcast listener, the bundled assets, and the
-     * one list signal that has to reach TWO tabs. Everything a single tab cares about — the speed
-     * feed, the tunnel state, the latency results — is observed by that tab.
+     * list signal that reaches Главная. Everything a single tab cares about — the speed feed, the
+     * tunnel state, the latency results — is observed by that tab.
      */
     private fun setupViewModel() {
         mainViewModel.updateListAction.observe(this) { index ->
             val position = index ?: -1
-            // Both server lists are driven by the one cache; each tab rebinds its own, and a tab
-            // that has no view yet paints itself from the same cache when it gets one.
-            serversFragment?.bindList(position)
+            // Главная reads the one cache; a tab that has no view yet paints itself from the same
+            // cache when it gets one.
             homeFragment?.bindList(position)
             // Adding or removing a subscription can change whether there is anything to navigate
             // to, and (with a departament subscription) whether the Аккаунт item belongs there.
@@ -707,9 +747,11 @@ class MainActivity : HelperBaseActivity(), MainHost {
     }
 
     /**
-     * Opens the Incy server-actions bottom sheet for [guid] (long-press entry point).
+     * Opens the Incy server-actions bottom sheet for [guid].
      * Each action delegates to an existing per-server flow; duplicate reuses
      * [MmkvManager.encodeServerConfig] with a blank guid to mint a fresh copy.
+     *
+     * Nothing calls this today — see [MainHost.showServerActions] for why it is kept whole.
      */
     override fun showServerActions(guid: String) {
         val profile = MmkvManager.decodeServerConfig(guid) ?: return
@@ -728,69 +770,44 @@ class MainActivity : HelperBaseActivity(), MainHost {
                 mainViewModel.reloadServerList()
             },
             onSetDefault = { setSelectServer(guid) },
-            onDelete = { removeServer(guid, serversAdapter?.positionOfGuid(guid) ?: -1) },
+            // -1: no list is on screen to drop a row from, so the removal is store-only.
+            onDelete = { removeServer(guid, -1) },
         ).show()
     }
 
     /**
-     * Popup for the header controls, anchored to the tapped button.
+     * The «Добавить подписку» popup, anchored to the tapped control: scan a QR code, or take the
+     * link from the clipboard. Two items — see `menu_main.xml` for the owner's cut and for where
+     * the four that used to sit under them went.
      *
-     * [withListActions] adds the whole-list group (sort / export / the three bulk deletes). Only
-     * the Servers tab passes it: Главная owns adding a source, not managing the list.
+     * No group divider is set any more: there is one group, and a divider above the first item of
+     * the only group is a rule drawn under nothing.
      */
-    private fun showImportMenu(anchor: android.view.View, withListActions: Boolean = false) {
+    private fun showImportMenu(anchor: android.view.View) {
         val popup = androidx.appcompat.widget.PopupMenu(this, anchor)
         popup.menuInflater.inflate(R.menu.menu_main, popup.menu)
         // Icons in a PopupMenu are hidden unless forced, and the drawables ship in mixed
-        // black/white fills, so each visible item is tinted from the theme below.
+        // black/white fills, so each item is tinted from the theme below.
         popup.setForceShowIcon(true)
-        MenuCompat.setGroupDividerEnabled(popup.menu, true)
-        prepareMenu(popup.menu, withListActions)
+        prepareMenu(popup.menu)
         popup.setOnMenuItemClickListener { onOptionsItemSelected(it) }
         popup.show()
     }
 
     /**
-     * Decides what the popup may offer, so no item in it can be a dead end:
-     *
-     * - the whole-list group is hidden entirely when there is nothing to act on (no servers) or
-     *   when the surface does not own list actions;
-     * - «Экспортировать в буфер» is disabled when every server is operator-locked, because
-     *   `AngConfigManager.shareConfig()` refuses to emit a link for those by design;
-     * - «Найти выбранный сервер» is hidden unless a selected server actually exists in the store,
-     *   because with none the item could only ever announce its own uselessness;
-     * - the three deletions are painted in `colorError` (1.4.1: red is destructive only) and sit
-     *   behind the group divider, so the destructive half of the menu is legible before a tap.
+     * Tints the popup's glyphs from the theme. Nothing is conditionally hidden: every item in the
+     * menu resource has a live handler in [onOptionsItemSelected], which is the property that
+     * replaced the old "hide the group whose handlers are gone" pass.
      */
-    private fun prepareMenu(menu: Menu, withListActions: Boolean) {
+    private fun prepareMenu(menu: Menu) {
         val neutral = themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
-        val destructive = themeColor(androidx.appcompat.R.attr.colorError)
-
-        val hasServers = mainViewModel.serversCache.isNotEmpty()
-        menu.setGroupVisible(R.id.group_server_list, withListActions && hasServers)
-
-        val exportable = mainViewModel.serversCache.any { !TemplateManager.isLocked(it.profile) }
-        menu.findItem(R.id.servers_export)?.isEnabled = exportable
-
-        // Read the store, not `serversCache`: the cache is narrowed by the search field, and a
-        // selection the search happens to hide is exactly the case «Найти выбранный сервер» is
-        // for. Runs after setGroupVisible, which writes every item in the group.
-        val selectedGuid = MmkvManager.getSelectServer()
-        val hasSelection = !selectedGuid.isNullOrEmpty() && MmkvManager.decodeServerConfig(selectedGuid) != null
-        menu.findItem(R.id.servers_locate)?.isVisible = withListActions && hasServers && hasSelection
-
         for (i in 0 until menu.size()) {
-            val item = menu.getItem(i)
-            if (!item.isVisible) continue
-            val isDestructive = item.itemId == R.id.servers_del_duplicate ||
-                item.itemId == R.id.servers_del_invalid ||
-                item.itemId == R.id.servers_del_all
-            paintMenuItem(item, if (isDestructive) destructive else neutral, tintTitle = isDestructive)
+            paintMenuItem(menu.getItem(i), neutral)
         }
     }
 
-    /** Tints one menu item's glyph (and its label, for destructive items) from the theme. */
-    private fun paintMenuItem(item: MenuItem, color: Int, tintTitle: Boolean) {
+    /** Tints one menu item's glyph from the theme. */
+    private fun paintMenuItem(item: MenuItem, color: Int) {
         item.icon?.let { icon ->
             val glyph = icon.mutate()
             DrawableCompat.setTint(glyph, color)
@@ -798,11 +815,6 @@ class MainActivity : HelperBaseActivity(), MainHost {
             // menu itself, the glyph is not.
             glyph.alpha = if (item.isEnabled) 255 else 97
             item.icon = glyph
-        }
-        if (tintTitle) {
-            val label = SpannableString(item.title ?: "")
-            label.setSpan(ForegroundColorSpan(color), 0, label.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            item.title = label
         }
     }
 
@@ -813,17 +825,28 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * in a FrameLayout (it never reserved layout space), so hiding it leaves no phantom bottom gap.
      * When it reappears we guarantee a valid selected tab (the Account tab is only valid while
      * signed in; otherwise fall back to Home).
+     *
+     * **The count is the STORED one, never `serversCache`** (D15). `serversCache` is a *view*: it
+     * is rebuilt by `MainViewModel.updateCache()` through `subscriptionId` and `keywordFilter`, so
+     * a filter that matches nothing empties it while the user's servers are all still there. Gated
+     * on that, typing in a server search took the whole bottom navigation off screen and threw the
+     * app back to onboarding — a filtered-to-zero list and an empty store are not the same fact,
+     * and only one of them is a reason to hide the app's navigation.
+     * [MmkvManager.decodeAllServerList] is the unfiltered truth; the cache stays a list's own
+     * business. There is no search on screen today, which is precisely why this must be written
+     * down now: the next one to add a filter must not be able to reintroduce the defect.
      */
     private fun updateBottomNavVisibility() {
-        val show = AccountSession.isLoggedIn() || mainViewModel.serversCache.isNotEmpty()
+        val show = AccountSession.isLoggedIn() || MmkvManager.decodeAllServerList().isNotEmpty()
         val becomingVisible = show && !binding.bottomNav.isVisible
         binding.bottomNav.isVisible = show
         binding.bottomNavScrim.isVisible = show
         if (becomingVisible) {
-            val valid = selectedNavId == R.id.nav_home ||
-                selectedNavId == R.id.nav_servers ||
-                selectedNavId == R.id.nav_settings ||
-                (selectedNavId == R.id.nav_account && accountAccessAllowed())
+            val valid = when (MainTab.fromNavId(selectedNavId)) {
+                MainTab.HOME, MainTab.SETTINGS -> true
+                MainTab.ACCOUNT -> accountAccessAllowed()
+                null -> false
+            }
             if (!valid) selectTabWhenIdle(R.id.nav_home)
         }
     }
@@ -843,14 +866,42 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * (`HomeFragment.applyAccountHeaderGate`); the bar itself is the shell's.
      */
     private fun updateAccountNav() {
-        if (!BackendConfig.isConfigured()) {
-            binding.navAccount.isVisible = false
-            return
+        val available = BackendConfig.isConfigured() && accountAccessAllowed()
+        binding.navAccount.isVisible = available
+        // Hiding the item is not enough: the tab BEHIND it has to go too — see dropAccountTab.
+        if (!available) dropAccountTab()
+    }
+
+    /**
+     * Takes the Аккаунт tab off screen and out of the FragmentManager when the session ends (D12).
+     *
+     * Hiding the bar item used to be the whole of it, and a hidden fragment is not a stopped one:
+     * tabs are `hide`/`show`n, never replaced, so [AccountFragment] stayed added and RESUMED after
+     * a sign-out, with every `repeatOnLifecycle(STARTED)` collector in it still running against a
+     * session that no longer exists. Removing it is what makes «выйти» mean it — the next sign-in
+     * gets a fresh instance from [syncTabFragments], loading from a clean state rather than from
+     * the previous user's rendered screen.
+     *
+     * Posted, not inline, for the same reason [selectTabWhenIdle] is: the account state arrives on
+     * a fragment's own collector, inside the FragmentManager's dispatch, where a second commit
+     * throws. Every precondition is re-read inside the runnable, so a sign-in that lands in that
+     * one frame cancels the removal instead of racing it.
+     */
+    private fun dropAccountTab() {
+        val attached = supportFragmentManager.findFragmentByTag(MainTab.ACCOUNT.tag) != null
+        if (!attached && selectedNavId != R.id.nav_account) return
+        binding.bottomNav.post {
+            if (isFinishing || isDestroyed) return@post
+            // Signed back in within the frame: the tab is legitimate again, leave it alone.
+            if (accountAccessAllowed()) return@post
+            val fm = supportFragmentManager
+            if (fm.isStateSaved) return@post
+            // Off the tab first — removing the fragment the user is looking at would empty the
+            // container under them.
+            if (selectedNavId == R.id.nav_account) selectNav(R.id.nav_home)
+            val fragment = fm.findFragmentByTag(MainTab.ACCOUNT.tag) ?: return@post
+            fm.beginTransaction().remove(fragment).commitNow()
         }
-        val loggedIn = AccountSession.isLoggedIn()
-        binding.navAccount.isVisible = loggedIn
-        // Signed out while on the Account tab: the tab is hidden, so fall back to Home.
-        if (!loggedIn && selectedNavId == R.id.nav_account) selectTabWhenIdle(R.id.nav_home)
     }
 
     /**
@@ -946,9 +997,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
 
     private fun removeServerSub(guid: String, position: Int) {
         mainViewModel.removeServer(guid)
-        serversAdapter?.removeServerSub(guid, position)
         homeFragment?.removeServerRow(guid, position)
-        serversFragment?.refreshChrome()
     }
 
     /**
@@ -957,15 +1006,18 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * Connecting is the connect button's job alone. When a tunnel is already up and the user picks a
      * different server, the running tunnel is left untouched and an explicit "apply it" action is
      * offered instead, so a tap in the list can never silently tear down a working connection.
+     *
+     * The shell still owns the write, and still fans it out, because more than one surface reads the
+     * selected server: Главная's under-shield label today, and whatever list is plugged into
+     * [serverActions] next. A list that is on screen mirrors the change through
+     * [MainRecyclerAdapter.setSelectServer]; there is none right now, so only Главная is told.
      */
     private fun setSelectServer(guid: String) {
         val selected = MmkvManager.getSelectServer()
         if (guid == selected) return
 
         MmkvManager.setSelectServer(guid)
-        serversAdapter?.setSelectServer(selected, guid)
-        // The Главная half of the same mirror: its list row, its under-shield label and the
-        // subscription card its carousel is showing.
+        // The Главная half of the same mirror: its under-shield label and the subscription card.
         homeFragment?.onSelectedServerChanged(selected, guid)
         if (mainViewModel.isRunning.value == true) {
             promptApplySelectedServer(guid)
@@ -1040,25 +1092,32 @@ class MainActivity : HelperBaseActivity(), MainHost {
 
     override fun onResume() {
         super.onResume()
-        // Other entry points change the selected server without owning this list — the URL-scheme
-        // and shortcut activities, and the quick tile. Re-reading it here keeps the rows honest
-        // instead of leaving a stale one painted as selected. (Главная re-reads its own list, and
-        // its account chip, in HomeFragment.onResume — a hidden tab is still RESUMED, so every tab
-        // refreshes itself without the shell reaching into it.)
-        serversAdapter?.syncSelection()
+        // Главная re-reads the selected server, and its account chip, in HomeFragment.onResume — a
+        // hidden tab is still RESUMED, so every tab refreshes itself without the shell reaching
+        // into it. (Other entry points change the selection without owning a list: the URL-scheme
+        // and shortcut activities, and the quick tile.)
+        //
         // A login or a subscription change from another screen can add or remove the Аккаунт item
         // and, in the onboarding state, the bar itself.
         refreshNavGates()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        // No toolbar action menu: the shell has no app bar at all, so the tab header controls own
-        // the menu. Both open menu_main as a PopupMenu via showImportMenu (Главная: the add group
-        // only; Серверы: add + whole-list actions), and the Settings tab has no control at all.
-        // onOptionsItemSelected is the shared dispatch for those PopupMenus, so it stays.
+        // No toolbar action menu: the shell has no app bar at all, so the tab's own control owns the
+        // menu. Главная opens menu_main as a PopupMenu via showImportMenu; the Settings tab has no
+        // control at all. onOptionsItemSelected is the dispatch for that PopupMenu, so it stays.
         return false
     }
 
+    /**
+     * Dispatch for the «Добавить подписку» popup, which is the only menu the shell inflates.
+     *
+     * Two branches, because the menu has two items. The «Ввести ссылку» / «Создать вручную» /
+     * «Импортировать из файла» branches that used to sit here moved to
+     * [showAdvancedAddMethods] — the actions are unchanged, they are simply no longer reached
+     * through a menu id — and «Отправить на телевизор» kept only its live entry point, the
+     * Настройки · Устройства row.
+     */
     override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
         R.id.import_qrcode -> {
             importQRcode()
@@ -1067,65 +1126,6 @@ class MainActivity : HelperBaseActivity(), MainHost {
 
         R.id.import_clipboard -> {
             importClipboard()
-            true
-        }
-
-        R.id.tv_send -> {
-            startActivity(Intent(this, TvSendActivity::class.java))
-            true
-        }
-
-        R.id.import_manually_vless -> {
-            // «Ввести ссылку» - a simple text-input dialog where the user pastes/types a config
-            // or subscription link by hand; the entered text is imported via the same path as
-            // pasted clipboard text (importBatchConfig).
-            showManualEntryDialog()
-            true
-        }
-
-        R.id.import_create -> {
-            // «Создать вручную» - pick the protocol, then fill in the server by hand.
-            pickManualServerType()
-            true
-        }
-
-        R.id.import_file -> {
-            importConfigLocal()
-            true
-        }
-
-        R.id.servers_locate -> {
-            locateSelectedServer()
-            true
-        }
-
-        R.id.servers_sort -> {
-            sortByTestResults()
-            true
-        }
-
-        R.id.servers_export -> {
-            exportAll()
-            true
-        }
-
-        R.id.servers_del_duplicate -> {
-            delDuplicateConfig()
-            true
-        }
-
-        R.id.servers_del_invalid -> {
-            delInvalidConfig()
-            true
-        }
-
-        R.id.servers_del_all -> {
-            delAllConfig()
-            true
-        }
-
-        R.id.sub_update -> {
-            importConfigViaSub()
             true
         }
 
@@ -1195,15 +1195,19 @@ class MainActivity : HelperBaseActivity(), MainHost {
     }
 
     /**
-     * "Ввести вручную": a plain text-input dialog for pasting/typing a config or subscription
-     * link by hand. The entered string is fed into the same import path as pasted clipboard text.
+     * «Ввести ссылку»: a plain text-input dialog for pasting/typing a config or subscription link
+     * by hand. The entered string is fed into the same import path as pasted clipboard text.
+     *
+     * Reached from [showAdvancedAddMethods], no longer from the add menu.
      */
     private fun showManualEntryDialog() {
         val input = EditText(this).apply {
             hint = getString(R.string.manual_entry_hint)
         }
         val dialog = AlertDialog.Builder(this)
-            .setTitle(R.string.menu_add_manual)
+            // The same wording the picker row carries. It used to read «Ввести вручную» while the
+            // row that opened it read «Ввести ссылку» — one concept, two names.
+            .setTitle(R.string.menu_actions_add_link)
             .setView(input)
             .setPositiveButton(android.R.string.ok, null)
             .setNegativeButton(android.R.string.cancel, null)
@@ -1215,10 +1219,9 @@ class MainActivity : HelperBaseActivity(), MainHost {
                 val text = input.text.toString().trim()
                 when {
                     text.isEmpty() ->
-                        input.error = "Вставьте ссылку подписки или конфигурацию сервера"
+                        input.error = getString(R.string.import_link_required)
                     !looksImportable(text) ->
-                        input.error = "Не похоже на ссылку или конфигурацию. " +
-                                "Пример: https://departament.example/sub или vless://…"
+                        input.error = getString(R.string.import_link_invalid)
                     else -> {
                         dialog.dismiss()
                         importBatchConfig(text)
@@ -1300,9 +1303,9 @@ class MainActivity : HelperBaseActivity(), MainHost {
             result.countSub > 0 -> {
                 val loaded = result.subFetch?.configCount ?: 0
                 if (loaded > 0) {
-                    toastSuccess("Серверы добавлены: $loaded")
+                    toastSuccess(getString(R.string.import_servers_added, loaded))
                 } else {
-                    toastError("Не удалось загрузить серверы подписки")
+                    toastError(getString(R.string.import_sub_empty))
                 }
                 mainViewModel.reloadServerList()
             }
@@ -1312,9 +1315,9 @@ class MainActivity : HelperBaseActivity(), MainHost {
                 mainViewModel.reloadServerList()
             }
             // The subscription link is valid but was already added.
-            result.subDuplicate -> toast("Подписка уже добавлена")
+            result.subDuplicate -> toast(getString(R.string.import_sub_duplicate))
             // The subscription link is not from departament.
-            result.subRejected -> toast("Эта ссылка не от departament. Используйте подписку из нашего бота.")
+            result.subRejected -> toast(getString(R.string.import_sub_foreign))
             else -> toastError(R.string.toast_failure)
         }
     }
@@ -1365,306 +1368,15 @@ class MainActivity : HelperBaseActivity(), MainHost {
     }
 
     /**
-     * «Экспортировать в буфер»: every shareable server as one newline-separated list of links.
-     *
-     * `AngConfigManager.shareConfig()` returns nothing for an operator-locked profile and for the
-     * complex types (custom json, group, chain), so a partial result is normal and the count is
-     * what the user is told. The menu item is already disabled when nothing at all is shareable.
+     * The one feedback surface for the shell's own outcomes: a themed Snackbar, never a Toast
+     * (00-rules.md 1.4.8). 3s, which is the no-action duration of 22-components.md 14. Anchored
+     * above the bottom navigation only while it is actually visible - in the signed-out empty state
+     * it is gone, and anchoring to a hidden view would park the bar in the wrong place.
      */
-    private fun exportAll() {
-        showLoading()
-        lifecycleScope.launch(Dispatchers.IO) {
-            val ret = mainViewModel.exportAllServer()
-            withContext(Dispatchers.Main) {
-                hideLoading()
-                if (ret > 0) {
-                    showActionSnackbar(getString(R.string.menu_actions_export_done, ret))
-                } else {
-                    showActionSnackbar(getString(R.string.menu_actions_export_failed))
-                }
-            }
-        }
-    }
-
-    /**
-     * «Удалить все серверы»: the one bulk deletion that keeps a dialog.
-     *
-     * 00-rules.md 7.5 allows a confirmation only for the genuinely irreversible, and this is it:
-     * `MmkvManager.removeAllServer()` clears the whole profile store, the per-provider indexes and
-     * the selected-server key in one `clearAll()`, so there is no per-item removal left to reverse.
-     * Provider servers come back with «Обновить подписки»; hand-added ones do not come back at all,
-     * which is what the dialog body says.
-     */
-    private fun delAllConfig() {
-        if (!bulkDeleteAllowed()) return
-        val dialog = AlertDialog.Builder(this)
-            .setTitle(R.string.menu_actions_del_all)
-            .setMessage(R.string.menu_actions_del_all_body)
-            .setPositiveButton(R.string.menu_actions_del_all_confirm) { _, _ ->
-                showLoading()
-                lifecycleScope.launch(Dispatchers.IO) {
-                    // MmkvManager.removeAllServer() wipes the whole MAIN store, which also holds
-                    // the WebDAV backup config - collateral the label does not promise. Carry it
-                    // across. (The subscription id list rebuilds itself from the SUB store on the
-                    // next read, so providers survive.)
-                    val webDav = MmkvManager.decodeWebDavConfig()
-                    // What the user is told is what the user could see. The store-level count can
-                    // be larger (it counts every profile key, including any orphan not listed
-                    // under a provider), and a receipt that overstates the deletion is a lie.
-                    val listed = mainViewModel.serversCache.size
-                    val wiped = mainViewModel.removeAllServer()
-                    webDav?.let { MmkvManager.encodeWebDavConfig(it) }
-                    LogUtil.i(AppConfig.TAG, "delAllConfig: $listed listed servers, $wiped profile entries wiped")
-                    withContext(Dispatchers.Main) {
-                        mainViewModel.reloadServerList()
-                        homeFragment?.refreshSelectedServer()
-                        hideLoading()
-                        showActionSnackbar(getString(R.string.menu_actions_all_deleted, listed))
-                    }
-                }
-            }
-            .setNegativeButton(R.string.menu_actions_cancel, null)
-            .create()
-        // 7.5: the confirm is the red button on the right, cancel stays neutral on the left.
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                ?.setTextColor(themeColor(androidx.appcompat.R.attr.colorError))
-        }
-        dialog.show()
-    }
-
-    /**
-     * «Удалить дубликаты»: removes immediately and offers undo, per 00-rules.md 7.5 - a duplicate
-     * is a copy of a server that is still in the list, so nothing unique is at stake.
-     */
-    private fun delDuplicateConfig() {
-        if (!bulkDeleteAllowed()) return
-        runBulkDelete(
-            remove = { mainViewModel.removeDuplicateServer() },
-            successText = R.string.menu_actions_duplicates_deleted,
-            emptyResult = { showActionSnackbar(getString(R.string.menu_actions_duplicates_none)) },
-        )
-    }
-
-    /**
-     * «Удалить недоступные»: removes the servers whose last latency check failed, with undo.
-     *
-     * "Invalid" means a stored delay below zero, so with no check ever run there is nothing to
-     * remove and the old dialog's «Выполните проверку перед удалением» was the only hint. Instead
-     * of a warning before the fact, the empty outcome now says why and offers the check itself.
-     */
-    private fun delInvalidConfig() {
-        if (!bulkDeleteAllowed()) return
-        runBulkDelete(
-            remove = { mainViewModel.removeInvalidServer() },
-            successText = R.string.menu_actions_invalid_deleted,
-            emptyResult = {
-                showActionSnackbar(
-                    getString(R.string.menu_actions_invalid_none),
-                    getString(R.string.menu_actions_check),
-                ) { startLatencyCheckAll() }
-            },
-        )
-    }
-
-    /**
-     * Shared body of the two undoable bulk deletions: snapshot, delete, report the count with an
-     * «Отменить» action that puts the removed servers back exactly where they were.
-     */
-    private fun runBulkDelete(
-        remove: () -> Int,
-        @StringRes successText: Int,
-        emptyResult: () -> Unit,
-    ) {
-        showLoading()
-        lifecycleScope.launch(Dispatchers.IO) {
-            val snapshot = snapshotServers()
-            val ret = remove()
-            withContext(Dispatchers.Main) {
-                mainViewModel.reloadServerList()
-                homeFragment?.refreshSelectedServer()
-                hideLoading()
-                if (ret > 0) {
-                    showActionSnackbar(
-                        getString(successText, ret),
-                        getString(R.string.menu_actions_undo),
-                    ) { undoBulkDelete(snapshot) }
-                } else {
-                    emptyResult()
-                }
-            }
-        }
-    }
-
-    /** Everything needed to put a bulk-deleted set of servers back, taken before the deletion. */
-    private class ServersSnapshot(
-        val profiles: Map<String, ProfileItem>,
-        val delays: Map<String, Long>,
-        val order: Map<String, List<String>>,
-        val selected: String?,
-    )
-
-    /**
-     * Reads the current servers into memory: the profile behind each guid, its measured latency,
-     * the per-provider order and the selected guid. Raw xray-json bodies are not captured because
-     * `MmkvManager.removeServer()` leaves the raw store untouched.
-     *
-     * Call from a background dispatcher: this is one json parse per server.
-     */
-    private fun snapshotServers(): ServersSnapshot {
-        val profiles = LinkedHashMap<String, ProfileItem>()
-        val delays = HashMap<String, Long>()
-        // Copied first: the cache itself is rebuilt on the main thread, and this runs on IO.
-        mainViewModel.serversCache.toList().forEach { cached ->
-            MmkvManager.decodeServerConfig(cached.guid)?.let { profiles[cached.guid] = it }
-            MmkvManager.decodeServerAffiliationInfo(cached.guid)?.let {
-                delays[cached.guid] = it.testDelayMillis
-            }
-        }
-        val subIds = (listOf(AppConfig.DEFAULT_SUBSCRIPTION_ID) + MmkvManager.decodeSubsList()).distinct()
-        val order = subIds.associateWith { MmkvManager.decodeServerList(it).toList() }
-        return ServersSnapshot(profiles, delays, order, MmkvManager.getSelectServer())
-    }
-
-    /**
-     * Restores a [ServersSnapshot]: re-encodes the profiles that are gone, puts their latency back,
-     * then rewrites each provider's order from the snapshot with anything added since appended, so
-     * a subscription refresh that landed inside the undo window is not thrown away.
-     */
-    private fun undoBulkDelete(snapshot: ServersSnapshot) {
-        showLoading()
-        lifecycleScope.launch(Dispatchers.IO) {
-            snapshot.profiles.forEach { (guid, profile) ->
-                if (MmkvManager.decodeServerConfig(guid) == null) {
-                    MmkvManager.encodeServerConfig(guid, profile)
-                    snapshot.delays[guid]?.let { MmkvManager.encodeServerTestDelayMillis(guid, it) }
-                }
-            }
-            snapshot.order.forEach { (subId, guids) ->
-                val restored = guids.filter { MmkvManager.decodeServerConfig(it) != null }.toMutableList()
-                MmkvManager.decodeServerList(subId).forEach { guid ->
-                    if (!restored.contains(guid)) restored.add(guid)
-                }
-                MmkvManager.encodeServerList(restored, subId)
-            }
-            // encodeServerConfig() claims the selection when none is set, so put the user's own
-            // choice back if it survived.
-            snapshot.selected
-                ?.takeIf { MmkvManager.decodeServerConfig(it) != null }
-                ?.let { MmkvManager.setSelectServer(it) }
-            withContext(Dispatchers.Main) {
-                mainViewModel.reloadServerList()
-                homeFragment?.refreshSelectedServer()
-                hideLoading()
-                showActionSnackbar(getString(R.string.menu_actions_restored))
-            }
-        }
-    }
-
-    /**
-     * Bulk deletions are refused while the tunnel is up.
-     *
-     * Deleting the running server would leave the hero labelled with a server that no longer
-     * exists, and emptying the list hides the connect control altogether (Главная's empty state),
-     * which would strand the user with a live tunnel and no way to stop it. The per-server delete
-     * already refuses to touch the selected server, so this is the same rule at list scale.
-     */
-    private fun bulkDeleteAllowed(): Boolean {
-        if (mainViewModel.isRunning.value != true) return true
-        showActionSnackbar(
-            getString(R.string.menu_actions_busy),
-            getString(R.string.menu_actions_busy_action),
-        ) { toggleConnection() }
-        return false
-    }
-
-    /**
-     * «Сортировать по задержке»: reorders each provider's group by its measured latency.
-     *
-     * With no measurement there is nothing to sort by and the old code just spun the loader and
-     * changed nothing, so the untested case now says so and offers the check.
-     */
-    private fun sortByTestResults() {
-        val measured = mainViewModel.serversCache.toList().any { cached ->
-            (MmkvManager.decodeServerAffiliationInfo(cached.guid)?.testDelayMillis ?: 0L) > 0L
-        }
-        if (!measured) {
-            showActionSnackbar(
-                getString(R.string.menu_actions_no_delay),
-                getString(R.string.menu_actions_check),
-            ) { startLatencyCheckAll() }
-            return
-        }
-        showLoading()
-        lifecycleScope.launch(Dispatchers.IO) {
-            mainViewModel.sortByTestResults()
-            withContext(Dispatchers.Main) {
-                mainViewModel.reloadServerList()
-                hideLoading()
-                showActionSnackbar(getString(R.string.menu_actions_sorted))
-            }
-        }
-    }
-
-    /**
-     * Runs the latency check over the whole list.
-     *
-     * Every «Проверить задержку» route lands here: the Серверы header control, the Home meta bar
-     * and the recovery actions on the sort / «Удалить недоступные» snackbars.
-     *
-     * Which rows go into the measuring state is decided by [MainViewModel], not here: it is the one
-     * that knows which rows this method can actually address, and a row nothing will measure must
-     * not be shown as being measured.
-     *
-     * With nothing to measure, none of the four methods behind [MainViewModel.testAllServers]
-     * leaves a trace - three iterate an empty list and the real-ping one returns early inside its
-     * coroutine ([MainViewModel.testAllRealPing]) - so the control would read as broken. An empty
-     * list and a search that matched nothing are different problems, so they get different
-     * recoveries. The measurement itself needs no tunnel: real ping runs in `CoreTestService`,
-     * which builds a throwaway core per server at `SettingsManager.getRealPingConcurrency()` at a
-     * time, reports progress in its own notification and is cancellable, so a long list is slow
-     * but never unbounded.
-     */
-    override fun startLatencyCheckAll() {
-        if (mainViewModel.serversCache.isEmpty()) {
-            if (mainViewModel.keywordFilter.isNotEmpty()) {
-                showActionSnackbar(
-                    getString(R.string.menu_actions_ping_filtered),
-                    getString(R.string.menu_actions_reset_search),
-                ) { serversFragment?.clearSearch() }
-            } else {
-                val onServers = selectedNavId == R.id.nav_servers
-                // Each tab offers its own control to anchor to: the Серверы header's, or Главная's
-                // scrolling "+". With neither on screen the menu is anchored to the bar itself, so
-                // the action is never a dead end.
-                val anchor = (if (onServers) serversFragment?.addMenuAnchor() else homeFragment?.addMenuAnchor())
-                    ?: binding.bottomNav
-                showActionSnackbar(
-                    getString(R.string.menu_actions_ping_empty),
-                    getString(R.string.menu_actions_add),
-                ) { showImportMenu(anchor, withListActions = onServers) }
-            }
-            return
-        }
-        mainViewModel.testAllServers()
-    }
-
-    /**
-     * The one feedback surface for these actions: a themed Snackbar, never a Toast (00-rules.md
-     * 1.4.8 - anything the user can act on needs an action). 5s with an action, 3s without
-     * (22-components.md 14). Anchored above the bottom navigation only while it is actually
-     * visible - in the signed-out empty state it is gone, and anchoring to a hidden view would
-     * park the bar in the wrong place.
-     */
-    private fun showActionSnackbar(
-        text: CharSequence,
-        actionLabel: CharSequence? = null,
-        action: (() -> Unit)? = null,
-    ) {
+    private fun showActionSnackbar(text: CharSequence) {
         val bar = Snackbar.make(binding.mainContent, text, Snackbar.LENGTH_LONG)
-        bar.duration = if (action != null) 5000 else 3000
+        bar.duration = 3000
         if (binding.bottomNav.isVisible) bar.setAnchorView(binding.bottomNav)
-        if (action != null && actionLabel != null) bar.setAction(actionLabel) { action() }
         bar.show()
     }
 
@@ -1701,37 +1413,6 @@ class MainActivity : HelperBaseActivity(), MainHost {
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to read content from URI", e)
             showActionSnackbar(getString(R.string.menu_actions_file_failed))
-        }
-    }
-
-    /**
-     * «Найти выбранный сервер»: scrolls the Серверы list to the server the next connect would use.
-     *
-     * The scrolling itself — and the two states that hide the row without it being gone, an active
-     * search and a collapsed provider group — belong to the list, so they live in
-     * [ServersFragment.locateServer]; this opens the tab it needs and reports the one outcome that
-     * is not a scroll.
-     *
-     * The two old `toast()` calls also pointed at the wrong strings: `title_file_chooser`
-     * («Выберите профиль») and `toast_server_not_found_in_group` both say «профиль», which
-     * 00-rules.md 9.3 locks to «сервер», and both were Toasts for something the user can act on
-     * (1.4.8).
-     */
-    private fun locateSelectedServer() {
-        val selectedGuid = MmkvManager.getSelectServer()
-        if (selectedGuid.isNullOrEmpty()) {
-            // prepareMenu() hides the item in this state; this still guards the window between
-            // opening the menu and tapping it.
-            showActionSnackbar(getString(R.string.menu_actions_locate_none))
-            return
-        }
-        // Only the Серверы menu offers this today, so this is a no-op there; it keeps the action
-        // correct if a second surface ever calls it. Selecting the tab also attaches its fragment,
-        // so the list exists by the line below.
-        if (selectedNavId != R.id.nav_servers) selectNav(R.id.nav_servers)
-
-        if (serversFragment?.locateServer(selectedGuid) != true) {
-            showActionSnackbar(getString(R.string.menu_actions_locate_missing))
         }
     }
 

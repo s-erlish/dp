@@ -31,7 +31,8 @@
     <!-- Subscriptions -->
     <string name="account_subs_header">Мои подписки</string>
     <string name="account_subs_empty">Подписки пока нет</string>
-    <string name="account_no_subscription">Купите тариф, чтобы подключаться к серверам Departament.</string>
+    <!-- «departament» is lower case in every string on both platforms — owner ruling B2. -->
+    <string name="account_no_subscription">Купите тариф, чтобы подключаться к серверам departament.</string>
     <string name="account_empty_title">Подписки пока нет</string>
     <string name="account_error_load_title">Не удалось загрузить данные</string>
     <string name="account_retry">Повторить</string>
@@ -77,6 +78,50 @@
     <string name="account_payments_more">Показать ещё</string>
     <string name="account_payment_pending">Платёж обрабатывается…</string>
 
+    <!-- ============ The hero time block (23-account-rework.md 1.2 / 4.3) ============
+         One silhouette, three temperatures: the label names the state, the figure and the word
+         beside it carry it, and the detail line appears only while a day count is worth reading.
+         The month word is always UI-face Russian — the figure face has no Cyrillic at all. -->
+    <string name="account_time_active">Активна до</string>
+    <string name="account_time_left">Осталось</string>
+    <string name="account_time_today">Истекает</string>
+    <string name="account_time_expired">Истекла</string>
+    <string name="account_time_detail_today">Сегодня последний день</string>
+    <!-- «Осталось 24 дня» — the figure and its plural form are formatted separately. -->
+    <string name="account_time_detail_left">Осталось %1$d %2$s</string>
+    <string name="account_time_detail_until">Активна до %1$s</string>
+    <string name="account_time_perpetual">Бессрочная подписка</string>
+    <string name="account_time_perpetual_sub">Срок не ограничен</string>
+    <string name="account_time_unknown">Срок неизвестен</string>
+    <string name="account_time_unknown_sub">Обновите страницу или проверьте позже</string>
+    <!-- «3 августа» -->
+    <string name="account_date_long">%1$d %2$s</string>
+    <!-- «августа 2027» — the year appears only when it is not the current one. -->
+    <string name="account_month_year">%1$s %2$d</string>
+
+    <plurals name="account_days">
+        <item quantity="one">день</item>
+        <item quantity="few">дня</item>
+        <item quantity="many">дней</item>
+        <item quantity="other">дня</item>
+    </plurals>
+
+    <!-- Genitive months: they are only ever read after a day figure («3 августа»). -->
+    <string-array name="account_months_genitive">
+        <item>января</item>
+        <item>февраля</item>
+        <item>марта</item>
+        <item>апреля</item>
+        <item>мая</item>
+        <item>июня</item>
+        <item>июля</item>
+        <item>августа</item>
+        <item>сентября</item>
+        <item>октября</item>
+        <item>ноября</item>
+        <item>декабря</item>
+    </string-array>
+
     <!-- Top-up dialog -->
     <string name="account_top_up_title">Сумма пополнения</string>
     <string name="account_top_up_hint">Введите сумму</string>
@@ -101,6 +146,10 @@
     <!-- Payment error dialog. Copy law 9.4: the user never sees the HTTP code or the raw
          backend reason. Both keys still take the arguments the call sites pass; the formatter
          drops unused arguments, and the real cause belongs in the log, not on screen. -->
+    <!-- The label a money button wears while its charge is in flight. One control, one word,
+         both billing surfaces — a control that is working says so, and stops taking taps (D10). -->
+    <string name="account_pay_in_progress">Оплата…</string>
+
     <string name="account_payment_error_title">Ошибка оплаты</string>
     <string name="account_payment_error_body">Платёж не прошёл. Попробуйте другой способ оплаты.</string>
     <string name="account_payment_error_body_nodetail">Платёж не прошёл. Попробуйте другой способ оплаты.</string>

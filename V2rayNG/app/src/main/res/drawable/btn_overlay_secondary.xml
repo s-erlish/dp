@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  THE SECONDARY BUTTON'S FOREGROUND. The neutral tonal fill gets the same bevel
+  as the primary: a fill is a fill, and a flat one reads unfinished whatever
+  colour it is.
+
+  Same contract as @drawable/btn_overlay_primary — read the reasoning there:
+  foreground because MaterialButton owns its background, cross-faded on the
+  press clock, and ordered disabled > loading > pressed > rest because a
+  StateListDrawable takes the first item whose states the view satisfies.
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:enterFadeDuration="@integer/motion_press_in"
+    android:exitFadeDuration="@integer/motion_press_out">
+
+    <item android:drawable="@android:color/transparent" android:state_enabled="false" />
+    <!-- LOADING holds the RESTING bevel, and holds it ahead of the pressed row so a
+         control that is already working can never be pushed into a press look. R8:
+         opacity stays 1.0 while it works — a faded button reads as broken, not as
+         busy. What changes is the label, which the content ColorStateList takes to
+         alpha 0 on this same state so it is still measured and the button cannot
+         resize; the arc over it is the design system's own
+         @style/Widget.Departament.Progress.Circular.Inline.*, centred by the screen,
+         not a second spinner invented here. -->
+    <item android:drawable="@drawable/btn_gloss_rest" android:state_activated="true" />
+    <item android:drawable="@drawable/btn_gloss_press" android:state_pressed="true" />
+    <item android:drawable="@drawable/btn_gloss_rest" />
+
+</selector>

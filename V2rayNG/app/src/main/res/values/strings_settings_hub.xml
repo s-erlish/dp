@@ -1,15 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- Строки новых пунктов вкладки настроек -->
-    <string name="settings_local_proxy">Локальный прокси</string>
-    <string name="settings_local_proxy_sub">SOCKS5-авторизация, память, доступ по сети</string>
+    <!-- Строки вкладки настроек (SettingsTabFragment + fragment_settings_tab.xml).
 
-    <string name="settings_provider">Настройки провайдеров</string>
+         Словарь: то, что раньше называлось «провайдером», везде называется
+         подпиской; departament пишется строчными. -->
+
+    <string name="settings_local_proxy">Локальный прокси</string>
+    <string name="settings_local_proxy_sub">Порт, логин и пароль, доступ по сети</string>
+
+    <string name="settings_provider">Настройки подписок</string>
     <string name="settings_provider_sub">Автообновление, сеть, список серверов</string>
+
+    <!-- Список подписок (SubSettingActivity). Экран умеет добавлять, обновлять,
+         включать и удалять подписку, и до этой волны на него не вело ничего:
+         поэтому подписку нельзя было удалить с телефона. -->
+    <string name="settings_subs_list">Список подписок</string>
+    <string name="settings_subs_list_sub">Добавить, обновить, удалить</string>
 
     <string name="settings_url_scheme">Схемы URL-адресов</string>
     <string name="settings_url_scheme_sub">Быстрые команды depv://</string>
+
+    <!-- Режим подключения. Названия и порядок заданы владельцем: TUN, Proxy,
+         TUN + Proxy. Значения латиницей, поэтому translatable="false".
+           TUN         - PREF_MODE = VPN, PREF_PROXY_SHARING = false
+           Proxy       - PREF_MODE = «Proxy only»
+           TUN + Proxy - PREF_MODE = VPN, PREF_PROXY_SHARING = true -->
+    <string name="settings_mode_value_tun" translatable="false">TUN</string>
+    <string name="settings_mode_value_proxy" translatable="false">Proxy</string>
+    <string name="settings_mode_value_tun_proxy" translatable="false">TUN + Proxy</string>
 
     <!-- Оформление (выбор темы: светлая / тёмная / чёрно-белая) -->
     <string name="settings_appearance">Оформление</string>

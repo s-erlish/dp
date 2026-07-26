@@ -1,11 +1,13 @@
 package com.v2ray.ang.ui
 
+import android.content.Context
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.v2ray.ang.R
 import com.v2ray.ang.contracts.BaseAdapterListener
 import com.v2ray.ang.databinding.ViewRowBinding
+import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.helper.ItemTouchHelperAdapter
 import com.v2ray.ang.helper.ItemTouchHelperViewHolder
 import com.v2ray.ang.ui.component.RowBinder
@@ -43,21 +45,27 @@ class SubSettingRecyclerAdapter(
         val subItem = entry.subscription
         val context = holder.itemView.context
 
-        val subtitle = if (subItem.url.isBlank()) {
-            context.getString(R.string.subs_local)
-        } else {
-            val updated = subItem.lastUpdated.takeIf { it > 0 }
-                ?.let { context.getString(R.string.subs_updated, Utils.formatTimestamp(it)) }
-                ?: context.getString(R.string.subs_never_updated)
-            listOfNotNull(
-                context.getString(R.string.subs_disabled).takeIf { !subItem.enabled },
-                updated,
-            ).joinToString(" · ")
+        val unnamedLocalGroup = isUnnamedLocalGroup(subItem)
+        val title = displayName(context, subItem)
+
+        val subtitle = when {
+            // Title already says it; repeating it under itself is noise.
+            unnamedLocalGroup -> null
+            subItem.url.isBlank() -> context.getString(R.string.subs_local)
+            else -> {
+                val updated = subItem.lastUpdated.takeIf { it > 0 }
+                    ?.let { context.getString(R.string.subs_updated, Utils.formatTimestamp(it)) }
+                    ?: context.getString(R.string.subs_never_updated)
+                listOfNotNull(
+                    context.getString(R.string.subs_disabled).takeIf { !subItem.enabled },
+                    updated,
+                ).joinToString(" · ")
+            }
         }
 
         RowBinder.bind(
             root = holder.binding.root,
-            title = subItem.remarks,
+            title = title,
             subtitle = subtitle,
             glyph = R.drawable.ic_subscriptions_24dp,
             trailing = RowBinder.Trailing.IconAction(
@@ -94,5 +102,35 @@ class SubSettingRecyclerAdapter(
     }
 
     override fun onItemDismiss(position: Int) {
+    }
+
+    companion object {
+        /** The remark `SettingsManager` gives the linkless container it recreates. Not a name. */
+        private const val PLACEHOLDER_REMARK = "Default"
+
+        /**
+         * The store keeps ONE linkless container for hand-added servers, and recreates it under the
+         * remark «Default» the moment the last real подписка is deleted
+         * (`SettingsManager.removeSubscriptionWithDefault`).
+         */
+        private fun isUnnamedLocalGroup(item: SubscriptionItem): Boolean =
+            item.url.isBlank() &&
+                (item.remarks.isBlank() || item.remarks.equals(PLACEHOLDER_REMARK, ignoreCase = true))
+
+        /**
+         * What to call this подписка on screen.
+         *
+         * Left as it was, the recreated container drew the raw remark «Default», so a user who had
+         * just deleted his only подписка saw a row appear where it had been and concluded nothing
+         * was deleted - which is how «удалять почему-то я тоже не могу подписки» looks from the
+         * outside. The container is named for what it is instead, and the same name is used by the
+         * row, by the actions sheet and by the delete confirmation, so all three agree.
+         */
+        fun displayName(context: Context, item: SubscriptionItem): String =
+            if (isUnnamedLocalGroup(item)) {
+                context.getString(R.string.subs_local)
+            } else {
+                item.remarks
+            }
     }
 }

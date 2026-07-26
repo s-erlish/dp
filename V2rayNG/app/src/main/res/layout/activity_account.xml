@@ -124,31 +124,105 @@
                         android:text="@string/account_top_up"
                         android:textAllCaps="false"
                         android:textStyle="bold"
-                        app:cornerRadius="@dimen/radius_pill"
+                        app:cornerRadius="@dimen/radius_button"
                         app:icon="@drawable/ic_add_24dp"
                         app:iconGravity="textStart"
                         app:iconSize="18dp" />
                 </LinearLayout>
 
-                <!-- Balance: quiet label above the big brand-font figure -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_16"
-                    android:text="@string/account_balance"
-                    android:textAppearance="@style/TextAppearance.App.Caption"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
+                <!-- ============ The hero figure is TIME, not money ============
+                     23-account-rework.md 1.2: the user opens this tab because the подписка is
+                     running out, not because of the wallet. So the ONE Display figure on the
+                     screen is the expiry, and its silhouette is CONSTANT — label, figure + word,
+                     optional detail — with colour carrying health (onSurface / amber / red), so
+                     the card never changes shape as the account's state changes.
 
-                <TextView
-                    android:id="@+id/tv_balance"
+                     Perpetual and unknown-expiry have no date to set: the figure hides and
+                     tv_time_word carries the Title line with tv_time_detail beneath it. Those are
+                     the only two states in which this tab shows zero Display figures. -->
+                <LinearLayout
+                    android:id="@+id/ll_time_block"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_4"
-                    android:ellipsize="end"
-                    android:fontFeatureSettings="&quot;tnum&quot; on, &quot;lnum&quot; on"
-                    android:maxLines="1"
-                    android:textAppearance="@style/TextAppearance.App.Display"
-                    tools:text="1 500 ₽" />
+                    android:layout_marginTop="@dimen/space_16"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    tools:visibility="visible">
+
+                    <TextView
+                        android:id="@+id/tv_time_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        tools:text="Активна до" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_4"
+                        android:baselineAligned="true"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tv_time_figure"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="@style/TextAppearance.App.Numeric.Display"
+                            tools:text="3" />
+
+                        <TextView
+                            android:id="@+id/tv_time_word"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_8"
+                            android:layout_weight="1"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textAppearance="@style/TextAppearance.App.Title"
+                            tools:text="августа" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tv_time_detail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_4"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        android:visibility="gone"
+                        tools:text="Осталось 24 дня"
+                        tools:visibility="visible" />
+                </LinearLayout>
+
+                <!-- Balance: demoted from the 34sp hero to a labelled value (1.2, 1.3). It is
+                     still the count-up figure it always was — «Пополнить» above it is the action,
+                     so this line states and does not duplicate the CTA. -->
+                <LinearLayout
+                    android:id="@+id/row_balance"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_16"
+                    android:baselineAligned="true"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="@string/account_balance"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle" />
+
+                    <TextView
+                        android:id="@+id/tv_balance"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_12"
+                        android:maxLines="1"
+                        android:textAppearance="@style/TextAppearance.App.Numeric.Money"
+                        android:textSize="16sp"
+                        tools:text="1 500 ₽" />
+                </LinearLayout>
 
                 <!-- Referral: whole row taps to copy; code reads on a quiet chip, copy is the trailing glyph -->
                 <LinearLayout
@@ -275,7 +349,7 @@
                         android:text="@string/account_hub_buy"
                         android:textAllCaps="false"
                         android:textStyle="bold"
-                        app:cornerRadius="@dimen/radius_pill"
+                        app:cornerRadius="@dimen/radius_button"
                         app:icon="@drawable/ic_acc_upgrade"
                         app:iconGravity="textStart"
                         app:iconSize="18dp" />
@@ -352,7 +426,7 @@
                         android:text="@string/account_retry"
                         android:textAllCaps="false"
                         android:textStyle="bold"
-                        app:cornerRadius="@dimen/radius_pill" />
+                        app:cornerRadius="@dimen/radius_button" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
         </FrameLayout>

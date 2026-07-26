@@ -27,10 +27,15 @@
   them now comes from @style/Widget.Departament.Button.*, where a height is a
   MINIMUM and Material's 6dp insets are already zeroed (R2).
 
-  S-9: «Войти» is the primary and «Добавить провайдера» the secondary. This product
-  sells subscriptions through the site and the bot, so the overwhelmingly common
-  first run is a user who has already paid and needs to sign in. QR and clipboard
-  import stay one tap away behind the secondary, and also live in Серверы.
+  «Войти» is the primary and «Добавить подписку» the secondary. This product sells
+  подписки through the site and the bot, so the overwhelmingly common first run is
+  a user who has already paid and needs to sign in. QR and clipboard import stay
+  one tap away behind the secondary.
+
+  THE SECONDARY IS NOT DECORATION, and it is the reason this block has two slots:
+  in the signed-in-with-no-подписка shape it carries «Привязать Telegram», the only
+  live entry point to linking Telegram anywhere on Главная. The onboarding card
+  that used to hold it was replaced by this block; the action came with it.
 
   The caption's colour is set by HomeFragment: onSurfaceVariant normally,
   @color/color_destructive_text when the caption IS the failure reason.
@@ -55,7 +60,7 @@
         android:maxLines="2"
         android:textAppearance="@style/TextAppearance.App.Body"
         android:textColor="?attr/colorOnSurfaceVariant"
-        tools:text="Войдите, чтобы получить серверы Departament." />
+        tools:text="Войдите, чтобы получить серверы departament." />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_gate_primary"
@@ -72,6 +77,6 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/space_12"
         android:visibility="gone"
-        tools:text="Добавить провайдера"
+        tools:text="Добавить подписку"
         tools:visibility="visible" />
 </LinearLayout>

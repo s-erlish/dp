@@ -98,6 +98,14 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         s.rowBoot.setOnClickListener { toggleStartOnBoot() }
 
         // ПОДПИСКА
+        // Список подписок. Экран существовал, умел добавлять, включать, обновлять и УДАЛЯТЬ
+        // подписку — и не был подключён ни к одной кнопке в приложении. Это и есть причина
+        // жалобы «удалять почему-то я тоже не могу подписки на телефоне»: удаление работало,
+        // до него нельзя было дойти. Идёт через launchSettingsScreen, чтобы оболочка
+        // перечитала список серверов, когда экран вернётся.
+        s.rowSubsList.setOnClickListener {
+            mainHost.launchSettingsScreen(Intent(requireContext(), SubSettingActivity::class.java))
+        }
         s.rowSubAutoUpdate.setOnClickListener { pickSubAutoUpdate() }
         s.rowRouting.setOnClickListener {
             mainHost.launchSettingsScreen(Intent(requireContext(), RoutingSettingActivity::class.java))
@@ -142,9 +150,9 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         val proxySharing = MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING, false)
         s.valueMode.text = getString(
             when {
-                mode != AppConfig.VPN -> R.string.settings_mode_proxy_opt // Proxy-only
-                proxySharing -> R.string.settings_mode_vpn_proxy          // VPN(tun) + local proxy sharing
-                else -> R.string.settings_mode_tun                        // VPN(tun) only
+                mode != AppConfig.VPN -> R.string.settings_mode_value_proxy      // Proxy
+                proxySharing -> R.string.settings_mode_value_tun_proxy           // TUN + Proxy
+                else -> R.string.settings_mode_value_tun                         // TUN
             }
         )
 
@@ -194,16 +202,19 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
     }
 
     /**
-     * Three connection modes, all expressed with existing prefs (core config untouched):
+     * Three connection modes, all expressed with existing prefs (core config untouched). The
+     * names and their order are the owner's: «TUN», «Proxy», «TUN + Proxy», and the row value
+     * uses the same three strings as the picker, so a mode never reads one way in the list and
+     * another way in the dialog.
      *   0 TUN         = VPN(tun) mode, local-proxy sharing OFF
      *   1 Proxy       = proxy-only mode (isVpnMode() == false)
-     *   2 VPN + Proxy = VPN(tun) mode, local-proxy sharing ON (PREF_PROXY_SHARING)
+     *   2 TUN + Proxy = VPN(tun) mode, local-proxy sharing ON (PREF_PROXY_SHARING)
      */
     private fun pickMode() {
         val entries = arrayOf(
-            getString(R.string.settings_mode_tun),
-            getString(R.string.settings_mode_proxy_opt),
-            getString(R.string.settings_mode_vpn_proxy),
+            getString(R.string.settings_mode_value_tun),
+            getString(R.string.settings_mode_value_proxy),
+            getString(R.string.settings_mode_value_tun_proxy),
         )
         val mode = MmkvManager.decodeSettingsString(AppConfig.PREF_MODE, AppConfig.VPN)
         val proxySharing = MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING, false)
@@ -223,7 +234,7 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
                     1 -> { // Proxy only
                         MmkvManager.encodeSettings(AppConfig.PREF_MODE, "Proxy only")
                     }
-                    else -> { // VPN + Proxy
+                    else -> { // TUN + Proxy
                         MmkvManager.encodeSettings(AppConfig.PREF_MODE, AppConfig.VPN)
                         MmkvManager.encodeSettings(AppConfig.PREF_PROXY_SHARING, true)
                     }

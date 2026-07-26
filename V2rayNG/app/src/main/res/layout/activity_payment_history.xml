@@ -67,7 +67,7 @@
             android:text="@string/buy_title"
             android:textAllCaps="false"
             android:visibility="gone"
-            app:cornerRadius="22dp"
+            app:cornerRadius="@dimen/radius_button"
             tools:visibility="visible" />
     </LinearLayout>
 

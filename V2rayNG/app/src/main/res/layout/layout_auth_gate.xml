@@ -4,14 +4,30 @@
   SURFACE A — THE GATE.  14-auth.md §5.
   ============================================================================
 
-  Two anchors and nothing between them. The intro is top-anchored because it is
-  the screen's heading and must start where every other screen's first line
-  starts; the actions are bottom-anchored because the scene is one hand on a
-  moving train and a CTA floating 250dp down a 6.7-inch phone is out of thumb
-  reach. The space between them is the composition, not left-over room:
-  fillViewport + weight=1 on @id/gate_spacer means a short viewport (landscape,
-  split screen, font scale 200%) collapses the spacer to its 32dp floor and the
-  whole column scrolls. Nothing is ever clipped and nothing overlaps.
+  ONE BLOCK, NOT TWO ANCHORS.  Owner test 2026-07-27, item C3: «когда нажимаешь
+  войти, надо чтобы кнопки были выше». The first build of this screen pinned the
+  intro to the top and the actions to the bottom, and on a 6.7-inch phone that
+  left a headline stranded above 300dp of nothing with two buttons parked on the
+  bezel. It reads as a screen that failed to load, not as a composition.
+
+  So the heading, the sub-line and the actions are now ONE group — 32dp apart,
+  read as a unit — floated by a pair of weighted spacers, 3 above and 4 below.
+  The 3:4 split puts the group a touch above the optical centre, which is where
+  the eye lands and where the thumb already is; nothing sits on the bottom edge
+  and nothing is stranded at the top.
+
+  The spacers are still the composition and not left-over room: fillViewport +
+  weight means a short viewport (landscape, split screen, font scale 200%)
+  collapses both to nothing and the whole column scrolls. Nothing is ever
+  clipped and nothing overlaps.
+
+  THE FLOORS ARE THE COLUMN'S PADDING, NOT minHeight ON THE SPACERS. A weighted
+  child is re-measured with an EXACTLY spec, and Space.onMeasure returns the spec
+  size verbatim under EXACTLY — its minHeight is discarded. Written that way the
+  floors silently were not there, and at font scale 200% the heading sat flush
+  against the toolbar with the last button flush against the gesture bar. The
+  24/32 live on the column instead, where LinearLayout subtracts them before it
+  distributes the weights, so they hold in both directions.
 
   ONE FILLED ACCENT SURFACE, and it is @id/btn_gate_telegram. The Telegram glyph
   is tinted colorOnPrimary, NEVER Telegram's own blue — a second brand hue on the
@@ -25,10 +41,20 @@
   product is built from its most ordinary part. That is why the awaiting state is
   not a centred hero spinner with a paragraph under it.
 
-  THE ERROR LINE SITS ABOVE THE ACTION SLOT so that a growing error eats the
-  spacer and the buttons do not move under the thumb. Start-aligned at the
-  gutter, like every other line here; the old centred grey-red line at the bottom
-  of a scroll is deleted.
+  THE ACTION SLOT NEVER CHANGES HEIGHT. The awaiting stack is 64dp taller than
+  the idle one, and while it was GONE that difference moved the whole column the
+  instant the crossfade started — a layout jump under a 200ms fade, which is the
+  cheapest-looking thing a transition can do. It is INVISIBLE instead, so the
+  FrameLayout is always measured against the taller of the two and the heading,
+  the CTA and the row that replaces it all sit on exactly the same baseline. An
+  invisible view is out of the accessibility tree and its progress indicator
+  stops animating, so nothing is paid for the stability.
+
+  THE ERROR LINE SITS ABOVE THE ACTION SLOT: it belongs to the intro's half of
+  the group, so a two-line failure grows upwards into the lead spacer instead of
+  shoving the buttons down under the thumb. Start-aligned at the gutter, like
+  every other line here; the old centred grey-red line at the bottom of a scroll
+  is deleted.
 -->
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -45,13 +71,24 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:paddingTop="@dimen/space_24"
+        android:paddingBottom="@dimen/space_32">
+
+        <!-- The lead spacer. Weight 3 against the trail's 4, so the group settles
+             just above the optical centre instead of on the top edge. It carries
+             no minHeight: an EXACTLY spec ignores one, and the floor above it is
+             the column's own padding. -->
+        <Space
+            android:id="@+id/gate_lead"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="3" />
 
         <LinearLayout
             android:id="@+id/gate_intro"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_32"
             android:orientation="vertical">
 
             <!-- «Вход в departament». The Latin token is re-set in the brand face
@@ -79,18 +116,14 @@
                 android:textColor="?attr/colorOnSurfaceVariant" />
         </LinearLayout>
 
-        <Space
-            android:id="@+id/gate_spacer"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:minHeight="@dimen/space_32" />
-
+        <!-- 32dp, the same step that separates a section from its content
+             everywhere else, is what ties the heading to what it is asking for.
+             It is a margin and not a spacer: this gap never stretches. -->
         <LinearLayout
             android:id="@+id/gate_actions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="@dimen/space_32"
+            android:layout_marginTop="@dimen/space_32"
             android:orientation="vertical">
 
             <!-- Screen-level error: Body 14/400 in the error TEXT red (6.15:1),
@@ -107,7 +140,9 @@
                 tools:text="@string/auth_err_network"
                 tools:visibility="visible" />
 
-            <!-- The crossfade host: exactly one stack is on screen at a time. -->
+            <!-- The crossfade host: exactly one stack is READABLE at a time, but
+                 both are always MEASURED, so the slot is the taller one's height
+                 in every state and nothing below the heading ever moves. -->
             <FrameLayout
                 android:id="@+id/gate_action_slot"
                 android:layout_width="match_parent"
@@ -158,7 +193,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:visibility="gone"
+                    android:visibility="invisible"
                     tools:visibility="visible">
 
                     <!-- The universal 56dp row: 40 slot, 12 gap, text at 68 from the
@@ -250,5 +285,15 @@
                 </LinearLayout>
             </FrameLayout>
         </LinearLayout>
+
+        <!-- The trail spacer. Weight 4 against the lead's 3: it keeps the group
+             off the bottom edge and off the gesture bar, and it is the one that
+             gives way first when the viewport gets short. Same as the lead — the
+             floor below it is the column's padding, not a minHeight. -->
+        <Space
+            android:id="@+id/gate_spacer"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="4" />
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

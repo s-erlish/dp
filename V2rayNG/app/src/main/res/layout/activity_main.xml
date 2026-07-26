@@ -28,10 +28,10 @@
             <!-- ==================== TAB HOST (fragment tabs) ==================== -->
             <!-- The shell's fragment container: one fragment per bottom-nav destination, kept alive
                  (hide/show, never replace) so scroll position and in-flight state survive a tab
-                 switch. It hosts ALL FOUR tabs — Главная (HomeFragment), Серверы (ServersFragment),
-                 Аккаунт (AccountFragment) and Настройки (SettingsTabFragment); the shell itself
-                 holds only this container, the scrim and the bottom bar.
-                 Главная is attached at launch and the other three the first time their tab is
+                 switch. It hosts ALL THREE tabs — Главная (HomeFragment), Аккаунт (AccountFragment)
+                 and Настройки (SettingsTabFragment); the shell itself holds only this container,
+                 the scrim and the bottom bar.
+                 Главная is attached at launch and the other two the first time their tab is
                  opened (see MainActivity.syncTabFragments). -->
             <androidx.fragment.app.FragmentContainerView
                 android:id="@+id/tab_host"
@@ -52,10 +52,12 @@
 
             <!-- Custom bottom bar (replaces Material BottomNavigationView, which reserved tall
                  internal whitespace below the label and floated the items well above the edge).
-                 A plain 3-item weighted row of icon+label hugs the very bottom; a SMALL fixed
-                 bottom pad (~gesture bar only) is applied at runtime so it sits a few dp low.
-                 The item container ids (nav_home/nav_servers/nav_settings) match the existing
-                 R.id constants so showTab/tab selection is unchanged. -->
+                 A plain weighted row of icon+label hugs the very bottom; a SMALL fixed bottom pad
+                 (~gesture bar only) is applied at runtime so it sits a few dp low.
+                 The destination set is Главная · Аккаунт · Настройки, in that order — three items,
+                 with Аккаунт still hidden while signed out. There is no Серверы item: the owner
+                 removed that destination on 2026-07-26 (docs/design2026/11-app-structure.md 2.0)
+                 and none of its functions were moved elsewhere. -->
             <LinearLayout
                 android:id="@+id/bottom_nav"
                 android:layout_width="match_parent"
@@ -108,8 +110,11 @@
 
                 </LinearLayout>
 
+                <!-- 2nd item: the Account tab. Shown only when signed in (toggled at
+                     runtime); a weighted item so it collapses to zero width while GONE
+                     and the 2 remaining items keep equal halves. -->
                 <LinearLayout
-                    android:id="@+id/nav_servers"
+                    android:id="@+id/nav_account"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
@@ -118,27 +123,28 @@
                     android:focusable="true"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:stateListAnimator="@anim/nav_press">
+                    android:stateListAnimator="@anim/nav_press"
+                    android:visibility="gone">
 
                     <ImageView
-                        android:id="@+id/nav_servers_icon"
+                        android:id="@+id/nav_account_icon"
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_nav_servers"
+                        app:srcCompat="@drawable/ic_nav_account"
                         app:tint="?attr/colorOnSurfaceVariant" />
 
                     <TextView
-                        android:id="@+id/nav_servers_label"
+                        android:id="@+id/nav_account_label"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="3dp"
-                        android:text="@string/bottom_nav_servers"
+                        android:text="@string/bottom_nav_account"
                         android:textAppearance="@style/BottomNavLabel"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
                     <View
-                        android:id="@+id/nav_servers_dot"
+                        android:id="@+id/nav_account_dot"
                         android:layout_width="34dp"
                         android:layout_height="3dp"
                         android:layout_marginTop="3dp"
@@ -179,50 +185,6 @@
 
                     <View
                         android:id="@+id/nav_settings_dot"
-                        android:layout_width="34dp"
-                        android:layout_height="3dp"
-                        android:layout_marginTop="3dp"
-                        android:background="@drawable/bg_nav_dot"
-                        android:importantForAccessibility="no"
-                        android:visibility="invisible" />
-
-                </LinearLayout>
-
-                <!-- 4th item: opens the Account screen. Shown only when signed in
-                     (toggled at runtime); a weighted item so it collapses to zero
-                     width while GONE and the 3 remaining items keep equal thirds. -->
-                <LinearLayout
-                    android:id="@+id/nav_account"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:background="@null"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:stateListAnimator="@anim/nav_press"
-                    android:visibility="gone">
-
-                    <ImageView
-                        android:id="@+id/nav_account_icon"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_nav_account"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-
-                    <TextView
-                        android:id="@+id/nav_account_label"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:text="@string/bottom_nav_account"
-                        android:textAppearance="@style/BottomNavLabel"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
-
-                    <View
-                        android:id="@+id/nav_account_dot"
                         android:layout_width="34dp"
                         android:layout_height="3dp"
                         android:layout_marginTop="3dp"

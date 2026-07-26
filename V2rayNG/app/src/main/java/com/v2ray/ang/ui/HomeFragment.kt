@@ -16,6 +16,7 @@ import android.graphics.drawable.StateListDrawable
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.net.VpnService
 import android.os.Bundle
 import android.os.SystemClock
@@ -24,72 +25,99 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.Animation
 import android.view.animation.AnimationUtils
+import android.widget.LinearLayout
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
+import androidx.core.view.doOnPreDraw
 import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
 import androidx.core.widget.NestedScrollView
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.fragment.app.viewModels
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.viewpager2.widget.CompositePageTransformer
+import androidx.viewpager2.widget.MarginPageTransformer
+import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.snackbar.Snackbar
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.AccountRepository
 import com.v2ray.ang.auth.AccountSession
+import com.v2ray.ang.auth.AuthTokenStore
 import com.v2ray.ang.auth.BackendConfig
+import com.v2ray.ang.auth.SubscriptionSyncManager
 import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.auth.dto.UserProfileDto
 import com.v2ray.ang.core.CoreServiceManager
 import com.v2ray.ang.databinding.FragmentHomeBinding
+import com.v2ray.ang.databinding.LayoutSubscriptionMetaBarBinding
+import com.v2ray.ang.dto.entities.SubscriptionItem
+import com.v2ray.ang.dto.entities.hasUserInfo
+import com.v2ray.ang.dto.entities.isExpired
+import com.v2ray.ang.dto.entities.isUnlimited
+import com.v2ray.ang.dto.entities.trafficFraction
+import com.v2ray.ang.dto.entities.usedTraffic
+import com.v2ray.ang.extension.toTrafficString
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.ui.component.Haptic
-import com.v2ray.ang.ui.component.RowBinder
 import com.v2ray.ang.ui.component.SkeletonBinder
 import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.util.AvatarManager
 import com.v2ray.ang.util.FlagUtil
 import com.v2ray.ang.util.reducedMotion
+import com.v2ray.ang.util.tickHaptic
 import com.v2ray.ang.viewmodel.AccountViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToLong
 
 /**
- * Главная — the screen the app opens on, rebuilt to `docs/design2026/13-start-screen.md`.
+ * Главная — the screen the app opens on.
  *
- * ONE GLANCE ANSWERS THREE QUESTIONS: am I protected (the disc and the word under it), through what
- * (the server name under the word), and what do I do next (exactly one thing, and only when there is
- * something to do). Everything on this screen serves one of those three; nothing else is here.
+ * **THIS SCREEN IS A RESTYLE, NOT A REDESIGN**, and the distinction is the reason this file reads
+ * the way it does. A wave rebuilt Главная from `docs/design2026/13-start-screen.md`, dropped the
+ * inline server list, the subscription card, the session clock and the connect object's rings and
+ * motion, and replaced them with two rows that navigate away. The owner ran that build and rejected
+ * it — «как выглядела главная по функционалу такая и должна остаться», «все должно быть вернуто с
+ * пилюлей и инфой о подписке под кнопкой». That document now carries an OWNER OVERRULE: its scope is
+ * void and only its visual language survives.
+ *
+ * So everything that screen had is here, drawn on the component layer with tokens and the type ramp:
+ *
+ *  - the top strip — отдача, время сессии, приём — and the add action, on one line;
+ *  - the connect object with its three concentric rings, its negotiating breath and sweep, its
+ *    one-shot confirm ring, its press scale and its cold-start assemble;
+ *  - the country flag and the server identity under it;
+ *  - the subscription card carousel — traffic pill, name, auto-update stamp, the operator's notice,
+ *    support and Telegram, refresh, ping, pin, delete;
+ *  - the server list, inline, which is the ONLY place in the product a server can be picked.
  *
  * **The fragment renders, it does not decide twice.** [resolveState] reads every input once and
- * returns one [HomeState]; [render] applies it and branches on nothing else. The two are the whole
- * screen. The spec puts [resolveState] in the ViewModel, and it belongs there — `MainViewModel` is
- * another wave's file, so it lives here for now, as ONE function rather than as branching sprinkled
- * through a dozen `update*()` calls, which is what this file used to be.
+ * returns one [HomeState]; [render] applies it and branches on nothing else.
  *
- * **It still owns the CONNECT STATE MACHINE, unchanged in behaviour**: the tap handler, the VPN
- * permission prompt, the connect watchdog, the restart-that-waits-for-a-real-stop, the one-shot
- * auto-fallback with its confirmation re-probe. That state machine is why this fragment is attached
- * at LAUNCH rather than the first time its tab is opened (`MainActivity.syncTabFragments`): a hidden
- * fragment is still RESUMED, so the tunnel is still observed, the health check still fires and
- * «Перезапустить» after a core-config change on Настройки still reaches a running core.
- *
- * **What left this screen and why.** The embedded server list, the provider meta-bar carousel, the
- * memory card, the onboarding card, the page gradient, the connect glow and its 850ms breathing
- * loop, the cold-start assemble, the uptime timer and the custom `Toast` are all gone — banned,
- * duplicated elsewhere, or (servers, providers) a destination rather than a widget. Servers are
- * reached through the «Серверы» row; the subscription through «Подписка».
+ * **It owns the CONNECT STATE MACHINE, unchanged in behaviour**: the tap handler, the VPN permission
+ * prompt, the connect watchdog, the restart-that-waits-for-a-real-stop, the one-shot auto-fallback
+ * with its confirmation re-probe. That state machine is why this fragment is attached at LAUNCH
+ * rather than the first time its tab is opened (`MainActivity.syncTabFragments`): a hidden fragment
+ * is still RESUMED, so the tunnel is still observed and «Перезапустить» after a core-config change
+ * still reaches a running core.
  *
  * The tab's view outlives nothing and outlasts every bind — the shell hides and shows tabs rather
  * than replacing them — so every async callback checks [isBindingInitialized] before touching a view
@@ -99,16 +127,17 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
     // ==================== The model ====================
 
-    /** The connection as the screen draws it. Exactly one is true at a time (13 s. 11.2). */
+    /** The connection as the screen draws it. Exactly one is true at a time. */
     private enum class Conn { DISCONNECTED, CONNECTING, CONNECTED, DISCONNECTING, ERROR, NO_SERVER, GATED }
 
     /**
-     * The gate block's four shapes (13 s. 8.3). A gate exists ONLY when the ledger rows would have
-     * nothing true to say, which on this product means "there is not one server to connect to".
+     * The gate block's shapes. A gate exists ONLY when the subscription card and the server list
+     * would have nothing true to show, which on this product means "there is not one server to
+     * connect to".
      */
-    private enum class Gate { SIGN_IN, ADD_PROVIDER, BUY, SYNC_SERVERS, SYNC_FAILED }
+    private enum class Gate { SIGN_IN, ADD_SUBSCRIPTION, BUY, SYNC_SERVERS, SYNC_FAILED }
 
-    /** What the «Подписка» row knows. [UNKNOWN] is "still resolving", and draws the skeleton. */
+    /** What the account knows about the subscription. [Unknown] is "still resolving". */
     private sealed interface Sub {
         data object Unknown : Sub
         data object None : Sub
@@ -133,8 +162,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         val gate: Gate?,
         val accountLoading: Boolean,
         val serverName: String?,
+        val serverFlag: String?,
         val serverCount: Int,
-        val providerCount: Int,
         val sub: Sub,
         val condition: Condition?,
         val stale: Boolean,
@@ -144,8 +173,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
     /**
      * The account's subscriptions, the same `SubInfoDto` list Аккаунт renders — one truth, two
-     * surfaces (32-master-plan-android.md 1.2, signature moment 3). Fragment-scoped: Главная is
-     * attached for the whole process, so this is created once and refreshed on resume.
+     * surfaces. It is also what gives the subscription card its NAME: when a подписка came from the
+     * account, the nickname the account returns is what the card shows.
      */
     private val accountViewModel: AccountViewModel by viewModels()
 
@@ -153,9 +182,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private var subsResolved = false
 
     /**
-     * The last account fetch failed. The «Подписка» row then KEEPS its last value and says it could
-     * not be refreshed, rather than emptying: an error must not delete data the user had
-     * (00-rules.md 9.6, 13 s. 11.3 "error, data").
+     * The last account fetch failed. The screen then KEEPS its last values and says it could not be
+     * refreshed, rather than emptying: an error must not delete data the user had.
      */
     private var subsError = false
 
@@ -163,8 +191,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private var syncRequested = false
 
     // Tracks the last observed signed-in state so the post-login auto-import fires only on a real
-    // logged-out -> logged-in transition, not on every state replay. Seeded from the persisted
-    // session so a returning (already signed-in) user is not treated as a fresh login.
+    // logged-out -> logged-in transition, not on every state replay.
     private var accountLoggedIn = AccountSession.isLoggedIn()
     private var accountResolved = !BackendConfig.isConfigured() || !AccountSession.isLoggedIn()
 
@@ -178,26 +205,24 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private var renderedConn: Conn? = null
 
     /**
-     * Whether the connect object is currently drawn in its CONNECTED dress (filled shield, accent
-     * ring, figures on screen). Kept apart from [renderedConn] because «Отключение…» is a distinct
-     * connection state but the same visual exit: the release plays on the tap, not one repaint later
-     * when the daemon finally answers.
+     * Whether the connect object is currently drawn in its CONNECTED dress. Kept apart from
+     * [renderedConn] because «Отключение…» is a distinct connection state but the same visual exit:
+     * the release plays on the tap, not one repaint later when the daemon finally answers.
      */
     private var visualConnected = false
 
     // SkeletonBinder.showAfterDelay() re-posts its 300ms timer on every call, so a screen that
-    // re-renders while it waits would postpone the skeleton forever. These arm it exactly once.
+    // re-renders while it waits would postpone the skeleton forever. This arms it exactly once.
     private var accountSkeletonArmed = false
-    private var subscriptionSkeletonArmed = false
 
     /** True while the strip's exit is still running, so an arriving condition re-shows it. */
     private var stripHiding = false
 
-    /** Which of the ledger slot's two occupants is drawn, so the swap can be crossfaded once. */
+    /** Which of the slot's two occupants is drawn, so the swap can be crossfaded once. */
     private var renderedGateVisible: Boolean? = null
 
-    // The three figures. Null means "no reading yet", which draws an EMPTY box of reserved width —
-    // never a dash, never a zero (13 s. 7).
+    // The live figures. Null means "no reading yet", which prints a zero rather than an empty box:
+    // this strip is the screen's ledger and it is on screen at rest.
     private var downBytesPerSec: Long? = null
     private var upBytesPerSec: Long? = null
     private var pingMs: Int? = null
@@ -207,11 +232,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private var offline = false
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
-    /**
-     * How many background loads the shell has open. The connect sweep is no longer allowed to stand
-     * in for them (13 s. 5.3: an indeterminate indicator that spins while nothing is negotiating is
-     * a lie about the system), so they report on the status strip instead.
-     */
+    /** How many background loads the shell has open — a subscription refresh, an import, an export. */
     private var backgroundLoads = 0
 
     private val timerHandler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -224,11 +245,36 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     // "not running" is reported as a failure rather than a silent revert.
     private var connectInProgress = false
 
-    // The ring's stroke lives in this drawable; the tint animation retints it in place, which is why
-    // there is no runtime-tinted ring drawable file and therefore no raw hex anywhere on this screen.
-    private var ringDrawable: GradientDrawable? = null
+    // ---- The inline server list ----
+
+    /**
+     * Главная's own server list. The Серверы destination was removed by the owner on 2026-07-26 and
+     * none of its functions moved anywhere, so this adapter is the product's only server list; row
+     * actions come from the shell so a row behaves identically wherever it is drawn.
+     */
+    private var homeAdapter: MainRecyclerAdapter? = null
+
+    /** The subscription card's chevron collapses the list under it. Session state, not a setting. */
+    private var homeListCollapsed = false
+
+    // ---- The subscription card carousel ----
+
+    private var homeMetaAdapter: HomeMetaPagerAdapter? = null
+    private var homeMetaSubIds: List<String> = emptyList()
+    private var homeMetaPage = 0
+
+    // ---- The connect object ----
+
+    // The three rings' strokes live in these drawables; the tint animation retints them in place,
+    // which is why there is no runtime-tinted ring drawable file and no raw hex on this screen.
+    private var ringOuter: GradientDrawable? = null
+    private var ringMid: GradientDrawable? = null
+    private var ringInner: GradientDrawable? = null
     private var ringColor = 0
     private var ringAnimator: ValueAnimator? = null
+
+    /** The negotiating breath: the outer rings swelling while the core talks to a server. */
+    private var breathAnimator: ValueAnimator? = null
 
     // Cached easing curves (loaded once) so the imperative hero motion rides the same ease-out tempo
     // as res/interpolator and res/anim. No bounce.
@@ -239,7 +285,25 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private val durStateExit get() = resources.getInteger(R.integer.motion_state_exit).toLong()
     private val durReveal get() = resources.getInteger(R.integer.motion_reveal).toLong()
     private val durRevealExit get() = resources.getInteger(R.integer.motion_reveal_exit).toLong()
-    private val durEmphasis get() = resources.getInteger(R.integer.motion_emphasis).toLong()
+
+    // ---- The session clock ----
+
+    /** Epoch millis the current session started, persisted so uptime survives a recreate. */
+    private var connectionStartTime = 0L
+
+    private val uptimeRunnable = object : Runnable {
+        override fun run() {
+            if (connectionStartTime == 0L || !isBindingInitialized) return
+            val elapsed = ((System.currentTimeMillis() - connectionStartTime) / 1000L).coerceAtLeast(0L)
+            binding.tvUptime.text = getString(
+                R.string.home_uptime_format,
+                elapsed / 3600L,
+                (elapsed % 3600L) / 60L,
+                elapsed % 60L,
+            )
+            timerHandler.postDelayed(this, 1000L)
+        }
+    }
 
     // Auto-fallback: one-shot post-connect health check that switches to the fastest working server
     // if the current tunnel doesn't actually pass traffic. The "already fired this session" flag
@@ -267,7 +331,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         }
     }
 
-    /** The 30s latency probe of the ACTIVE server, and the only producer of the third column. */
+    /** The 30s latency probe of the ACTIVE server, and the only producer of the «мс» figure. */
     private val latencyRunnable = object : Runnable {
         override fun run() {
             if (mainViewModel.isRunning.value != true) return
@@ -288,6 +352,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     private companion object {
+        const val KEY_CONNECTION_START = "cache_connection_start_time"
+
         const val HEALTH_CHECK_DELAY_MS = 7000L
 
         // Gap before the confirmation re-probe: long enough for a momentary DNS/test-URL hiccup to
@@ -302,31 +368,55 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         const val RESTART_STOP_TIMEOUT_MS = 6000L
         const val RESTART_STOP_POLL_MS = 50L
 
-        // 13 s. 19.4 q2: the dial to turn if the probe ever costs battery. The design does not change.
+        // The dial to turn if the probe ever costs battery. The design does not change.
         const val LATENCY_INTERVAL_MS = 30_000L
 
-        // Three consecutive failed probes, not one: a single dropped packet is not a dead server
-        // (13 s. 7).
+        // Three consecutive failed probes, not one: a single dropped packet is not a dead server.
         const val SILENT_SERVER_FAILURES = 3
 
-        // Under this many days left the subscription is «Истекает» (13 s. 8.1).
+        // Under this many days left the subscription is «Истекает».
         const val EXPIRING_DAYS = 3
 
-        // Below 100 the speed carries one decimal, at or above it none (13 s. 7).
+        // Below 100 the speed carries one decimal, at or above it none.
         const val SPEED_DECIMAL_BELOW = 100.0
 
         // ~2088-01-01 in epoch seconds. Some panels send a date this far out to mean "never".
         const val UNLIMITED_EXPIRE_SECONDS = 3_723_840_000L
 
         const val DISABLED_ALPHA = 0.38f
-        const val CONFIRM_RING_SCALE = 1.35f
-        const val CONFIRM_RING_ALPHA = 0.6f
-        const val RIPPLE_ALPHA = 26 // 10% of 255, 13 s. 5.1
+        const val RIPPLE_ALPHA = 26 // 10% of 255
+
+        // The three rings are ONE colour at three opacities: outermost faintest, the disc's own
+        // brightest. That is the whole gradient this object is allowed, and it is a state channel
+        // rather than decoration.
+        const val RING_ALPHA_OUTER = 56 // ~22%
+        const val RING_ALPHA_MID = 128 // ~50%
+        const val OPAQUE = 255
+
+        // The negotiating breath, on the two outer rings. Same 850ms reverse the old build breathed
+        // the (now banned) halo glow with, moved onto the rings where it belongs.
+        const val BREATH_PERIOD_MS = 850L
+        const val BREATH_ALPHA_MIN = 90
+
+        // The cold-start assemble plays once per PROCESS, not on every theme/language recreate.
+        private var heroAssembled = false
     }
 
     private val requestVpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (it.resultCode == Activity.RESULT_OK) {
+            // The system prompt is modal and the user may take as long as he likes over it, so the
+            // watchdog was stood down while it was up (see [startVpnWithPermission]). The attempt's
+            // clock starts here, when a start is actually going out.
+            scheduleConnectWatchdog()
             startV2Ray()
+        } else {
+            // A CANCELLED ACTION IS NOT A FAILURE. Declining Android's own VPN prompt used to leave
+            // the attempt in flight, so the object sat on «Подключение…» and then reported
+            // «Не удалось подключиться» for something the user chose to do.
+            connectInProgress = false
+            tunnelError = false
+            cancelConnectWatchdog()
+            applyRunningState(isLoading = false, isRunning = false)
         }
     }
 
@@ -340,10 +430,14 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         wireConnect()
         wireStatusStrip()
         wireScrollHairline()
+        setupServerList()
+        setupHomeMetaPager()
         observeTunnel()
         observeAccount()
         observeNetwork()
+        applyListInsets()
         render()
+        playColdStartAssemble()
     }
 
     /**
@@ -354,6 +448,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     override fun onResume() {
         super.onResume()
         refreshAccountData()
+        refreshServerSurfaces(-1)
         render()
     }
 
@@ -362,9 +457,16 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         timerHandler.removeCallbacks(healthRecheckRunnable)
         timerHandler.removeCallbacks(latencyRunnable)
         timerHandler.removeCallbacks(connectWatchdogRunnable)
+        timerHandler.removeCallbacks(uptimeRunnable)
         ringAnimator?.cancel()
         ringAnimator = null
-        ringDrawable = null
+        breathAnimator?.cancel()
+        breathAnimator = null
+        ringOuter = null
+        ringMid = null
+        ringInner = null
+        homeAdapter = null
+        homeMetaAdapter = null
         unregisterNetworkCallback()
         super.onDestroyView()
     }
@@ -372,58 +474,56 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     // ==================== What the shell calls ====================
 
     /**
-     * The server cache changed. Главная does not list servers any more — the «Серверы» row carries
-     * the count — so this repaints the ledger rather than an adapter.
+     * The server cache changed: rebuild the inline list and the subscription carousel from it.
      *
-     * @param index unused here; kept because the shell fans one signal out to two tabs and the
-     *   Серверы tab does use it.
+     * @param index the changed server's index in the cache, or -1 for the whole list.
      */
     fun bindList(index: Int) {
         if (!isBindingInitialized) return
+        refreshServerSurfaces(index)
         render()
         // Whether there is a server at all is one of the two inputs to the shell's nav gates.
         mainHost.refreshNavGates()
     }
 
     /**
-     * Главная has no scrolling list of its own any more, so there is nothing to pad. Kept because
-     * the shell pushes the inset into every attached tab and one inset strategy is the point.
+     * The server list scrolls with this screen rather than inside itself, so the inset that clears
+     * the overlaid bottom bar belongs to the scroll CONTENT. Never smaller than the layout's own
+     * bottom breathing room, so a zero inset (before the shell has measured the window) cannot
+     * leave the last row flush against the edge.
      */
-    fun applyListInsets() = Unit
-
-    /**
-     * The control the shell anchors its add menu to. The gate's «Добавить провайдера» when it is on
-     * screen, otherwise none — the shell falls back to the bottom bar, so the action is never a dead
-     * end.
-     */
-    fun addMenuAnchor(): View? {
-        if (!isBindingInitialized) return null
-        val secondary = binding.layoutGate.btnGateSecondary
-        return if (binding.layoutGate.gate.isVisible && secondary.isVisible) secondary else null
+    fun applyListInsets() {
+        if (!isBindingInitialized) return
+        val floor = resources.getDimensionPixelSize(R.dimen.space_24)
+        binding.homeContent.updatePadding(bottom = maxOf(mainHost.listBottomInset, floor))
     }
 
-    /** Repaints the status line after the shell changed which server is selected. */
+    /** Repaints after the shell changed which server is selected. */
     fun refreshSelectedServer() {
         if (!isBindingInitialized) return
+        homeAdapter?.syncSelection()
         render()
     }
 
     /**
-     * The shell has just written a new selected server. The shell owns the write because the Серверы
-     * list has to be mirrored too; all this screen has to do is re-read it.
+     * The shell has just written a new selected server. The shell owns the write because more than
+     * one surface reads the selection; this mirrors it into the list so exactly one row is ever
+     * painted selected, and drops the previous server's latency reading.
      */
     fun onSelectedServerChanged(previous: String?, guid: String) {
         if (!isBindingInitialized) return
-        // A new server invalidates the previous server's latency reading.
+        homeAdapter?.setSelectServer(previous, guid)
         pingMs = null
         pingProbeFailures = 0
         render()
     }
 
-    /** A server was removed elsewhere; the «Серверы» row's count follows it. */
+    /** A server was removed elsewhere; the inline list follows it. */
     fun removeServerRow(guid: String, position: Int) {
         if (!isBindingInitialized) return
+        refreshServerSurfaces(-1)
         render()
+        mainHost.refreshNavGates()
     }
 
     /**
@@ -448,9 +548,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     /**
      * @see MainHost.showStatus
      *
-     * A transient EVENT, so it is a `Snackbar` (00-rules.md 1.4.8 retires the custom `Toast` pill
-     * this used to be, and 13 s. 9 keeps the strip for persistent CONDITIONS only). Offset above the
-     * overlaid bottom navigation with the shell's own inset figure.
+     * A transient EVENT, so it is a `Snackbar`, offset above the overlaid bottom navigation with the
+     * shell's own inset figure. Persistent CONDITIONS go on the status strip instead.
      */
     fun showStatus(text: CharSequence) {
         if (!isBindingInitialized) return
@@ -464,11 +563,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
     /**
      * A background load opened somewhere in the shell (a subscription refresh, an import, an
-     * export). It reports on the status strip at the LOWEST priority, so a real condition always
-     * wins the single strip.
-     *
-     * It deliberately does NOT touch the connect sweep any more: the sweep means "the core is
-     * negotiating a tunnel" and nothing else (13 s. 5.3).
+     * export). It spins the connect object's sweep — the shared indicator this screen has always
+     * used for exactly these two things — and reports on the status strip at the LOWEST priority,
+     * so a real condition always wins the single strip.
      */
     fun showConnectArc() {
         backgroundLoads++
@@ -484,37 +581,45 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     // ==================== Building the connect object ====================
 
     /**
-     * Builds the disc, its ring and its ripple/focus foreground from THEME ATTRIBUTES.
+     * Builds the three rings, the disc's fill and the frame's ripple/focus foreground from THEME
+     * ATTRIBUTES.
      *
-     * These are drawables and not drawable files on purpose. The ring's colour is the screen's whole
+     * These are drawables and not drawable files on purpose. The rings' colour is the screen's whole
      * state channel and changes at runtime between five values; the shipped `bg_connect_ring.xml`
      * solved that with six raw hex literals across three theme variants, two of which measured
-     * 2.33:1 and 1.29:1 against the ground and failed the 3:1 boundary floor (00-rules.md 6.8,
-     * WCAG 1.4.11). Built here, every colour is resolved through `?attr` and is therefore correct in
-     * blue, light and the mono overlay at once, with no file to keep in three copies.
+     * 2.33:1 and 1.29:1 against the ground and failed the 3:1 boundary floor. Built here, every
+     * colour is resolved through `?attr` and is therefore correct in blue, light and the mono
+     * overlay at once, with no file to keep in three copies.
      *
-     * The frame IS the control: 176dp of touch target, and press scales the disc, the ring and the
-     * shield together because they are one object.
+     * THE FRAME IS THE CONTROL: 224dp of touch target, and @anim/press_scale scales the rings, the
+     * disc and the shield together, because they are one object.
      */
     private fun buildConnectObject() {
         val frame = binding.connectFrame
         val stroke = resources.getDimensionPixelSize(R.dimen.stroke_ring)
+        val step = resources.getDimensionPixelSize(R.dimen.space_12)
+        ringColor = idleRingColor()
 
+        // Rings 3 and 2 are two layers of the frame's background — 224dp and, inset
+        // by one @dimen/space_12 all round, 200dp. They are layers rather than child views
+        // because a child of a FrameLayout is measured inside the PADDED box, so no child of this
+        // frame can be wider than the 176dp disc, and these two have to be wider than it.
+        ringOuter = ovalStroke(stroke)
+        ringMid = ovalStroke(stroke)
+        frame.background = LayerDrawable(arrayOf(ringOuter, ringMid)).apply {
+            setLayerInset(1, step, step, step, step)
+        }
+        // Ring 1 of 3, the disc's own, over the disc's fill.
         val fill = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(themeColor(com.google.android.material.R.attr.colorSurfaceContainerHighest))
         }
-        ringColor = idleRingColor()
-        val ring = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(Color.TRANSPARENT)
-            setStroke(stroke, ringColor)
-        }
-        ringDrawable = ring
-        frame.background = LayerDrawable(arrayOf(fill, ring))
+        ringInner = ovalStroke(stroke)
+        binding.connectDisc.background = LayerDrawable(arrayOf(fill, ringInner))
+        applyRingColor(ringColor)
 
-        // R7: every focusable control draws a 2dp accent ring. The disc had none at all — the
-        // product's primary control was unreachable by keyboard, D-pad and switch access in practice.
+        // Every focusable control draws a 2dp accent ring. The disc had none at all — the product's
+        // primary control was unreachable by keyboard, D-pad and switch access in practice.
         val focus = StateListDrawable().apply {
             addState(
                 intArrayOf(android.R.attr.state_focused),
@@ -546,11 +651,38 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             setStroke(stroke, themeColor(androidx.appcompat.R.attr.colorPrimary))
         }
 
-        // The monogram's circle: the P3 plane, never the accent (13 s. 10).
+        // The monogram's circle: the P3 plane, never the accent.
         binding.layoutHomeAccount.tvAvatarInitial.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(themeColor(com.google.android.material.R.attr.colorSurfaceContainerHighest))
         }
+    }
+
+    private fun ovalStroke(stroke: Int) = GradientDrawable().apply {
+        shape = GradientDrawable.OVAL
+        setColor(Color.TRANSPARENT)
+        setStroke(stroke, Color.TRANSPARENT)
+    }
+
+    /** One hue, three opacities. The geometry never changes; only this does. */
+    private fun applyRingColor(colour: Int) {
+        val stroke = resources.getDimensionPixelSize(R.dimen.stroke_ring)
+        ringOuter?.setStroke(stroke, ColorUtils.setAlphaComponent(colour, RING_ALPHA_OUTER))
+        ringMid?.setStroke(stroke, ColorUtils.setAlphaComponent(colour, RING_ALPHA_MID))
+        ringInner?.setStroke(stroke, colour)
+    }
+
+    /**
+     * The cold-start assemble: the object settles in once per process, scaling up from 0.9 as it
+     * fades in. It is the first thing the app says and it was removed by the redesign; it is back,
+     * still once per process and still skipped under reduced motion.
+     */
+    private fun playColdStartAssemble() {
+        if (heroAssembled) return
+        heroAssembled = true
+        val frame = binding.connectFrame
+        if (frame.reducedMotion()) return
+        frame.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.shield_assemble))
     }
 
     private fun wireConnect() {
@@ -559,13 +691,14 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
     private fun wireHeaderRow() {
         binding.layoutHomeAccount.rowAccount.onSingleClick { openAccount() }
+        binding.btnHomeAdd.onSingleClick { mainHost.showAddMenu(it) }
     }
 
     /**
-     * The inline placement of the shared status strip (S-6). The component file is the shell's
-     * DOCKED bar — full-bleed, hairline on top — so two properties are adjusted here and nowhere
-     * else: the hairline goes, and the bar is clipped to @dimen/radius_control so it reads as a
-     * block inside the content rather than as an edge of the window.
+     * The inline placement of the shared status strip. The component file is the shell's DOCKED bar
+     * — full-bleed, hairline on top — so two properties are adjusted here and nowhere else: the
+     * hairline goes, and the bar is clipped to @dimen/radius_control so it reads as a block inside
+     * the content rather than as an edge of the window.
      */
     private fun wireStatusStrip() {
         val strip = binding.layoutStatusStrip
@@ -581,8 +714,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
-     * The ONE scroll-linked change on this screen (13 s. 10): a hairline under the header row fades
-     * in once the content has moved. No colour step, no elevation, no shadow, no collapsing title.
+     * The ONE scroll-linked change on this screen: a hairline under the header row fades in once the
+     * content has moved. No colour step, no elevation, no shadow, no collapsing title.
      */
     private fun wireScrollHairline() {
         // The SAM constructor is explicit because View and NestedScrollView both declare a
@@ -602,6 +735,433 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
                     .setDuration(durState).setInterpolator(easeStandard).start()
             }
         )
+    }
+
+    // ==================== The inline server list ====================
+
+    /**
+     * Builds Главная's server list. Row actions come from [MainHost.serverActions] — one listener
+     * for every list in the app — and a long press opens the shell's server-actions sheet, which is
+     * the only route to edit, share, QR and delete.
+     *
+     * Tapping a row SELECTS and never connects; that contract lives in `MainActivity.setSelectServer`
+     * and is deliberately not re-implemented here.
+     */
+    private fun setupServerList() {
+        val listAdapter = MainRecyclerAdapter(mainViewModel, mainHost.serverActions)
+        listAdapter.onItemLongClick = { guid -> mainHost.showServerActions(guid) }
+        homeAdapter = listAdapter
+        binding.rvHomeServers.apply {
+            setHasFixedSize(false)
+            layoutManager = LinearLayoutManager(requireContext())
+            isNestedScrollingEnabled = false
+            this@HomeFragment.addCustomDividerToRecyclerView(this, R.drawable.custom_divider)
+            adapter = listAdapter
+        }
+        refreshServerList(-1)
+    }
+
+    /**
+     * Repaints the list from the one cache.
+     *
+     * Section headers are OFF: the subscription card above the list is that подписка's header, and a
+     * second one inside the list would say the same thing twice.
+     *
+     * This does NOT touch the carousel, because a bulk ping delivers one result per server and
+     * rebuilding a ViewPager2 once per server would thrash it for a change no card shows.
+     */
+    private fun refreshServerList(index: Int) {
+        val groups = mainViewModel.getProviderGroups()
+        homeAdapter?.setSections(mainViewModel.serversCache, groups, showHeaders = false, index = index)
+    }
+
+    /** The cache itself changed — an import, a delete, a refresh — so both surfaces follow it. */
+    private fun refreshServerSurfaces(index: Int) {
+        refreshServerList(index)
+        rebuildHomeMeta()
+    }
+
+    // ==================== The subscription card carousel ====================
+
+    /**
+     * One page per подписка. Per-page actions carry the page's own subscription id — pin, delete,
+     * support and Telegram act on the card under the thumb — while collapse, ping and refresh are
+     * genuinely list-wide.
+     */
+    private fun setupHomeMetaPager() {
+        val pagerAdapter = HomeMetaPagerAdapter(
+            bindPage = { meta, subId, sub -> bindMetaBar(meta, subId, sub) },
+            onToggleList = { toggleHomeServerList() },
+            // "A check is in flight" is the ViewModel's own transient state (`isMeasuring`) and it
+            // publishes a repaint itself, so this asks for the test and nothing else. Marking the
+            // rows here by writing a negative delay into the STORE is what the shipped build did,
+            // and it is exactly what `ServerAffiliationInfo` forbids: a stored negative outlives
+            // the run that wrote it and every reader treats it as "unreachable" — including
+            // «Удалить недоступные», which then deletes the server.
+            onPingAll = { mainViewModel.testAllServers() },
+            onRefreshAll = { mainHost.refreshSubscriptions() },
+            onTogglePin = { subId -> toggleHomePin(subId) },
+            onDeleteSub = { subId -> confirmDeleteSubscription(subId) },
+            onOpenSupport = { subId -> openSubUrl(MmkvManager.decodeSubscription(subId)?.supportUrl) },
+            onOpenTelegram = { subId -> openSubUrl(MmkvManager.decodeSubscription(subId)?.supportUrl) },
+            collapsed = { homeListCollapsed },
+        )
+        homeMetaAdapter = pagerAdapter
+        binding.vpHomeMeta.apply {
+            adapter = pagerAdapter
+            offscreenPageLimit = 1
+            clipToPadding = false
+            registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+                private var dragged = false
+
+                override fun onPageScrollStateChanged(state: Int) {
+                    if (state == ViewPager2.SCROLL_STATE_DRAGGING) dragged = true
+                }
+
+                override fun onPageSelected(position: Int) {
+                    homeMetaPage = position
+                    updateHomeMetaDots(position)
+                    if (dragged) {
+                        if (isBindingInitialized) binding.vpHomeMeta.tickHaptic()
+                        dragged = false
+                    }
+                }
+            })
+        }
+        rebuildHomeMeta()
+    }
+
+    /**
+     * Rebuilds the carousel from the current groups, keeping the user on the same подписка across
+     * rebuilds (pin reorders, refresh, deletes) by restoring the page by its subscription id. Page
+     * dots and the inter-page gap appear only past one card.
+     */
+    private fun rebuildHomeMeta() {
+        val adapter = homeMetaAdapter ?: return
+        val ids = mainViewModel.getProviderGroups().map { it.id }.filter { it.isNotEmpty() }
+        val keepSubId = homeMetaSubIds.getOrNull(homeMetaPage)
+        val count = ids.size
+        val many = count > 1
+        // A подписка with no card is a slot with no content: the carousel is only on screen when
+        // there is at least one to draw. Local-only servers have no подписка and no card.
+        binding.groupHomeMeta.isVisible = count > 0
+
+        // Same подписки, changed contents (a refresh moved the traffic figure and the timestamp):
+        // repaint the pages in place rather than replacing them, so the card under the thumb does
+        // not jump back to the first one every time a subscription updates.
+        if (ids == homeMetaSubIds && adapter.itemCount == count) {
+            adapter.repaint()
+            measureHomeMetaHeight()
+            return
+        }
+        homeMetaSubIds = ids
+        adapter.submit(ids)
+        // Neighbour cards peek past the 16dp gutter; a 12dp gap keeps them from touching.
+        binding.vpHomeMeta.setPageTransformer(
+            if (many) {
+                CompositePageTransformer().apply {
+                    addTransformer(MarginPageTransformer(resources.getDimensionPixelSize(R.dimen.space_12)))
+                }
+            } else {
+                null
+            }
+        )
+        // Keep the user on the card they were reading; on the FIRST build there is no such card, so
+        // open on the подписка the selected server belongs to rather than always on the first one.
+        val restore = keepSubId?.let { ids.indexOf(it) }?.takeIf { it >= 0 }
+            ?: ids.indexOf(currentMetaSubId()).takeIf { it >= 0 }
+            ?: 0
+        homeMetaPage = restore.coerceIn(0, (count - 1).coerceAtLeast(0))
+        if (count > 0) binding.vpHomeMeta.setCurrentItem(homeMetaPage, false)
+        buildHomeMetaDots(count)
+        updateHomeMetaDots(homeMetaPage)
+        binding.llHomeMetaDots.isVisible = many
+        measureHomeMetaHeight()
+    }
+
+    /**
+     * ViewPager2 cannot wrap_content, so fix its height to the tallest page. Each page's height
+     * varies (traffic row, the operator's notice), so measure every подписка's card at the page
+     * width and take the max — one stable height, so peeking neighbours stay aligned.
+     */
+    private fun measureHomeMetaHeight() {
+        if (homeMetaSubIds.isEmpty()) return
+        binding.vpHomeMeta.doOnPreDraw {
+            if (!isBindingInitialized) return@doOnPreDraw
+            val pager = binding.vpHomeMeta
+            val innerWidth = pager.width - pager.paddingStart - pager.paddingEnd
+            if (innerWidth <= 0) return@doOnPreDraw
+            val widthSpec = View.MeasureSpec.makeMeasureSpec(innerWidth, View.MeasureSpec.EXACTLY)
+            val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+            val inflater = LayoutInflater.from(requireContext())
+            var maxH = 0
+            for (id in homeMetaSubIds) {
+                val sub = MmkvManager.decodeSubscription(id) ?: continue
+                val probe = LayoutSubscriptionMetaBarBinding.inflate(inflater, pager, false)
+                (probe.root.layoutParams as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
+                bindMetaBar(probe, id, sub)
+                probe.root.measure(widthSpec, heightSpec)
+                maxH = maxOf(maxH, probe.root.measuredHeight)
+            }
+            if (maxH > 0 && pager.layoutParams.height != maxH) {
+                pager.layoutParams = pager.layoutParams.apply { height = maxH }
+            }
+        }
+    }
+
+    /** Rebuilds the page dots to match [count] pages (nothing shown for 0/1 page). */
+    private fun buildHomeMetaDots(count: Int) {
+        val container = binding.llHomeMetaDots
+        container.removeAllViews()
+        if (count <= 1) return
+        val size = resources.getDimensionPixelSize(R.dimen.dot_size)
+        val activeSize = resources.getDimensionPixelSize(R.dimen.dot_size_active)
+        val gap = resources.getDimensionPixelSize(R.dimen.space_4)
+        for (i in 0 until count) {
+            val selected = i == homeMetaPage
+            val dim = if (selected) activeSize else size
+            val dot = View(requireContext()).apply {
+                layoutParams = LinearLayout.LayoutParams(dim, dim).apply {
+                    if (i > 0) marginStart = gap
+                }
+                setBackgroundResource(if (selected) R.drawable.dot_active else R.drawable.dot_inactive)
+            }
+            container.addView(dot)
+        }
+    }
+
+    /** Swaps the dot backgrounds/sizes so only [position]'s dot reads as active. */
+    private fun updateHomeMetaDots(position: Int) {
+        val container = binding.llHomeMetaDots
+        val size = resources.getDimensionPixelSize(R.dimen.dot_size)
+        val activeSize = resources.getDimensionPixelSize(R.dimen.dot_size_active)
+        for (i in 0 until container.childCount) {
+            val dot = container.getChildAt(i)
+            val selected = i == position
+            dot.setBackgroundResource(if (selected) R.drawable.dot_active else R.drawable.dot_inactive)
+            val dim = if (selected) activeSize else size
+            dot.layoutParams = dot.layoutParams.apply {
+                width = dim
+                height = dim
+            }
+        }
+    }
+
+    /**
+     * The card's chevron shows and hides the server list under it — never the card's own body, which
+     * stays on screen so the traffic figure is always readable.
+     */
+    private fun toggleHomeServerList() {
+        homeListCollapsed = !homeListCollapsed
+        // The chevron lives on EVERY page and the collapse is global, so all of them follow it —
+        // not just the one under the thumb, which would leave the neighbour pointing the wrong way.
+        homeMetaAdapter?.repaint()
+        render()
+    }
+
+    private fun toggleHomePin(subId: String) {
+        val sub = MmkvManager.decodeSubscription(subId) ?: return
+        sub.pinned = !sub.pinned
+        MmkvManager.encodeSubscription(subId, sub)
+        homeMetaAdapter?.notifyItemChanged(homeMetaPage)
+        mainViewModel.reloadServerList()
+    }
+
+    /**
+     * Deleting a подписка, from the card that shows it. The owner reported that подписки could not
+     * be deleted on the phone at all — the card that carried this was removed with the rest of the
+     * screen, and nothing replaced it.
+     */
+    private fun confirmDeleteSubscription(subId: String) {
+        if (subId.isEmpty()) return
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.home_sub_delete_title)
+            .setMessage(R.string.home_sub_delete_message)
+            .setPositiveButton(R.string.home_sub_delete_confirm) { _, _ ->
+                MmkvManager.removeSubscription(subId)
+                mainViewModel.reloadServerList()
+                showStatus(getString(R.string.home_sub_deleted))
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** Opens the подписка's own link, and says so plainly when the device has nothing to open it. */
+    private fun openSubUrl(url: String?) {
+        if (url.isNullOrBlank()) return
+        runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+            .onFailure { showStatus(getString(R.string.home_sub_link_failed)) }
+    }
+
+    /**
+     * The card's heading.
+     *
+     * WHEN THE ПОДПИСКА CAME FROM THE ACCOUNT, THE ACCOUNT'S OWN NICKNAME WINS. That is the owner's
+     * instruction — «чтобы при подтягивании подписки с акка писался ник подписки» — and it is the one
+     * thing the old build got wrong: it preferred the provider-sent `profile-title`, which for this
+     * deployment is the same generic service name on every подписка, so two differently-named
+     * подписки drew the same label.
+     *
+     * [accountNameFor] reads the LIVE account list, so renaming a подписка in Аккаунт shows here
+     * without waiting for a re-import; the imported remark is the same nickname one refresh behind,
+     * and stands in when the account has not answered yet.
+     */
+    private fun metaTitle(subId: String, sub: SubscriptionItem): String {
+        accountNameFor(subId)?.let { return it }
+        val remarks = sub.remarks.trim()
+        val fromRemarks = remarks.takeIf { it.isNotEmpty() && !it.equals("Default", ignoreCase = true) }
+        if (isAccountManaged(subId)) {
+            // Account-managed: the remark IS the nickname the import wrote, so it outranks the
+            // provider's generic title.
+            fromRemarks?.let { return it }
+        }
+        sub.profileTitle.takeIf { it.isNotBlank() }?.let { return it }
+        fromRemarks?.let { return it }
+        return getString(R.string.home_sub_untitled)
+    }
+
+    /** True when this local подписка is one the account manages, rather than a pasted link. */
+    private fun isAccountManaged(subId: String): Boolean =
+        runCatching { AuthTokenStore.getManagedGuids().containsValue(subId) }.getOrDefault(false)
+
+    /**
+     * The nickname the account returns for this local подписка, or null when it is not an account
+     * one (or the account has not answered yet).
+     *
+     * The import remembers each подписка under an identity key — the constant "root" for the account's
+     * primary, the remnawave uuid / id for a secondary — so the mapping back to a `SubInfoDto` is
+     * that key, not a name match.
+     */
+    private fun accountNameFor(subId: String): String? {
+        val identity = runCatching {
+            AuthTokenStore.getManagedGuids().entries.firstOrNull { it.value == subId }?.key
+        }.getOrNull() ?: return null
+        val info = accountSubs.firstOrNull { candidate ->
+            val key = if (candidate.type.equals(SubscriptionSyncManager.TYPE_ROOT, ignoreCase = true)) {
+                SubscriptionSyncManager.TYPE_ROOT
+            } else {
+                candidate.remnawaveUuid.ifBlank { candidate.id }
+            }
+            key.isNotBlank() && key == identity
+        } ?: return null
+        return info.displayName?.takeIf { it.isNotBlank() }
+            ?: info.defaultLabel?.takeIf { it.isNotBlank() }
+    }
+
+    /**
+     * The line under the card's heading: when the подписка last updated, and how often it does. The
+     * timestamp is formatted from a resource pattern rather than a locale-dependent default so a
+     * Russian sentence never ends in an English month.
+     */
+    private fun metaSubtitle(sub: SubscriptionItem): String {
+        val last = if (sub.lastUpdated > 0L) {
+            SimpleDateFormat(getString(R.string.home_date_numeric_time), Locale.getDefault())
+                .format(Date(sub.lastUpdated))
+        } else {
+            getString(R.string.home_sub_updated_never)
+        }
+        val interval = if (!sub.autoUpdate) {
+            getString(R.string.home_sub_auto_update_off)
+        } else {
+            val minutes = sub.updateInterval
+            if (minutes >= 60L && minutes % 60L == 0L) {
+                getString(R.string.home_sub_interval_hours, (minutes / 60L).toInt())
+            } else {
+                getString(R.string.home_sub_interval_minutes, minutes.toInt())
+            }
+        }
+        return getString(R.string.home_sub_meta, last, getString(R.string.home_sub_auto_update, interval))
+    }
+
+    /**
+     * Paints one card: the name, the meta line, the traffic pill, the expiry marker, the operator's
+     * notice and the support / Telegram actions. The pill is a rounded track with the usage figure
+     * centred on it; the expiry shows ∞ when there is none (or an effectively unlimited one).
+     */
+    private fun bindMetaBar(meta: LayoutSubscriptionMetaBarBinding, subId: String, sub: SubscriptionItem?) {
+        if (sub == null) {
+            meta.root.isVisible = false
+            return
+        }
+        meta.root.isVisible = true
+        meta.tvSubTitle.text = metaTitle(subId, sub)
+        meta.tvMetaSubtitle.text = metaSubtitle(sub)
+        meta.tvMetaSubtitle.isVisible = true
+
+        // Accessible names for the card's actions, in this screen's own voice.
+        meta.btnCollapse.contentDescription = getString(
+            if (homeListCollapsed) R.string.home_sub_cd_expand else R.string.home_sub_cd_collapse
+        )
+        meta.btnPing.contentDescription = getString(R.string.home_sub_cd_ping)
+        meta.btnRefresh.contentDescription = getString(R.string.home_sub_cd_refresh)
+        meta.btnSupport.contentDescription = getString(R.string.home_sub_cd_support)
+        meta.btnTelegram.contentDescription = getString(R.string.home_sub_cd_telegram)
+
+        val primaryColor = MaterialColors.getColor(meta.btnPin, androidx.appcompat.R.attr.colorPrimary)
+        val onVariant = MaterialColors.getColor(meta.btnPin, com.google.android.material.R.attr.colorOnSurfaceVariant)
+        meta.btnPin.setColorFilter(if (sub.pinned) primaryColor else onVariant)
+        meta.btnPin.contentDescription =
+            getString(if (sub.pinned) R.string.home_sub_cd_unpin else R.string.home_sub_cd_pin)
+
+        // The operator's notice, verbatim, as plain text — never markup.
+        if (sub.announce.isNotBlank()) {
+            meta.tvAnnounce.isVisible = true
+            meta.tvAnnounce.text = sub.announce
+        } else {
+            meta.tvAnnounce.isVisible = false
+        }
+        meta.btnSupport.isVisible = sub.supportUrl.isNotBlank()
+        meta.btnTelegram.isVisible = sub.supportUrl.isNotBlank()
+
+        if (!sub.hasUserInfo) {
+            meta.layoutTraffic.isVisible = false
+            return
+        }
+        meta.layoutTraffic.isVisible = true
+
+        val onSurfaceColor = MaterialColors.getColor(meta.tvTraffic, com.google.android.material.R.attr.colorOnSurface)
+        val variantColor = MaterialColors.getColor(meta.tvExpiry, com.google.android.material.R.attr.colorOnSurfaceVariant)
+        val dangerColor = ContextCompat.getColor(requireContext(), R.color.color_destructive_text)
+
+        meta.tvTraffic.text = if (sub.isUnlimited) {
+            getString(R.string.home_sub_traffic_unlimited, sub.usedTraffic.toTrafficString())
+        } else {
+            getString(
+                R.string.home_sub_traffic_used,
+                sub.usedTraffic.toTrafficString(),
+                sub.totalTraffic.toTrafficString(),
+            )
+        }
+        meta.tvTraffic.setTextColor(onSurfaceColor)
+        // Unlimited traffic keeps an empty rounded track behind the label instead of a filled bar.
+        // A horizontal ProgressBar takes an Int against max=1000, so the fraction is unchanged.
+        val fillFraction = if (sub.isUnlimited) 0f else sub.trafficFraction
+        meta.progressTraffic.progress = (fillFraction * 1000).toInt()
+
+        val expiryUnlimited = sub.expire <= 0L || sub.expire >= UNLIMITED_EXPIRE_SECONDS
+        when {
+            expiryUnlimited -> {
+                meta.tvExpiry.text = getString(R.string.home_sub_infinity)
+                meta.tvExpiry.setTextColor(variantColor)
+            }
+
+            sub.isExpired -> {
+                meta.tvExpiry.text = getString(R.string.home_sub_expired)
+                meta.tvExpiry.setTextColor(dangerColor)
+            }
+
+            else -> {
+                meta.tvExpiry.text = getString(R.string.home_sub_expires, formatDate(sub.expire * 1000L))
+                meta.tvExpiry.setTextColor(variantColor)
+            }
+        }
+        meta.tvExpiry.isVisible = true
+    }
+
+    /** The подписка the selected server belongs to, else the first one there is. */
+    private fun currentMetaSubId(): String {
+        mainViewModel.findSubscriptionIdBySelect()?.takeIf { it.isNotEmpty() }?.let { return it }
+        return mainViewModel.getProviderGroups().firstOrNull()?.id.orEmpty()
     }
 
     // ==================== Observers ====================
@@ -649,16 +1209,18 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             val liveTransition = connectInProgress || (prevRunning != null && prevRunning != isRunning)
 
             // A start that ends in "not running" while a connect was in flight is a FAILURE, and it
-            // is reported on the screen (13 s. 11.2) rather than as a toast that has already gone.
+            // is reported on the screen rather than as a toast that has already gone.
             tunnelError = !isRunning && connectInProgress
             disconnecting = false
 
             applyRunningState(isLoading = false, isRunning = isRunning, animate = liveTransition)
 
             if (isRunning) {
+                startConnectionTimer()
                 scheduleHealthCheckIfEnabled()
                 startLatencyProbe()
             } else {
+                stopConnectionTimer()
                 cancelHealthCheck()
                 stopLatencyProbe()
             }
@@ -670,12 +1232,17 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         mainViewModel.delayResultAction.observe(viewLifecycleOwner) { time ->
             onDelayResult(time)
         }
+
+        mainViewModel.updateTestResultAction.observe(viewLifecycleOwner) {
+            // A bulk ping finished for one row; the list repaints itself from the stored delay.
+            if (isBindingInitialized) refreshServerList(-1)
+        }
     }
 
     /**
-     * One delay result serves two consumers: the numeric strip's third column, and the auto-fallback
-     * health check. The latency update runs FIRST and unconditionally — it is the reading, and the
-     * health check's `pending` flag says nothing about whether the figure is true.
+     * One delay result serves two consumers: the latency shown beside the server identity, and the
+     * auto-fallback health check. The latency update runs FIRST and unconditionally — it is the
+     * reading, and the health check's `pending` flag says nothing about whether the figure is true.
      */
     private fun onDelayResult(time: Long) {
         if (mainViewModel.isRunning.value == true) {
@@ -687,8 +1254,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
                 pingMs = null
                 pingProbeFailures++
             }
-            // A reading only repaints the figure. A full render is for the frame the "server is not
-            // answering" condition actually appears or clears on.
+            // A reading only repaints the identity line. A full render is for the frame the "server
+            // is not answering" condition actually appears or clears on.
             if (isBindingInitialized) {
                 if (wasSilent != (pingProbeFailures >= SILENT_SERVER_FAILURES)) render() else paintFigures()
             }
@@ -721,9 +1288,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
-     * The account and its subscriptions. Both feed the header row and the «Подписка» row, and
-     * NEITHER blocks the other: a subscription that resolves while the profile is still in flight
-     * paints its row and leaves the header a skeleton (13 s. 11.3, "partial").
+     * The account and its subscriptions. Both feed the header row and the subscription card, and
+     * NEITHER blocks the other: a подписка that resolves while the profile is still in flight paints
+     * its card and leaves the header a skeleton.
      */
     private fun observeAccount() {
         viewLifecycleOwner.lifecycleScope.launch {
@@ -737,7 +1304,11 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
                     accountSubs = subs
                     subsResolved = true
                     subsError = false
-                    if (isBindingInitialized) render()
+                    if (!isBindingInitialized) return@collect
+                    // The account's nicknames are what the cards are named by, so a fresh list
+                    // repaints them.
+                    homeMetaAdapter?.repaint()
+                    render()
                 }
             }
         }
@@ -761,7 +1332,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         refreshAccountData()
     }
 
-    /** 00-rules.md 9.4: every error ships a recovery affordance. */
+    /** Every error ships a recovery affordance. */
     private fun showRetry() {
         val bar = Snackbar.make(binding.root, getString(R.string.home_sub_stale), Snackbar.LENGTH_LONG)
             .setAction(R.string.home_action_retry) { refreshAccountData() }
@@ -804,8 +1375,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
-     * Runs once when the user transitions to signed-in: auto-import their subscriptions and reload
-     * the server list on success.
+     * Runs once when the user transitions to signed-in: auto-import their подписки and reload the
+     * server list on success.
      */
     private fun onLoggedIn() {
         lifecycleScope.launch {
@@ -859,21 +1430,18 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
     /**
      * Reads every input once and returns the screen. This is the only place a decision is made; from
-     * here down the code paints what it is told (13 s. 15.4).
+     * here down the code paints what it is told.
      */
     private fun resolveState(): HomeState {
         val serverCount = mainViewModel.serversCache.size
-        val providerCount = mainViewModel.serversCache
-            .map { it.profile.subscriptionId }
-            .filter { it.isNotEmpty() }
-            .distinct()
-            .size
         val selected = MmkvManager.getSelectServer()
-        val serverName = selected
-            ?.let { MmkvManager.decodeServerConfig(it)?.remarks }
+        val profile = selected?.let { MmkvManager.decodeServerConfig(it) }
+        val serverName = profile?.remarks
             ?.takeIf { it.isNotBlank() }
-            // The leading country flag renders as a tile on the «Серверы» row, never as text here.
+            // The leading country flag is the tile beside the name, never text inside it.
             ?.let { FlagUtil.stripLeadingFlag(it).trim() }
+            ?.takeIf { it.isNotEmpty() }
+        val serverFlag = profile?.let { FlagUtil.resolveFlag(it) }
 
         // A sync that produced servers is a sync that succeeded; the request is spent.
         if (serverCount > 0) syncRequested = false
@@ -895,8 +1463,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             gate = gate,
             accountLoading = !accountResolved,
             serverName = serverName,
+            serverFlag = serverFlag,
             serverCount = serverCount,
-            providerCount = providerCount,
             sub = sub,
             condition = resolveCondition(sub, conn),
             stale = offline,
@@ -904,19 +1472,15 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
-     * 13 s. 8.3: the gate replaces the rows only when the rows would have nothing true to say. On
+     * The gate replaces the card and the list only when they would have nothing true to show. On
      * this product that reduces to one test — there is not a single server to connect to — and then
      * WHICH gate is a question about what the user is missing.
-     *
-     * With servers present the rows always show, and any actionable condition (expired, expiring,
-     * device limit) is carried by the status strip instead.
      */
     private fun resolveGate(serverCount: Int): Gate? {
         if (serverCount > 0) return null
-        if (!BackendConfig.isConfigured()) return Gate.ADD_PROVIDER
+        if (!BackendConfig.isConfigured()) return Gate.ADD_SUBSCRIPTION
         if (!AccountSession.isLoggedIn()) return Gate.SIGN_IN
-        // Still resolving: show the ledger with its skeleton rather than guess a gate and then
-        // swap it for a different one a second later.
+        // Still resolving: show nothing rather than guess a gate and swap it a second later.
         if (!subsResolved) return null
         if (accountSubs.isEmpty()) return Gate.BUY
         // A sync that the user asked for, that has finished, and that produced no server, is a
@@ -926,8 +1490,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
-     * The subscription, from the account when there is one and from the local provider metadata
-     * otherwise, so a pasted subscription still tells the truth on this row.
+     * The subscription, from the account when there is one and from the local metadata otherwise, so
+     * a pasted подписка still tells the truth.
      *
      * `isTrial` is the backend's flag and is never inferred from a tariff name or a squad — in this
      * deployment the trial squad IS the paid base squad, so squad-based detection misclassifies real
@@ -940,9 +1504,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             val until = parseIsoMillis(active.expireAtIso) ?: return Sub.Active(null)
             return classifyExpiry(until, active.isTrial)
         }
-        // No account: the provider's own `userinfo` expiry is the only truth available. Panels
+        // No account: the подписка's own `userinfo` expiry is the only truth available. Panels
         // sometimes send a huge timestamp instead of 0 for "never", which reads as an active
-        // subscription with no date - which is exactly what Sub.Active(null) draws.
+        // subscription with no date — which is exactly what Sub.Active(null) draws.
         val expireSeconds = MmkvManager.decodeSubscriptions()
             .mapNotNull { it.subscription.expire.takeIf { e -> e > 0L } }
             .minOrNull()
@@ -964,11 +1528,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
-     * ONE condition, resolved by the priority order of 13 s. 9. The renderer never picks between
-     * conditions; if two are true at once, the higher one is the only one shown.
-     *
-     * Two rows of that table have no producer on Android yet and are therefore absent rather than
-     * faked: the device limit (row 2) and TUN-requested-but-unavailable (row 6).
+     * ONE condition, resolved by priority. The renderer never picks between conditions; if two are
+     * true at once, the higher one is the only one shown.
      */
     private fun resolveCondition(sub: Sub, conn: Conn): Condition? {
         if (sub is Sub.Expired) {
@@ -988,11 +1549,11 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             )
         }
         if (conn == Conn.CONNECTED && pingProbeFailures >= SILENT_SERVER_FAILURES) {
+            // The list is on this screen, so the warning can point at it: the recovery is one tap
+            // away and no longer a dead end.
             return Condition(
                 text = getString(R.string.home_condition_silent),
                 severity = Severity.WARN,
-                actionLabel = getString(R.string.home_action_change_server),
-                action = { mainHost.selectTab(MainTab.SERVERS) },
             )
         }
         if (sub is Sub.Expiring) {
@@ -1091,8 +1652,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             return
         }
         val wasVisible = strip.statusStrip.isVisible && !stripHiding
-        // A replaced message CROSSFADES; the bar itself does not move (13 s. 12.5). Only the text
-        // is animated, so a strip that stays up while its reason changes never jumps.
+        // A replaced message CROSSFADES; the bar itself does not move. Only the text is animated, so
+        // a strip that stays up while its reason changes never jumps.
         if (wasVisible && strip.statusStripText.text?.toString() != condition.text.toString()) {
             crossfadeText(strip.statusStripText, condition.text)
         } else {
@@ -1103,9 +1664,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             Severity.WARN -> themeColor(R.attr.warning)
             Severity.ERROR -> ContextCompat.getColor(requireContext(), R.color.color_destructive_text)
         }
-        // res/drawable ships no ic_warning and no ic_error yet (filed with the icon owner), so the
-        // warning and error severities carry the info glyph in the correct tone. That keeps two
-        // channels — the glyph's colour and the words — rather than one.
         strip.statusStripIcon.imageTintList = ColorStateList.valueOf(tint)
 
         val label = condition.actionLabel
@@ -1173,22 +1731,22 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
-     * The disc, the ring, the shield and the status line. Colour carries the state on a geometry
-     * that never changes: the ring is 3dp in every state and only its tint moves (S-2), because a
-     * ring that changes width makes the control appear to change size.
+     * The rings, the disc, the shield and the status line. Colour carries the state on a geometry
+     * that never changes: every ring is 3dp in every state and only its tint moves, because a ring
+     * that changes width makes the control appear to change size.
      */
     private fun paintConnect(state: HomeState, animate: Boolean) {
         val frame = binding.connectFrame
         val enabled = when (state.conn) {
             Conn.GATED, Conn.NO_SERVER, Conn.DISCONNECTING -> false
-            // 13 s. 11.1 variant E: the app does not know better than the OS whether a tunnel can be
-            // raised, so offline keeps the disc live.
+            // The app does not know better than the OS whether a tunnel can be raised, so offline
+            // keeps the disc live.
             else -> true
         }
         frame.isEnabled = enabled
         frame.isFocusable = enabled
         frame.alpha = if (enabled) 1f else DISABLED_ALPHA
-        // 13 s. 14: the name states STATE and ACTION. A disabled disc names the state alone,
+        // The accessible name states STATE and ACTION. A disabled object names the state alone,
         // because it has no action to offer and promising one is a lie to a screen reader.
         frame.contentDescription = getString(
             when (state.conn) {
@@ -1201,11 +1759,15 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             }
         )
 
-        val sweeping = state.conn == Conn.CONNECTING
-        if (sweeping) binding.connectSweep.show() else binding.connectSweep.hide()
+        val negotiating = state.conn == Conn.CONNECTING
+        // The sweep spins for the two things this screen has always spun it for: the core
+        // negotiating a tunnel, and a подписка being fetched.
+        if (negotiating || backgroundLoads > 0) binding.connectSweep.show() else binding.connectSweep.hide()
+        if (negotiating) startBreathing() else stopBreathing()
 
         val targetRing = when (state.conn) {
             Conn.CONNECTED -> themeColor(androidx.appcompat.R.attr.colorPrimary)
+            Conn.CONNECTING -> themeColor(R.attr.connectActiveColor)
             Conn.ERROR -> themeColor(androidx.appcompat.R.attr.colorError)
             Conn.GATED, Conn.NO_SERVER -> themeColor(com.google.android.material.R.attr.colorOutline)
             else -> idleRingColor()
@@ -1251,15 +1813,30 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         binding.tvStatus.setText(textRes)
         binding.tvStatus.setTextColor(colour)
 
-        val detail: CharSequence? = when (state.conn) {
+        // WHAT IT RUNS THROUGH: the flag, then the server, then its live latency once a probe has
+        // landed. The whole line is INVISIBLE rather than GONE, so nothing below it moves.
+        val name = state.serverName
+        // The IDENTITY and a HINT are two different lines that share one slot, and only the
+        // identity gets the flag: a flag beside «Нажмите, чтобы повторить» would label the
+        // instruction with a country.
+        val identity: CharSequence? = when (state.conn) {
+            Conn.ERROR, Conn.NO_SERVER, Conn.GATED -> null
+            Conn.CONNECTED -> name?.let { server ->
+                pingMs?.let { getString(R.string.home_server_latency, server, it) } ?: server
+            }
+
+            else -> name
+        }
+        val hint: CharSequence? = when (state.conn) {
             Conn.ERROR -> getString(R.string.home_detail_retry)
             Conn.NO_SERVER -> getString(R.string.home_detail_pick_server)
-            Conn.GATED -> null
-            else -> state.serverName
+            else -> null
         }
+        val detail = identity ?: hint
+        binding.tvServerFlag.text = state.serverFlag.orEmpty()
+        binding.tvServerFlag.isVisible = identity != null && state.serverFlag != null
         binding.tvStatusDetail.text = detail ?: ""
-        // INVISIBLE, never GONE: the line stays reserved so the strip below never moves.
-        binding.tvStatusDetail.visibility = if (detail == null) View.INVISIBLE else View.VISIBLE
+        binding.serverIdentity.visibility = if (detail == null) View.INVISIBLE else View.VISIBLE
     }
 
     private fun gateStatusWord(state: HomeState): Int = when {
@@ -1269,43 +1846,28 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
-     * The three figures. Visible only while CONNECTED: during negotiation the throughput is
-     * genuinely zero and there is no latency measurement, and printing `0,0` there would be a
-     * placeholder pretending to be a reading.
+     * The strip's two speed columns. A figure LANDS — it does not tick, count or animate — and it
+     * reads zero at rest rather than blank: this row is the screen's ledger and it is always there.
+     * The session clock is written by [uptimeRunnable], which owns it second by second.
      */
     private fun paintFigures() {
         if (!isBindingInitialized) return
-        // A figure LANDS. It does not tick, count or animate (13 s. 12.5).
-        binding.tvDown.text = downBytesPerSec?.let { formatSpeed(it) }.orEmpty()
-        binding.tvUp.text = upBytesPerSec?.let { formatSpeed(it) }.orEmpty()
-
-        // The one exception: the latency's FIRST arrival fades in, because until the probe lands
-        // its box is deliberately empty and a figure appearing out of nothing reads as a glitch.
-        val ping = pingMs?.toString().orEmpty()
-        val view = binding.tvPing
-        val firstArrival = ping.isNotEmpty() && view.text.isNullOrEmpty()
-        if (firstArrival && !view.reducedMotion()) {
-            view.animate().cancel()
-            view.alpha = 0f
-            view.text = ping
-            view.animate().alpha(1f).setDuration(durState).setInterpolator(easeStandard).start()
-        } else {
-            view.alpha = 1f
-            view.text = ping
-        }
+        val zero = getString(R.string.home_speed_zero)
+        binding.tvUp.text = upBytesPerSec?.let { formatSpeed(it) } ?: zero
+        binding.tvDown.text = downBytesPerSec?.let { formatSpeed(it) } ?: zero
     }
 
-    /** The ledger rows and the gate block share one slot and are never both on screen. */
+    /** The subscription card + list, and the gate block, share one slot and are never both up. */
     private fun paintSlot(state: HomeState) {
         val gate = state.gate
         val gateVisible = gate != null
-        binding.ledger.isVisible = !gateVisible
+        binding.subscriptionSlot.isVisible = !gateVisible
         binding.layoutGate.gate.isVisible = gateVisible
-        if (gate != null) paintGate(gate) else paintLedger(state)
-        // The slot's two occupants swap in place over motion_state (13 s. 12.5). Nothing else on
-        // the screen moves, because the slot's y is fixed by the rhythm above it.
+        if (gate != null) paintGate(gate) else paintSubscriptionSlot(state)
+        // The slot's two occupants swap in place over motion_state. Nothing else on the screen
+        // moves, because the slot's y is fixed by the rhythm above it.
         if (renderedGateVisible != null && renderedGateVisible != gateVisible) {
-            val incoming = if (gateVisible) binding.layoutGate.gate else binding.ledger
+            val incoming = if (gateVisible) binding.layoutGate.gate else binding.subscriptionSlot
             incoming.animate().cancel()
             if (incoming.reducedMotion()) {
                 incoming.alpha = 1f
@@ -1318,17 +1880,24 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         renderedGateVisible = gateVisible
     }
 
+    private fun paintSubscriptionSlot(state: HomeState) {
+        binding.rvHomeServers.isVisible = state.serverCount > 0 && !homeListCollapsed
+        // Offline, or a failed refresh: the card and the rows keep their last values and the screen
+        // says so, rather than emptying.
+        binding.tvStaleHint.isVisible = state.stale || subsError
+    }
+
     private fun paintGate(gate: Gate) {
         val block = binding.layoutGate
         val captionRes = when (gate) {
             Gate.SIGN_IN -> R.string.home_gate_signin_caption
-            Gate.ADD_PROVIDER -> R.string.home_gate_provider_caption
+            Gate.ADD_SUBSCRIPTION -> R.string.home_gate_subscription_caption
             Gate.BUY -> R.string.home_gate_buy_caption
             Gate.SYNC_SERVERS -> R.string.home_gate_sync_caption
             Gate.SYNC_FAILED -> R.string.home_gate_sync_failed_caption
         }
         block.tvGateCaption.setText(captionRes)
-        // The failure reason IS the caption, so it carries the failure's colour (13 s. 8.3).
+        // The failure reason IS the caption, so it carries the failure's colour.
         block.tvGateCaption.setTextColor(
             if (gate == Gate.SYNC_FAILED) {
                 ContextCompat.getColor(requireContext(), R.color.color_destructive_text)
@@ -1342,13 +1911,13 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
                 block.btnGatePrimary.setText(R.string.home_gate_signin)
                 block.btnGatePrimary.onSingleClick { openLoginScreen() }
                 block.btnGateSecondary.isVisible = true
-                block.btnGateSecondary.setText(R.string.home_gate_add_provider)
-                block.btnGateSecondary.onSingleClick { mainHost.showAddMenu(it, withListActions = false) }
+                block.btnGateSecondary.setText(R.string.home_gate_add_subscription)
+                block.btnGateSecondary.onSingleClick { mainHost.showAddMenu(it) }
             }
 
-            Gate.ADD_PROVIDER -> {
-                block.btnGatePrimary.setText(R.string.home_gate_add_provider)
-                block.btnGatePrimary.onSingleClick { mainHost.showAddMenu(it, withListActions = false) }
+            Gate.ADD_SUBSCRIPTION -> {
+                block.btnGatePrimary.setText(R.string.home_gate_add_subscription)
+                block.btnGatePrimary.onSingleClick { mainHost.showAddMenu(it) }
                 block.btnGateSecondary.isVisible = false
             }
 
@@ -1357,7 +1926,14 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
                 block.btnGatePrimary.onSingleClick {
                     startActivity(Intent(requireContext(), BuyTariffActivity::class.java))
                 }
-                block.btnGateSecondary.isVisible = false
+                // «Привязать Telegram» — the only live entry point to linking Telegram on this
+                // screen. It lived on the onboarding card this block replaced, and it is offered on
+                // exactly the same condition: signed in, no подписка, Telegram not yet attached.
+                val linked = (AccountSession.state.value as? AccountSession.AccountState.LoggedIn)
+                    ?.profile?.telegramLinked == true
+                block.btnGateSecondary.isVisible = !linked
+                block.btnGateSecondary.setText(R.string.home_gate_link_telegram)
+                block.btnGateSecondary.onSingleClick { openTelegramLink() }
             }
 
             Gate.SYNC_SERVERS -> {
@@ -1379,113 +1955,26 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         mainHost.refreshSubscriptions()
     }
 
-    private fun paintLedger(state: HomeState) {
-        val servers = resources.getQuantityString(
-            R.plurals.home_servers_count,
-            state.serverCount,
-            state.serverCount,
-        )
-        val providers = resources.getQuantityString(
-            R.plurals.home_providers_count,
-            state.providerCount,
-            state.providerCount,
-        )
-        RowBinder.bind(
-            root = binding.rowServers.row,
-            title = getString(R.string.home_row_servers),
-            subtitle = getString(R.string.home_row_servers_value, servers, providers),
-            glyph = R.drawable.ic_nav_servers,
-            trailing = RowBinder.Trailing.Chevron,
-            onClick = { mainHost.selectTab(MainTab.SERVERS) },
-        )
-
-        if (state.sub is Sub.Unknown) {
-            if (!subscriptionSkeletonArmed) {
-                subscriptionSkeletonArmed = true
-                SkeletonBinder.showAfterDelay(binding.subscriptionSkeleton)
-            }
-        } else {
-            if (binding.subscriptionSkeleton.isVisible) {
-                SkeletonBinder.swap(
-                    skeleton = binding.subscriptionSkeleton,
-                    content = binding.rowSubscription.row,
-                )
-            } else if (subscriptionSkeletonArmed) {
-                SkeletonBinder.cancel(binding.subscriptionSkeleton)
-            }
-            subscriptionSkeletonArmed = false
-        }
-
-        // The last fetch failed: the row keeps its state and says it could not be refreshed, rather
-        // than emptying (13 s. 11.3, "error, data").
-        val failedToRefresh = subsError && state.sub !is Sub.Unknown
-        val subtitle = if (failedToRefresh) {
-            getString(R.string.home_sub_stale)
-        } else when (val sub = state.sub) {
-            is Sub.Unknown -> ""
-            is Sub.None -> getString(R.string.home_sub_none)
-            is Sub.Active -> sub.untilMs?.let { getString(R.string.home_sub_active, formatDate(it)) }.orEmpty()
-            is Sub.Trial -> getString(R.string.home_sub_trial, formatDate(sub.untilMs))
-            is Sub.Expiring -> resources.getQuantityString(
-                R.plurals.home_sub_days_left,
-                sub.daysLeft,
-                sub.daysLeft,
-            )
-            is Sub.Expired -> getString(R.string.home_sub_expired, formatDate(sub.sinceMs))
-        }
-        RowBinder.bind(
-            root = binding.rowSubscription.row,
-            title = getString(R.string.home_row_subscription),
-            subtitle = subtitle.takeIf { it.isNotEmpty() },
-            glyph = R.drawable.ic_subscriptions_24dp,
-            // S-4 puts the state word in the TEXT COLUMN so the chevron stays the row's single
-            // trailing element. view_row.xml has no chip slot, so the row's `value` carries the word
-            // and its tone is applied below - the one sanctioned value+chevron pairing. A chip slot
-            // on the universal row is filed with the ui/component owner.
-            value = when (state.sub) {
-                is Sub.Expiring -> getString(R.string.home_chip_expiring)
-                is Sub.Expired -> getString(R.string.home_chip_expired)
-                else -> null
-            },
-            trailing = RowBinder.Trailing.Chevron,
-            onClick = { openSubscription() },
-        )
-        val danger = ContextCompat.getColor(requireContext(), R.color.color_destructive_text)
-        binding.rowSubscription.rowValue.setTextColor(
-            if (state.sub is Sub.Expired) danger else themeColor(R.attr.warning)
-        )
-        binding.rowSubscription.rowSubtitle.setTextColor(
-            if (state.sub is Sub.Expired || failedToRefresh) {
-                danger
-            } else {
-                themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
-            }
-        )
-        // Offline: the rows keep their last value and the screen says so, rather than emptying
-        // (00-rules.md 9.6).
-        binding.tvStaleHint.isVisible = state.stale
-    }
-
     // ==================== Motion ====================
 
     /**
-     * The one hero moment in the product (13 s. 12.3): 600ms, once, and nothing else in the app is
-     * allowed this budget. Four beats fire together at T=0 — the shield crossfade, the ring tint,
-     * the sweep's exit and the single confirm ring — and the numeric strip enters on the tail,
-     * because it cannot show a reading before there is a tunnel to read.
+     * The one hero moment in the product: 600ms, once, and nothing else in the app is allowed this
+     * budget. Four beats fire together at T=0 — the shield crossfade, the ring tint, the sweep's
+     * exit and the single confirm ring.
      *
-     * Reduced motion: the shield is filled instantly, the ring tint is set instantly, the ring is
-     * NOT emitted at all, the strip appears instantly, and the haptic still fires.
+     * Reduced motion: the shield is filled instantly, the ring tint is set instantly, the confirm
+     * ring is NOT emitted at all, and the haptic still fires.
      */
     private fun playConfirm(ringTarget: Int, live: Boolean, haptic: Boolean) {
         if (haptic) binding.connectFrame.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+        stopBreathing()
         tintRing(ringTarget, animate = live)
 
         if (!live) {
             binding.shieldFilled.alpha = 1f
             binding.shieldOutline.alpha = 0f
+            binding.connectRingPulse.clearAnimation()
             binding.connectRingPulse.visibility = View.INVISIBLE
-            showFigures(animated = false)
             return
         }
 
@@ -1494,104 +1983,81 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         binding.shieldOutline.animate().cancel()
         binding.shieldOutline.animate().alpha(0f).setDuration(durState).setInterpolator(easeStandard).start()
 
+        // The choreography itself lives in @anim/connect_confirm — one file, so the ring's scale,
+        // its fade and its tempo cannot drift away from the tokens they are written in.
         val pulse = binding.connectRingPulse
-        pulse.animate().cancel()
-        pulse.scaleX = 1f
-        pulse.scaleY = 1f
-        pulse.alpha = CONFIRM_RING_ALPHA
+        pulse.clearAnimation()
         pulse.visibility = View.VISIBLE
-        pulse.animate()
-            .scaleX(CONFIRM_RING_SCALE).scaleY(CONFIRM_RING_SCALE).alpha(0f)
-            .setDuration(durEmphasis).setInterpolator(easeOutQuint)
-            .withEndAction {
-                if (!isBindingInitialized) return@withEndAction
+        val confirm = AnimationUtils.loadAnimation(requireContext(), R.anim.connect_confirm)
+        confirm.setAnimationListener(object : Animation.AnimationListener {
+            override fun onAnimationStart(animation: Animation?) = Unit
+            override fun onAnimationRepeat(animation: Animation?) = Unit
+            override fun onAnimationEnd(animation: Animation?) {
+                if (!isBindingInitialized) return
                 pulse.visibility = View.INVISIBLE
-                pulse.scaleX = 1f
-                pulse.scaleY = 1f
-                pulse.alpha = CONFIRM_RING_ALPHA
-            }.start()
-
-        showFigures(animated = true)
+            }
+        })
+        pulse.startAnimation(confirm)
     }
 
-    /** Exit is 75 percent of enter, and it emits nothing (13 s. 12.4). */
+    /** Exit is 75 percent of enter, and it emits nothing. */
     private fun playRelease(ringTarget: Int, live: Boolean) {
+        stopBreathing()
         tintRing(ringTarget, animate = live)
-        binding.connectRingPulse.animate().cancel()
+        binding.connectRingPulse.clearAnimation()
         binding.connectRingPulse.visibility = View.INVISIBLE
 
         if (!live) {
             binding.shieldFilled.alpha = 0f
             binding.shieldOutline.alpha = 1f
-            hideFigures(animated = false)
             return
         }
         binding.shieldFilled.animate().cancel()
         binding.shieldFilled.animate().alpha(0f).setDuration(durStateExit).setInterpolator(easeStandard).start()
         binding.shieldOutline.animate().cancel()
         binding.shieldOutline.animate().alpha(1f).setDuration(durStateExit).setInterpolator(easeStandard).start()
-        hideFigures(animated = true)
     }
 
-    private fun showFigures(animated: Boolean) {
-        val strip = binding.numericStrip
-        strip.animate().cancel()
-        if (!animated) {
-            strip.visibility = View.VISIBLE
-            strip.alpha = 1f
-            strip.translationY = 0f
-            return
+    /**
+     * The negotiating breath. The old build breathed the halo glow behind the shield; that glow is
+     * banned and did not come back, so the same 850ms reverse lives on the TWO OUTER RINGS, which
+     * are part of the object rather than a wash behind it. They swell in opacity together while the
+     * sweep travels the disc — motion the user reads as "it is working on it", on the object itself.
+     *
+     * Reduced motion: nothing breathes and the sweep is the only signal.
+     */
+    private fun startBreathing() {
+        if (breathAnimator?.isRunning == true) return
+        if (binding.connectFrame.reducedMotion()) return
+        breathAnimator = ValueAnimator.ofInt(BREATH_ALPHA_MIN, OPAQUE).apply {
+            duration = BREATH_PERIOD_MS
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.REVERSE
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener {
+                val value = it.animatedValue as Int
+                ringOuter?.alpha = value
+                ringMid?.alpha = value
+            }
+            start()
         }
-        strip.alpha = 0f
-        strip.translationY = resources.getDimensionPixelSize(R.dimen.space_8).toFloat()
-        strip.visibility = View.VISIBLE
-        strip.animate().alpha(1f).translationY(0f)
-            .setStartDelay(durState)
-            .setDuration(durReveal).setInterpolator(easeOutQuint).start()
     }
 
-    private fun hideFigures(animated: Boolean) {
-        val strip = binding.numericStrip
-        strip.animate().cancel()
-        if (!animated) {
-            strip.visibility = View.INVISIBLE
-            strip.alpha = 1f
-            strip.translationY = 0f
-            clearFigures()
-            return
-        }
-        strip.animate().alpha(0f)
-            // showFigures() leaves a start delay on the shared animator; the exit has none.
-            .setStartDelay(0)
-            .translationY(resources.getDimensionPixelSize(R.dimen.space_8).toFloat())
-            .setDuration(durRevealExit).setInterpolator(easeStandard)
-            .withEndAction {
-                if (!isBindingInitialized) return@withEndAction
-                strip.visibility = View.INVISIBLE
-                strip.alpha = 1f
-                strip.translationY = 0f
-                clearFigures()
-            }.start()
+    private fun stopBreathing() {
+        breathAnimator?.cancel()
+        breathAnimator = null
+        ringOuter?.alpha = OPAQUE
+        ringMid?.alpha = OPAQUE
     }
 
-    /** Drops the last session's readings, once nothing is showing them any more. */
-    private fun clearFigures() {
-        downBytesPerSec = null
-        upBytesPerSec = null
-        pingMs = null
-        pingProbeFailures = 0
-        if (isBindingInitialized) paintFigures()
-    }
-
-    /** The ring's only state channel. Width never changes; the colour crosses over motion_state. */
+    /** The rings' only state channel. Width never changes; the colour crosses over motion_state. */
     private fun tintRing(target: Int, animate: Boolean) {
-        val ring = ringDrawable ?: return
+        if (ringInner == null) return
         ringAnimator?.cancel()
         ringAnimator = null
-        val stroke = resources.getDimensionPixelSize(R.dimen.stroke_ring)
         if (!animate || ringColor == target) {
             ringColor = target
-            ring.setStroke(stroke, target)
+            applyRingColor(target)
             return
         }
         val from = ringColor
@@ -1601,7 +2067,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             addUpdateListener {
                 val value = it.animatedValue as Int
                 ringColor = value
-                ring.setStroke(stroke, value)
+                applyRingColor(value)
             }
             start()
         }
@@ -1611,12 +2077,45 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
     private fun themeColor(attr: Int): Int = MaterialColors.getColor(binding.connectFrame, attr)
 
+    // ==================== The session clock ====================
+
+    /**
+     * Starts the per-second uptime. The start instant is persisted, so the clock survives a rotation
+     * or a theme recreate instead of restarting from zero on a tunnel that never went down.
+     */
+    private fun startConnectionTimer() {
+        val stored = MmkvManager.decodeSettingsLong(KEY_CONNECTION_START, 0L)
+        connectionStartTime = if (stored > 0L) {
+            stored
+        } else {
+            System.currentTimeMillis().also { MmkvManager.encodeSettings(KEY_CONNECTION_START, it) }
+        }
+        timerHandler.removeCallbacks(uptimeRunnable)
+        timerHandler.post(uptimeRunnable)
+    }
+
+    private fun stopConnectionTimer() {
+        timerHandler.removeCallbacks(uptimeRunnable)
+        connectionStartTime = 0L
+        MmkvManager.encodeSettings(KEY_CONNECTION_START, 0L)
+        // The session is over, so its readings go with it — and the strip returns to zeroes rather
+        // than freezing on the last speed the tunnel ever saw.
+        downBytesPerSec = null
+        upBytesPerSec = null
+        pingMs = null
+        pingProbeFailures = 0
+        if (isBindingInitialized) {
+            binding.tvUptime.text = getString(R.string.home_uptime_zero)
+            paintFigures()
+        }
+    }
+
     // ==================== The connect state machine ====================
 
     /**
-     * The disc's action. Three cases, and the middle one is the one the shipped build got wrong: a
-     * tap DURING negotiation cancels the attempt (13 s. 11.2), because a control that ignores a tap
-     * for twenty seconds is a control the user stops trusting.
+     * The object's action. Three cases, and the middle one is the one the shipped build got wrong: a
+     * tap DURING negotiation cancels the attempt, because a control that ignores a tap for twenty
+     * seconds is a control the user stops trusting.
      */
     private fun handleConnectAction() {
         // A manual connect/disconnect starts a fresh session: allow auto-fallback again, and end any
@@ -1651,9 +2150,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             else -> {
                 connectInProgress = true
                 tunnelError = false
-                // The previous session's readings are not this session's; the strip is hidden
-                // while negotiating, so this lands before anything can show them again.
-                clearFigures()
                 applyRunningState(isLoading = true, isRunning = false)
                 scheduleConnectWatchdog()
                 startVpnWithPermission()
@@ -1677,7 +2173,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
     private fun startV2Ray() {
         if (MmkvManager.getSelectServer().isNullOrEmpty()) {
-            // The disc is disabled in this state, so this is a backstop rather than the user's
+            // The object is disabled in this state, so this is a backstop rather than the user's
             // first contact with the problem — the status line already says «Сервер не выбран».
             connectInProgress = false
             applyRunningState(isLoading = false, isRunning = false)
@@ -1690,7 +2186,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * Stops the running tunnel and starts it again on the currently selected server.
      *
      * The core runs in its own process (`:RunSoLibV2RayDaemon`), so stopping is asynchronous and the
-     * only truthful signal in this process is [MainViewModel.isRunning], driven by the daemon's
+     * only truthful signal in this process is `MainViewModel.isRunning`, driven by the daemon's
      * broadcasts. Waiting a fixed delay here used to lose that race: the new start would arrive
      * while the old core was still up, `startContextService()` would see `coreController.isRunning`
      * and return silently, and the tunnel would keep running the PREVIOUS server while the UI showed
@@ -1736,8 +2232,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         tunnelRunning = isRunning && !isLoading
         if (!isLoading) disconnecting = false
         if (isRunning || isLoading) tunnelError = false
-        // The figures are NOT cleared here: the strip is still fading out at this point, and
-        // blanking it first would fade out an empty box. clearFigures() runs when the fade lands.
         if (isBindingInitialized) render(animate)
     }
 
@@ -1773,7 +2267,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     /**
      * Cancels a pending health check and its confirmation re-probe. On a *genuine* user disconnect
      * it also clears the once-per-session fallback flag; during the fallback's own internal restart
-     * ([MainViewModel.fallbackInProgress]) the flag must survive, or the next START_SUCCESS re-arms
+     * (`MainViewModel.fallbackInProgress`) the flag must survive, or the next START_SUCCESS re-arms
      * the check and the switch/restart loop returns.
      */
     private fun cancelHealthCheck() {
@@ -1805,7 +2299,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         }
     }
 
-    /** «Подписка» opens Аккаунт, which is where a subscription is managed. */
+    /** The subscription is managed on Аккаунт; the card here acts on the local copy. */
     private fun openSubscription() {
         if (BackendConfig.isConfigured() && AccountSession.isLoggedIn()) {
             mainHost.selectTab(MainTab.ACCOUNT)
@@ -1817,6 +2311,19 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private fun openLoginScreen() {
         if (!BackendConfig.isConfigured()) return
         mainHost.launchAuthScreen(Intent(requireContext(), LoginActivity::class.java))
+    }
+
+    /**
+     * Opens the Telegram screen in LINK mode: the already-signed-in account gets its Telegram
+     * attached, so the bot tracks the подписка. The token request carries the current JWT, so the
+     * backend links Telegram to this account instead of starting a separate login.
+     */
+    private fun openTelegramLink() {
+        if (!BackendConfig.isConfigured()) return
+        val intent = Intent(requireContext(), LoginActivity::class.java)
+            .putExtra(LoginActivity.EXTRA_MODE, LoginActivity.MODE_TELEGRAM)
+            .putExtra(LoginActivity.EXTRA_LINK, true)
+        mainHost.launchAuthScreen(intent)
     }
 
     // ==================== Formatting ====================
@@ -1836,7 +2343,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
     /**
      * «14 августа» inside the current year, «14 августа 2027» otherwise. Never a numeric date on
-     * this screen.
+     * this screen, and never `SimpleDateFormat("d MMMM")`, which follows the DEVICE locale and
+     * prints «до 14 August» on an English phone.
      */
     private fun formatDate(millis: Long): String {
         val date = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()

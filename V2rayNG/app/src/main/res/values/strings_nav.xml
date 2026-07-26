@@ -1,22 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Strings for the account bottom-nav tab and the home account entry points.
-  Russian user-facing copy (pure dark + blue accent design).
+  The shell's own strings: the bottom-navigation tabs and the dialogs MainActivity puts up itself.
+  Everything a tab draws lives in that tab's file.
+
+  Russian, sentence case, «подписка» never «провайдер», departament always lowercase.
+
+  The «Привязать Telegram» banner's two strings used to live here. The banner is gone — linking
+  Telegram belongs to Аккаунт, and the onboarding gate already offers it — so the strings went with
+  it rather than waiting for a screen that was never coming back.
 -->
 <resources>
-    <!-- 4th bottom-nav tab, visible only when signed in. -->
+    <!-- Bottom-nav tab, visible only when signed in. -->
     <string name="bottom_nav_account">Аккаунт</string>
 
     <!-- Signed-out home entry point: open the login screen for a site (email) login. -->
     <string name="auth_sign_in_site">Войти через сайт</string>
-
-    <!-- Dismissible CTA for users who pasted a subscription but are not signed in. -->
-    <string name="auth_link_telegram_cta">Привяжите Telegram, чтобы управлять подпиской</string>
-    <string name="auth_link_telegram_cta_dismiss">Скрыть</string>
 
     <!-- Signed-in account chip subtitle. -->
     <string name="auth_open_account">Управление аккаунтом</string>
 
     <!-- Gray status toast shown after subscriptions are auto-imported post-login. -->
     <string name="toast_subscription_linked">Подписка привязана</string>
+
+    <!-- Title of the picker that holds the add methods «Добавить подписку» no longer carries:
+         a typed link, a hand-built server, a config file. -->
+    <string name="add_other_methods_title">Другие способы добавления</string>
+
+    <!-- ==================== What an import says back ====================
+         Every one of these was a Russian literal inside MainActivity.kt. Copy lives in resources,
+         so it can be reviewed against the register and translated, and so nobody has to read
+         Kotlin to find out what the app says. -->
+
+    <!-- Inline errors on the «Ввести ссылку» field, shown before the dialog closes. -->
+    <string name="import_link_required">Вставьте ссылку подписки или конфигурацию сервера</string>
+    <string name="import_link_invalid">Не похоже на ссылку или конфигурацию. Пример: https://departament.site/sub или vless://…</string>
+
+    <!-- Outcomes of an import, from the precise one to the blunt one. -->
+    <string name="import_servers_added">Серверы добавлены: %1$d</string>
+    <string name="import_sub_empty">Не удалось загрузить серверы подписки</string>
+    <string name="import_sub_duplicate">Подписка уже добавлена</string>
+    <string name="import_sub_foreign">Эта ссылка не от departament. Используйте подписку из нашего бота.</string>
 </resources>

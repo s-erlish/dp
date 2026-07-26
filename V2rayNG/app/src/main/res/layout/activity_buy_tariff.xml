@@ -4,9 +4,9 @@
   accent, calm premium spacing. Pick a tariff, a duration/price option and extra
   devices, then tap "Оплатить" to choose a payment method.
 
-  States (driven by BuyTariffActivity): progress_buy + tv_state = loading;
-  tv_state + btn_retry = error; tv_state = empty. iv_state_icon (error/empty glyph)
-  and ll_skeleton (loading placeholders) are wire-ready and gone by default.
+  States (driven by BuyTariffActivity): ll_skeleton = loading; iv_state_icon +
+  tv_state + btn_retry = error; iv_state_icon + tv_state = empty. progress_buy is
+  NOT a screen state — it is the pay CTA's in-flight arc and lives on the button.
 -->
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -25,16 +25,6 @@
         android:paddingBottom="@dimen/space_24">
 
         <!-- ============ States ============ -->
-        <ProgressBar
-            android:id="@+id/progress_buy"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="@dimen/space_32"
-            android:indeterminateTint="?attr/colorPrimary"
-            android:visibility="gone"
-            tools:visibility="visible" />
-
         <!-- Error/empty glyph: wire-ready, revealed by the activity alongside tv_state. -->
         <ImageView
             android:id="@+id/iv_state_icon"
@@ -72,7 +62,7 @@
             android:layout_marginBottom="@dimen/space_8"
             android:text="@string/buy_retry"
             android:textAllCaps="false"
-            app:cornerRadius="22dp"
+            app:cornerRadius="@dimen/radius_button"
             android:visibility="gone"
             tools:visibility="visible" />
 
@@ -291,18 +281,40 @@
                         tools:text="299 ₽" />
                 </LinearLayout>
 
-                <!-- Pay CTA: filled blue primary -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_pay"
+                <!-- Pay CTA: filled blue primary, radius_button 16 (00-rules 1.4.5 / C§R1 — the
+                     52dp stadium is the shape the owner rejected by name).
+
+                     progress_buy lives HERE, on the control that spends money, and not in the
+                     states block above where it was declared and then hidden in four places and
+                     shown in none. While a charge is in flight the button says «Оплата…», stops
+                     taking taps, and this arc turns beside its label (D10). -->
+                <FrameLayout
                     android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:layout_marginTop="@dimen/space_16"
-                    android:text="@string/buy_pay"
-                    android:textAllCaps="false"
-                    android:textStyle="bold"
-                    app:cornerRadius="26dp"
-                    app:icon="@drawable/ic_acc_wallet"
-                    app:iconGravity="textStart" />
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_16">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_pay"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:text="@string/buy_pay"
+                        android:textAllCaps="false"
+                        android:textStyle="bold"
+                        app:cornerRadius="@dimen/radius_button"
+                        app:icon="@drawable/ic_acc_wallet"
+                        app:iconGravity="textStart" />
+
+                    <com.google.android.material.progressindicator.CircularProgressIndicator
+                        android:id="@+id/progress_buy"
+                        style="@style/Widget.Departament.Progress.Circular.Inline.OnAccent"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="end|center_vertical"
+                        android:layout_marginEnd="@dimen/space_16"
+                        android:importantForAccessibility="no"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+                </FrameLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
     </LinearLayout>

@@ -227,4 +227,28 @@
          fill delta by design; mono_onSurface on it is 14.26:1. -->
     <color name="mono_warningContainer">#232326</color>
     <color name="mono_skeleton">#232326</color>
+
+    <!-- =====================================================================
+         BUTTON BEVEL — the depth tokens, DARK. See values/colors.xml for what the
+         system is and why it carries no hue.
+
+         Dark carries the bevel harder than light, and has to: on a near-black
+         background a flat fill has nothing to separate it from the surface, which
+         is precisely the "просто сплошной цвет" the owner rejected. The rim is
+         24%, half again the light value, and the settle is 15%.
+
+         Contrast is unaffected at the label, by construction: the lift is spent by
+         30% of the height and the settle does not start until 74%, while a 16sp
+         label centred in a 48-52dp button occupies ~30%-70%. onPrimary #00183A on
+         #4C8DFF stays 5.51:1 in EVERY state - rest, pressed, focused, loading.
+         Only the bare top and bottom edges, where nothing is drawn, ever see the
+         full strength.
+         ===================================================================== -->
+    <!-- btn_gloss_clear / btn_gloss_clear_dark are theme-invariant and stay in
+         values/colors.xml. Only the four strengths differ. -->
+    <color name="btn_gloss_rim">#3DFFFFFF</color>
+    <color name="btn_gloss_top">#24FFFFFF</color>
+    <color name="btn_gloss_bottom">#26000000</color>
+    <color name="btn_gloss_press_top">#33000000</color>
+    <color name="btn_gloss_press_bottom">#14FFFFFF</color>
 </resources>

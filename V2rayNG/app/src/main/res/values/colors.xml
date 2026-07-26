@@ -351,4 +351,47 @@
     <color name="mono_surfaceContainer">#F4F4F5</color>
     <color name="mono_surfaceContainerHigh">#EEEEEF</color>
     <color name="mono_surfaceContainerHighest">#E7E7E9</color>
+
+    <!-- =====================================================================
+         BUTTON BEVEL — the depth tokens, LIGHT.
+
+         The owner's instruction was that a button must not be "просто сплошной
+         цвет". These six values are the whole gradient system, and they are
+         deliberately colourless: a white lift and a black settle, never a second
+         hue. That is what lets ONE pair of drawables (@drawable/btn_gloss_rest,
+         @drawable/btn_gloss_press) sit correctly on the blue primary, the red
+         destructive, the neutral secondary AND the greyscale ThemeOverlay.Mono,
+         in both themes, without a per-variant gradient anywhere.
+
+         It is also why 00-rules.md's gradient ban is not actually breached in
+         spirit: nothing here paints a hue ramp across a surface. It models a
+         light source above the control, which is what "depth" means.
+
+         Light is the quieter of the two: the surfaces are already bright, so a
+         hard white lift would blow out and a hard black settle would read as
+         dirt. Measured worst case, at the extreme top edge of the light primary
+         #1E5FC7 under the full rim, white-on-fill still measures 5.08:1 — and no
+         glyph is ever drawn there, because both ramps clear the label band.
+         ===================================================================== -->
+    <!-- The two zero-alpha stops, and they are NOT interchangeable. Android
+         interpolates a gradient in UNPREMULTIPLIED sRGB, so the RGB of a fully
+         transparent stop still steers every colour between it and its neighbour:
+         ramp white->#00000000 and the midpoint is a translucent GREY, which over a
+         blue fill reads as a smear rather than as light. Each ramp therefore fades
+         to its own colour at zero alpha - white ramps to btn_gloss_clear, black
+         ramps to btn_gloss_clear_dark - and stays clean end to end.
+         Both are theme-invariant and are deliberately NOT restated in
+         values-night/: one definition, one place to change. -->
+    <color name="btn_gloss_clear">#00FFFFFF</color>
+    <color name="btn_gloss_clear_dark">#00000000</color>
+    <!-- The light source itself: the crisp edge along the top arc. -->
+    <color name="btn_gloss_rim">#26FFFFFF</color>
+    <!-- The falloff under the rim, spent before the label band begins. -->
+    <color name="btn_gloss_top">#14FFFFFF</color>
+    <!-- The base settle that gives the control its weight. -->
+    <color name="btn_gloss_bottom">#1F000000</color>
+    <!-- Pressed: the light has moved. Shade under the top edge... -->
+    <color name="btn_gloss_press_top">#1F000000</color>
+    <!-- ...and the base catches what the top lost. -->
+    <color name="btn_gloss_press_bottom">#0AFFFFFF</color>
 </resources>

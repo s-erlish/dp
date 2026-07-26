@@ -57,6 +57,8 @@
 
     <!-- ===================== ошибки (14-auth.md 13.1) ===================== -->
     <string name="auth_email_invalid">Введите корректный email, например name@example.com</string>
+    <!-- Строка поля, не ошибка экрана: «Готово» при пустом пароле раньше не делало ничего. -->
+    <string name="auth_password_required">Введите пароль</string>
     <string name="auth_err_credentials">Неверная почта или пароль. Проверьте и повторите.</string>
     <string name="auth_err_gone">Ссылка устарела. Начните вход заново.</string>
     <string name="auth_err_rate_limited">Слишком много попыток. Повторите через минуту.</string>
@@ -67,7 +69,10 @@
     <string name="auth_err_not_configured">Вход сейчас недоступен. Повторите попытку позже.</string>
     <string name="auth_err_generic">Что-то пошло не так. Повторите попытку.</string>
     <string name="auth_err_telegram_missing">Telegram не установлен. Войдите по почте.</string>
-    <string name="auth_err_browser_missing">Не нашли браузер, чтобы открыть сайт.</string>
+    <!-- Та же ошибка в режиме «Привязать Telegram»: там «войдите по почте» бессмысленно, аккаунт
+         уже вошёл, и Telegram — единственное, что нужно этому действию. -->
+    <string name="auth_err_link_telegram_missing">Telegram не установлен. Установите приложение и повторите привязку.</string>
+    <string name="auth_err_browser_missing">Не нашли браузер, чтобы открыть сайт. Зайдите на departament.site с другого устройства.</string>
 
     <!-- ===================== доступность ===================== -->
     <string name="auth_loading_cd">%1$s, загрузка</string>

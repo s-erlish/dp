@@ -98,7 +98,12 @@ class LoginActivity : BaseActivity() {
     /** True in [EXTRA_LINK] mode: the flow attaches Telegram to the session that already exists. */
     private var linkMode = false
 
-    /** False when the caller asked for the form directly ([MODE_SITE]); Back then leaves. */
+    /**
+     * True when the gate sits behind the form, i.e. Back on surface B pops to surface A instead of
+     * closing the screen. False for [MODE_SITE], which opens the form with nothing behind it, and
+     * for link mode, which never reaches the form at all. It decides Back, NOT which surface opens
+     * — see [onCreate].
+     */
     private var gateReachable = true
 
     /** Set once the address has been wrong, after which it is validated live rather than on blur. */
@@ -131,6 +136,15 @@ class LoginActivity : BaseActivity() {
         linkMode = intent.getBooleanExtra(EXTRA_LINK, false)
         val mode = intent.getStringExtra(EXTRA_MODE)
         gateReachable = !linkMode && mode != MODE_SITE
+        // WHICH surface opens is NOT the same question as whether the gate is behind it. Both
+        // MODE_SITE and link mode make Back leave the screen rather than pop to the gate — that is
+        // what [gateReachable] says — but only MODE_SITE starts on the form. Link mode starts on
+        // the GATE: that is where its CTA, its awaiting row and its success beat live, and its two
+        // «Войти по почте» buttons are hidden below precisely because the form has no part in it.
+        // Deriving the start page from gateReachable therefore opened «Привязать Telegram» on the
+        // email form, keyboard up, while startTelegramLogin() sent Telegram over the top of it and
+        // the awaiting row was never seen at all.
+        val startPage = if (gateReachable || linkMode) Page.GATE else Page.MAIL
 
         // Already signed in and this is an ordinary sign-in: there is nothing to do here. Link mode
         // is the exception and the whole point — it is the signed-in user who attaches Telegram.
@@ -146,7 +160,7 @@ class LoginActivity : BaseActivity() {
         setupRows()
         setupBack()
 
-        showPage(if (gateReachable) Page.GATE else Page.MAIL, animate = false)
+        showPage(startPage, animate = false)
         observe()
 
         // Link mode arrives from a tap that already said «Привязать Telegram», so it starts the
@@ -170,20 +184,24 @@ class LoginActivity : BaseActivity() {
     }
 
     /**
-     * Back never traps and never surprises (D-14.E). Priority: the 2FA step returns to the form, an
-     * in-flight Telegram wait returns to the gate's idle stack, the form returns to the gate, and
-     * only then does the screen close.
+     * Back never traps and never surprises (D-14.E). Priority: the 2FA step returns to the form, a
+     * Telegram attempt — being minted or being waited on — returns to the gate's idle stack, the
+     * form returns to the gate, and only then does the screen close.
+     *
+     * Every busy state therefore has a way out, and none of them leaves the screen while something
+     * it started is still running.
      */
     private fun setupBack() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                val state = viewModel.state.value
                 when {
-                    viewModel.state.value is AuthUiState.TwoFactor -> viewModel.cancelTwoFactor()
+                    state is AuthUiState.TwoFactor -> viewModel.cancelTwoFactor()
 
-                    viewModel.state.value is AuthUiState.TelegramAwaiting ->
+                    state is AuthUiState.TelegramAwaiting || state is AuthUiState.TelegramStarting ->
                         viewModel.cancelTelegramLogin()
 
-                    page == Page.MAIL && gateReachable -> showPage(Page.GATE)
+                    page == Page.MAIL && gateReachable -> goToGate()
 
                     else -> SubPage.close(this@LoginActivity)
                 }
@@ -222,11 +240,33 @@ class LoginActivity : BaseActivity() {
 
         gate.btnGateTelegram.onSingleClick(Haptic.PRESS) { viewModel.startTelegramLogin() }
         gate.btnGateOpenTelegram.onSingleClick { reopenTelegram() }
-        gate.btnGateEmail.onSingleClick { showPage(Page.MAIL) }
-        gate.btnGateEmailAlt.onSingleClick {
-            viewModel.cancelTelegramLogin()
-            showPage(Page.MAIL)
-        }
+        // Both «Войти по почте» take the identical path. The idle one used to just swap the page,
+        // which meant a tap during the token mint left the poll running: the user reached the form,
+        // and a second later Telegram opened over it on its own.
+        gate.btnGateEmail.onSingleClick { goToMail() }
+        gate.btnGateEmailAlt.onSingleClick { goToMail() }
+    }
+
+    /** Leaving the gate for the form abandons whatever the gate had in flight. */
+    private fun goToMail() {
+        val state = viewModel.state.value
+        // The success beat runs for 440ms with the awaiting stack — and its «Войти по почте» —
+        // still on screen. The sign-in has already happened and the screen is handing back, so a
+        // tap in that window must do nothing rather than cancel a finished login and swap to a
+        // form that is about to be destroyed.
+        if (state is AuthUiState.Success) return
+        if (state !is AuthUiState.Idle) viewModel.cancelTelegramLogin()
+        showPage(Page.MAIL)
+    }
+
+    /**
+     * Leaving the form for the gate abandons a submit in flight. Without this the user would land
+     * on the gate with a request still running, and its answer — a failure line, or a success beat
+     * played against a check on a page nobody is looking at — would arrive on the wrong surface.
+     */
+    private fun goToGate() {
+        if (viewModel.state.value is AuthUiState.Submitting) viewModel.cancelPending()
+        showPage(Page.GATE)
     }
 
     /**
@@ -387,12 +427,21 @@ class LoginActivity : BaseActivity() {
      * navigations, and their subtitle names the destination: a label promising an in-app form would
      * be lying about what the tap does (00-rules.md 9.1).
      */
-    private fun setupRows() {
+    private fun setupRows() = bindRows(enabled = true)
+
+    /**
+     * @param enabled false while a request is in flight. It goes through [RowBinder] rather than
+     * through `root.isEnabled`, which is what this used to do: `isEnabled` on a ViewGroup makes the
+     * row inert without changing a pixel of it, so the two errands looked perfectly tappable and
+     * swallowed every tap. The binder takes the whole control to R6's 0.38 and drops the listener.
+     */
+    private fun bindRows(enabled: Boolean) {
         RowBinder.bind(
             root = binding.mail.rowRegister.root,
             title = getString(R.string.auth_row_register),
             subtitle = getString(R.string.auth_row_register_sub),
             trailing = RowBinder.Trailing.Chevron,
+            enabled = enabled,
             onClick = { openInBrowser(REGISTER_URL) },
         )
         RowBinder.bind(
@@ -400,6 +449,7 @@ class LoginActivity : BaseActivity() {
             title = getString(R.string.auth_row_reset),
             subtitle = getString(R.string.auth_row_reset_sub),
             trailing = RowBinder.Trailing.Chevron,
+            enabled = enabled,
             onClick = { openInBrowser(RESET_URL) },
         )
     }
@@ -422,6 +472,15 @@ class LoginActivity : BaseActivity() {
                 }
                 val password = binding.mail.etPassword.text?.toString().orEmpty()
                 if (password.isEmpty()) {
+                    // The CTA is already dark for an empty password, so this is only reachable
+                    // from the IME's «Готово» — which used to move focus to the field the caret
+                    // was already in, i.e. do nothing at all and say nothing. The reserved line
+                    // below the box is exactly what it is for.
+                    setFieldError(
+                        binding.mail.tilPassword,
+                        binding.mail.errPassword,
+                        getString(R.string.auth_password_required),
+                    )
                     binding.mail.etPassword.requestFocus()
                     return
                 }
@@ -450,11 +509,21 @@ class LoginActivity : BaseActivity() {
 
     /**
      * R9 layer 1: the control is not offered while it cannot work. The submit is live only when the
-     * form is actually submittable, nothing is in flight, and no 429 cool-down is running.
+     * form is actually submittable and no 429 cool-down is running.
+     *
+     * A control that is *working* is the exception, and it is the same exception the gate's CTA
+     * already makes (R8, see [setGateLoading]): while the request is in flight — and through the
+     * success beat that follows it — the button keeps its accent and its opacity and stops taking
+     * taps instead. Disabling it there would dim the fill under its own spinner, and a faded
+     * spinner reads as broken rather than as busy; dimming it under the success check would read
+     * as a failure at the exact moment the sign-in worked. [setFormBusy] owns the tap-blocking.
      */
     private fun updateSubmitEnabled() {
         val state = viewModel.state.value
-        val busy = state is AuthUiState.Submitting
+        if (state is AuthUiState.Submitting || state is AuthUiState.Success) {
+            binding.mail.btnSubmit.isEnabled = true
+            return
+        }
         val ready = when (state) {
             is AuthUiState.TwoFactor ->
                 binding.mail.otp.otpInput.text?.length == OTP_LENGTH
@@ -467,7 +536,7 @@ class LoginActivity : BaseActivity() {
 
             else -> false
         }
-        binding.mail.btnSubmit.isEnabled = ready && !busy && !viewModel.rateLimited.value
+        binding.mail.btnSubmit.isEnabled = ready && !viewModel.rateLimited.value
     }
 
     // ------------------------------------------------------------------ state rendering
@@ -588,7 +657,12 @@ class LoginActivity : BaseActivity() {
         }
     }
 
-    /** 12.1: the two stacks crossfade, the incoming one rising 8dp. Never a height animation. */
+    /**
+     * 12.1: the two stacks crossfade, the incoming one rising 8dp. Never a height animation — and
+     * now never a height CHANGE either. The outgoing stack is left INVISIBLE rather than GONE, so
+     * `gate_action_slot` stays measured against the taller of the two and the heading, the CTA and
+     * the row that replaces it keep the same baseline through the whole transition.
+     */
     private fun showAwaitingStack(awaiting: Boolean) {
         val idle = binding.gate.gateStackIdle
         val wait = binding.gate.gateStackAwaiting
@@ -596,7 +670,7 @@ class LoginActivity : BaseActivity() {
         val incoming = if (awaiting) wait else idle
         val outgoing = if (awaiting) idle else wait
         if (!awaiting) resetRingBeat()
-        crossfade(outgoing, incoming)
+        crossfade(outgoing, incoming, hideOutgoingAs = View.INVISIBLE)
     }
 
     private fun setFormBusy(busy: Boolean) {
@@ -607,8 +681,7 @@ class LoginActivity : BaseActivity() {
         mail.etPassword.isEnabled = !busy
         mail.otp.otpInput.isEnabled = !busy
         mail.btnCancel2fa.isEnabled = !busy
-        mail.rowRegister.root.isEnabled = !busy
-        mail.rowReset.root.isEnabled = !busy
+        bindRows(enabled = !busy)
         if (busy) {
             mail.btnSubmit.contentDescription =
                 getString(R.string.auth_loading_cd, mail.btnSubmit.text)
@@ -784,8 +857,14 @@ class LoginActivity : BaseActivity() {
         } catch (e: ActivityNotFoundException) {
             LogUtil.w(AppConfig.TAG, "Telegram is not installed, falling back to the browser", e)
             if (!openInBrowser(deepLink, silent = true)) {
+                // Link mode gets its own sentence: «войдите по почте» is not a fix for an account
+                // that is already signed in and is only here to attach Telegram.
                 viewModel.failLocally(
-                    R.string.auth_err_telegram_missing,
+                    if (linkMode) {
+                        R.string.auth_err_link_telegram_missing
+                    } else {
+                        R.string.auth_err_telegram_missing
+                    },
                     AuthViewModel.Surface.GATE,
                 )
             }
@@ -909,9 +988,22 @@ class LoginActivity : BaseActivity() {
             .start()
     }
 
-    private fun crossfade(outgoing: View, incoming: View) {
+    /**
+     * @param hideOutgoingAs [View.GONE] for the page swap, where the surface that left must stop
+     * taking space, and [View.INVISIBLE] for the gate's two action stacks, where it must keep it.
+     */
+    private fun crossfade(outgoing: View, incoming: View, hideOutgoingAs: Int = View.GONE) {
+        // A swap that arrives while the previous one is still running finds the two views in
+        // swapped roles, and the view now coming IN is still carrying the end action that hides
+        // it. Whether a cancelled ViewPropertyAnimator runs that action is a platform detail this
+        // screen should not be betting on — if it does, the slot is left with both children
+        // hidden and nothing scheduled to show either. Clearing both animators first makes the
+        // outcome the same under either behaviour: whatever was pending is settled before the new
+        // roles are assigned, and the visibility written below is the last word.
+        outgoing.animate().cancel()
+        incoming.animate().cancel()
         if (!animationsEnabled()) {
-            outgoing.isVisible = false
+            outgoing.visibility = hideOutgoingAs
             incoming.alpha = 1f
             incoming.translationY = 0f
             incoming.isVisible = true
@@ -921,7 +1013,7 @@ class LoginActivity : BaseActivity() {
             .setDuration(durationOf(R.integer.motion_state_exit))
             .setInterpolator(curve(R.interpolator.ease_standard))
             .withEndAction {
-                outgoing.isVisible = false
+                outgoing.visibility = hideOutgoingAs
                 outgoing.alpha = 1f
             }
             .start()
@@ -934,8 +1026,19 @@ class LoginActivity : BaseActivity() {
             .start()
     }
 
+    /**
+     * The IME is asked for on the view's own queue, not inline. Two of the three callers run
+     * before the window has a view root — `MODE_SITE` opens straight onto the form from
+     * `onCreate` — and an insets controller asked to show the keyboard then does nothing at all,
+     * which is why that entry point used to land on a form with no keyboard. Posting also lets the
+     * request check that the field still holds focus, so a page swap in between cannot raise a
+     * keyboard for a field nobody is on.
+     */
     private fun showKeyboard(view: View) {
-        WindowCompat.getInsetsController(window, view).show(WindowInsetsCompat.Type.ime())
+        view.post {
+            if (!view.isAttachedToWindow || !view.hasFocus()) return@post
+            WindowCompat.getInsetsController(window, view).show(WindowInsetsCompat.Type.ime())
+        }
     }
 
     private fun hideKeyboard() {
