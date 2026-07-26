@@ -74,8 +74,16 @@ class MainRecyclerAdapter(
         this.showHeaders = showHeaders
         val targetGuid = if (index in this.servers.indices) this.servers[index].guid else null
         rebuildRows()
+
+        // Selection can have been changed by something that owns no list — a subscription import,
+        // fast-connect, or the service starting with an explicit guid. Re-read it on every rebuild
+        // so a single-row refresh can never leave a stale row painted as selected.
+        val latestSelection = MmkvManager.getSelectServer()
+        val selectionChanged = latestSelection != selectedGuid
+        selectedGuid = latestSelection
+
         val flat = targetGuid?.let { flatPositionOf(it) } ?: -1
-        if (flat >= 0) notifyItemChanged(flat) else notifyDataSetChanged()
+        if (flat >= 0 && !selectionChanged) notifyItemChanged(flat) else notifyDataSetChanged()
     }
 
     /** Backward-compatible shim: flat list, no section headers. */
@@ -123,6 +131,15 @@ class MainRecyclerAdapter(
 
     private fun flatPositionOf(guid: String): Int =
         rows.indexOfFirst { it is Row.Server && it.cache.guid == guid }
+
+    /**
+     * The guid this adapter currently paints as selected. Selection lives in MMKV, but MMKV cannot
+     * notify, and it is written from several places that do not own a list (subscription import,
+     * fast-connect, service start). Mirroring it here lets [syncSelection] repaint exactly the rows
+     * that changed — and, crucially, detect the case where the previously selected row is no longer
+     * findable, which used to leave two rows painted as selected at once.
+     */
+    private var selectedGuid: String? = MmkvManager.getSelectServer()
 
     /** Toggles collapse state across all provider sections. */
     @SuppressLint("NotifyDataSetChanged")
@@ -203,7 +220,9 @@ class MainRecyclerAdapter(
 
         // Selection: blue rounded outline via bg_server_row selected state.
         // Indicator bar tint via theme attr (mono-safe).
-        val selected = guid == MmkvManager.getSelectServer()
+        // Painted from the mirrored [selectedGuid], not straight from MMKV, so that a row can never
+        // render a selection state the adapter has not been told about.
+        val selected = guid == selectedGuid
         binding.infoContainer.isSelected = selected
         binding.layoutIndicator.setBackgroundColor(
             if (selected) MaterialColors.getColor(binding.layoutIndicator, R.attr.indicatorColor)
@@ -288,8 +307,35 @@ class MainRecyclerAdapter(
 
     /** Refreshes the two rows involved in a selection change (guids). */
     fun setSelectServer(fromGuid: String?, toGuid: String?) {
-        fromGuid?.let { flatPositionOf(it).takeIf { p -> p >= 0 }?.let { p -> notifyItemChanged(p) } }
-        toGuid?.let { flatPositionOf(it).takeIf { p -> p >= 0 }?.let { p -> notifyItemChanged(p) } }
+        syncSelection(toGuid, previous = fromGuid)
+    }
+
+    /**
+     * Repaints selection to match [guid] (defaults to whatever MMKV holds).
+     *
+     * Refreshing only the two affected rows is the cheap path, but it is only correct when BOTH
+     * rows are currently in [rows]. The old row can be missing — it may sit inside a collapsed
+     * section, or the list may have been rebuilt by a subscription update since it was selected —
+     * and a missed refresh leaves it painted as selected next to the new one, which is the
+     * "two servers selected at once" defect. So: fall back to a full refresh whenever either row
+     * cannot be located.
+     */
+    @SuppressLint("NotifyDataSetChanged")
+    fun syncSelection(guid: String? = MmkvManager.getSelectServer(), previous: String? = selectedGuid) {
+        if (guid == selectedGuid && previous == selectedGuid) return
+        selectedGuid = guid
+
+        val fromPos = previous?.let { flatPositionOf(it) } ?: -1
+        val toPos = guid?.let { flatPositionOf(it) } ?: -1
+
+        val fromResolved = previous == null || fromPos >= 0
+        val toResolved = guid == null || toPos >= 0
+        if (!fromResolved || !toResolved) {
+            notifyDataSetChanged()
+            return
+        }
+        if (fromPos >= 0) notifyItemChanged(fromPos)
+        if (toPos >= 0 && toPos != fromPos) notifyItemChanged(toPos)
     }
 
     /** Flat adapter position of a server guid, or -1. */

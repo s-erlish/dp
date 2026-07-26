@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.net.VpnService
 import android.os.Bundle
+import android.os.SystemClock
 import android.text.InputType
 import android.view.KeyEvent
 import android.view.Menu
@@ -29,6 +30,7 @@ import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.color.MaterialColors
+import com.google.android.material.snackbar.Snackbar
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.BuildConfig
 import com.v2ray.ang.R
@@ -78,6 +80,7 @@ import com.v2ray.ang.handler.SubscriptionUpdater
 import com.v2ray.ang.tv.TvReceiveActivity
 import com.v2ray.ang.tv.TvSendActivity
 import com.v2ray.ang.util.AvatarManager
+import com.v2ray.ang.util.FlagUtil
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.MemoryStatsManager
 import com.v2ray.ang.util.SubscriptionOrigin
@@ -195,6 +198,10 @@ class MainActivity : HelperBaseActivity() {
         const val HEALTH_CHECK_DELAY_MS = 7000L
         // Upper bound for a connect attempt before the UI gives up and returns to idle.
         const val CONNECT_TIMEOUT_MS = 20000L
+        // A restart must not start the new core until the daemon process reports the old one
+        // stopped; these bound that wait.
+        const val RESTART_STOP_TIMEOUT_MS = 6000L
+        const val RESTART_STOP_POLL_MS = 50L
         // Remembers which bottom-nav tab was selected so it survives an activity
         // recreate (theme/language change) instead of snapping back to Home.
         const val KEY_SELECTED_NAV = "selected_bottom_nav"
@@ -1395,25 +1402,54 @@ class MainActivity : HelperBaseActivity() {
         updateServersChrome(mainViewModel.getProviderGroups().size)
     }
 
+    /**
+     * Tapping a server row SELECTS it — it never connects and never reconnects.
+     *
+     * Connecting is the connect button's job alone. When a tunnel is already up and the user picks a
+     * different server, the running tunnel is left untouched and an explicit "apply it" action is
+     * offered instead, so a tap in the list can never silently tear down a working connection.
+     */
     private fun setSelectServer(guid: String) {
         val selected = MmkvManager.getSelectServer()
-        if (guid != selected) {
-            MmkvManager.setSelectServer(guid)
-            serversAdapter.setSelectServer(selected, guid)
-            homeAdapter.setSelectServer(selected, guid)
-            updateSelectedServer()
-            // Surface the selected server's subscription card in the carousel.
-            mainViewModel.findSubscriptionIdBySelect()?.let { selectedSubId ->
-                val idx = homeMetaSubIds.indexOf(selectedSubId)
-                if (idx >= 0 && idx != homeMetaPage) {
-                    homeMetaPage = idx
-                    binding.vpHomeMeta.setCurrentItem(idx, true)
-                }
-            }
-            if (mainViewModel.isRunning.value == true) {
-                restartV2Ray()
+        if (guid == selected) return
+
+        MmkvManager.setSelectServer(guid)
+        serversAdapter.setSelectServer(selected, guid)
+        homeAdapter.setSelectServer(selected, guid)
+        updateSelectedServer()
+        // Surface the selected server's subscription card in the carousel.
+        mainViewModel.findSubscriptionIdBySelect()?.let { selectedSubId ->
+            val idx = homeMetaSubIds.indexOf(selectedSubId)
+            if (idx >= 0 && idx != homeMetaPage) {
+                homeMetaPage = idx
+                binding.vpHomeMeta.setCurrentItem(idx, true)
             }
         }
+        if (mainViewModel.isRunning.value == true) {
+            promptApplySelectedServer(guid)
+        }
+    }
+
+    /**
+     * Offers to move an already-running tunnel onto the newly selected server. Declining leaves the
+     * connection exactly as it was — the selection is remembered for the next connect.
+     */
+    private fun promptApplySelectedServer(guid: String) {
+        val name = MmkvManager.decodeServerConfig(guid)?.remarks.orEmpty()
+        val message = if (name.isBlank()) {
+            getString(R.string.server_selected_reconnect_prompt_generic)
+        } else {
+            getString(R.string.server_selected_reconnect_prompt, FlagUtil.stripLeadingFlag(name))
+        }
+        Snackbar.make(binding.mainContent, message, Snackbar.LENGTH_LONG)
+            .setAnchorView(binding.bottomNav)
+            .setAction(R.string.server_selected_reconnect_action) {
+                connectInProgress = true
+                applyRunningState(isLoading = true, isRunning = true)
+                scheduleConnectWatchdog()
+                restartV2Ray()
+            }
+            .show()
     }
 
     private inner class ActivityAdapterListener : MainAdapterListener {
@@ -1488,12 +1524,34 @@ class MainActivity : HelperBaseActivity() {
         CoreServiceManager.startVService(this)
     }
 
+    /**
+     * Stops the running tunnel and starts it again on the currently selected server.
+     *
+     * The core runs in its own process (`:RunSoLibV2RayDaemon`), so stopping is asynchronous and the
+     * only truthful signal in this process is [MainViewModel.isRunning], driven by the daemon's
+     * broadcasts. Waiting a fixed delay here used to lose that race: the new start would arrive
+     * while the old core was still up, `startContextService()` would see `coreController.isRunning`
+     * and return silently, and the tunnel would keep running the PREVIOUS server while the UI
+     * showed the new one. So wait for a real stopped state, and report failure rather than
+     * pretending to have switched.
+     */
     fun restartV2Ray() {
-        if (mainViewModel.isRunning.value == true) {
-            CoreServiceManager.stopVService(this)
+        if (mainViewModel.isRunning.value != true) {
+            startV2Ray()
+            return
         }
+        CoreServiceManager.stopVService(this)
         lifecycleScope.launch {
-            delay(500)
+            val deadline = SystemClock.elapsedRealtime() + RESTART_STOP_TIMEOUT_MS
+            while (mainViewModel.isRunning.value == true && SystemClock.elapsedRealtime() < deadline) {
+                delay(RESTART_STOP_POLL_MS)
+            }
+            if (mainViewModel.isRunning.value == true) {
+                connectInProgress = false
+                showStatusToast(getString(R.string.toast_status_failed))
+                applyRunningState(isLoading = false, isRunning = true)
+                return@launch
+            }
             startV2Ray()
         }
     }
@@ -1914,6 +1972,11 @@ class MainActivity : HelperBaseActivity() {
     override fun onResume() {
         super.onResume()
         updateSelectedServer()
+        // Other entry points change the selected server without owning these lists — the URL-scheme
+        // and shortcut activities, and the quick tile. Re-reading it here keeps the rows honest
+        // instead of leaving a stale one painted as selected.
+        serversAdapter.syncSelection()
+        homeAdapter.syncSelection()
         // The account header is repainted reactively by the AccountSession.state collector
         // (repeatOnLifecycle STARTED); re-evaluate the departament-subscription gate here too, so a
         // subscription added/removed elsewhere shows/hides the account on return without a restart.

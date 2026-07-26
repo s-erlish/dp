@@ -563,4 +563,7 @@
     <string name="settings_backup">Резервное копирование</string>
     <string name="settings_value_on">Вкл</string>
     <string name="settings_value_off">Выкл</string>
+    <string name="server_selected_reconnect_prompt">Выбран %1$s. Переподключиться к нему?</string>
+    <string name="server_selected_reconnect_prompt_generic">Сервер выбран. Переподключиться к нему?</string>
+    <string name="server_selected_reconnect_action">Переподключиться</string>
 </resources>

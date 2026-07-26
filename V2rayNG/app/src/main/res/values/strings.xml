@@ -609,4 +609,7 @@
     <string name="settings_value_on">Вкл</string>
     <string name="settings_value_off">Выкл</string>
 
+    <string name="server_selected_reconnect_prompt">Selected %1$s. Reconnect to it now?</string>
+    <string name="server_selected_reconnect_prompt_generic">Server selected. Reconnect to it now?</string>
+    <string name="server_selected_reconnect_action">Reconnect</string>
 </resources>
