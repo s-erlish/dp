@@ -1,5 +1,20 @@
 # How to verify Android changes in this environment
 
+## One wave per platform at a time
+
+Disjoint file groups let agents edit in parallel without overwriting each other. They do **not** make
+a build meaningful in parallel, because the build is shared: a compile sees the whole tree, so agent A's
+gate run fails on agent B's half-written file, and the failure is reported against A's change.
+
+That happened here — a shell-split stage was stopped by errors from another wave's in-progress rewrite
+of `AboutActivity` and `LogcatActivity` against string keys it had not finished adding.
+
+So: **only one wave may be editing a given platform at any time.** Android and the desktop are separate
+builds and may run concurrently; two Android waves may not. A docs-only wave is always safe.
+
+`flock` in `verify-build.sh` serialises *builds*, which stops two Gradle runs corrupting one build
+directory. Nothing serialises *edits*, and nothing can — that is a scheduling decision, made here.
+
 ## Fresh container: run the setup once
 
 A new container has **no** Android SDK, no .NET SDK, no submodule and no libv2ray stub. One command
