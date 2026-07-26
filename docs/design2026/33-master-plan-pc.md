@@ -2114,9 +2114,12 @@ Under `.lite`: the shield swaps instantly, no sonar, the dot and the word change
 
 ```
 StackPanel Orientation=Horizontal Spacing=8 HorizontalAlignment=Center
-├─ Ellipse 8x8   (the state dot, 5.3.2)
-└─ TextBlock.Title   «Подключено»
+├─ Ellipse 8x8       (the state dot, 5.3.2)
+└─ TextBlock.Title   the word from 2.12.1, 16/700, never a Headline
 ```
+
+The word **changes with no animation at all** (5.3.6 step 3). The dot crossfades over 220ms. A word
+that fades is a word the user reads twice.
 
 Below it, at 4px, `#gateLine`, `TextBlock.Subtitle` centred, `MaxWidth` 420, **present only when the
 subscription state is not `активна`**:
@@ -2139,29 +2142,38 @@ information.
 zero, sit at the top of the page before the user has done anything, which is the hero-metric template
 inverted.
 
+**The composition is 2.12.3** - three equal columns, download first, all three at `Numeric` 16/500,
+the unit inside the value string. This is a change from the first issue, which had up/uptime/down at
+13/16/13 with «Мбит/с» split into a separate 12px `Caption`.
+
 ```
-Grid ColumnDefinitions="*,Auto,*"  Height 44  MaxWidth 420
-├─ [0] StackPanel Orientation=Horizontal Spacing 4  HorizontalAlignment=Right
-│        PathIcon Geo.Action.ArrowUp 16 Brush.OnSurfaceVariant
-│        TextBlock.Numeric «3,1»   +  TextBlock.Caption «Мбит/с»
-├─ [1] TextBlock.Numeric  «02:14:07»  16/500  Brush.OnSurface   Margin 24,0
-└─ [2] StackPanel Orientation=Horizontal Spacing 4  HorizontalAlignment=Left
-         PathIcon Geo.Action.ArrowDown 16
-         TextBlock.Numeric «24,8»  +  TextBlock.Caption «Мбит/с»
+Grid ColumnDefinitions="*,*,*"  Height 44  MaxWidth 420
+├─ [0] StackPanel Orientation=Horizontal Spacing 8  HorizontalAlignment=Center
+│        PathIcon Geo.Action.ArrowDown 16  Brush.OnSurfaceVariant
+│        TextBlock.Numeric «24,8 Мбит/с»   16/500  Brush.OnSurface
+├─ [1] StackPanel Orientation=Horizontal Spacing 8  HorizontalAlignment=Center
+│        PathIcon Geo.State.Clock 16       Brush.OnSurfaceVariant
+│        TextBlock.Numeric «02:14:07»      16/500  Brush.OnSurface
+└─ [2] StackPanel Orientation=Horizontal Spacing 8  HorizontalAlignment=Center
+         PathIcon Geo.Action.ArrowUp 16    Brush.OnSurfaceVariant
+         TextBlock.Numeric «3,1 Мбит/с»    16/500  Brush.OnSurface
 ```
 
-- **Uptime is the middle stat and it is the largest of the three.** Speeds fluctuate and mean little;
-  a duration is a trust signal. Two hours fourteen minutes of unbroken tunnel is the single most
-  reassuring number a VPN can show, and it costs one ticker. This is Incy's best Home idea
-  (`30-reference-analysis.md` 2.1.4) and it is free.
-- Every figure is `TextBlock.Numeric` with `tnum,lnum` so nothing jitters. Each speed column reserves
-  `5 x 0.62 x 13 = 41px` for its digits so `9,9` to `12,4` does not shift the row. Uptime reserves
-  `8 x 0.62 x 16 = 80px`.
-- The 42px invisible spacer that fakes optical centring today is deleted; a three-column `Grid` with
-  a centred middle column does it honestly.
-- Units are in the UI face at `Caption` 12; figures are in the figure face. A sentence never ripples
-  between two faces, but these are values in their own slots, which is exactly where the split
-  belongs.
+- **Three equal columns, and the reason the first issue's 13/16/13 is wrong.** Making uptime larger
+  says a duration is a more important fact than a rate, which is an editorial claim the screen is
+  not entitled to make, and it puts three type sizes on one 44px strip. Uptime keeps the **middle**
+  slot, which is emphasis enough: it is the number the eye lands on and it is the trust signal
+  (`30-reference-analysis.md` 2.1.4). Download is first because it is the number a user checks.
+- **The unit lives inside the value.** «24,8 Мбит/с» is one string in `Font.Numeric` with
+  `tnum,lnum`, not a figure plus a caption in a second face. Splitting it sets one fact in two faces
+  on one line and creates a fourth alignment problem for a strip that has three columns.
+- Each column reserves its width from the 620/1000 tabular advance so nothing jitters: the speed
+  columns reserve `11 x 0.62 x 16 = 110px` for `24,8 Мбит/с`, uptime reserves
+  `8 x 0.62 x 16 = 80px`. Under 110px of column the unit abbreviates to «Мб/с», never wraps.
+- The 42px invisible spacer that fakes optical centring today is deleted; three star columns with
+  centred content do it honestly.
+- Zeroes: while connected but idle the strip renders `0,0 Мбит/с`, not a blank and not a dash.
+  Uptime starts at `00:00:00` on the frame the tunnel confirms.
 
 ### 5.6 The ledger rows
 
@@ -2182,39 +2194,49 @@ selected. Right-click opens the same `MenuFlyout` the server list uses (6.5). Wh
 selected: title «Сервер не выбран», subtitle «Выберите сервер, чтобы подключиться», tile is the globe
 glyph, no ping, and the row is the primary affordance on the page.
 
-**`#rowSubscription`** - the subscription object's Home rendering (4.1).
+**`#cardSubscription`** - the subscription object's Home rendering (4.1), and **the one card on this
+screen** (2.12.3). Identical in anatomy to `32-master-plan-android.md` 11.6 and to Аккаунт's zone 2
+(7.1.3): one object, one state machine, three renderings.
 
 ```
-Border.Row  #rowSubscription
-├─ Border.Tile   Geo.Set.Shield 22    neutral, or .amber / .red in the warning states
+Border.Card  #cardSubscription   Padding 16
+├─ row 1   Grid "*,Auto"
+│            TextBlock.Title  «Ваша подписка»          (or the user's rename), maxLines 2
+│            Border.Chip      state word + colour + glyph            (4.1)
+├─ 4
+├─ row 2   TextBlock.Caption  the expiry sentence: «Действует до 12.08.2026» / «Осталось 3 дня»
+├─ 16
+├─ row 3   Border.Meter  «Трафик»  ·  Subtitle.Numeric «12,4 из 50 ГБ»
+│            omitted entirely when the operator sent `subscription-userinfo: 0` or on a
+│            secondary subscription, where traffic is not root data
 ├─ 12
-├─ text     Title    «Подписка»
-│           Subtitle «12,4 ГБ из 50 ГБ»               traffic, beside a 4px meter, never on it
-├─ trailing Border.Chip  «Активна до 12.08.2026»      state word + colour + glyph
-└─ chevron 20   → route `account/subscription/{id}`
+├─ row 4   Border.Meter  «Устройства»  ·  Subtitle.Numeric «3 из 5»    (bar omitted when unlimited)
+├─ 16
+├─ row 5   the operator message, dismissible, <= 200 chars, <= 5 lines           (6.7)
+└─ row 6   at most ONE filled accent button, 48h full width, plus at most one Button.Text beside it
+             Button.Primary «Продлить»   in истекает / истекла
+             Button.Primary «Устройства» at the device limit
+             Button.Primary «Купить»     in нет подписки
+             nothing at all              in активна
 ```
 
-With two or more subscriptions the row's title becomes «Подписки», the subtitle becomes
-«3 подписки · ближайшая истекает 12.08.2026», and the chip carries the **worst** state of the set.
+Clicking the card opens `account/subscription/{id}`. There is no long-press, no swipe and no
+context menu: the destructive action that Android's `HomeMetaPagerAdapter` hid behind a long-press
+is removed on both platforms.
 
-**`#rowAccount`** - replaces `HomeAccountChip.axaml` as a standalone component.
+With two or more subscriptions the card's title becomes «Подписки», row 2 becomes «3 подписки ·
+ближайшая истекает 12.08.2026», the meters are omitted, the chip carries the **worst** state of the
+set, and the card opens `account` rather than a single subscription.
 
-```
-Border.Row  #rowAccount
-├─ Border.Avatar 40   monogram Title 16/700 Brush.OnAccent on Brush.Tile.Blue, or the photo
-├─ 12
-├─ text     Title    «@username»                      user content, ellipsises at the end
-│           Subtitle «Управление аккаунтом»
-└─ chevron 20   → destination `account`
-```
+**No account row, and no account chip.** `HomeAccountChip.axaml` is deleted rather than folded into a
+row (2.12.3): the rail carries the «Аккаунт» destination at all times, and a second permanent
+entrance to the same room is the duplicate-affordance failure this plan removes everywhere else.
+Its skeleton behaviour - a 40px circle plus a 120x14 and a 90x12 bar, pulsing - is harvested into
+`Border.Skeleton` and is what the Аккаунт hero uses (7.1.3).
 
-Signed out, the row becomes: neutral tile with `Geo.Auth.Telegram`, title «Войти в departament»,
-subtitle «Через Telegram, быстро и без пароля», chevron → route `auth/login`. It is never hidden,
-because a signed-out user needs the entrance more than a signed-in one needs the exit.
-
-While the profile resolves, the row shows the skeleton variant: a 40px `Border.Skeleton` circle, a
-120x14 bar, a 90x12 bar, all pulsing. `HomeAccountChip` already does this correctly and the behaviour
-is carried over verbatim.
+**Signed out, Главная does not grow a sign-in row.** It shows the first-run empty state instead
+(5.8), which is one `Border.EmptyIcon`, a title, one line and a `Button.Primary` «Войти» - one
+entrance, stated once, where the user is already looking.
 
 ### 5.7 The TUN banner
 

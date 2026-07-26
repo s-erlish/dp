@@ -1335,7 +1335,8 @@ FrameLayout  height @dimen/toolbar_height 56dp, background ?attr/colorBackground
 - Tab screens use the same bar with no back button: Home carries the wordmark
   (`@style/ToolbarBrandTitle`) plus a `+` action; Servers, Аккаунт and Настройки carry their title
   plus at most one action. `MainActivity.showTab()` currently hides the `AppBarLayout` on every tab
-  (`:441`), which is why the app has no title system; that line is deleted.
+  (`grep -n 'appBar.isVisible' MainActivity.kt`), which is why the app has no title system; that
+  line is deleted.
 
 ---
 
@@ -1373,7 +1374,7 @@ own cleanup list at 5.5 as a defect in `activity_main.xml`, so it cannot simulta
 sanctioned marker on the other client. Recorded as D-A18.
 
 The bar is **always visible on every tab**, including first run. The current
-`updateBottomNavVisibility()` (`MainActivity.kt:713`) hides the whole bar when signed out with no
+`MainActivity.updateBottomNavVisibility()` hides the whole bar when signed out with no
 servers, so a first-time user sees a bar-less screen and cannot discover the product; that is
 deleted (decision D-A2).
 
@@ -1661,40 +1662,65 @@ MainActivity  (singleTask, edge-to-edge, no ActionBar, four fragments in a Fragm
 │     ├── Устройства               -> DeviceManagementActivity
 │     ├── История платежей         -> PaymentHistoryActivity
 │     ├── Привязать Telegram       -> TelegramLinkSheet
+│     ├── Пригласить друга         -> ReferralActivity
 │     ├── Пополнить                -> TopUpSheet -> PaymentMethodSheet
+│     ├── card overflow            -> SubscriptionActionsSheet (rename, QR, autorenew, delete)
 │     └── Выйти                    -> confirm dialog
 │
-└── Настройки          SettingsFragment  (hub, 15 rows in 4 groups)
+└── Настройки          SettingsFragment  (hub, 16 rows in 4 groups)
       ├── Режим подключения        -> ConnectionSettingsActivity
       ├── Прокси по приложениям    -> PerAppProxyActivity -> AppPickerActivity
       ├── Маршрутизация            -> RoutingSettingActivity -> RoutingEditActivity
       ├── DNS                      -> DnsSettingsActivity
+      ├── Файлы ресурсов           -> UserAssetActivity -> AssetUrlSheet
       ├── Обход блокировок         -> CircumventionActivity
       ├── Проверка серверов        -> PingSettingsActivity
       ├── Локальный прокси         -> LocalProxyActivity
-      ├── Провайдеры               -> ProviderSettingsActivity -> SubEditActivity
+      ├── Провайдеры               -> ProviderSettingsActivity -> ProviderDetailActivity
       ├── Что настроил провайдер   -> OperatorSettingsActivity
-      ├── Перенести подписку       -> TvSendActivity / TvReceiveActivity
+      ├── Перенести подписку       -> TvSendActivity  (TvReceiveActivity is the TV shell's own)
       ├── Оформление               -> AppearanceActivity
       ├── Язык                     -> LanguageActivity
       ├── Запуск при загрузке      -> switch, in place
-      ├── Резервное копирование    -> BackupActivity
+      ├── Резервное копирование    -> BackupActivity -> WebDavActivity
       └── О приложении             -> AboutActivity -> LogcatActivity, UrlSchemeListActivity
 ```
+
+**Nothing in this product is reachable except through this map.** Every activity in
+`AndroidManifest.xml` appears above, or in 22 (surfaces outside the app window), or in 24.2 with an
+explicit deletion. The three that used to be missing from every version of this map -
+`UserAssetActivity` and `UserAssetUrlActivity` (reachable **today**, from the Settings tab's
+`row_assets`, wired at `MainActivity.kt:2470`) and `AppPickerActivity` - are now on it.
+`dialog_config_filter.xml` is not, and 23 says why it is deleted rather than routed.
 
 **Depth law: two levels below a tab, never three** (`03-direction.md` 7.3). `Настройки ->
 Маршрутизация -> правило` is the maximum. `Настройки -> Провайдеры -> провайдер -> сервер` would be
 three and is why the server editor is reached from the Servers tab's action sheet instead.
+`Настройки -> Файлы ресурсов -> добавить URL` stays at two because the add-URL surface is a **sheet
+over** the page, not a third level (20.15).
 
 ### 9.3 The shell: `MainActivity`
 
-**Files today:** `ui/MainActivity.kt` (2 777 lines, the largest file in the app),
-`res/layout/activity_main.xml` (705 lines). **Verdict: REBUILD.**
+**Files today:** `ui/MainActivity.kt` (**2 906 lines at the time of this revision**, the largest file
+in the app, and growing - see the citation note below), `res/layout/activity_main.xml` (705 lines).
+**Verdict: REBUILD.**
 
 `MainActivity` is not a container today; it is one layout holding four sibling `View` groups toggled
 by `isVisible`, with `layout_settings_content.xml` (1 536 lines) inlined into it and only the
-Account tab being a real Fragment. That is why the file is 2 777 lines and why the four tabs drifted
-into four design languages.
+Account tab being a real Fragment. That is why the file is nearly three thousand lines and why the
+four tabs drifted into four design languages.
+
+> **Citation note, and a wave-0 obligation.** This document cited roughly two hundred file:line
+> pairs; a third of the `MainActivity.kt` ones had already drifted by the time of this revision
+> (`:610`, `:713`, `:1048`, `:1741`, `:2016` and `:2298` no longer point at what they described,
+> while `:2470`, `MainRecyclerAdapter.kt:56`, `themes.xml:88-99` and
+> `layout_subscription_meta_bar.xml:163-176` still do). **A plan routed by line number rots the
+> moment work starts.** Every citation in this revision that could be expressed as a symbol has
+> been: `MainActivity.updateAccountGate()`, `MainActivity.updateBottomNavVisibility()`,
+> `MainActivity.showManualEntryDialog()`, `MainActivity.showTab()`,
+> `AccountFragment.startSkeletonPulse()`, `MainRecyclerAdapter.onItemLongClick`. Line numbers
+> survive only where the target is an anonymous block, and each is paired with the grep that finds
+> it again. Wave 0 step 4 re-resolves the remainder against HEAD.
 
 **Target structure:**
 
@@ -1717,9 +1743,10 @@ activity_main.xml
   the navigation-bar inset; every scrolling child adds `navigationBar + 56 + 16` bottom padding;
   every form applies `ime()`. `activity_base.xml`'s `android:fitsSystemWindows="true"` is removed so
   the two current strategies become one.
-- **Back.** Three competing handlers exist today and handler 2 (`onKeyDown`, `MainActivity.kt:2298`)
-  returns `true` unconditionally and calls `moveTaskToBack(false)`, so the app **never finishes on
-  Back** and predictive Back is not declared anywhere. Target:
+- **Back.** Three competing handlers exist today and handler 2 (`MainActivity.onKeyDown()`; find it
+  with `grep -n 'moveTaskToBack' MainActivity.kt`) returns `true` unconditionally and calls
+  `moveTaskToBack(false)`, so the app **never finishes on Back** and predictive Back is not declared
+  anywhere. Target:
   1. `android:enableOnBackInvokedCallback="true"` in `AndroidManifest.xml`.
   2. One `OnBackPressedCallback`: if a sheet is open, close it; else if the current tab is not
      Главная, go to Главная; else disable and re-dispatch so the system finishes the activity.
@@ -1790,8 +1817,8 @@ first screen a paying user sees and it is our worst.
 ### 10.3 Component tree
 
 Root: `ScrollView` on `?attr/colorBackground`, `fillViewport`, IME insets applied, no toolbar and
-no card. Content column: `layout_width` match_parent, `maxWidth 480dp`, centred,
-`paddingHorizontal @dimen/screen_gutter`.
+no card. Content column: `layout_width` match_parent, `maxWidth @dimen/form_max_width` 480dp,
+centred, `paddingHorizontal @dimen/screen_gutter`.
 
 ```
 [ status-bar inset ]
@@ -2102,7 +2129,8 @@ Rules that make it one object rather than four renderings:
 - Traffic is root-only in the API. A secondary subscription renders **no traffic meter** rather than
   an empty one.
 - Tapping the card opens Аккаунт. Long-press does nothing. **The current long-press-to-delete
-  (`HomeMetaPagerAdapter.kt:66`) is removed**: undiscoverable and destructive is the exact inverse
+  (`HomeMetaPagerAdapter`'s `root.setOnLongClickListener { onDeleteSub(subId) }`) is removed**:
+  undiscoverable and destructive is the exact inverse
   of the destructive-action law.
 
 ### 11.7 Interaction
@@ -2168,8 +2196,9 @@ with its latency legible and its per-item actions one deliberate gesture away.
 | `res/drawable/bg_search_pill.xml` (radius 14) | Delete, replaced by `bg_input_field.xml` (radius 12) |
 | `res/drawable/bg_server_row.xml` (raw `#1F4C8DFF`) | **RESTYLE** to theme attrs |
 
-**The P0.** `MainActivity.kt:610-611` assigns `serversAdapter.onItemLongClick` and
-`homeAdapter.onItemLongClick`; `MainRecyclerAdapter.kt:56` declares the property with a comment
+**The P0.** `MainActivity` assigns `serversAdapter.onItemLongClick` and
+`homeAdapter.onItemLongClick` (`grep -n 'onItemLongClick =' MainActivity.kt`);
+`MainRecyclerAdapter.onItemLongClick` declares the property with a comment
 saying it is "no longer invoked by the adapter". Consequently **a user cannot delete, rename, share,
 duplicate, QR or edit a single server from the UI**, `editServer()`, `shareServer()`,
 `showQRCode()`, `share2Clipboard()`, `removeServer()` and `locateSelectedServer()` have no callers,
@@ -2242,7 +2271,8 @@ deliberate divergence from Incy's dot-plus-value-plus-word and from our own curr
 **Selected state, two axes:** row background `?attr/colorSurfaceContainerHighest` (P3) **and** the
 20dp accent check in the state-marker slot. No side stripe (absolute ban), no 1.5dp accent stroke,
 no fill tint. The zero-size `layout_indicator` `View` that survives only so
-`MainRecyclerAdapter.kt:208` can call `setBackgroundColor` on it is deleted.
+`MainRecyclerAdapter.bindServer()` can call `setBackgroundColor` on it is deleted
+(`grep -n 'layoutIndicator' MainRecyclerAdapter.kt`).
 
 **Protocol chip contrast fix:** the chip moves from `chip_type_text #4C8DFF` on
 `colorPrimaryContainer #17325C` (**4.0:1**, a failure at 11sp) to the Neutral chip variant,
@@ -3814,7 +3844,7 @@ Order of preference, always: **inline > expandable row > bottom sheet > dialog**
 | Автообновление подписки (single-choice) | `ic_unfold_more` cycle row on Провайдеры (20.8) |
 | DNS «Свой…» (text input) | One-field sheet from the «Свой» row (20.4) |
 | Число соединений Mux (text input) | Inline `Stepper` on Обход блокировок (20.5) |
-| «Ввести вручную» (text input, with **two hardcoded Russian literals in Kotlin** at `MainActivity.kt:2016` and `:2018`) | **Stays a dialog** (a free-text paste has no better home) with the literals moved to resources and the confirmation sheet of 14.5 after it |
+| «Ввести вручную» (text input, with **two hardcoded Russian literals in Kotlin** inside `MainActivity.showManualEntryDialog()`) | **Stays a dialog** (a free-text paste has no better home) with the literals moved to resources and the confirmation sheet of 14.5 after it |
 | Удалить сервер | **Undo strip** (a server is re-importable) |
 | Удалить все / дубликаты / недоступные | **Undo strip**, with the count in the message |
 | Удалить подписку | **Dialog** (irreversible; the link may not be recoverable) |
@@ -3895,8 +3925,13 @@ Four jobs, all mechanical, all blocking:
    `values-bn/`, `values-ar/` translations. Hyphen, comma, colon, full stop, or a line break.
    Verify with `grep -rn -e '—' -e '–' values*/strings*.xml`.
 3. **Three dots to `…`.** Verify with `grep -rn '\.\.\.' values*/strings*.xml`.
-4. **Hardcoded Russian in Kotlin.** `MainActivity.kt:2016`, `:2018`, `:2101`, `:2103`, `:2113`,
-   `:2115` move to resources.
+4. **Hardcoded Russian in Kotlin.** Ten literals, all in `MainActivity`: two inside
+   `showManualEntryDialog()` («Вставьте ссылку подписки или конфигурацию сервера», «Не похоже на
+   ссылку или конфигурацию. Пример: …»), four in the import-result branch («Серверы добавлены: %d»,
+   «Не удалось загрузить серверы подписки», «Подписка уже добавлена», «Эта ссылка не от departament.
+   Используйте подписку из нашего бота.»), and the rest found by
+   `grep -nP '"[^"]*[А-Яа-я][^"]*"' java/com/v2ray/ang/ui/*.kt`. All move to resources; the four
+   import-result ones also stop being toasts and become status-strip messages (8.10).
 
 ### 24.4 The operator message component
 

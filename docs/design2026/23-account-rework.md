@@ -213,8 +213,7 @@ One order, both platforms, no exceptions (§13).
 
 ```
 ┌ P0 ground, gutter 16 ───────────────────────────────────────┐
-│ [offline bar]           only when offline                    │
-│ [payment bar]           only while a checkout is being polled │
+│ [status bar]            offline, or a checkout being polled  │
 │                                                              │
 │ HEAD          avatar 40 · name · login handle    (no card)   │
 │  32                                                          │
@@ -223,45 +222,67 @@ One order, both platforms, no exceptions (§13).
 │ CARD          the subscription            ← the ONE card     │
 │  24                                                          │
 │ «Подписка»    Устройства              2 / 5                  │
-│               Улучшить тариф                ›                │
+│               Купить подписку               ›                │
 │  24                                                          │
 │ «Оплата»      Баланс                1 500 ₽                  │
-│               Купить подписку               ›                │
 │               История платежей     12.06.2026                │
 │               Реферальный код          ABC123                │
 │  24                                                          │
-│ «Вход»        Способы входа     Telegram, почта              │
+│ «Аккаунт и вход»                                             │
+│               Способы входа     Telegram, почта              │
 │               Выйти                                          │
 │  32 + bottom inset                                           │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-Counts against D§7.3: **3 row groups** (cap 4), **max 4 rows per group** (cap 7), **1 card** (cap 1),
-**1 Display figure, sometimes 0** (cap 1), **2 levels below the tab** (cap 2 - tab → Devices → nothing).
+Rows carry **no leading tile** and start at the 16 gutter (1.4). Hairlines between rows in a group
+also start at 16.
+
+**«Улучшить тариф» has exactly one entrance, and it is the card.** An earlier draft put a Tertiary
+button in the card *and* a navigation row in the «Подписка» group - two controls, same label, same
+destination, same sheet, ~200dp apart. That is the duplicate-CTA-intent failure D§7.3 forbids by
+name, and it is the same rule this file already applies to «Купить подписку» (6.6). The card is
+where the tariff lives, so the card keeps the button and the row is deleted. That drops «Подписка»
+to «Устройства» plus the conditional «Купить подписку», which is why «Купить подписку» sits in
+«Подписка» and not in «Оплата»: for a user who already has a subscription, that row buys a **second**
+one, which is a subscription action, not a billing action.
+
+Counts against D§7.3: **3 row groups** (cap 4), **max 3 rows per group** (cap 7), **1 card** (cap 1),
+**1 Display figure** (cap 1; 0 only in the perpetual and unknown-expiry variants, where there is no
+date to set), **1 primary action** (cap 1), **2 levels below the tab** (cap 2 - tab → Devices →
+nothing).
 
 **Row trailing discipline** (§4.5 - trailing is exactly one thing, never two). Applied as a rule you can
 teach: **a row that carries a value carries no chevron; a row that carries no value carries a chevron.**
 The whole row is the target either way.
 
-| Row | Trailing | Why |
-|---|---|---|
-| Устройства | value `2 / 5` | the value is the point; the tap is a bonus |
-| Улучшить тариф | chevron | navigation to a choice |
-| Баланс | value `1 500 ₽` | the value is the point |
-| Купить подписку | chevron | navigation |
-| История платежей | value `12.06.2026` | the latest payment date is the point |
-| Реферальный код | value `ABC123` | the code is the point; tap copies |
-| Способы входа | value `Telegram, почта` | the summary is the point |
-| Выйти | nothing | a terminal action, no destination and no value |
+| Row | Component | Trailing | Why |
+|---|---|---|---|
+| Устройства | `Row.Value` | value `2 / 5` | the value is the point; the tap is a bonus |
+| Купить подписку | `Row.Navigation` | chevron | navigation |
+| Баланс | `Row.Value` | value `1 500 ₽` | the value is the point |
+| История платежей | `Row.Value` | value `12.06.2026` | the latest payment date is the point |
+| Реферальный код | `Row.Value` | value `ABC123` | the code is the point; tap copies |
+| Способы входа | `Row.Value` | value `Telegram, почта` | the summary is the point |
+| Выйти | `Row.Destructive` | nothing | a terminal action, no destination and no value |
 
-**Origin discipline.** Two surface families, never mixed inside one surface:
+C§8.3 Row.Value's default trailing is "value text, then a 20dp chevron". **On this tab a value row
+carries the value only**, because every one of these rows opens a surface whose subject is the value
+itself, and a chevron beside a number is two trailing things (C§8.1: "exactly one of … Never two").
+Recorded as decision 13.2 C-5. The whole row is the target either way, and `Row.Value` keeps its
+chevron everywhere else in the product.
 
-- **Management surfaces** (the Account groups, Devices, Sign-in methods): tiled rows, text origin
-  **68** = 16 gutter + 40 tile + 12, hairlines start at 68 (`@dimen/row_text_origin`).
-- **Transaction surfaces** (the payment sheet, Payment history): tile-less ledger rows, text origin
-  **16**, hairlines start at 16.
+**Origin discipline.** A surface's rows either all carry a tile or none do; a surface never mixes the
+two, and a surface has exactly one text origin.
 
-This is a clarification of §4.1, recorded as decision A-2.
+| Surface family | Rows | Origin | Hairline inset |
+|---|---|---|---|
+| The Account tab's groups | tile-less | **16** | 16 |
+| Tiled management surfaces (Devices, Sign-in methods, Settings) | 40 tile + 12 | **68** (`@dimen/row_text_origin`) | 68 |
+| Transaction surfaces (the payment surface, Payment history) | `Row.Ledger`, tile-less | **16** | 16 |
+
+This is a clarification of §4.1 (whose 68 assumes a tile, because 68 *is* 16 + 40 + 12: with no tile
+there is nothing to add), recorded as decision A-2, extended by A-16.
 
 ---
 
