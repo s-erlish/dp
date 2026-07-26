@@ -91,6 +91,10 @@ class AccountFragment : Fragment() {
     // flashes for one frame reads as a glitch (00-rules.md 7.3).
     private var signOutSpinnerJob: Job? = null
 
+    // The retry bar from a failed sign-out, held so a wipe that finishes late (the watchdog gave
+    // up, the work did not) can take back a message that has stopped being true.
+    private var signOutBar: Snackbar? = null
+
     // Last logged-in/out value this view has rendered. Null until the first emission, so the
     // StateFlow's initial replay is not mistaken for a transition. Drives the reset that keeps a
     // dropped session (sign-out, or a 401 on the identity endpoint) from leaving the previous
@@ -146,6 +150,8 @@ class AccountFragment : Fragment() {
         skeletonAnimator = null
         signOutSpinnerJob?.cancel()
         signOutSpinnerJob = null
+        signOutBar?.dismiss()
+        signOutBar = null
         _binding = null
     }
 
@@ -275,6 +281,10 @@ class AccountFragment : Fragment() {
      */
     private fun onSessionCleared() {
         endSignOutBusy()
+        // The session did go away, so a "не удалось выйти" bar from a watchdog that fired early is
+        // now a lie about the screen the user is looking at. Take it back.
+        signOutBar?.dismiss()
+        signOutBar = null
         // Idempotent, and the only thing that clears the ViewModel on the 401 route (an explicit
         // sign-out has already done it by the time we get here).
         viewModel.clearAccountData()
@@ -711,13 +721,18 @@ class AccountFragment : Fragment() {
     }
 
     /**
-     * The wipe threw, so the user is still signed in and nothing was half-removed that a retry
-     * cannot finish (every step of the wipe is idempotent). 00-rules.md 1.4.8: a failure the user
-     * can act on is a Snackbar with an action, never a Toast. Anchored above the bottom bar so
-     * the action is reachable.
+     * The sign-out did not complete: either the wipe threw, or it stopped making progress long
+     * enough that [AccountViewModel.logout]'s watchdog stopped waiting on it. Both leave the user
+     * signed in with nothing half-removed that a retry cannot finish (every step of the wipe is
+     * idempotent), and both read the same from here, so they get one message and one action
+     * rather than a diagnosis the user cannot act on differently.
      *
-     * There is no "the call never returned" branch to design: this backend has no logout endpoint
-     * and issues a non-refreshable token, so sign-out never touches the network.
+     * This is the branch that keeps a stalled sign-out from being a spinner with no end: the row
+     * goes back to being tappable, the spinner stops, and the way forward is on screen.
+     *
+     * 00-rules.md 1.4.8: a failure the user can act on is a Snackbar with an action, never a
+     * Toast. Anchored above the bottom bar so the action is reachable. Held in [signOutBar] so a
+     * late-finishing wipe can dismiss it instead of leaving a contradiction on screen.
      */
     private fun onSignOutFailed() {
         endSignOutBusy()
@@ -728,6 +743,7 @@ class AccountFragment : Fragment() {
         // onboarding, and anchoring to a gone view drops the snackbar off the bottom edge.
         activity?.findViewById<View>(R.id.bottom_nav)?.takeIf { it.isVisible }
             ?.let { bar.setAnchorView(it) }
+        signOutBar = bar
         bar.show()
     }
 

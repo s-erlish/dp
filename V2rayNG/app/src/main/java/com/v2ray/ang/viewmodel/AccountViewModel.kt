@@ -24,9 +24,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Backs the account/subscriptions/store/payments screens. Holds the observable data as
@@ -411,8 +412,9 @@ class AccountViewModel : ViewModel() {
      *
      * **There is no network call here, and there cannot be one.** This backend issues a 7-day,
      * non-refreshable JWT and exposes no logout endpoint (see [com.v2ray.ang.auth.AuthManager]'s
-     * class comment: "There is NO refresh/logout here"). Sign-out is entirely local, so nothing
-     * can hang on the wire, time out, or come back after the screen is gone.
+     * class comment: "There is NO refresh/logout here"). Sign-out is entirely local: nothing here
+     * waits on a server, so there is no request to time out and no late reply to arrive after the
+     * screen is gone. Local is not the same as instant, though - see the watchdog note below.
      *
      * The failure that matters is a HALF-cleared session, so the order is load-bearing:
      *
@@ -438,14 +440,27 @@ class AccountViewModel : ViewModel() {
      * user added by hand. Those are the user's, not the account's.
      *
      * [onFailure] is invoked when step 1 threw, i.e. the user is still signed in and the caller
-     * should offer a retry. It is deliberately NOT invoked on success: the state flip tears the
-     * tab down and the UI change is the confirmation, so there is nothing to say.
+     * should offer a retry. It is also invoked when the wipe stops making progress: none of these
+     * calls is a network call, but two of them cross a process boundary (`RemoteWorkManager` binds
+     * a service to cancel the auto-update work, `stopVService` messages the core service), and a
+     * binder that never comes back would otherwise leave the caller's spinner turning for ever
+     * with no way out. [LOGOUT_WATCHDOG_MS] bounds the wait; the wipe itself is deliberately NOT
+     * cancelled when the watchdog fires, because a half-run wipe is the one outcome this method
+     * exists to prevent. It keeps running, and if it does finish it flips the session to
+     * LoggedOut, which the Account tab already observes and treats exactly like a normal
+     * sign-out. So the worst case is a retry offered for work that then succeeds on its own —
+     * never a stuck screen, and never a torn session.
+     *
+     * [onFailure] is deliberately NOT invoked on success: the state flip tears the tab down and
+     * the UI change is the confirmation, so there is nothing to say.
      */
     fun logout(onFailure: () -> Unit = {}) {
         viewModelScope.launch {
-            // NonCancellable: a wipe interrupted half-way is the exact state this method exists to
-            // prevent, so it may not abort if the ViewModel is cleared while it runs.
-            val wiped = withContext(Dispatchers.IO + NonCancellable) {
+            // Passing NonCancellable as the context's Job detaches this coroutine from
+            // viewModelScope, which is the point: the wipe must survive both the ViewModel being
+            // cleared mid-flight and the watchdog below giving up on it. Nothing inside can throw
+            // (every step is wrapped), so the detached job cannot fail unobserved either.
+            val work = viewModelScope.async(Dispatchers.IO + NonCancellable) {
                 val ok = runCatching { AccountSession.wipe() }.isSuccess
                 if (ok) {
                     val app = AngApplication.application
@@ -455,7 +470,11 @@ class AccountViewModel : ViewModel() {
                 }
                 ok
             }
-            if (wiped) clearAccountData() else onFailure()
+            // true = signed out, false = the wipe threw, null = it is still running and the
+            // watchdog gave up waiting. The last two are the same thing to the user: still signed
+            // in, safe to try again.
+            val wiped = withTimeoutOrNull(LOGOUT_WATCHDOG_MS) { work.await() }
+            if (wiped == true) clearAccountData() else onFailure()
         }
     }
 
@@ -484,6 +503,16 @@ class AccountViewModel : ViewModel() {
         _tariffs.value = emptyList()
         _error.value = null
         _loading.value = false
+    }
+
+    private companion object {
+        /**
+         * How long [logout] waits for a wipe that is entirely local before it stops promising the
+         * user that something is happening. Generous on purpose: everything here normally lands in
+         * single-digit milliseconds, so this only ever fires when a binder call is genuinely wedged,
+         * and firing it early would report a failure for work that was about to succeed.
+         */
+        const val LOGOUT_WATCHDOG_MS = 8_000L
     }
 
     // endregion
