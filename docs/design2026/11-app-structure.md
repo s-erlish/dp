@@ -63,20 +63,35 @@ stays declared and unused, and `Nav_Servers` is not added to `Common/L.Shell.cs`
 argument is recorded but overruled; sections 3.2 and 4.2 apply to Android alone, and the desktop rail
 does **not** gain a fourth item at index 1.
 
-The server list therefore stays inside Главная on desktop. That does not make the problems section
-2.3 identified go away, and they are now Главная's to solve there:
+The server list therefore stays inside Главная on desktop.
 
-- The app still has **no server search on desktop** — the only search field ever written lives in a
-  view nothing instantiates. With 150 servers that is a functional hole. Главная's list needs
-  in-place filtering and a designed no-results state.
-- The **seven per-server actions** are reachable only from a right-click menu, which is a hidden
-  affordance and the app's only route to edit, delete, share and QR. They need a visible control on
-  the row.
-- In compact mode the list starts below a 440px-minimum hero on a 630px window, so **the primary
-  list in the app sits permanently below the fold**. Главная's layout must give the list real estate
-  rather than assume a separate screen will carry it.
+**Главная keeps the functionality it has today, on both platforms.** The owner has been explicit
+twice: no Серверы destination on desktop, and **no search on Главная** — «как выглядела главная по
+функционалу такая и должна остаться, ЧТО НА ПК, что на андроиде». Section 2.3's argument is recorded
+but overruled, and so is the corrective work order that followed it: an earlier revision of this
+section told the desktop wave to add in-place filtering to Главная, and that was my inference, not a
+request. It is withdrawn. A search field was built on it and is being removed.
 
-Solving those three inside Главная is the desktop work order. Adding a tab is not.
+The owner then narrowed it once more: «просто убрать полностью вкладку сервера да и все, а функции из
+вкладки сервера не надо никуда пихать». So the Серверы destination is simply gone on desktop, and
+**nothing from it is relocated**. Not the search, not a row-actions control, not the compact-mode fold
+fix — that last one reads as layout, but the list only sits below the fold because Главная is carrying
+a screen's worth of list, and re-proportioning it to fix that is re-scoping by another name.
+
+The three problems section 2.3 identified are therefore **acknowledged and not solved here**:
+
+- the desktop has no server search at all, and the only field ever written lives in a view nothing
+  instantiates;
+- the seven per-server actions are reachable only from a right-click menu, which is the app's only
+  route to edit, delete, share and QR;
+- in compact mode the list starts below a 440px-minimum hero on a 630px window.
+
+They are recorded so they are not mistaken for oversights. If any of them is ever worth solving, the
+owner decides where — and the answer is not "quietly, inside Главная".
+
+**The rule: Главная is a restyle.** Same controls, same capabilities, same information, drawn on the
+new class styles. Anything that adds a capability to that screen needs the owner to ask for it, and a
+spec that asks for one is overruled.
 
 ### 2.1 The decision
 
