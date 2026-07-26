@@ -72,6 +72,33 @@ It was removed because a spec redesigned the screen. It comes back as it was.
 
 | F4 | **Server names are clipped in the desktop list.** «у серверов везде кривой текст». In the screenshot the tops of the capitals are cut off — "Germany", "Latvia", "LTE Белый интернет 1" all lose their ascenders. A TextBlock whose height is fixed below the font's ascent, or a line height set smaller than the face needs, will do this; Cyrillic and Latin caps clip together, so it is metrics, not a glyph gap. Fix the metric, not by nudging a margin. Likely the same root cause as the "font looks too heavy" complaint — a face resolving to something other than the intended one. `Views/ServerListView.axaml`. |
 
+## G. Port the phone's small courtesies to the desktop, one to one
+
+«при выборе серверов на андроиде удобно сделано что там предлагает переподключиться, я бы хотел чтобы
+ты такие фишки перенес и на пк 1 в 1 по стилю и дизайну, вот андроид приложение хорошо проработано в
+плане таких мелочей, мне нравится»
+
+The named one, and the pattern behind it:
+
+**G1 — the reconnect offer.** On Android, tapping a server row selects it and never connects. With a
+tunnel already up, the running connection is left alone and an explicit «Переподключиться» action is
+offered instead, naming the server. See `MainActivity.setSelectServer` and
+`promptApplySelectedServer`. Port it to the desktop exactly — same behaviour, same wording, same
+placement relative to the list, natively expressed.
+
+**G2 — and the rest of the same kind.** The owner is pointing at a class of detail, not one feature.
+Go through the Android client for the small courtesies the desktop lacks and bring each across:
+
+- a cancelled action is never reported as a failure;
+- an action that cannot work does not present an enabled control;
+- an in-flight action shows it, and cannot be fired twice;
+- a destructive action names what it will destroy;
+- an empty state says what to do next rather than only that something is empty;
+- a failure offers the retry, in the same place it reports the failure;
+- state that changed elsewhere repaints here, rather than going stale until the next visit.
+
+Audit the desktop against each and list what is missing before fixing, so the list is the record.
+
 ---
 
 ## The rule this feedback exists to enforce
