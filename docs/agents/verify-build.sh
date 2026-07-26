@@ -34,7 +34,12 @@ build_android() {
   export ANDROID_HOME=/opt/android-sdk ANDROID_SDK_ROOT=/opt/android-sdk
   export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
   echo "=== ANDROID: ./gradlew :app:assembleFdroidDebug ==="
-  ( cd "$DP/V2rayNG" && ./gradlew :app:assembleFdroidDebug --no-daemon ) > "$OUT/android.raw" 2>&1
+  # Serialised: agents share this build tree, and two concurrent Gradle runs on one project
+  # contend for the same locks. Waiting for a turn is slow; interleaving is broken.
+  echo "(waiting for the android build lock if another agent holds it)"
+  flock /tmp/dep-android-build.lock \
+    bash -c 'cd "'"$DP"'/V2rayNG" && ./gradlew :app:assembleFdroidDebug --no-daemon' \
+    > "$OUT/android.raw" 2>&1
   local rc=$?
   if grep -q "BUILD SUCCESSFUL" "$OUT/android.raw"; then
     echo "BUILD: SUCCESSFUL"
@@ -64,7 +69,10 @@ build_desktop() {
   export DOTNET_ROOT=/opt/dotnet PATH=/opt/dotnet:$PATH
   export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
   echo "=== DESKTOP: dotnet build v2rayN.Desktop -c Release ==="
-  ( cd "$PC/v2rayN" && dotnet build v2rayN.Desktop/v2rayN.Desktop.csproj -c Release ) > "$OUT/desktop.raw" 2>&1
+  echo "(waiting for the desktop build lock if another agent holds it)"
+  flock /tmp/dep-desktop-build.lock \
+    bash -c 'cd "'"$PC"'/v2rayN" && dotnet build v2rayN.Desktop/v2rayN.Desktop.csproj -c Release' \
+    > "$OUT/desktop.raw" 2>&1
   local rc=$?
   if grep -qE "^ *0 Error\(s\)" "$OUT/desktop.raw"; then
     echo "BUILD: SUCCESSFUL"
