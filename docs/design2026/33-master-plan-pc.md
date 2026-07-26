@@ -10,7 +10,9 @@
 | Shared core | `/home/user/v2rayN/v2rayN/ServiceLib` |
 | Paths below | relative to `v2rayN/v2rayN.Desktop/` unless stated |
 | Sibling document | `32-master-plan-android.md` (the Android half of the same product design) |
-| Date | 2026-07-26 |
+| Second UI project | `/home/user/v2rayN/v2rayN/v2rayN` - the **upstream WPF client**, still in the solution and still released. Section 8A |
+| Shared cross-platform values | **Section 2.12**, canonical. Nothing in sections 5 to 11 restates a value that lives there |
+| Date | 2026-07-26 (revised 2026-07-26, second issue - see the change log) |
 
 ---
 
@@ -51,12 +53,22 @@ Android counterpart, the exact `.axaml` file, whether it is **restyle** or **reb
 the component tree with real values, every state, every interaction, the keyboard path, the motion,
 and the Russian copy. It ends with an ordered implementation sequence.
 
-Verdict vocabulary, fixed:
+Verdict vocabulary, fixed at **seven** words. Every verdict in sections 8, 8A, 10 and 14 is exactly
+one of these; a compound like "REBUILD + WIRE" is a verdict plus a note, written as
+`REBUILD` *(and wire it: no call site exists today)*, never as a new word.
 
-- **KEEP** - ships as-is; only token and spacing cleanups.
-- **RESTYLE** - the structure is right; the surface, states and tokens change.
-- **REBUILD** - start from this spec, not from the current file.
-- **DELETE** - the file goes; its feature, if any, is migrated to a named destination.
+| Verdict | Means | Counts as a removal in section 14 |
+|---|---|---|
+| **KEEP** | Ships as-is; only token and spacing cleanups | no |
+| **RESTYLE** | The structure is right; the surface, states and tokens change | no |
+| **REBUILD** | Start from this spec, not from the current file. The route id survives; the file may not | no |
+| **SPLIT** | One file becomes two or more, each named here. Applies only to the two `Assets/` dictionaries | no |
+| **HARVEST** | One named feature is lifted out into a named destination, **then** the file is deleted. Always paired with DELETE in the same commit | yes |
+| **REFACTOR** | The markup dies, the code-behind's live logic moves to a named host. Always paired with DELETE | yes |
+| **DELETE** | The file goes. Its feature is either migrated to a named destination or dropped by a numbered decision in 12.2. There is no third option | yes |
+
+**MERGED** is not a verdict. A file that disappears into another surface is `DELETE`, with the
+destination named in the same row; section 14 counts it.
 
 ### 0.4 A note on dashes
 
@@ -84,10 +96,21 @@ state and a focus ring and both are mandatory.
 These are the parity contract (`00-rules.md` 13). A difference in any of them is a defect on the
 platform that diverged, not a platform adaptation.
 
+**Where the values live.** Everything in this table whose value could be written down twice is
+written down **once**, in **section 2.12, "The shared block"**, with a per-platform column. Sections
+5, 6, 7 and 11 of this file and sections 10, 11, 19 and 20 of `32-master-plan-android.md` cite it;
+neither restates it. Section 11 does not *assert* parity, it *audits* against 2.12, row by row, with
+a line number for every claim. The previous issue of this document asserted parity in prose and was
+wrong in six places; that is what 2.12 exists to make impossible.
+
 | Identical | Value |
 |---|---|
 | Destination set and order | Главная · Серверы · Настройки · Аккаунт |
-| Every user-visible string for the same concept | `Common/L.*.cs` mirrors `res/values*/strings*.xml` |
+| Every user-visible string for the same concept | `Common/L.*.cs` mirrors `res/values*/strings*.xml`; the six connect-state words are 2.12.1 |
+| The connect object | 2.12.2: fill token, ring, glyph, the four states |
+| Главная's composition | 2.12.3: what is on the screen and in what order |
+| The sign-in structure | 2.12.4: which method is promoted, which panels exist |
+| The settings hub | 2.12.5: four groups, their names and order, and every row with its per-platform column |
 | Terminology | `00-rules.md` 9.3, no exceptions |
 | The row | 56 min height, 40 tile, 22 glyph, 12 gap, 68 text origin, hairline from 68 |
 | The card | `Brush.Surface`, radius 20, 1px `Brush.OutlineVariant`, padding 16, no shadow |
@@ -107,7 +130,7 @@ platform that diverged, not a platform adaptation.
 | Concept | Android | Desktop | Why |
 |---|---|---|---|
 | Top-level navigation | Bottom navigation, 4 items | Left rail 76px wide, 4 items, in compact a bottom bar with the same 4 | A pointer travels to a fixed edge cheaply; a thumb does not reach the top of a 6.7" phone. The rail is the desktop's cheapest fixed target and it survives a 3840px window without stretching |
-| Hover | Does not exist | Mandatory on every clickable surface | A pointer needs to be told what is clickable before it commits. `Brush.Hover` or one surface step, 150ms `Ease.Standard` |
+| Hover | Does not exist | Mandatory on every clickable surface | A pointer needs to be told what is clickable before it commits. **One surface step up**, `Brush.Hover` / `Brush.HoverOnSurface` (2.1), measured at >= 1.20:1 against what it sits on in all three themes, 150ms `Ease.Standard`. A black overlay is not a hover on a near-black theme; see 2.1 |
 | Focus ring | Keyboard and TV only | Always, on every focusable control, 2px `Brush.Accent`, 2px offset | Desktop tasks must be completable with no mouse (`00-rules.md` 14.8) |
 | Press feedback | Ripple plus scale 0.97 | Scale 0.97 only, no ripple | Avalonia has no Material ripple and a synthesised one reads as a web imitation |
 | Per-item actions | Bottom sheet | `MenuFlyout` anchored to the row, opened by right-click, by a kebab that appears on hover or focus, and by the Menu key | A sheet is a thumb affordance. A flyout is where a pointer already is |
@@ -123,20 +146,27 @@ platform that diverged, not a platform adaptation.
 | Tray | Ongoing notification | Tray icon plus native menu | Section 3.11 |
 | Multi-select | Not offered | `Ctrl+click`, `Shift+click`, `Ctrl+A` on the server list | A pointer can rubber-band; a finger cannot |
 | Editors | Full-screen activities | Sub-pages in the shell, never OS-decorated windows | Section 8 |
+| Manual ordering | Not offered (the list is provider-ordered) | Drag a row, `Alt+Up` / `Alt+Down`, «В начало» / «В конец» | A pointer can drag precisely and a keyboard can nudge; on a phone a long-press drag inside a scrolling list fights the scroll. `MoveTopCmd` / `MoveUpCmd` / `MoveDownCmd` / `MoveBottomCmd` already exist (`ProfilesViewModel.cs:76-80`) and 6.6 gives them their first live UI |
+| **The tray, as a control surface** | Ongoing notification, 2 actions | Tray icon **plus a live server submenu**, the current server checked, latency beside each, quick connect | 3.11. This is the desktop's one genuinely native idea and it is spec'd to the same depth as the connect control. `StatusBarViewModel.cs:344-372` already maintains the list and the selection |
+| **Drag and drop onto the window** | Not offered | A `.json` config, a subscription URL, a `.zip` backup or a QR image dropped anywhere on the window imports itself | 3.13. One handler removes an entire flow; there is no desktop app in this category that does not do it |
 
 ### 1.4 What the desktop must stop doing
 
-Six failures, each measured in `02-inventory-pc.md`, `20-control-survey.md` or
-`31-self-assessment.md`, each closed by a named part of this plan.
+Nine failures, each measured in `02-inventory-pc.md`, `20-control-survey.md`,
+`31-self-assessment.md` or a `grep` recorded in the "Measured" column, each closed by a named part
+of this plan.
 
 | # | Failure today | Measured | Closed by |
 |---|---|---|---|
 | F1 | The shell, Home, Login, Onboarding and AccountSync are painted with a navy radial gradient, and the connect control carries a radial glow, two alpha rings, an ambient breathing loop and a sonar loop | `GlobalResources.axaml:88`, `:124`, `:269`, `:280-281`; `MainWindow.axaml:434`, `:551`; `ConnectHeroView.axaml:342-470` | 2.1 and 5.3. The gradient tokens are deleted, not restyled |
-| F2 | 289 of 483 controls fall through to the Semi default look; 22 of 49 views speak upstream `ResUI` strings | `20-control-survey.md` B.2 | Section 8. Every reachable surface is converted or deleted |
-| F3 | There is no user-visible feedback surface at all. `snackHost` is permanently invisible and `MsgView` is never mounted | `MainWindow.axaml:623`, `MainWindow.axaml.cs:1765`, `SimpleViewLocator.cs:26` | 3.8 and 7.12 |
+| F2 | 289 of 483 controls fall through to the Semi default look; **22 of the 50** `Views/*.axaml` speak upstream `ResUI` strings | `20-control-survey.md` B.2; `ls Views/*.axaml \| wc -l` = 50, `grep -l resx:ResUI Views/*.axaml \| wc -l` = 22 | Section 8. Every reachable surface is converted or deleted |
+| F3 | There is no user-visible feedback surface at all. `snackHost` is permanently invisible and `MsgView` is never mounted | `MainWindow.axaml:623`, `MainWindow.axaml.cs:1765`, `SimpleViewLocator.cs:26` | 3.8 and `settings/core/log` (7.16) |
 | F4 | Escape does not go back; the sub-page stack is global rather than per-destination | `MainWindow.axaml.cs:74`, `:1086` | 3.7 |
 | F5 | There is no server search, no sort, no multi-select, and no Servers destination | `CompactServersView.axaml:90` is dead; the rail has three items | Section 6 |
 | F6 | Seven press scales, ten glyph sizes, two icon-button systems, 28 button class combinations, 190 view-local style rules, 10 copies of one back-arrow geometry | `20-control-survey.md` B.3, B.5 | 2.7 and 2.5 |
+| F7 | **Thirteen server-list commands have no live UI.** `MoveTop/Up/Down/Bottom`, `MoveToGroup`, `RemoveDuplicateServer`, `RemoveInvalidServerResult`, `SortServerResult`, `GenGroupAllServer`, `GenGroupRegionServer`, `SpeedServer`, `UdpTestServer`, `MixedTestServer`, `Export2ClientConfig`, `Export2ShareUrlBase64`, `Export2InnerUri` are bound **only** inside `ProfilesView.axaml.cs`, a view registered at `SimpleViewLocator:29` and never shown. Deleting that file, as the previous issue of this plan did, would delete the product's manual ordering, its bulk list hygiene, its throughput test and three of its four export formats by omission | `grep -rn 'MoveTopCmd\|SortServerResultCmd\|Export2InnerUriCmd' Views/` returns `ProfilesView.axaml.cs:64-84` and nothing else | 6.6, 6.3 and section 8B, which gives every one of the 29 `ProfilesViewModel` commands a destination or a numbered deletion |
+| F8 | **A second, unbranded Windows client is still built and released.** `v2rayN/v2rayN/` is 23 WPF views, 8 179 lines, **621** `resx:ResUI` references, MaterialDesignThemes, `v2rayN.ico`, and **zero** occurrences of the string "departament". It has no sign-in, no account, no subscription and no onboarding. `build-windows.yml` builds it on every push to `master` and `build-all.yml` triggers it | `grep -ri departament v2rayN/v2rayN/` = 0 hits; `.github/workflows/build-windows.yml:22` `project: ./v2rayN/v2rayN.csproj` | **Section 8A**, decision **PC-D11** |
+| F9 | **Eight TUN parameters, five system-proxy parameters, eight per-protocol core choices and eleven engine fields exist in the config and have no UI on any reachable surface.** `OptionSettingWindow` carries all 75 of them and `MainWindowViewModel.cs:726` has no binding that opens it. 5.7 puts a TUN elevation banner on Главная while there is no page on which to configure TUN | `grep -o 'x:Name="[A-Za-z0-9_]*"' Views/OptionSettingWindow.axaml` = 75 names | 7.6 (the hub), the new `settings/tun`, `settings/proxy`, `settings/serverlist`, `settings/window` pages, and **section 8.4**, which is now an exhaustive 75-row table |
 
 ### 1.5 The desktop slop test
 
@@ -160,19 +190,37 @@ Six failures, each measured in `02-inventory-pc.md`, `20-control-survey.md` or
 8. **The decoration tell.** Point at every non-text pixel and say what it communicates.
 9. **The trust test.** Would a user who lives in Raycast, Linear and Telegram Desktop trust this
    window?
+10. **The memory test.** Having trusted it, is there one thing here they would tell someone about?
+    Hover, focus rings, a rail and a resizable window are not that thing: those are 2019 table
+    stakes and a Raycast user has had them for six years. This plan's answer is two named,
+    fully-specified desktop-native surfaces - **the live tray submenu (3.11)** and **drag-and-drop
+    import onto any window surface (3.13)** - each spec'd to the depth of the connect control. If
+    both were deleted, question 10 would have no answer, and that is the test.
 
-### 1.6 The five open questions from `02-inventory-pc.md` 6, answered
+### 1.6 The seven open questions from `02-inventory-pc.md` 6, answered
 
-The inventory ended with seven questions. Here are the answers this plan implements. They are
-binding for both platforms; the Android half of each is noted for the sibling document.
+The inventory ended with **seven** questions. Here are the seven answers this plan implements. They
+are binding for both platforms; the Android half of each is noted for the sibling document.
 
 **Q1. Gradients and glow: amend the law, or replace them?**
 **Replace.** `Brush.HomeGradient`, `Brush.ConnectGlow`, `Brush.Ring.Outer`, `Brush.Ring.Inner`
 and `Nav.Scrim` are deleted from `Assets/GlobalResources.axaml` and every consumer moves to flat
-`{DynamicResource Brush.Bg}`. `03-direction.md` D-H already deletes the Android equivalents. The
-connect control's depth comes from `Brush.SurfaceHigh #1A1D21` on `Brush.Bg #0A0B0D`, which is a
-1.4:1 luminance step and is exactly Incy's own recessed-idle idea (`30-reference-analysis.md`
-2.1.2) executed without a bloom.
+`{DynamicResource Brush.Bg}`. `03-direction.md` D-H already deletes the Android equivalents.
+
+**And the replacement is measured, not asserted.** The first issue of this document said the disc's
+depth came from `Brush.SurfaceHigh #1A1D21` on `Brush.Bg #0A0B0D`, "a 1.4:1 luminance step". That
+number was wrong: the pair measures **1.16:1**, and 1.45:1 is the ring's ratio, one row down the
+table. In light `#EAEFF7` on `#F4F7FC` is **1.08:1**, and in mono the old spec's `#151515` on
+`#000000` is **1.15:1**. Deleting five glow layers and leaving a 1.1:1 shape on a flat page in all
+three themes is not restraint, it is an invisible object.
+
+The disc therefore moves to **P3** - dark `#20242B` (**1.26:1**), light `#E3EAF4` (**1.13:1**), mono
+`#232326` (**1.34:1**) - which is also exactly what `32-master-plan-android.md:138` and `:1441`
+specify, so this closes the cross-platform colour split in the same change. The ring goes to
+**1.5px** and gets its own token, `Brush.OutlineStrong`, because in light the fill alone cannot
+carry the shape and the edge has to (5.3.2 carries the three measured ratios per state per theme).
+Incy's recessed-idle idea survives as **the absence of accent at rest**, which is the part of it
+that was ever information; the part that depended on a bloom does not.
 
 **Q2. Where do servers live: a destination or a column?**
 **A destination.** The rail and the compact bar carry four items, matching Android. Home keeps the
@@ -183,18 +231,21 @@ window.
 
 **Q3. The auth screen: one method promoted, five disclosed. What is the disclosure?**
 **A panel step inside the same page,** not a dialog and not a new route. The sign-in page is a
-single column with a small internal panel stack: `Method` (default) → `Email` → `Code` →
-`AwaitingTelegram` → `PendingEmail`. Moving between panels is a 220ms crossfade plus a 16px
+single column with a six-panel internal stack: `Method` (default) → `Email` → `TwoFactor` → `Code`
+→ `AwaitingTelegram` → `PendingEmail`. Moving between panels is a 220ms crossfade plus a 16px
 directional slide, Escape steps back one panel, and each panel has exactly one filled accent
-control. Section 7.9.
+control. Route `auth/login`, **section 7.21**. Which method is promoted is not this document's call
+to make alone: it is **2.12.4**, decided by **PC-D12**, and it changes the sibling plan's 10.3.
 
 **Q4. The upstream stratum: which are rebuilt, which are deleted?**
 Six rebuilt as shell sub-pages, four deleted with their features migrated into Settings, three
-dialogs rebuilt, one control restyled. Full table in section 8.
+dialogs rebuilt, one control restyled. Full table in **section 8**. The *second* upstream stratum -
+the whole WPF client - is **section 8A**, and its verdict is DELETE under **PC-D11**.
 
 **Q5. The feedback channel, given the owner rejected toasts.**
-**A docked status strip in the shell** plus a durable **log page** under Настройки › Ядро и логи ›
-Журнал. `Border.Toast` is deleted. Section 3.8 and 7.12.
+**A docked status strip in the shell** plus a durable **log page** at route `settings/core/log`,
+reached from Настройки › Система › Ядро и журнал › Журнал. `Border.Toast` is deleted. **Section 3.8
+and 7.16.**
 
 **Q6. Back semantics.**
 Escape, mouse button 4 (`XButton1`), `Alt+Left`, and the toolbar back button, all popping a
@@ -231,18 +282,49 @@ except the four documented exceptions in 2.7.5.
 ### 2.1 Surfaces and elevation
 
 Four planes, from `03-direction.md` 4.1, with their Avalonia keys and the rule that governs each.
+The mono column is the **shipping** mono set (`App.axaml.cs:608-616`), which becomes
+`Assets/Themes/Mono.axaml` in wave 1; the first issue of this document printed invented mono values
+(`#0B0B0B` / `#151515` / `#1E1E1E`) that no code has ever produced.
 
-| Plane | Key | Dark | Light | Mono dark | Allowed to be |
+| Plane | Key | Dark | Light | Mono dark | Mono light | Allowed to be |
+|---|---|---|---|---|---|---|
+| P0 ground | `Brush.Bg` | `#0A0B0D` | `#F4F7FC` | `#000000` | `#FFFFFF` | The window, every page, every sub-page toolbar, the rail, the compact bar |
+| P1 object | `Brush.Surface` | `#141619` | `#FFFFFF` | `#121214` | `#FFFFFF` | A card, a dialog body, a flyout body, the status strip |
+| P2 raised | `Brush.SurfaceHigh` | `#1A1D21` | `#EAEFF7` | `#1B1B1E` | `#EEEEEF` | **Transient only**: `.pressed`, drag, the skeleton fill. Nothing is P2 at rest, with no exceptions |
+| P3 inset | `Brush.SurfaceHighest` | `#20242B` | `#E3EAF4` | `#232326` | `#E7E7E9` | Input field, chip fill, neutral tile, selected row fill, **the connect disc** |
+
+**The step sizes, measured** (WCAG relative luminance; these are the numbers the review checks, not
+adjectives):
+
+| Step | Dark | Light | Mono dark | Mono light |
+|---|---|---|---|---|
+| P1 on P0 | 1.09:1 | 1.07:1 | 1.12:1 | **1.00:1** |
+| P2 on P0 | 1.16:1 | 1.08:1 | 1.22:1 | 1.16:1 |
+| P3 on P0 | **1.26:1** | **1.13:1** | **1.34:1** | **1.23:1** |
+| P3 on P1 | 1.16:1 | 1.21:1 | 1.19:1 | 1.23:1 |
+| `Brush.Outline` on P0 | 1.45:1 | 1.51:1 | 1.80:1 | 1.51:1 |
+| `Brush.OutlineStrong` on P0 | 1.96:1 | 1.73:1 | 2.39:1 | 1.98:1 |
+
+**A surface step alone never carries a shape.** No plane pair in this system reaches 1.4:1, which is
+what a near-black theme costs, and in **mono light a card and the page are the same white** - P1 on
+P0 is 1.00:1, a literally invisible fill. Every object that must read as an object therefore also
+carries a **1px `Brush.OutlineVariant` hairline** (a card), or a **1.5px `Brush.OutlineStrong` ring**
+(the connect disc, 5.3), or a **glyph** (a chip). A design that relies on fill alone to separate two
+planes is a defect, it is the single most common way a dark UI goes flat, and in mono light it does
+not work at all.
+
+**Two new tokens this section adds**, both required by the above and both carried in
+`Assets/Themes/*.axaml`:
+
+| Token | Dark | Light | Mono dark | Mono light | Purpose |
 |---|---|---|---|---|---|
-| P0 ground | `Brush.Bg` | `#0A0B0D` | `#F4F7FC` | `#000000` | The window, every page, every sub-page toolbar, the rail, the compact bar |
-| P1 object | `Brush.Surface` | `#141619` | `#FFFFFF` | `#0B0B0B` | A card, a dialog body, a flyout body, the status strip |
-| P2 raised | `Brush.SurfaceHigh` | `#1A1D21` | `#EAEFF7` | `#151515` | Transient only: `:pointerover`, `.pressed`, drag. Plus the connect disc, which is the one object whose *resting* recess is its state |
-| P3 inset | `Brush.SurfaceHighest` | `#20242B` | `#E3EAF4` | `#1E1E1E` | Input field, chip fill, neutral tile, selected row fill, skeleton bar |
+| `Brush.OutlineStrong` | `#3C4250` | `#B4BFD2` | `#4A4A50` | `#B8B8BC` | The one place a hairline must survive being drawn *on* a surface rather than on the page: the connect ring, which measures **1.55 / 1.53 / 1.78 / 1.60** against the P3 disc where `Brush.Outline` manages only 1.14 / 1.33 / 1.34 / 1.35 |
+| `Brush.HoverOnSurface` | `#232830` | `#E3EAF4` | `#2A2A2E` | `#E7E7E9` | Hover for a control that sits inside a P1 card, where `Brush.Hover` would be invisible |
 
 Rules, enforced by review:
 
-- **Nothing is P2 at rest** except `Border.ConnectDisc`. A settings screen that stacks P2 slabs is a
-  defect.
+- **Nothing is P2 at rest.** No exception, including the connect disc, which is P3. A settings
+  screen that stacks P2 slabs is a defect.
 - **At most two planes above ground in one region.** `P0 → P1 card → P3 chip` is legal.
   `P0 → P1 → P1` (nested cards) is banned. `P0 → P1 → P2` (a raised thing inside a card) is banned.
 - **No `BoxShadow` anywhere.** Delete it from `IncyFlyoutTheme` (`GlobalStyles.axaml:42`),
@@ -254,6 +336,26 @@ Rules, enforced by review:
 - **Scrim is one token.** `Brush.Scrim` `#000000` at 0.6. The three inline hexes
   (`MainWindow.axaml:308` `#B3000000`, `DevicesView.axaml:451` `#80000000`,
   `ConnectHeroView.axaml:526` `#000000`) all become `{DynamicResource Brush.Scrim}`.
+
+**Hover is a surface step up, never a black overlay.** `Brush.Hover` ships today as
+`#000000` at **0.32** (`GlobalResources.axaml:86`), which on a transparent row over `Brush.Bg`
+composites to `#070709` - **1.02:1** against the page - and inside a card to `#0E0F11` - **1.06:1**.
+A pointer crossing the settings hub sees nothing. On a `#0A0B0D` product a *darkening* hover is
+arithmetically incapable of being seen, and this was the same mistake in two places
+(`00-rules.md` 7.1's hover row carries the identical black-0.32 definition and is corrected by
+**PC-D13**).
+
+| Token | Applies to | Dark | Light | Mono dark | Mono light |
+|---|---|---|---|---|---|
+| `Brush.Hover` | A row, button or nav item over **P0 ground** | `#1E2126` **1.22:1** | `#DCE3EF` **1.20:1** | `#1B1B1E` **1.22:1** | `#E7E7E9` **1.24:1** |
+| `Brush.HoverOnSurface` | The same, inside a **P1 card** | `#232830` **1.22:1** | `#E3EAF4` **1.21:1** | `#2A2A2E` **1.31:1** | `#E7E7E9` **1.23:1** |
+| `Brush.HoverOnHighest` | Over a **P3** fill: the connect disc, a chip, a field | `#2D333E` **1.23:1** | `#CBD5E6` **1.22:1** | `#333338` **1.25:1** | `#D3D3D7` **1.21:1** |
+
+Every hover ratio is quoted against **what the control sits on**, and the floor is **1.19:1**. A new
+hover value that does not clear it is a defect. `.pressed` is one further step (P2 over ground, P3
+inside a card) **plus** `scale(0.97)`, so press is never only a colour change. Ratios in this table
+were computed, not estimated; the script lives with the token file and is re-run whenever a surface
+value changes.
 
 **Separators.** One hairline: `Height="1"`, `Background="{DynamicResource Brush.OutlineVariant}"`.
 Inside a card between rows it starts at the 68px text origin (`Margin="68,0,0,0"` relative to the
@@ -270,30 +372,74 @@ progress).
 **The accent is not theme-aware today.** `Color.Accent`, `Brush.Accent`, `Brush.OnAccent`,
 `Brush.Tile.*`, `Brush.SelectedFill` and `Brush.StatusChip.*` are declared **outside**
 `ResourceDictionary.ThemeDictionaries` in `GlobalResources.axaml:39-51`, so the light theme renders
-`#4C8DFF` on white at **2.98:1**. That is a P1 accessibility defect
-(`20-control-survey.md` D2). All of them move inside the theme dictionaries in wave 1.
+`#4C8DFF` at **3.20:1 on a white card** and **3.36:1 on the light page** - under the 4.5:1 floor on
+both. That is a P1 accessibility defect (`20-control-survey.md` D2). All of them move inside the
+theme dictionaries in wave 1, and the light accent becomes `#1E5FC7`, which measures **5.97:1 on
+`#FFFFFF`**, **5.56:1 on the `#F4F7FC` page** and **4.93:1 on a `#E3EAF4` P3 fill**. All three land,
+and all three matter: accent text appears on the page (a section link), on a card (a row title) and
+on a chip. Quoting only the white-card figure, as the first issue of this document did, hides the
+tightest of the three.
 
-| Screen | The one filled accent surface | Additional tinted elements (max 3) | Accent count must be |
-|---|---|---|---|
-| Главная, disconnected | none | the rail's current destination | 1 |
-| Главная, connecting | the connect arc | rail | 2 |
-| Главная, connected | the filled shield | rail | 2 |
-| Главная, no subscription | «Купить подписку» row CTA | rail | 2 |
-| Серверы | none | rail, selected row fill, focus ring | 3 |
-| Настройки hub | none | rail, focus ring | 2 |
-| Any settings sub-page | none, or one «Сохранить» when the page has unsaved state | selected chip, focus ring | <= 3 |
-| Аккаунт | «Продлить» on the subscription card, or «Купить подписку» when there is none | rail, focus ring | 3 |
-| Подписка sub-page | «Продлить» | focus ring | 2 |
-| Покупка | «Оплатить» | selected tariff fill, selected price option, focus ring | 4 |
-| Устройства | none (destructive is red) | focus ring | 2 |
-| История платежей | «Купить подписку» only in the empty state | focus ring | <= 2 |
-| Вход, panel Method | «Войти через Telegram» | focus ring | 2 |
-| Вход, panel Email | «Войти» | focus ring | 2 |
-| Онбординг | «Добавить по QR-коду» | focus ring | 2 |
-| Синхронизация | the progress arc | none | 1 |
+**How the count works, so that the table can be audited rather than believed.** The budget is
+`00-rules.md` 3.6: **one filled accent surface plus at most three further tinted elements**. Two
+things are *not* charged against a screen's budget, and are shown in a separate fixed column:
+
+- **The rail's current-destination mark.** It is shell chrome and it is on every screen at all
+  times; charging it would mean no screen may have three tinted elements, which is not what the rule
+  says.
+- **The focus ring.** It is transient, it belongs to exactly one control at a time, and it exists
+  only while the keyboard is driving.
+
+Everything else counts, including a `Brush.Tile.Blue` tile, a `Brush.SelectedFill` row, an accent
+check glyph, an accent price figure, an accent border, an accent progress arc and an accent link.
+The number in the last column is the number a reviewer counts on the running screen.
+
+| Screen | The one filled accent surface | Tinted elements, itemised (max 3) | Budget | Shell |
+|---|---|---|---|---|
+| Главная, disconnected | none | none | **0** | rail |
+| Главная, connecting | the connect arc | none | **1** | rail |
+| Главная, connected | the filled shield | none | **1** | rail. The status dot is `Brush.Green`, not accent |
+| Главная, no subscription | «Купить» in the subscription card | none | **1** | rail |
+| Серверы | none | selected row fill; the selected row's check glyph | **2** | rail, focus ring |
+| Настройки hub | none | none. Twenty-four neutral tiles | **0** | rail, focus ring |
+| Any settings sub-page | none, or one «Сохранить» when the page has unsaved state | the selected row's check glyph | **<= 2** | rail, focus ring |
+| `settings/appearance` | none | the selected theme row's check glyph | **1** | rail, focus ring |
+| Аккаунт | «Продлить» on the subscription card, or «Купить» when there is none | the 48px avatar tile `Brush.Tile.Blue`; the Telegram row tile `.Blue` | **3** | rail, focus ring |
+| Подписка sub-page | «Продлить» | the selected payment row's check glyph | **2** | rail, focus ring |
+| Покупка | «Оплатить» | the selected tariff card's 1.5px accent border; that card's check glyph; the selected price row's `Brush.SelectedFill` | **4** | rail, focus ring |
+| Устройства | none (destructive is red) | none | **0** | rail, focus ring |
+| История платежей | «Купить подписку», empty state only | none | **<= 1** | rail, focus ring |
+| Вход, panel `Method` | «Войти через Telegram» | the 64px brand tile `Brush.Tile.Blue` | **2** | focus ring. No rail: the sign-in page covers the shell |
+| Вход, panels `Email` / `TwoFactor` / `Code` | «Войти» / «Подтвердить» | the focused code cell's accent border | **2** | focus ring |
+| Вход, panel `AwaitingTelegram` | «Открыть Telegram» | the waiting arc | **2** | focus ring |
+| Онбординг | «Добавить по QR-коду» | the 64px brand tile `Brush.Tile.Blue` | **2** | focus ring |
+| Синхронизация | the progress arc | none | **1** | none |
+
+**Six re-counts this table forces, against the screens as they were first spec'd:**
+
+1. **Покупка, price figures.** 7.3 rendered every «1 290 ₽» as `Body Bold accent`, on every option
+   row of every tariff - up to nine accent labels, most of them on unselected rows, which the ban
+   list below calls out by name ("any inactive state"). Price figures are `Brush.OnSurface`; the
+   selected one steps to weight 700 and keeps the same colour. A price is a fact.
+2. **Покупка, «Итого».** The total figure was accent. It becomes `Brush.OnSurface` at `Headline` 24.
+   The user is not being asked to press the total.
+3. **Покупка, the option check.** The tariff card carries a check; the price row inside it does not.
+   Its selection reads as `Brush.SelectedFill` plus weight 700 - two channels, no third accent.
+4. **Устройства, «Это устройство».** It was `Border.Chip.accent` on a row that is not selected and
+   not actionable. It becomes `Border.Chip.neutral`. Being the current device is a fact about the
+   world, not a state the user controls, and 2.2's whole rule is that accent means action or
+   user-controlled state.
+5. **Аккаунт, the «Купить подписку» row tile.** It was `.Blue`, which made three blue tiles on one
+   tab. It becomes neutral: a row in «Управление» is navigation, not a category. The avatar keeps
+   `Brush.Tile.Blue` (identity is the one place a person-coloured object is justified) and the
+   Telegram row keeps `.Blue` (a brand mark).
+6. **Главная.** The old ledger counted the rail into every row, which hid the fact that the
+   disconnected screen has **zero** accent elements. It does, and that is the point: if the tunnel
+   is off, nothing on the screen is blue.
 
 **Banned outright** (`03-direction.md` 5.7): backgrounds, section headers, dividers, the wordmark,
-empty-state artwork, non-category tiles, unselected chips, any inactive state, any shadow or glow.
+empty-state artwork, non-category tiles, unselected chips, any inactive state, any shadow or glow,
+**a price**, **a total**, and **a fact the user did not choose**.
 
 **Tiles.** `Border.Tile` neutral (`Brush.Tile.Neutral` fill, `Brush.OnSurfaceVariant` glyph) is the
 default on every row. Coloured tiles are a **closed category system of at most three categories per
@@ -367,6 +513,36 @@ wordmark, and the protocol chip.
   with six digits reserves `6 x 0.62 x 34 = 127px`.
 - **Russian number formatting**: comma decimal, U+2009 THIN SPACE thousands, U+00A0 before `₽`,
   `12,4 ГБ`, `24,8 Мбит/с`, `48 мс`, `02:14:07`, `1 290 ₽`.
+
+**Where the top of the ramp is spent, screen by screen, and where it deliberately is not.**
+A nine-step ramp that never uses its top two steps is a ramp on paper. This is the honest audit:
+
+| Screen | Largest type | Why |
+|---|---|---|
+| **Главная** | `Title` 16 (the status word) | **Deliberate.** Главная's hierarchy is carried by a 176px object, not by type. The disc is the largest thing on the screen by an order of magnitude and the status word is its caption. Raising «Подключено» to `Headline` 24 was considered and rejected: it makes the word compete with the object it describes, and it makes the connected state reflow the column by 8px every time the tunnel comes up. A reviewer who opens Главная looking for a type ramp is looking in the wrong place, and 5.1 says so out loud |
+| **Серверы** | `Title` 16 (a server name) | **Deliberate.** A list has no hero. Its hierarchy is the row: 16/700 title, 13/400 subtitle, 13/500 numeric value, at one text origin |
+| **Настройки** and every sub-page | `SectionHeader` 16 | Same reason |
+| **Аккаунт** | `Display` 34 | The **days remaining** on the subscription. See below |
+| **Покупка** | `Headline` 24 | The total |
+| **Вход**, **Онбординг**, **Синхронизация** | `Headline` 24 | One question per panel, asked once |
+| **Устройства**, **История**, dialogs | `Title` 16 | Lists and questions |
+
+**The one `Display` in the product moves from the balance to the subscription.** The first issue
+spent 34/700 on `Баланс` - a figure that reads `0 ₽` for every user who has never topped up, which
+in a subscription product is most of them, and 7.1.7 listed "balance zero" as a state without saying
+what a 34px zero does to the screen. A `Display` should be the number that decides whether the
+product works tomorrow. That number is **days remaining**:
+
+```
+TextBlock.Display.Numeric  «14»      34/700  tnum lnum  +zero   Brush.OnSurface
+TextBlock.Title            «дней»    16/700          Brush.OnSurfaceVariant  Margin 6,0,0,5
+```
+
+with the plural agreeing (`1 день` / `3 дня` / `14 дней`), and the six substitutions the state
+machine needs: `истекла` renders `0` in `Brush.RedText` with «дней» beneath; `бессрочно` renders the
+word at `Headline` 24 and no figure; `нет подписки` renders no figure at all and the zone is the
+empty card. The balance drops to `Title` 16/700 next to its `Caption` label, which is where a
+secondary money figure belongs. 7.1.2 carries the tree.
 
 ### 2.4 Spacing, rhythm and the desktop grid
 
@@ -489,7 +665,8 @@ Tokens are `Common/Motion.cs` mirroring the XAML `Ease.*` keys. They are already
 | `Dur.Shell` | 200 | `Ease.Standard` | | Shell overlay crossfade, layout-mode morph |
 | `Dur.Slow` | 450 | `Ease.OutExpo` | 0.16,1,0.3,1 | The single auth to Home hand-off. Nothing else |
 | `Dur.Stagger` | 40 | none | | Per-item list delay, total capped at 400ms (max 10 items) |
-| `Dur.Emphasis` | 600 | `Ease.OutQuint` | | The one hero moment: connect confirmation |
+| `Dur.Emphasis` | 600 | `Ease.OutQuint` | | Bounded moment 1: connect confirmation |
+| `Dur.Theme` | **520** | `Ease.OutQuint` | | Bounded moment 2: the theme flood (3.10). **New token**, replacing the hard-coded ~520ms in `App.ThemeTransitionHook` |
 
 **One press language.** `scale(0.97)`, `RenderTransformOrigin="50%,50%"` (relative, never
 `0.5,0.5`, which Avalonia reads as absolute pixels), in at `Dur.PressIn` with `Ease.OutQuart`, out
@@ -498,16 +675,41 @@ at `Dur.PressOut` with `Ease.OutQuint`. The seven values shipping today (`0.92` 
 `scale(0.94)` as the single documented exception, because it is a 176px object and 0.97 is
 imperceptible at that size; that exception is written into `GlobalStyles.axaml` with a comment.
 
-**One hover language.** `Brush.Hover` overlay (dark: black at 0.32; light: black at 0.06) or one
-step up the surface ramp, crossfaded over **150ms** `Ease.Standard`. Never both.
+**One hover language, and it is a step up the ramp.** `Brush.Hover` over ground,
+`Brush.HoverOnSurface` inside a card, `Brush.HoverOnHighest` over a P3 fill; values and measured
+ratios in 2.1; crossfaded over **150ms** `Ease.Standard`. **There is no overlay variant and no
+"or".** The current black-at-0.32 definition composites to 1.02:1 on the page and 1.06:1 inside a
+card, which is not a hover state, it is a no-op with a name. Any table in this document, in
+`00-rules.md` or in a component style that says "`Brush.Hover` overlay **or** one surface step" is
+carrying the pre-`PC-D13` text and is wrong; there is one definition and every component quotes the
+same token.
 
 **What never moves.** No ambient loops. No breathing. No idle sonar. No parallax. No page-load
 choreography. No animated gradients (there are none). No shimmer except on a skeleton. The two
 grandfathered `DoubleTransition Property="Width"/"Height"` cases on the rail collapse are the only
 animated layout properties in the product and no new ones are added.
 
-**The one hero moment.** Connect confirmation, 600ms, specified in 5.3.6. It exists once in the
-whole product. The disconnect reverse runs at 75 percent tempo (450ms) and emits nothing.
+**Two bounded moments, and they are named.** The first issue of this document said "only one 600ms
+hero moment exists in the product" and then grandfathered a 520ms full-window circular flood of a
+`RenderTargetBitmap` on every theme change, defending it as "not a second hero moment: it is a
+masked crossfade of a static bitmap". That is a definitional dodge: it is the longest and the
+largest animation in the product, and 7.6 wires it to a control in a settings list, so it fires on
+an ordinary toggle. The law is amended honestly:
+
+| # | Moment | Duration | Fires on | Reverse | `.lite` |
+|---|---|---|---|---|---|
+| 1 | **Connect confirmation** (5.3.6) | `Dur.Emphasis` 600 | the tunnel confirming, at most once per connect | disconnect at 450ms (75 percent), emitting no ring | shield swaps instantly, no sonar |
+| 2 | **Theme flood** (3.10) | `Dur.Theme` 520 | the user changing the appearance | none; the reverse is another flood | **skipped entirely**, an instant swap |
+
+Nothing else in the product exceeds `Dur.Slow` 450ms, and `Dur.Slow` itself is spent once, on the
+sign-in hand-off. A third bounded moment requires an owner decision, not an argument about whether
+it counts.
+
+**Re-entrancy is specified for both.** A second connect press during the 600ms cancels the sonar at
+its current scale and opacity and runs the disconnect reverse from there; the shield does not double
+up. A second theme change during the flood **cancels and snaps**: the in-flight clip animation stops,
+the overlay bitmap is dropped without a fade, and the new theme paints instantly. A user who toggles
+twice in a second gets one frame of the second theme, not two 520ms floods queued behind each other.
 
 **Reduced motion is a contract.** `MotionState.IsLite`, broadcast live from `SettingsViewModel`, with
 subscribers re-applying on the spot. Any animation that reads the flag once in a constructor is the
@@ -523,22 +725,32 @@ a view that hand-rolls one is a defect.
 
 #### 2.7.1 Buttons
 
+Hover columns name the token from 2.1: `H` = `Brush.Hover` (the control sits on P0 ground),
+`H1` = `Brush.HoverOnSurface` (inside a P1 card), `H3` = `Brush.HoverOnHighest` (over a P3 fill).
+A class used in both places resolves through the `Border.Card` context selector
+(`Border.Card Button.X:pointerover`), which is written once in `Buttons.axaml`, not per view.
+
 | Class | Height | Radius | Type | Rest | Hover | Pressed | Focus | Disabled |
 |---|---|---|---|---|---|---|---|---|
-| `Button.Primary` | 48 | `Radius.Button` 16 | 14 Bold `Font.Ui` | `Brush.Accent` / `Brush.OnAccent` | `#3D7EF0`, 150ms | `#3877E0` + `scale(0.97)` | inner 2px `Brush.OnAccent` @40%, r16 | Opacity 0.38 |
+| `Button.Primary` | 48 | `Radius.Button` 16 | 14 Bold `Font.Ui` | `Brush.Accent` / `Brush.OnAccent` | `Brush.AccentHover` `#3D7EF0` (dark) / `#1A54B4` (light), 150ms | `Brush.AccentPressed` `#3877E0` / `#17499C` + `scale(0.97)` | inner 2px `Brush.OnAccent` @40%, r16 | Opacity 0.38 |
 | `Button.Primary.Tall` | 52 | 16 | inherits | | | | | |
-| `Button.Tonal` | 48 | 16 | 14 Medium | `Brush.SurfaceHighest` / `Brush.OnSurface` | `Brush.Hover` | `Brush.Hover` + 0.97 | outer 2px `Brush.Accent`, r18 | 0.38 |
+| `Button.Tonal` | 48 | 16 | 14 Medium | `Brush.SurfaceHighest` / `Brush.OnSurface` | `H3` | `H3` one step + 0.97 | outer 2px `Brush.Accent`, r18 | 0.38 |
 | `Button.Tonal.Tall` | **52** | 16 | inherits | **promoted to global**; the identical local copies in `LoginView.axaml:19-22` and `OnboardingView.axaml` are deleted | | | | |
-| `Button.Outlined` | 48 | 16 | 14 Medium | transparent + 1px `Brush.Outline` | `Brush.Hover` | `Brush.Hover` + 0.97 | outer 2px r18 | 0.38 |
+| `Button.Outlined` | 48 | 16 | 14 Medium | transparent + 1px `Brush.Outline` | `H` / `H1` | + 0.97 | outer 2px r18 | 0.38 |
 | `Button.Destructive` | 48 | 16 | 14 Bold | `Brush.Red` / `#FFFFFF` | `Brush.RedPressed` | `Brush.RedPressed` + 0.97 | outer 2px r18 | 0.38 |
-| `Button.Text` | 40 | `Radius.Chip` 12 | 14 Medium | transparent / `Brush.Accent` | `Brush.Hover` | `Brush.Hover` + 0.97 | outer 2px r14 | 0.38 |
-| `Button.IconButton40` | 40x40 | `Radius.Pill` | glyph 22 | transparent | `Brush.Hover` | `Brush.Hover` + 0.97 | outer 2px, pill | 0.38 |
-| `Button.IconButton40.Row` | 40x40 | pill | glyph 20 | | | | | |
-| `Button.IconButton40.Accent` | 40x40 | pill | glyph 22 `Brush.Accent` | | | | | |
-| `Button.Stepper` | 40x40 | 12 | glyph 20 `Brush.Accent` | `Brush.Tile.Neutral` | `Brush.Hover` | `scale(0.97)` | outer 2px r14 | 0.38 |
-| `Button.NavItem` | 76x64 rail / star x56 bar | 12 | glyph 24 + label 11 | `Brush.OnSurfaceVariant` | glyph to `Brush.OnSurfaceVariantHover` | `scale(0.97)` | inner 2px r12 | n/a |
-| `Button.BackNav` | 40x40 | pill | glyph 22 | transparent | `Brush.Hover` | `Brush.Hover` + 0.97 | outer 2px, pill | n/a |
-| `Button.Caption` | 46x32 | 0 | glyph 10 | transparent | `Brush.Hover`; close to `#8E1D23` | one step darker | inner 2px | n/a |
+| `Button.Text` | 40 | `Radius.Chip` 12 | 14 Medium | transparent / `Brush.Accent` | `H` / `H1` | + 0.97 | outer 2px r14 | 0.38 |
+| `Button.IconButton40` | 40x40 | `Radius.Pill` | glyph 22 | transparent | `H` / `H1` | + 0.97 | outer 2px, pill | 0.38 |
+| `Button.IconButton40.Row` | 40x40 | pill | glyph 20 | | `H1` | | | |
+| `Button.IconButton40.Accent` | 40x40 | pill | glyph 22 `Brush.Accent` | | `H` / `H1` | | | |
+| `Button.Stepper` | 40x40 | 12 | glyph 20 `Brush.Accent` | `Brush.Tile.Neutral` (P3) | `H3` | `H3` + `scale(0.97)` | outer 2px r14 | 0.38 |
+| `Button.NavItem` | 76x64 rail / star x56 bar | 12 | glyph 24 + label 11 | `Brush.OnSurfaceVariant` | glyph to `Brush.OnSurfaceVariantHover`, **no background box** (owner request 0.4.8) | `scale(0.97)` | inner 2px r12 | n/a |
+| `Button.BackNav` | 40x40 | pill | glyph 22 | transparent | `H` | `H` + 0.97 | outer 2px, pill | n/a |
+| `Button.Caption` | 46x32 | 0 | glyph 10 | transparent | `H`; close to `#8E1D23` | one step darker, `#7A181D` on close | inner 2px | n/a |
+
+`Brush.AccentHover` and `Brush.AccentPressed` are **new tokens** replacing the two raw hexes at
+`AccountView.axaml:65` and `:68`, and they carry light values, which the raw hexes did not: on
+`#1E5FC7`, hover is `#1A54B4` and pressed is `#17499C`. Without them the light theme's primary
+button gets *lighter* on hover, which reads as disabled.
 
 Deleted: `Button.IconButton` (the legacy 32x32 class at `GlobalStyles.axaml:226-245` **and its ten
 verbatim view-local re-declarations**), `Button.LinkAction` (renamed `Button.Text`),
@@ -559,7 +771,7 @@ view-local button styles.**
 | Class | Spec |
 |---|---|
 | `Border.Card` | `Brush.Surface`, `Radius.Card` 20, 1px `Brush.OutlineVariant`, `Padding` 16 (0 when it hosts rows), elevation 0, no shadow |
-| `Border.Row` | MinHeight `Size.Row` 56, Padding 16,12, transparent, `Cursor=Hand`, `:pointerover` `Brush.Hover`, `.pressed` `scale(0.97)`, focus ring inner 2px r12, `Focusable=True` `IsTabStop=True` |
+| `Border.Row` | MinHeight `Size.Row` 56, Padding 16,12, transparent, `Cursor=Hand`, `:pointerover` `Brush.Hover` on a page / `Brush.HoverOnSurface` inside a card, `.pressed` one further step **plus** `scale(0.97)`, focus ring inner 2px r12, `Focusable=True` `IsTabStop=True` |
 | `Border.Row.static` | same geometry, `Cursor=Arrow`, no hover, no focus: a read-only fact row |
 | `Border.ServerRow` | `Border.Row` plus the selection contract: `.selected` gets `Brush.SelectedFill` **and** a filled 20px `Geo.State.Check` in `Brush.Accent`. Radius 12, not 20. The permanent 1.5px border is deleted; a hairline between rows replaces it |
 | `Border.Tile` | 40x40, `Radius.Tile` 12, `Brush.Tile.Neutral`. Modifiers `.Blue`, `.Green`, `.Red`, `.Amber` only |
@@ -674,23 +886,37 @@ section 5 to 7, and it is stated per screen.
 | `Ctrl+K` | Command palette **(not built; reserved, do not bind)** | - |
 | `Ctrl+N` | Add a server or a provider, from Серверы | Destination |
 | `Ctrl+V` | Add from clipboard | Shell |
-| `Ctrl+S` | Scan the screen for a QR code | Shell |
+| `Ctrl+Shift+S` | Scan the screen for a QR code | Shell |
+| `Ctrl+S` | **Save**, and only ever save | Sub-page with unsaved state (see below) |
 | `F5` | Refresh the current destination (subscriptions on Серверы, profile on Аккаунт) | Destination |
 | `Ctrl+R` | Reconnect | Shell |
 | `Ctrl+Enter` | Connect or disconnect | Shell |
-| `Ctrl+P` | Ping all servers in the current group | Серверы |
+| `Ctrl+P` | Ping all servers in the current group (real delay) | Серверы |
+| `Ctrl+Shift+P` | Throughput test on the selection | Серверы |
 | `Ctrl+A` | Select all servers | Серверы, list focused |
+| `Alt+Up` / `Alt+Down` | Move the focused server one place up or down | Серверы, list focused |
+| `Alt+Home` / `Alt+End` | Move the focused server to the top or the bottom | Серверы, list focused |
 | `Delete` | Remove the selected servers, with an undo strip | Серверы |
 | `Enter` | Activate the focused row; submit the focused form | Everywhere |
 | `Space` | Toggle the focused switch row; toggle selection on a server row | Everywhere |
 | `Up` / `Down` | Move within a list; `Home` / `End` jump | Any list |
+| `Menu` / `Shift+F10` | Open the focused row's flyout | Any list |
 | `Ctrl+=` / `Ctrl+-` / `Ctrl+0` | UI zoom step and reset | Shell |
 | `Ctrl+Shift+L` | Open Журнал | Shell |
 | `Ctrl+W` | Hide to tray (never quit; quit is tray only) | Shell |
 
-`Ctrl+Enter`, `Ctrl+R`, `Ctrl+P` and `Ctrl+Shift+L` are new and must not collide with a focused text
-field: when a `TextBox` has focus, only `Esc`, `Enter`, `Ctrl+A/C/V/X/Z` and the zoom set are
-handled, everything else falls through.
+**`Ctrl+S` is Save, everywhere, and nothing else.** The first issue of this document bound it twice -
+Shell scope for "scan the screen for a QR code" (2.8, advertised in the add flyout at 6.3) and
+"saves" inside the server editor (8.1) - with no resolution. Screen-scan moves to `Ctrl+Shift+S`,
+which is also what the add flyout advertises. `Ctrl+S` is scoped: it is **inert** unless a sub-page
+with unsaved state is on top (`servers/editor`, `servers/provider-editor`,
+`settings/core/advanced`, `settings/routing/ruleset`), in which case it runs that page's save and
+nothing propagates to the shell.
+
+`Ctrl+Enter`, `Ctrl+R`, `Ctrl+P`, `Ctrl+Shift+P`, `Ctrl+Shift+S`, `Ctrl+Shift+L`, `Alt+Up`,
+`Alt+Down`, `Alt+Home` and `Alt+End` are new and must not collide with a focused text field: when a
+`TextBox` has focus, only `Esc`, `Enter`, `Ctrl+A/C/V/X/Z`, `Ctrl+S` and the zoom set are handled,
+everything else falls through. `Ctrl+K` remains **reserved and unbound** (12.3).
 
 **Cursor.** `Hand` on rows, cards that navigate, links and nav items. Default arrow everywhere else.
 `SizeWE` / `SizeNS` / `SizeNWSE` on the eight resize zones. Never a custom cursor bitmap.
@@ -802,6 +1028,259 @@ v2rayN.Desktop/
 
 Every rename in that tree is mechanical and is done in wave 1, before any redesign work, so that
 later waves do not re-file code they just wrote.
+
+### 2.12 The shared block: the values that are identical on both platforms
+
+**This subsection is canonical.** Every value in it is used by both clients. Nothing in sections 5 to
+11 of this file, and nothing in sections 10, 11, 19 or 20 of `32-master-plan-android.md`, restates
+one of these values: they cite `2.12.n` and render it. When a value here changes, it changes in one
+place and both plans inherit it.
+
+**Why it exists.** The first issue of this document asserted parity in section 11 - "identical set /
+Yes, item for item" - and was wrong in six places at once, because two documents written in parallel
+each specified the same object. The disc was `Brush.SurfaceHigh #1A1D21` here and
+`?attr/colorSurfaceContainerHighest #20242B` there; the stats row was up/uptime/down at 13/16/13 here
+and down/uptime/up at 16/16/16 there; Главная carried a permanent account row here and forbade one
+there; the subscription was a row in a shared card here and "the ONE card on this screen" there; and
+the disconnected status word was «Не подключено» here and «Отключено» there - a difference the
+parity contract's own first line ("every user-visible string for the same concept") forbids. Parity
+is not something a document can claim. It is something two documents can only have by sharing a
+table.
+
+**How to read the per-platform columns.** Where a row has one value, it is one value on both. Where
+it has two, the difference is a *deliberate* platform expression and the reason is in the row. Where
+a row says **CHANGES ANDROID**, the sibling plan's current text loses and the decision that settles
+it is named.
+
+#### 2.12.1 The connect-state vocabulary
+
+Six words. `Common/L.Home.cs` and `res/values/strings_home.xml` carry the same six, keyed the same
+way. **This changes the desktop**, which called the idle state «Не подключено» and therefore had no
+word left for a failure.
+
+| Key | Word | State | Dot |
+|---|---|---|---|
+| `home_status_disconnected` | `Отключено` | The tunnel is down because the user has not raised it | 8px `Brush.OnSurfaceVariant` |
+| `home_status_connecting` | `Подключение…` | The core is negotiating | 8px `Brush.Accent` |
+| `home_status_connected` | `Подключено` | The tunnel is up | 8px `Brush.Green` |
+| `home_status_disconnecting` | `Отключение…` | The core is tearing down | 8px `Brush.OnSurfaceVariant` |
+| `home_status_failed` | `Не подключено` | The tunnel **tried and failed**; the cause is on the gate line and the recovery is on the status strip | 8px `Brush.Red` |
+| `home_status_no_server` | `Сервер не выбран` | Nothing to connect to; the control is disabled | 8px `Brush.OnSurfaceVariant` |
+
+`home_status_expired` (`Подписка истекла`) replaces the status word when the subscription gate is
+closed, on both platforms. **Colour is never the only signal**: every state pairs a dot with a word,
+and the tray tooltip (3.11) and the rail dot (3.4.3) carry the same six words verbatim.
+
+#### 2.12.2 The connect object
+
+| Property | Value | Desktop token | Android token |
+|---|---|---|---|
+| Disc diameter | **176** | `Size.ConnectDisc` | `@dimen/connect_disc` |
+| Disc fill, at rest | **P3** - dark `#20242B`, light `#E3EAF4`, mono `#232326` | `Brush.SurfaceHighest` | `?attr/colorSurfaceContainerHighest` |
+| Ring | **1.5px `Brush.OutlineStrong`**, drawn on the disc edge at 176, **not** on a larger frame | `Brush.OutlineStrong` | `?attr/colorOutlineStrong` |
+| Frame | **there is none.** The disc and its ring are one 176px object; the arc and the sonar draw on the same 176 circle | - | - |
+| Progress arc | 3px `Brush.Accent`, 90 degrees, 1.2 s per rotation, linear, visible **only** while the core negotiates | `Dot.ConnectTrack` 3 | `@dimen/connect_track` 3dp |
+| Shield glyph | **80**, outline at rest, filled `Brush.Accent` when connected | `Size.ShieldGlyph` | `@dimen/connect_glyph` |
+| Press | `scale(0.94)`, the one documented exception to 0.97, because 0.97 is imperceptible at 176 | | |
+| Confirmation | one sonar ring, `scale 1.0 -> 1.35`, `Opacity 0.6 -> 0`, `Dur.Emphasis` 600, `Ease.OutQuint`, **once**, never looping | | |
+
+**The 200px frame is deleted.** The first issue of this document invented a `Panel #connectFrame`
+200x200 with the ring drawn at 200 and the disc at 176 inside it, which Android has no counterpart
+for: a 12px gap between a disc and its own ring is a fourth, unexplained separation on a screen whose
+whole argument is that it has one. Ring, arc and sonar all draw on the 176 circle. `Size.ConnectFrame`
+is not created; wave 1 drops it from the token list.
+
+#### 2.12.3 Главная's composition
+
+Top to bottom, both platforms, in this order and with nothing else on the screen:
+
+| # | Element | Desktop | Android |
+|---|---|---|---|
+| 1 | The connect object (2.12.2) | centred | centred |
+| 2 | 16 · the status line: 8px dot + 8 gap + the word at `Title` 16/700 | same | same |
+| 3 | 4 · the gate line at `Subtitle` 13, **only** when the subscription state is not `активна` | same | same |
+| 4 | 24 · the numeric strip, **only when connected** | same | same |
+| 5 | 32 · `SectionHeader` «Сервер» + **one** server row | same | same |
+| 6 | 24 · `SectionHeader` «Подписка» + **the one card on this screen** | same | same |
+| 7 | 32 · bottom | same | same |
+
+**Three things are not on Главная, on either platform:** a server list (it is the Серверы
+destination), a permanent account affordance, and a second card. **CHANGES THE DESKTOP:** the first
+issue put the subscription and a `#rowAccount` inside one shared three-row ledger card. The account
+row goes - the rail already carries the «Аккаунт» destination and a second permanent entrance to one
+room is the duplicate-affordance failure - and the subscription becomes its own card, exactly as
+`32-master-plan-android.md:1481` has it. Signed out, Главная shows the first-run empty state with
+«Войти», which is the entrance; it does not carry a persistent sign-in row.
+
+**The numeric strip**, identical on both:
+
+| Column | Content | Type | Glyph |
+|---|---|---|---|
+| left | download, e.g. `24,8 Мбит/с` | `Numeric` **16/500** | 16px `Geo.Action.ArrowDown` |
+| centre | uptime, e.g. `02:14:07` | `Numeric` **16/500** | 16px `Geo.State.Clock` |
+| right | upload, e.g. `3,1 Мбит/с` | `Numeric` **16/500** | 16px `Geo.Action.ArrowUp` |
+
+Three equal columns, `weight 1` each, glyph then 8 gap then value, the **unit inside the value
+string**, not in a separate `Caption`. **CHANGES THE DESKTOP**, which had up/uptime/down at
+13/16/13 with «Мбит/с» split into its own 12px caption. Three columns at three sizes is an
+unearned emphasis - a duration is not more true than a rate - and splitting the unit off means the
+same fact is set in two faces on one line. Each column reserves its digit width from the 620/1000
+tabular advance so nothing shifts. Order is **download first** because that is the number a user
+looks at.
+
+#### 2.12.4 The sign-in structure
+
+**Decided by PC-D12.** The question the two plans disagreed on: is Telegram the promoted method, or
+is the e-mail form primary with Telegram demoted below an «или» divider? The desktop plan diagnosed
+the second arrangement as "the hierarchy is inverted"; the Android plan's 10.3 shipped exactly that
+arrangement. One of them had to lose.
+
+**Telegram is promoted, on both platforms.** Three reasons, in order of weight:
+
+1. It is the only **passwordless** path, and most departament users arrive through the bot and have
+   never created a password. A screen whose primary control asks for a credential the user does not
+   have is a wall.
+2. The one filled accent surface should be the path most users take. That is the whole of 2.2.
+3. `00-rules.md` 13 demands one answer. The desktop's own diagnosis is correct, so the Android tree
+   changes, not the diagnosis.
+
+**The shared structure**, six panels, exactly one visible, one filled accent control in each:
+
+| Panel | Reached from | The one filled control | Also on the panel |
+|---|---|---|---|
+| `Method` (default) | entry | `Войти через Telegram` | `Войти через сайт` tonal · `Другой способ входа` text |
+| `Email` | `Method` › «Другой способ входа» | `Войти` / `Создать аккаунт` | the `Вход` \| `Регистрация` segment · `Забыли пароль?` · `Войти по коду из письма` |
+| `TwoFactor` | `Email` submit, when the backend returns a temp token | `Подтвердить` | six code cells · `Другой способ входа` |
+| `Code` | `Email` › «Войти по коду из письма» | `Подтвердить` | six code cells · `Отправить ещё раз` with a 60 s cooldown |
+| `AwaitingTelegram` | `Method` › Telegram | `Открыть Telegram` | the waiting arc · `Начать заново` · `Другой способ входа` |
+| `PendingEmail` | a magic-link submit | none | `Отправить ещё раз` · `Назад` |
+
+**`TwoFactor` is not optional.** `LoginView.axaml:646-700` ships a TOTP block today
+(`TwoFaBlock`, six `CodeCell` borders over a hidden `CodeBox`, driven by `TwoFaTempToken`), and
+`32-master-plan-android.md:1328` keeps a two-factor step. The first issue of this document specified
+five panels and none of them was it, which means a user with two-factor enabled could not sign in
+under that spec. `Code` and `TwoFactor` share one `CodeEntry` sub-component (7.21.1) and differ only
+in their title, their body line and their resend affordance.
+
+**Registration is in-app on both. CHANGES ANDROID**, whose 10.6 opens `departament.site` in a Custom
+Tab. A browser hand-off loses the captured referral code (the site's own known gap), loses the
+session, and is the "the app cannot do this, go to the website" tell the slop test rejects. The
+`Вход` | `Регистрация` segment inside the `Email` panel is the one implementation, on both.
+
+**Copy, shared.** These keys exist in `Common/L.Account.cs` today and are the canonical strings;
+`res/values/strings_auth.xml` adopts them verbatim.
+
+| Concept | String |
+|---|---|
+| Page title | `Вход` |
+| Method lead | `Вход в departament` |
+| Method line | `Через Telegram, быстро и без пароля.` |
+| Telegram CTA | `Войти через Telegram` |
+| Site CTA | `Войти через сайт` |
+| Disclosure | `Другой способ входа` |
+| E-mail panel title | `Почта и пароль` |
+| Segment | `Вход` \| `Регистрация` |
+| Submit | `Войти` / `Создать аккаунт` |
+| Two-factor title | `Подтверждение` |
+| Two-factor line | `Введите 6-значный код из приложения` (`Login_EnterCode`) |
+| Two-factor error | `Код состоит из 6 цифр` (`Login_CodeIs6`) |
+| Two-factor submit | `Подтвердить` (`Login_Confirm`) |
+| Waiting title | `Ждём подтверждения` |
+| Waiting line | `Откройте бота и нажмите «Подтвердить».` |
+
+#### 2.12.5 The settings hub
+
+**Four groups, in this order, with these names, on both platforms.** Rows are marked `both`,
+`desktop` or `android`. A row that exists on one platform only is a capability difference, not a
+drift, and it is named here so section 11 does not have to argue about it. Desktop 24 rows, Android
+19. Maximum seven rows per group, four groups, satisfied on both.
+
+**Group 1 - «Подключение»** (desktop 7, Android 6)
+
+| Row | Value example | Desktop affordance | Android affordance | Who |
+|---|---|---|---|---|
+| Режим | `Весь трафик` | segment, applied in place | chevron -> 20.1 (Android needs the page: it also owns MTU and interface address) | both |
+| Параметры туннеля | `gvisor · MTU 9000` | chevron -> `settings/tun` | folded into 20.1 › Дополнительно | **desktop** |
+| Прокси | `SOCKS5 10808 · системный вкл` | chevron -> `settings/proxy` | chevron -> 20.7, local inbound only | both |
+| Прокси по приложениям | `Кроме 12 программ` / `Выкл` | chevron -> `settings/perapp` | chevron -> 20.2 | both |
+| Маршрутизация | `Стандартные · 42 правила` | chevron -> `settings/routing` | chevron -> 20.3 | both |
+| DNS | `Cloudflare` | chevron -> `settings/dns` | chevron -> 20.4 | both |
+| Обход блокировок | `Mux, фрагментация` / `Выкл` | chevron -> `settings/bypass` | chevron -> 20.5 | both |
+
+**Group 2 - «Подписки и серверы»** (desktop 6, Android 6)
+
+| Row | Value example | Desktop | Android | Who |
+|---|---|---|---|---|
+| Провайдеры | `Автообновление · 6 ч` | `settings/provider` | 20.8 | both |
+| Что настроил провайдер | `4 настройки`; the row is **hidden** at 0 | `settings/applied` | 20.9 | both |
+| Список серверов | `По задержке · вручную 3` | `settings/serverlist` | - | **desktop** |
+| Проверка серверов | `Реальная · 5 с` | `settings/ping` | 20.6 | both |
+| Файлы ресурсов | `geoip 8,2 МБ · 12.08` | `settings/geofiles` | 20.15 (**new on Android**; the Android core uses the same two files and the sibling plan has no page for them) | both |
+| Схемы URL-адресов | `Зарегистрирована` | `settings/urlschemes` | 20.14 › Схемы URL | both |
+| Перенести подписку | - | - | 20.10 | **android** |
+
+**Group 3 - «Интерфейс»** (desktop 6, Android 4)
+
+| Row | Value example | Desktop | Android | Who |
+|---|---|---|---|---|
+| Оформление | `Тёмная` | chevron -> `settings/appearance` | chevron -> 20.11 | both |
+| Язык | `Русский` | unfold, cycles 2 | chevron -> 20.12, 5 options | both |
+| Масштаб интерфейса | `125 %` | unfold, cycles 5 | - (Android honours the system font scale) | **desktop** |
+| Облегчённый режим | - | switch | switch | both |
+| Окно и трей | `Сворачивать в трей` | chevron -> `settings/window` | - | **desktop** |
+| Запуск при входе в систему | - | switch | switch, «Запуск при загрузке» | both |
+
+**Group 4 - «Система»** (desktop 5, Android 3)
+
+| Row | Value example | Desktop | Android | Who |
+|---|---|---|---|---|
+| Ядро и журнал | `Xray · предупреждения` | chevron -> `settings/core` | chevron -> 20.14 › Журнал (Android has one core and therefore no core row, only the log and its level) | both |
+| Горячие клавиши | `12 назначено` | chevron -> `settings/hotkeys` | - | **desktop** |
+| Резервная копия | `Копия 09.07.2026` | chevron -> `settings/backup` | 20.13 | both |
+| Обновления | `7.13.4 · актуальна` | chevron -> `settings/update` | - (Android updates through the store) | **desktop** |
+| О приложении | `7.13.4` | chevron -> `settings/about` | 20.14 | both |
+
+**«Автообновление подписки» exists once**, inside `settings/provider` / 20.8, on both platforms.
+
+#### 2.12.6 The affordance chosen by option count, so neither platform has to guess
+
+This rule replaces the case-by-case arguments the two plans were making separately, and it is what
+settles «Оформление» (2.12.7).
+
+| Options | Affordance | Example |
+|---|---|---|
+| 2, no subtitle needed | **segment**, applied in place | Режим: `Весь трафик` \| `Прокси` |
+| 2, boolean | **switch** | Облегчённый режим |
+| 3 to 5, no subtitle needed, cheap to change | **unfold**, cycles in place | Масштаб интерфейса, Язык on desktop |
+| 3 to 5, any option needs a subtitle | **a page of `Border.Row.selectable`** | DNS provider, Оформление |
+| 6 or more | **a page**, with search above 8 | Серверы, the app list |
+| Opens something with its own state | **chevron** | Маршрутизация |
+
+#### 2.12.7 «Оформление» is a page on both platforms
+
+The first issue of this document deleted `ThemeSettingView.axaml` with the argument that "a page
+whose entire content is three rows is a row group", and made Оформление a segment plus a separate
+«Монохром» switch. The sibling plan's 20.11 makes it a page of four rows. By 2.12.6 the page wins,
+because two of the options need a subtitle:
+
+```
+SubPage «Оформление»   MaxWidth Size.Content 720
+SectionHeader «Тема»
+Border.Card Padding 0
+  Border.Row.selectable  «Системная»   Subtitle «Как в настройках системы»       check when active
+  Border.Row.selectable  «Тёмная»                                                check when active
+  Border.Row.selectable  «Светлая»                                               check when active
+SectionHeader «Дополнительно»
+Border.Card Padding 0
+  Border.SettingRow  «Чёрно-белая»  ToggleSwitch.iOS
+     Subtitle «Без цветовых акцентов. Работает поверх светлой и тёмной»
+```
+
+Monochrome is a **switch that composes over the base**, not a fourth theme, because that is what the
+code does (`UIItem.BlackTheme` is a bool applied over `CurrentTheme`, `App.axaml.cs:569`) and
+because it is the only arrangement that yields a mono-light theme, which the codebase already
+builds. **CHANGES ANDROID**, whose 20.11 lists «Чёрно-белая» as a fourth mutually-exclusive row.
+The theme flood (3.10) plays from the click point of whichever row or switch was pressed.
 
 ---
 
@@ -1138,20 +1617,39 @@ frame. Crossfade between gates is `Dur.Shell` 200ms.
 
 ### 3.10 The theme transition
 
-Kept as the one piece of chrome flourish in the product, because it communicates a real state change
-and is bounded. `Border #themeTransitionOverlay` holds a `RenderTargetBitmap` snapshot of the old
-theme, revealed away with an expanding circular clip originating at the click point, ~520ms
-`Ease.OutQuint`, driven by `App.ThemeTransitionHook`. Skipped entirely under `.lite`. It does not use
-`Dur.Emphasis` and it is not a second hero moment: it is a masked crossfade of a static bitmap.
+**This is bounded moment 2 (2.6), and it is named as one.** `Border #themeTransitionOverlay` holds a
+`RenderTargetBitmap` snapshot of the old theme, revealed away with an expanding circular clip
+originating at the click point, **`Dur.Theme` 520ms** `Ease.OutQuint`, driven by
+`App.ThemeTransitionHook`. It is the longest and largest animation in the product and calling it
+"a masked crossfade of a static bitmap" does not make it smaller; the honest position is that the
+product has two bounded moments and this is one of them.
 
-Three themes ship: **Тёмная** (default), **Светлая**, and **Монохром**, the last being an overlay on
-top of either. After 2.11 the mono overlay is `Assets/Themes/Mono.axaml`, not
+Its four constraints, which are what keep it bounded:
+
+1. **It fires only from `settings/appearance` (2.12.7)**, from the row or switch the user pressed,
+   with the clip origin at that control's centre. It never fires from a system theme change, a
+   restore, a `depv://` link or session restore: those swap instantly.
+2. **Re-entrancy cancels and snaps.** A second appearance change while the flood is running stops
+   the clip animation at its current radius, drops the overlay bitmap with no fade, and paints the
+   new theme on the next frame. Two changes in a second produce one frame of the second theme, never
+   two 520ms floods in a queue.
+3. **`.lite` skips it entirely** - not shortened, skipped - and the appearance page swaps instantly.
+4. **A window under 900x600 skips it too.** The `RenderTargetBitmap` costs a full-window allocation;
+   at compact sizes the flood is over before the eye has crossed the window and the cost is not
+   repaid.
+
+Three appearances ship: **Тёмная** (default), **Светлая**, and the **Чёрно-белая** overlay that
+composes over either. After 2.11 the mono overlay is `Assets/Themes/Mono.axaml`, not
 `App.axaml.cs:580 BuildMonoOverlay`, so it can be reviewed as data and diffed against the other two.
+Its shipping values are the mono columns of 2.1, which is where they were measured.
 
 ### 3.11 The tray
 
 `App.axaml:26-48`. Native, OS-drawn; it cannot be Incy-styled, so the design work is the item set,
-the labels, the icon states and the click semantics.
+the labels, the icon states, the click semantics **and the live server submenu** - which is the
+desktop's answer to slop-test question 10 (1.5) and is spec'd here to the same depth as the connect
+control, because it is the only surface in the product that lets a user switch server and reconnect
+without ever raising a window.
 
 **Icon states** (`Assets/*.ico`, 16 / 24 / 32 / 48 px, monochrome-safe on both light and dark task
 bars):
@@ -1165,33 +1663,141 @@ bars):
 
 The four legacy `NotifyIcon1-4.ico` files are deleted.
 
-**Menu**, six entries, Russian sentence case:
+**3.11.1 The menu.** Eight entries plus one submenu, Russian sentence case. The first issue listed
+six static items and, by omission, deleted the server-switch submenu the app ships today
+(`StatusBarViewModel.cs:344-372` builds `Servers`, tracks `SelectedServer` against `_config.IndexId`
+and publishes `SetDefaultServerRequested` when it changes; `ConfigItems.cs:82`
+`TrayMenuServersLimit = 20` caps it). That submenu is the best thing in the desktop client's
+interaction model and it is kept, named and improved:
 
 ```
-┌──────────────────────────────────────┐
-│  Нидерланды · Amsterdam    (disabled)│  ← the live identity line; «Не подключено» when off
-├──────────────────────────────────────┤
-│  Отключить                            │  ← label follows core state: Подключить / Отключить
-│  Перезапустить                        │
-├──────────────────────────────────────┤
-│  Показать                             │
-│  Выход                                │
-└──────────────────────────────────────┘
+┌────────────────────────────────────────────────────┐
+│  Подключено · Нидерланды, Amsterdam    (disabled)  │  ← the identity line, 2.12.1's word + the server
+│  02:14:07 · 24,8 / 3,1 Мбит/с          (disabled)  │  ← the live line, only while connected
+├────────────────────────────────────────────────────┤
+│  Отключить                              Ctrl+Enter │  ← label follows core state
+│  Перезапустить                              Ctrl+R │
+├────────────────────────────────────────────────────┤
+│  Сервер: Нидерланды, Amsterdam                   ▸ │  ← the live submenu, 3.11.2
+│  Быстрое подключение                               │  ← lowest latency in the current provider
+├────────────────────────────────────────────────────┤
+│  Показать                                          │
+│  Выход                                             │
+└────────────────────────────────────────────────────┘
 ```
 
-- The identity line is a disabled `NativeMenuItem`; it is the only place the tray states *which*
-  server is up, and it means a user does not have to open the window to answer that.
+- Both header lines are disabled `NativeMenuItem`s. The identity line is the only place the tray
+  states **which** server is up. The live line appears only while connected and updates on the same
+  1 s tick the stats row uses; when the core is down it is absent, not zeroed.
 - Labels come from `L.Shell.cs` (`Tray_Restart`, `Tray_Connect`, `Tray_Disconnect`, `Tray_Show`,
-  `Tray_Exit`) and are re-applied through `App.axaml.cs`'s `LocalizeTray()` hook on
-  `L.Instance.LanguageChanged`, which already exists.
+  `Tray_Exit`, and new keys `Tray_Server`, `Tray_QuickConnect`, `Tray_MoreInApp`) and are re-applied
+  through `App.axaml.cs`'s `LocalizeTray()` hook on `L.Instance.LanguageChanged`, which exists.
+- Shortcut hints are rendered in the item text on Windows and Linux, where a native menu has no
+  accelerator column we control. On macOS they are set as real `NativeMenuItem.Gesture` values.
+
+**3.11.2 The server submenu, in full.**
+
+```
+Сервер: Нидерланды, Amsterdam                        ▸
+   ┌──────────────────────────────────────────────────┐
+   │  ✓  Нидерланды, Amsterdam            48 мс       │  ← the current server, checked
+   │     Германия, Frankfurt              61 мс       │
+   │     Финляндия, Helsinki             112 мс       │
+   │     Швеция, Stockholm          нет ответа        │
+   │     …                                            │
+   ├──────────────────────────────────────────────────┤
+   │     Ещё 84 сервера в приложении…                 │  ← only when the list is capped
+   └──────────────────────────────────────────────────┘
+```
+
+| Rule | Value |
+|---|---|
+| Membership | The **current provider's** servers, in the list's current sort order (6.3). Not every server on the machine: a flat 147-item native menu is unusable and is what the 20-item cap was invented to avoid |
+| Cap | `TrayMenuServersLimit`, default **20**, exposed in `settings/window` › «Серверов в меню трея» as an unfold cycling 10 / 20 / 50 / «не показывать». Today the cap silently hides the whole submenu (`BlServers = false` at `StatusBarViewModel.cs:351`) with no indication; after this change, exceeding it shows the first N plus the «Ещё N серверов в приложении…» item, which opens Серверы |
+| The check | A native check mark on the item whose `IndexId` equals `_config.IndexId`. One channel is enough here because a native menu has no second one to offer; this is the one place in the product where a single channel is permitted, and the reason is that the OS owns the drawing |
+| Latency | Right-aligned where the OS supports it, otherwise appended after two spaces. Rendered from the same `DelayDisplayConverter` the list uses, so a failed probe reads **«нет ответа»**, never «-» |
+| Selecting an item | Sets the default server **and**, if the tunnel is up, reconnects to it. If the tunnel is down it only sets it: choosing a server from a menu is not consent to raise a tunnel |
+| Rebuild | On provider change, on sort change, on a completed ping sweep, and on connect state change. Never on a timer |
+| `Быстрое подключение` | Connects to the lowest-latency reachable server in the current provider. Disabled, with the label unchanged, when no server has a latency figure |
+
+**3.11.3 Click semantics.**
+
 - **Left click shows or hides the window. It never toggles the tunnel.** Toggling a VPN by
   single-clicking a task-bar icon is a destructive misfire waiting to happen; the explicit menu item
   and `Ctrl+Enter` cover the intent.
 - Double click shows the window and focuses Главная.
-- `Ctrl+W` and the window close button hide to tray. **Quit is the tray menu only**, and on quit the
-  core is stopped and the user is told nothing, because the app is gone.
+- Middle click toggles the tunnel. It is the one deliberate power-user gesture, it is documented in
+  `settings/window`, and it is off by default behind «Средняя кнопка переключает подключение».
+- `Ctrl+W` and the window close button hide to tray **when «Сворачивать в трей при закрытии» is on**
+  (`UIItem.Hide2TrayWhenClose`, `settings/window`); when it is off, closing the window quits, which
+  is what a user who turned the setting off asked for. **Quit is always available from the tray
+  menu**, and on quit the core is stopped and the user is told nothing, because the app is gone.
 
-### 3.12 Shell acceptance
+**3.11.4 States of the tray itself.** Icon and tooltip per 3.11's state table; the menu additionally
+handles: **no servers** (the submenu is replaced by a single disabled item «Серверов пока нет» and
+«Быстрое подключение» is disabled), **signed out** (unchanged - the tray is about the tunnel, not
+the account), **elevation missing on Linux** (the connect item stays enabled and raises the sudo
+dialog, 9.3), and **`.lite`** (no change; there is nothing to animate).
+
+### 3.12 Drop anything on the window
+
+**The second desktop-native surface (1.5, question 10), and the cheapest one in the plan.** One
+`DragDrop` handler on `#windowRoot` removes an entire flow: today, importing a config means finding
+the add flyout, choosing the right one of four import commands, and locating a file in an OS dialog.
+`AllowDrop="True"` on the window and four content sniffs replace all of it.
+
+```
+Panel #windowRoot   AllowDrop=True
+   DragOver   → classify, set DragEffects, raise the drop veil
+   Drop       → route to the importer, then report through the status strip
+   DragLeave  → drop the veil at Dur.Exit 150ms
+```
+
+**What is accepted, and what each does.** Classification runs on `DragOver`, not on `Drop`, so the
+veil can already say what will happen:
+
+| Dropped | Detected by | Action | Status strip on success |
+|---|---|---|---|
+| A `.json` file, or several | extension plus a successful parse of an `outbounds` array | Import as servers | `Добавлено серверов: 12` · `Показать` |
+| A `.txt` / `.yaml` / `.yml` file, or several | extension | Import as share links or a provider list, one per line | `Добавлено серверов: 3` · `Показать` |
+| A `.zip` file | extension plus a backup manifest inside | Route to `settings/backup` with the restore confirm already open and the file name filled in. **Never restores on the drop itself**: a restore replaces everything and restarts the app | (the dialog is the feedback) |
+| A `.png` / `.jpg` / `.webp` image | extension | Decode a QR code from it; on success import what it carries | `Сервер добавлен` · `Показать` |
+| Text: one or more `vless://` `vmess://` `trojan://` `ss://` `hysteria2://` `tuic://` `wg://` links | scheme prefix | Import as servers | `Добавлено серверов: 2` · `Показать` |
+| Text: an `http(s)://` URL | scheme prefix | Add as a **provider**, opening `servers/provider-editor` with the URL filled in and the name focused | (the page is the feedback) |
+| Text: a `depv://` URL | scheme prefix | Execute the scheme (7.15) | per the command |
+| Anything else | - | Refused. `DragEffects.None`, the veil shows the refusal line, and dropping does nothing | none |
+
+**The drop veil.** Not a dashed rectangle and not a dimmed page.
+
+```
+Border #dropVeil   full bleed over #contentArea   Background Brush.Scrim
+                   IsHitTestVisible=False   Opacity 0 → 1 over Dur.State 220ms
+└─ Border  Brush.Surface  r20  1px Brush.Accent  Padding 24,20  centred  MaxWidth 420
+   ├─ PathIcon 32   Geo.Action.Import | Geo.Action.Qr | Geo.Set.Backup | Geo.State.Error
+   ├─ 12
+   ├─ TextBlock.Title    the promise, resolved from the classification:
+   │     «Добавить серверы» | «Добавить провайдера» | «Прочитать QR-код»
+   │     | «Восстановить из копии» | «Этот файл не подойдёт»
+   └─ 4
+      TextBlock.Subtitle the detail: «server-list.json» | «departament.site» | «3 ссылки»
+                         | «Поддерживаются .json, .txt, ссылки и QR-изображения»
+```
+
+The veil says **what will happen**, not "drop here", because "drop here" is what the pointer already
+knows. Refusal is rendered in the same veil with `Geo.State.Error` and `Brush.RedText` on the title,
+so a user learns the accepted set by trying, not by reading documentation.
+
+- The veil never appears over a modal dialog, over the sign-in page or over the sync gate: drops are
+  refused outright while a gate is up, because there is nowhere for the import to land.
+- Multi-file drops are one import and one status strip line, never one line per file.
+- A drop that produces zero servers reports the failure with its cause from the error taxonomy:
+  `Не удалось прочитать файл. Проверьте, что это конфиг или список ссылок.` with `Открыть журнал`.
+- Under `.lite` the veil snaps in and out with no transition.
+- `AllowDrop` on the server list additionally supports **reordering by drag** (6.6); the two
+  handlers coexist because the list's drag source is internal and the window's is external, and the
+  window handler checks `e.Data.Contains(DataFormats.Files | Text)` before claiming the event.
+
+### 3.13 Shell acceptance
 
 - [ ] Four destinations, in the Android order, with the Android labels
 - [ ] Rail at >= 760, compact bar below, one `Button.NavItem` class, one travelling indicator
@@ -1201,9 +1807,18 @@ The four legacy `NotifyIcon1-4.ico` files are deleted.
 - [ ] Sub-page stacks are per destination and survive a destination switch
 - [ ] The status strip renders an info, a warning and an error, with the error persisting
 - [ ] `Ctrl+1..4`, `Ctrl+Tab`, `Ctrl+,`, `Ctrl+F`, `Ctrl+Enter` all work with no mouse
+- [ ] `Ctrl+S` does nothing on a destination and saves on an editor; screen-scan is `Ctrl+Shift+S`
+- [ ] The tray menu lists the current provider's servers, checks the current one, shows a latency
+      figure per row, and switching from it reconnects when the tunnel is up
+- [ ] The tray's «Ещё N серверов в приложении…» appears when the list exceeds the cap, instead of
+      the submenu silently vanishing
+- [ ] All seven accepted drop types land, the eighth is refused in the veil, and the veil names the
+      outcome before the drop
+- [ ] Hover is visible on every clickable shell surface in **all three themes**, measured, not
+      assumed
 - [ ] Usable at 900x600 wide, 380x620 compact, and at UI zoom 200 percent
 - [ ] Dark, light and mono all verified; the accent is inside the theme dictionaries
-- [ ] Reduced motion: every shell animation snaps
+- [ ] Reduced motion: every shell animation snaps, and the theme flood is skipped, not shortened
 
 ---
 
@@ -1288,10 +1903,15 @@ into `ConnectControl` (delete five of its nine layers). MOVE `ServerListView` an
 identity, one subscription state, three live numbers, nothing else. Same states, same copy, same
 motion tempo. **Deliberate difference:** the desktop splits into two panes above 980px of content
 width, because a 1600px window with a single 720px column and a 176px disc leaves the right half
-empty; Android has no such width to answer for. **Deliberate difference:** on Android the account
-chip is a row at the top of Home; on desktop it is a row in the ledger, because the rail already
-carries the «Аккаунт» destination and a second permanent account affordance at the top of the page
-would be two entrances to one room.
+empty; Android has no such width to answer for. **Everything else on this screen is 2.12.3**, and
+the composition, the connect object and the six status words are not restated below - they are
+rendered.
+
+**Two things the first issue of this document got wrong here, both now corrected to 2.12.3:** it
+carried a permanent `#rowAccount` on Главная (deleted - the rail already owns the «Аккаунт»
+destination, and the sibling plan forbids an account chip on Home for the same reason), and it put
+the subscription inside a shared three-row ledger card (it is now **the one card on this screen**,
+under its own section header, exactly as Android has it).
 
 ### 5.1 What Главная is for
 
@@ -1302,6 +1922,14 @@ not a dashboard.
 `03-direction.md` 3.2: the connect screen is the *least* branded screen in the app, not the most.
 The identity of this product lives in its numbers and its ledger, not in the disc.
 
+**Said out loud, so a reviewer stops looking for it: Главная has no type hierarchy and is not
+supposed to.** The largest text on this screen is `Title` 16/700 - the status word - and «Подписка»,
+«Сервер», the server name and the card title are all the same size and weight. That is deliberate.
+The hierarchy is carried by **one 176px object** against six 16px lines, which is a ratio of eleven
+to one; adding a `Headline` 24 under the disc would put a second contender on a screen whose entire
+argument is that it has one thing to look at. 2.3's ramp audit records this as a decision rather
+than an omission, and the acceptance list checks that no `Headline` or `Display` appears here.
+
 ### 5.2 Layout
 
 **Compact and wide below 980px of content width - one centred column, `MaxWidth` 560:**
@@ -1309,24 +1937,23 @@ The identity of this product lives in its numbers and its ledger, not in the dis
 ```
 ScrollViewer  (one scroller, Padding 0,0,0,16)
 └─ StackPanel  MaxWidth 560  HorizontalAlignment=Center  Margin 16,0
-   ├─ 32                                              (space above the hero)
-   ├─ ConnectControl                     176px disc inside a 200px frame, centred
+   ├─ 32                                              (space above the object)
+   ├─ ConnectControl                     176px disc, ring on the same 176 circle, centred  (2.12.2)
    ├─ 16
-   ├─ TextBlock #statusLine              Title 16/700 + status dot + word
+   ├─ #statusLine                        8px dot + 8 + Title 16/700 word                   (2.12.1)
    ├─ 4
    ├─ TextBlock #gateLine                Subtitle 13, only when the subscription is not «активна»
    ├─ 24
-   ├─ StatsRow                           only when connected; 3 columns, 44px tall
+   ├─ StatsRow                           only when connected; 3 equal columns, 44px tall    (2.12.3)
    ├─ 32
-   ├─ TextBlock.SectionHeader «Подключение»
+   ├─ TextBlock.SectionHeader «Сервер»
    ├─ 8
-   ├─ Border.Card  Padding 0             the ledger
-   │   ├─ Border.Row  #rowServer         flag tile · name · protocol chip · ping · chevron
-   │   ├─ hairline at 68
-   │   ├─ Border.Row  #rowSubscription   tile · «Подписка» · state chip + expiry · chevron
-   │   ├─ hairline at 68
-   │   └─ Border.Row  #rowAccount        avatar tile · @handle · «Управление аккаунтом» · chevron
-   └─ 16
+   ├─ Border.Row  #rowServer             flag tile · name · protocol · ping · chevron
+   ├─ 24
+   ├─ TextBlock.SectionHeader «Подписка»
+   ├─ 8
+   ├─ Border.Card #cardSubscription      THE one card on this screen                        (5.6)
+   └─ 32
 ```
 
 **Wide at content width >= 980 - two panes, both centred as one group, total `MaxWidth` 988:**
@@ -1336,8 +1963,14 @@ Grid  ColumnDefinitions="420,48,*"   MaxWidth 988   HorizontalAlignment=Center
 ├─ [0] StackPanel  VerticalAlignment=Center        ← the connect pane
 │      ConnectControl · 16 · statusLine · 4 · gateLine · 24 · StatsRow
 └─ [2] StackPanel  VerticalAlignment=Center  MaxWidth 520    ← the ledger pane
-       SectionHeader «Подключение» · 8 · Border.Card with the three rows
+       SectionHeader «Сервер» · 8 · Border.Row #rowServer
+       · 24 · SectionHeader «Подписка» · 8 · Border.Card #cardSubscription
 ```
+
+The server row sits **outside** a card in both modes. One row is not a list, and wrapping a single
+row in a 20-radius bordered container to make it look like a group is the identical-card-grid defect
+from the other direction. It gets the row's own hover, press and focus treatment and the same 68px
+text origin as everything else on the page.
 
 No divider between the panes. 48px of space is the separator; a 1px line there would be the third
 background decision on a screen that needs one (today `HomeView` has a full-bleed gradient, a
@@ -1352,44 +1985,79 @@ there is one Home to design and one to test rather than two files that have alre
 
 ### 5.3 The connect control
 
-`Views/Home/ConnectControl.axaml`. The current `ConnectHeroView` stacks **nine** layers to express
-one boolean plus two transitions: `#AmbientSonar` → `#AmbientRing` → `#GlowHalo` → `#RingOuter` /
-`#RingHoverGlow` / `#RingInner` → `#SonarPulse` / `#SonarPulseEcho` → `#ConnectingArc` →
-`#ConnectDisc` → two shields. Our own inventory calls it **two competing idle animations on the same
-object**. Five layers are deleted.
+`Views/Home/ConnectControl.axaml` + `.axaml.cs`. The current `ConnectHeroView` stacks **nine** layers
+to express one boolean plus two transitions: `#AmbientSonar` → `#AmbientRing` → `#GlowHalo` →
+`#RingOuter` / `#RingHoverGlow` / `#RingInner` → `#SonarPulse` / `#SonarPulseEcho` → `#ConnectingArc`
+→ `#ConnectDisc` → two shields. Our own inventory calls it **two competing idle animations on the
+same object**. Five layers are deleted.
 
-**5.3.1 The object, after.**
+**Budgets, markup and code.** `ConnectHeroView.axaml` is 839 lines and `ConnectHeroView.axaml.cs` is
+**1 156** - and the five deleted layers' animation code lives in the second file, not the first.
+Deleting layers in markup while leaving their storyboards, their `.lite` guards and their state
+machines behind is how a rebuild ends up with a clean view backed by the same code-behind.
+
+| File | Today | After | What moves out |
+|---|---|---|---|
+| `Views/Home/ConnectControl.axaml` | 839 | **< 120** | four layers, all inline styles |
+| `Views/Home/ConnectControl.axaml.cs` | 1 156 | **< 260** | the sonar, the arc wind-up and the shield crossfade become one `Assets/Styles/Connect.axaml` storyboard set driven by three pseudo-classes (`:connecting`, `:connected`, `:failed`); the ambient loops are deleted outright; the state machine moves to `HomeViewModel` |
+
+**5.3.1 The object, after.** Values from **2.12.2**; this is the Avalonia rendering of them.
 
 ```
-Panel #connectFrame  200x200  ClipToBounds=False
-├─ Ellipse #ring       200x200  StrokeThickness 1   Stroke Brush.Outline
-├─ Arc     #arc        200x200  StrokeThickness 3   Stroke Brush.Accent   (connecting only)
-├─ Ellipse #sonar      200x200  StrokeThickness 2   Stroke Brush.Accent   (the hero moment only)
-└─ Border  #disc       176x176  CornerRadius 88     Background Brush.SurfaceHigh
-     └─ Viewbox 80x80
-        ├─ PathIcon #shieldOutline  Geo.Server.ShieldOutline
-        └─ PathIcon #shieldFilled   Geo.Server.ShieldFilled   (Opacity 0 at rest)
+Panel #connect  176x176  ClipToBounds=False   Focusable=True  IsTabStop=True
+├─ Border  #disc    176x176  CornerRadius 88  Background Brush.SurfaceHighest      ← P3
+│                            BorderThickness 1.5  BorderBrush Brush.OutlineStrong  ← the ring
+│    └─ Viewbox 80x80
+│       ├─ PathIcon #shieldOutline  Geo.Server.ShieldOutline
+│       └─ PathIcon #shieldFilled   Geo.Server.ShieldFilled   (Opacity 0 at rest)
+├─ Arc     #arc     176x176  StrokeThickness 3  Stroke Brush.Accent   (connecting only, over the ring)
+└─ Ellipse #sonar   176x176  StrokeThickness 2  Stroke Brush.Accent   (bounded moment 1 only)
 ```
 
 Deleted: `#GlowHalo` and `Brush.ConnectGlow`, `#AmbientSonar`, `#AmbientRing`, `#RingHoverGlow`,
-`#SonarPulseEcho`, `Brush.Ring.Outer`, `Brush.Ring.Inner`. The frame drops from 230 to 200 because
-nothing needs to bloom outside the ring any more; 200 and 176 are both off the spacing scale and both
-are legitimate component sizes carried as tokens (`Size.ConnectFrame` 200, `Size.ConnectDisc` 176,
-`Size.ShieldGlyph` 80).
+`#SonarPulseEcho`, `Brush.Ring.Outer`, `Brush.Ring.Inner`, **and the 200px frame** - the ring is the
+disc's own 1.5px border, so there is no second circle and no 12px gap between an object and its
+outline. Two tokens remain: `Size.ConnectDisc` 176 and `Size.ShieldGlyph` 80.
+`Size.ConnectFrame` is never created.
 
-**5.3.2 The four states.**
+**5.3.2 The states, per theme, measured.** The disc is P3 and the ring is `Brush.OutlineStrong`
+(2.1). The two ratios in each cell are **fill against the page** and **ring against the fill** -
+the two separations that decide whether a 176px circle reads as an object at all.
 
-| State | Disc | Ring | Shield | Status line |
+| State | Disc fill | Ring | Shield | Status line (2.12.1) |
 |---|---|---|---|---|
-| Отключено | `Brush.SurfaceHigh` `#1A1D21` | 1px `Brush.Outline` `#2A2E36` | outline, `Brush.OnSurfaceVariant` | 8px `Brush.OnSurfaceVariant` dot + «Не подключено» |
-| Подключение | `Brush.SurfaceHigh` | the arc replaces the ring: 3px `Brush.Accent`, 90 degrees of sweep, rotating | outline, `Brush.OnSurfaceVariant` | 8px `Brush.Accent` dot + «Подключение…» |
-| Подключено | `Brush.SurfaceHigh` | 1px `Brush.Outline`, back to rest | **filled, `Brush.Accent`** | 8px `Brush.Green` dot + «Подключено» |
-| Ошибка | `Brush.SurfaceHigh` | 1px `Brush.Red` | outline, `Brush.RedText` | 8px `Brush.Red` dot + the taxonomy's cause line, plus «Нажмите, чтобы повторить» |
+| **Отключено** | `Brush.SurfaceHighest` | 1.5px `Brush.OutlineStrong` | outline, `Brush.OnSurfaceVariant` | grey dot + «Отключено» |
+| **Подключение** | unchanged | the arc draws over the ring: 3px `Brush.Accent`, 90 degrees, rotating | outline, `Brush.OnSurfaceVariant` | `Brush.Accent` dot + «Подключение…» |
+| **Подключено** | unchanged | 1.5px `Brush.OutlineStrong`, unchanged | **filled, `Brush.Accent`** | `Brush.Green` dot + «Подключено» |
+| **Отключение** | unchanged | unchanged | crossfades filled → outline over 220ms | grey dot + «Отключение…» |
+| **Ошибка** | unchanged | 1.5px `Brush.Red` | outline, `Brush.RedText` | `Brush.Red` dot + «Не подключено», the cause on the gate line, «Нажмите, чтобы повторить» under the disc |
+| **Нет сервера / нет подписки** | unchanged at `Opacity` 0.38 | unchanged at 0.38 | outline at 0.38 | grey dot + «Сервер не выбран», or the gate line's reason |
 
-The idle state is **recessed, not tinted**: it is darker than the page because `Brush.SurfaceHigh` on
-`Brush.Bg` is a step up in a dark theme and reads as an inset control, and it carries **no blue at
-all**. `03-direction.md` 5.5: if the user's connection is off, nothing on the screen is blue. That is
-also what leaves contrast available to spend when it comes on.
+**The measured separations, all three themes:**
+
+| Theme | Page | Disc fill | Fill vs page | Ring | Ring vs fill | Ring vs page |
+|---|---|---|---|---|---|---|
+| Dark | `#0A0B0D` | `#20242B` | **1.26:1** | `#3C4250` | **1.55:1** | 1.96:1 |
+| Light | `#F4F7FC` | `#E3EAF4` | **1.13:1** | `#B4BFD2` | **1.53:1** | 1.73:1 |
+| Mono dark | `#000000` | `#232326` | **1.34:1** | `#4A4A50` | **1.78:1** | 2.39:1 |
+| Mono light | `#FFFFFF` | `#E7E7E9` | **1.23:1** | `#B8B8BC` | **1.60:1** | 1.98:1 |
+
+**Light is the case that decides the design.** At 1.13:1 the fill alone is not an object; the ring at
+1.53:1 is. That is why the ring is 1.5px rather than 1px and why it has its own token: the first
+issue specified 1px `Brush.Outline`, which measures 1.33:1 against the light disc, and would have
+shipped a nearly invisible 176px circle on the product's most important screen in a theme nobody
+checked. The acceptance list (5.10) carries "someone opened the light theme and looked at the disc"
+as a line item, because that is the only test that would have caught it.
+
+**The idle state is quiet, not recessed.** In every theme the disc is **one step lighter than the
+page in dark and one step darker in light** - that is, one step *up the surface ramp*, which is a
+raised plate, not a well. The first issue asserted the opposite and specified the fill that
+contradicts it in the same clause ("darker than the page because `Brush.SurfaceHigh` on `Brush.Bg`
+is a step up"), which is not a thing a surface can be. There is no inset here and there is no
+attempt to fake one with an inner top hairline. What survives of Incy's recessed-idle idea
+(`30-reference-analysis.md` 2.1.2) is the part that was information: **at rest the disc carries no
+blue at all**. `03-direction.md` 5.5: if the connection is off, nothing on the screen is blue. That
+is also what leaves contrast available to spend when it comes on.
 
 Colour is never the only signal: every state pairs the dot with the word.
 
@@ -1399,14 +2067,14 @@ Colour is never the only signal: every state pairs the dot with the word.
 |---|---|
 | Click on the disc | Toggle. Disabled while `Подключение` unless the press is a second press, which cancels |
 | `Ctrl+Enter` | Same |
-| Hover | `Brush.SurfaceHighest` on the disc, 150ms `Ease.Standard`. **No glow ring** (`#RingHoverGlow` deleted) |
+| Hover | `Brush.HoverOnHighest` on the disc - dark `#2D333E` (1.23:1 over the fill), light `#CBD5E6` (1.22:1), mono `#333338` / `#D3D3D7` - 150ms `Ease.Standard`. **No glow ring** (`#RingHoverGlow` deleted) |
 | Press | `scale(0.94)` at `Dur.PressIn` 90ms, out at `Dur.PressOut` 160ms. The documented exception to 0.97, because 0.97 is imperceptible on a 176px object |
-| Focus | 2px `Brush.Accent` ring at 2px offset, radius 88, drawn outside the ring |
+| Focus | 2px `Brush.Accent` ring at 2px offset, radius 90, drawn **outside** the 1.5px `Brush.OutlineStrong` border so the two never overlap |
 | Disabled | No subscription, or no server selected: `Opacity` 0.38, `IsEnabled=False`, cursor default, and the gate line explains why |
 | Tooltip | «Подключить (Ctrl+Enter)» / «Отключить (Ctrl+Enter)» |
-| Accessible name | «Кнопка подключения. Состояние: не подключено» |
+| Accessible name | «Кнопка подключения. Состояние: отключено» - bound to the 2.12.1 word, so the six states read the six words |
 
-**5.3.4 The connecting arc.** 3px stroke on the 200px circle, 90 degrees of sweep, one rotation per
+**5.3.4 The connecting arc.** 3px stroke on the 176px circle, 90 degrees of sweep, one rotation per
 **1.2 s**, linear (a genuine indeterminate progress indicator is the one place linear is correct),
 preceded by a one-shot 200ms `Ease.OutQuint` wind-up from 0 to 90 degrees of sweep so it starts
 decisively rather than snapping into a spin. It runs **only while the core is actually negotiating**
@@ -1421,7 +2089,8 @@ happening is a lie about the system. Under `.lite` the arc is a static 90-degree
 | `#AmbientSonar`, `#AmbientRing` (850ms breathing loops) | Idle ambience. `03-direction.md` 8.5: no looping animation exists in this product except a genuine indeterminate indicator |
 | `#SonarPulseEcho` | A second ring. The hero moment emits exactly one |
 | `#RingHoverGlow` | Hover is a surface step, not a bloom |
-| `Brush.Ring.Outer` / `.Inner` (alpha rings) | Two extra strokes saying what one 1px ring says |
+| `Brush.Ring.Outer` / `.Inner` (alpha rings) | Two extra strokes saying what one 1.5px ring says |
+| The 200px frame | An object and its own outline are one shape. A 12px gap between a disc and the circle around it is a fourth separation on a screen that argues it has one, and Android has no counterpart for it (2.12.2) |
 | `#CornerAddButton` | The app's primary "add subscription" action was parked in the hero's corner, in the wide layout only. It moves to the Серверы destination, where adding a server or a provider belongs, and to the onboarding page |
 | `Text="↑"` / `Text="↓"` | Typographic characters standing in for icons. `Geo.Action.ArrowUp/Down` at 16px |
 

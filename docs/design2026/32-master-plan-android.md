@@ -54,19 +54,28 @@ one open, that is a defect in this document; log it in section 25 rather than in
 
 Departament VPN on Android is a black instrument panel with one lit control on it: a flat near-black
 ground (`#0A0B0D`) that never draws attention to itself, structure carried entirely by 56dp rows and
-1dp hairlines that begin at a 68dp text origin held identically on every screen in the app, exactly
-one object per screen permitted to emit the brand blue and on most screens that number is zero, all
-Russian prose in a Cyrillic-capable UI face at 14sp and above while every quantity in the product -
-traffic, speed, latency, uptime, balance, price, device count - is set in Space Grotesk at fixed
-tabular 620/1000 advances so that a live counter is as still as a printed one, a spacing melody of
-4/8/12 inside an object, 16 between objects, 24 between sections and 32 exactly twice per screen
-rather than a uniform 16dp drone, depth expressed only by four surface planes and never by a shadow,
-a gradient or a glow, and motion that acknowledges a finger in 90ms, changes state in 220ms, reveals
-in 300ms, and performs exactly once in the entire product, for 600ms, at the instant the tunnel
-confirms. It reads as engineered rather than decorated, calm rather than dramatic, and Russian
-rather than translated; it is the opposite of the category's navy-plus-neon-plus-halo reflex, and
-the thing a user recognises in a screenshot with the wordmark cropped out is not the connect button
-but the ledger and the figures in it.
+1dp hairlines whose inset is never a free choice - every hairline starts exactly where the text
+above it starts, and a group only ever has one origin (5.3) - exactly one object per screen
+permitted to emit the brand blue and on most screens that number is zero, all Russian prose in a
+Cyrillic-capable UI face at 14sp and above while every quantity in the product - traffic, speed,
+latency, uptime, balance, price, device count - is set in Space Grotesk at fixed tabular 620/1000
+advances so that a live counter is as still as a printed one, a spacing melody of 4/8/12 inside an
+object, 16 between objects, 24 between sections and 32 exactly twice per screen rather than a
+uniform 16dp drone, depth expressed only by four surface planes and never by a shadow, a gradient or
+a glow, and motion that acknowledges a finger in 90ms, changes state in 220ms, reveals in 300ms, and
+performs exactly once in the entire product, for 600ms, at the instant the tunnel confirms. It reads
+as engineered rather than decorated, calm rather than dramatic, and Russian rather than translated;
+it is the opposite of the category's navy-plus-neon-plus-halo reflex.
+
+**The frame that carries the claim.** A thesis that only becomes visible after the tunnel is up is
+not a thesis, it is a reward. The frame a stranger sees - the store listing, the screenshot, the
+first launch after a reinstall - is **Главная, disconnected**, and it is designed to carry the whole
+argument on its own: a three-column tabular ledger of the last completed session sitting at the
+exact x positions the live strip will use (11.3), a subscription figure and its state chip, one
+56dp server row, and a grey disc. No competitor in this category ships a numeric ledger in its
+disconnected frame; both ship a circle and a word. That frame, cropped of the wordmark, is what the
+product is recognised by, and section 26 wave 10 checks it side by side against cropped Happ and
+Incy captures rather than asserting it.
 
 ### 1.2 The three signature moments
 
@@ -84,14 +93,20 @@ navigation does not react, and no second ring ever follows the first. Under redu
 shield is filled instantly, the ring is not emitted, and the haptic still fires.
 Files: `res/anim/connect_confirm.xml`, `res/anim/shield_assemble.xml`, `MainActivity.applyRunningState()`.
 
-**Moment 2 - «Цифры встают в колонку». The instrument comes alive.** Screen 11, the numeric strip.
-The three-column strip (download, uptime, upload) is absent while disconnected and appears when the
-tunnel is up, entering once with `motion_reveal` 300ms `ease_out_quint`, alpha 0 to 1 and
-translationY 8dp to 0. From that instant it never moves again: every column has a reserved width
-computed from the tabular 620/1000 advance, so `9,9 Мбит/с` becoming `10,1 Мбит/с` and `00:09:59`
-becoming `00:10:00` shift nothing. This is the moment the product's claim - "an instrument, not a
-storefront" - becomes visible, and it is the one thing in the app a competitor using Inter for
-everything physically cannot reproduce.
+**Moment 2 - «Цифры оживают». The instrument comes alive.** Screen 11, the numeric strip.
+The three-column strip is **always present** once the device has one completed session behind it.
+Disconnected it is the ledger of the last session - `12,4 ГБ` / `02:14:07` / `09.07` under the
+header «Последний сеанс», set in `?attr/colorOnSurfaceVariant`. At the instant the tunnel confirms,
+the same three columns **crossfade in place** over `motion_state` 220ms `ease_standard` to the live
+values in `?attr/colorOnSurface` and the header swaps to «Сеанс». **Nothing translates and nothing
+resizes**, because both sets are laid out on the same reserved column widths computed from the
+tabular 620/1000 advance, so `9,9 Мбит/с` becoming `10,1 Мбит/с` and `00:09:59` becoming `00:10:00`
+shift nothing, and neither does the transition between the two sets. This is the moment the
+product's claim - "an instrument, not a storefront" - becomes visible; it is the one thing in the
+app a competitor using Inter for everything physically cannot reproduce; and because the columns
+exist before the tunnel does, it is also the thing that makes the *disconnected* frame distinctive
+(1.1). On a device with no completed session the strip is absent and the first-run EmptyState
+occupies the space (11.4).
 
 **Moment 3 - «Подписка загорается в трёх местах». One object, three surfaces.** Screens 11, 15, 22.
 The subscription is a single six-state object resolved in one place (`SubscriptionState`), and when
@@ -113,10 +128,10 @@ implementation sequence (section 26).
 | T2 | More than one card on a screen, or a card inside a card | `activity_buy_tariff.xml` (option rows inside a tariff card), `activity_bypass_list.xml` (card header above card list), `activity_devices.xml`, `activity_payment_history.xml` |
 | T3 | A coloured icon tile that is not one of the three sanctioned categories | `bg_icon_green/orange/purple/yellow.xml` and their `iconTint*` / `iconTileBg*` attrs |
 | T4 | Text set by `android:textSize` instead of a ramp style | ~100 occurrences in 21 files |
-| T5 | A dp value outside 0/1/2/4/8/12/16/20/22/24/28/32/36/40/44/48/52/56/64/72/80/100/120/152/160/176 | 325 values in 25 files |
+| T5 | A dp value that is not in **the dp dictionary, section 5.1**. That table is the only list; this row does not carry a second one | 325 values in 25 files |
 | T6 | A `Toast` for anything the user can act on | ~40 call sites plus `toast_status.xml` |
 | T7 | Emoji or a typographic character used as UI chrome | `FlagUtil` flags, `🌐`, `✕`, `↑`, `↓`, `∞` as a value |
-| T8 | A screen with no entry point | 14 screens (section 24.9) |
+| T8 | A screen with no entry point | 6 activities and 1 dialog layout, resolved one by one in section 24.2 |
 | T9 | A single-choice `AlertDialog` where a segment or a push belongs | Режим, DNS, Пинг, Оформление, Язык, Автообновление |
 | T10 | English in a user-visible string | 384 of 463 strings in `values/strings.xml` |
 
@@ -165,22 +180,38 @@ Legal: `P0 -> P1 card -> P3 chip`. Illegal and each is a named defect:
    `MaterialAlertDialog`.
 6. **Light theme** may use Material's tonal elevation and must not use a coloured or offset shadow.
    Mono (`ThemeOverlay.Mono`) inherits the same four planes; the plane values are attributes, so
-   the overlay works for free. Every raw `@color/...` reference in a layout is a hole in mono and
-   is a defect (the current list is in `design-review-c942766.md` section 1.1).
+   the overlay works for free. **Every raw `@color/...` reference in a layout is a hole in mono and
+   is a defect** (the current list is in `design-review-c942766.md` section 1.1), with exactly four
+   exemptions, each of which is a colour whose *meaning* is that it survives the mono overlay:
+
+   | Exempt raw colour | Why it may appear in a layout |
+   |---|---|
+   | `@color/warning` | Amber has no Material attribute slot. It is declared per theme in `values/` and `values-night/`, and `ThemeOverlay.Mono` overrides it to `?attr/colorOnSurfaceVariant` via a `mono_warning` alias, so mono still resolves |
+   | `@color/ping_bad` | Error **text** on dark needs a lighter red than `?attr/colorError` (`00-rules.md` 18, 2026-07-26). Same per-theme + mono-alias treatment |
+   | `@color/chip_bg_success` / `_warning` / `_error` | 12 % status fills, per theme, mono-aliased to `?attr/colorSurfaceContainerHighest` |
+   | `@color/chip_text_success` / `_warning` / `_error` | The matching text hues, mono-aliased to `?attr/colorOnSurfaceVariant` |
+
+   Everything else - including the neutral tile and its glyph, which shipped as raw colours and are
+   promoted in wave 1 - resolves through `?attr/`. See 8.0 for the attribute declarations.
 
 ### 2.3 Separators
 
 | Between | Device | Value |
 |---|---|---|
-| Two rows in the same group | Hairline | `View`, `layout_height="1dp"`, `background="?attr/colorOutlineVariant"`, `layout_marginStart="@dimen/text_origin"` (68dp), `marginEnd="0dp"` |
+| Two rows in the same group | Hairline | `View`, `layout_height="@dimen/stroke_hairline"` (1dp), `background="?attr/colorOutlineVariant"`, `layout_marginStart` = **the group's own text origin** (`@dimen/text_origin` 68dp on a tiled group, `@dimen/screen_gutter` 16dp on a plain group - see 5.3), `marginEnd="0dp"` |
 | Two groups | Space | 24dp plus a section header |
 | A section header and its first row | Nothing | No divider above the first row of a group, ever |
 | A card and the next block | Space | 16dp (object to object) or 24dp (section to section) |
 | The rail-equivalent (sw600dp `NavigationRailView`) and content | Hairline | 1dp `?attr/colorOutlineVariant`, vertical |
 
-A row never carries both a top and a bottom hairline. The last row of a group carries none. The
-three divider insets currently shipped (44dp in `custom_divider.xml`, 68dp in layer B, 72dp in the
-Settings tab and the Account tab) collapse to one: **68dp**.
+A row never carries both a top and a bottom hairline. The last row of a group carries none.
+
+**The inset is derived, never chosen.** The three divider insets currently shipped (44dp in
+`custom_divider.xml`, 68dp in layer B, 72dp in the Settings tab and the Account tab) collapse to
+**two values, and neither is a free parameter**: a hairline starts at exactly the x where the title
+of the row above it starts. Tiled groups therefore inset 68; plain groups inset 16. **A group never
+mixes the two, and a hairline whose inset is not equal to its own group's text origin is a defect.**
+That is checkable with one grep per layout and it is what section 5.3 exists to make deterministic.
 
 ---
 
@@ -203,10 +234,10 @@ This table is binding. "The lit element" is the single filled or fully saturated
 | Screen | The one lit element | Tinted, max 3 | Accent count target |
 |---|---|---|---|
 | Home, disconnected | none | subscription-card action text button, nav indicator pill | 0 filled |
-| Home, connecting | the 3dp indeterminate arc on the disc | nav indicator pill | 0 filled |
+| Home, connecting | the 3dp indeterminate arc on the disc rim | nav indicator pill | 0 filled |
 | Home, connected | the filled shield glyph inside the disc | nav indicator pill | 1 |
 | Home, no subscription | «Купить» filled CTA | nav indicator pill | 1 |
-| Sign-in | «Войти» filled CTA | shield tile (`colorPrimaryContainer`), focused field ring, link text buttons | 1 |
+| Sign-in | «Войти» filled CTA | shield tile (`colorPrimaryContainer`), focused field ring, **«Забыли пароль?» text button - the only blue label on the screen** | 1 filled + 3 tinted, exactly at budget |
 | Servers | none | selected row's 20dp check glyph, nav indicator pill | 0 filled |
 | Servers, empty | «Добавить провайдера» filled CTA | nav indicator pill | 1 |
 | Server actions sheet | none | none. The destructive row is red, not blue | 0 |
@@ -237,13 +268,20 @@ The single largest source of accent leakage in the build: `values/themes.xml:88-
 `@color/icon_blue` / `@color/icon_tile_blue`, so 22 of 23 Settings rows, every action-sheet row,
 every device row and every payment row render the same blue tile. The layouts still say "green".
 
-**The 40dp tile has exactly three states and no others:**
+**The 40dp tile has exactly three categories and no others. Every value below is a theme attribute,
+so the tile survives light and mono without a second layout** (2.2.6):
 
-| Tile | Fill | Glyph | Meaning | Budget |
-|---|---|---|---|---|
-| Neutral | `@color/icon_tile_neutral` `#20242B` | `@color/icon_glyph_neutral` `#9BA1AD` | Everything | unlimited |
-| Accent | `?attr/colorPrimaryContainer` `#17325C` | `?attr/colorOnPrimaryContainer` `#CFE0FF` | This row **is** the screen's primary action | **max 1 per screen** |
-| Destructive | `@color/icon_tile_red` `#331F2225`-class red tint | `?attr/colorError` `#F04452` | This row destroys something | max 1 per screen |
+| Tile | Fill attr | Fill dark / light | Glyph attr | Glyph dark / light | Contrast (glyph on fill) | Meaning | Budget |
+|---|---|---|---|---|---|---|---|
+| Neutral | `?attr/iconTileNeutral` **(new, 8.0)** | `#20242B` / `#E3EAF4` | `?attr/iconGlyphNeutral` **(new)** | `#9BA1AD` / `#54607A` | 5.3:1 dark, 5.6:1 light | Everything | unlimited |
+| Accent | `?attr/colorPrimaryContainer` | `#17325C` / `#D8E4FF` | `?attr/colorOnPrimaryContainer` | `#CFE0FF` / `#001A43` | 9.6:1 dark, 13.9:1 light | This row **is** the screen's primary action | **max 1 per screen** |
+| Destructive | `?attr/iconTileRed` **(new)** -> `@color/icon_tile_red` | `#33F04452` / `#33C42B32` | `?attr/colorError` | `#F04452` / `#BA1A1A` | 4.9:1 dark, 5.1:1 light | This row destroys something | max 1 per screen |
+
+`@color/icon_tile_red` **already exists in the repo at the correct value**
+(`res/values/colors.xml:42`, `#33F04452` = 20 % of the error hue over the plane beneath it). It was
+never wrong; the previous revision of this document described it as a "`#331F2225`-class red tint",
+which is 20 % of a grey and is not a colour. There is nothing to author here beyond the attribute
+that points at it. The light value `#33C42B32` is new and is declared in 8.0.
 
 Deleted in the same change: `bg_icon_green.xml`, `bg_icon_orange.xml`, `bg_icon_purple.xml`,
 `bg_icon_yellow.xml`, `bg_chip_gold.xml`, and the attrs `iconTintGreen`, `iconTintOrange`,
@@ -252,12 +290,16 @@ Deleted in the same change: `bg_icon_green.xml`, `bg_icon_orange.xml`, `bg_icon_
 
 ### 3.5 The non-accent colours and what they may do
 
-| Colour | Attr / resource | Dark | May be a button? | May be a tile? | Where |
-|---|---|---|---|---|---|
-| Green (status) | `?attr/colorTertiary` | `#22C55E` | **No** | **No** | The connected dot and word; the «Оплачено» chip; the «Активна» chip |
-| Red (destructive) | `?attr/colorError` fill, `@color/ping_bad` text | `#F04452` / `#FF6069` | Yes, and only to destroy | Yes, max 1 | Delete rows, «Удалить» dialog action, error text, «нет ответа» |
-| Amber (warning) | `@color/warning` (new) | `#EAB308` | **No** | **No** | The «Истекает» chip, the «В обработке» chip, a meter above 90% |
-| Neutral | `?attr/colorOnSurfaceVariant` | `#9BA1AD` | n/a | Yes, default | Everything else |
+| Colour | Attr / resource | Dark | Light | May be a button? | May be a tile? | Where |
+|---|---|---|---|---|---|---|
+| Green (status) | `?attr/colorTertiary` fill, `@color/chip_text_success` text | `#22C55E` / `#22C55E` | `#12B76A` / `#0A6B3F` | **No** | **No** | The connected dot and word; the «Оплачено» chip; the «Активна» chip |
+| Red (destructive) | `?attr/colorError` fill, `@color/ping_bad` text | `#F04452` / `#FF6069` | `#BA1A1A` / `#C42B32` | Yes, and only to destroy | Yes, max 1 | Delete rows, «Удалить» dialog action, error text, «нет ответа» |
+| Amber (warning) | `@color/warning` (new) | `#EAB308` | `#7C4A03` | **No** | **No** | The «Истекает» chip, the «В обработке» chip, a meter at or above 90 % |
+| Neutral | `?attr/colorOnSurfaceVariant` | `#9BA1AD` | `#54607A` | n/a | Yes, default | Everything else |
+
+The two-value cells are **fill / text**: the fill hue may tint a dot, a meter or a glyph; the text
+hue is what a word is set in, and it is lighter on dark and darker on light so that 11sp and 12sp
+labels clear 4.5:1 on the plane they actually sit on. Every ratio is in 8.0.
 
 **Colour is never the only signal.** Every one of the above ships with a word or a glyph beside it:
 a green dot always sits next to the word «Подключено»; a red delete glyph always sits in a row whose
@@ -282,11 +324,21 @@ split is by script and it is load-bearing rather than decorative.
 | Subtitle | `TextAppearance.App.Subtitle` | **UI face** | 13sp | 400 | +0.01em | onSurfaceVariant | Row subtitles, row values, supporting lines |
 | Caption | `TextAppearance.App.Caption` | **UI face** | 12sp | 400 | +0.02em | onSurfaceVariant | Field labels, metadata, timestamps, helper text |
 | Chip | `TextAppearance.App.Chip` | brand | 11sp | 500 | +0.04em | contextual | Chip and badge labels only |
+| Nav label | `TextAppearance.App.NavLabel` **(new)** | brand | 11sp | 500 rest / 700 active | +0.02em | `?attr/colorOnSurfaceVariant` rest / `?attr/colorOnSurface` active | Bottom-navigation and rail labels only. Nowhere else |
 | Numeric | `TextAppearance.App.Numeric` | brand | inherits | **500** | 0 | onSurface | Every quantity in the product |
-| Section header | `@style/SettingsSectionLabel` | brand | 16sp | 700 | 0 | onSurface | Group headers |
+| Section header | `@style/SettingsSectionLabel` | brand | 16sp | 700 | 0 | **onSurfaceVariant** | Group headers |
 | Wordmark | `@style/ToolbarBrandTitle` | brand | 20sp | 700 | -0.01em | onBackground | `departament`, nowhere else |
 
-**Four required changes to `res/values/styles.xml` before any screen work starts:**
+**Why the section header is a colour step and not a size step.** Title and Section header are the
+same face at the same size and weight; the only thing separating them is luminance -
+`?attr/colorOnSurfaceVariant` `#9BA1AD` (**8.2:1** on `#0A0B0D`) against the row title's
+`?attr/colorOnSurface` `#F2F4F8` (**17.4:1**). That is deliberate, and it is a decision rather than
+an omission: on the app's densest screens a header must be a *label for* the rows beneath it, not a
+competitor to them, so it steps **back** rather than forward. Adding an eleventh size to separate
+them would break the ramp's 1.15-1.4 ratio law, and setting it in ALL-CAPS is banned outright. Both
+values clear 4.5:1 by a wide margin, so nothing is lost to accessibility. Recorded as D-A22.
+
+**Five required changes to `res/values/styles.xml` before any screen work starts:**
 
 1. `TextAppearance.App.Numeric` gains `android:textFontWeight="500"` (it currently declares no
    weight while `00-rules.md` 3.4 specifies 500).
@@ -294,36 +346,70 @@ split is by script and it is load-bearing rather than decorative.
    `android:fontFamily="@font/ui_face"` - the Cyrillic-capable family decided by `03-direction.md`
    D-1. Until that decision lands they explicitly declare `android:fontFamily="sans-serif"` so the
    face is chosen by us and not by the OEM.
-3. `SettingsSectionLabel` changes `paddingTop` from 18dp (off-scale) to **24dp** and keeps
-   `paddingBottom` 8dp.
-4. `res/font/space_grotesk.xml` gains explicit `android:fontVariationSettings="'wght' 400|500|700"`
+3. `SettingsSectionLabel` changes `paddingTop` from 18dp (off-scale) to **24dp**, keeps
+   `paddingBottom` 8dp, and its `textColor` changes to `?attr/colorOnSurfaceVariant`. A second
+   style `@style/SettingsSectionLabel.Inline` is declared with all four paddings at 0, for the two
+   places a section label is composed into another layout rather than laid out by itself: the
+   sticky server-group header (12.5) and a sheet title (8.16).
+4. `@style/BottomNavLabel` is **deleted** and replaced by `TextAppearance.App.NavLabel`, declared in
+   the ramp above like every other role. A private style for text that appears on literally every
+   frame of the product was the largest single hole in the ramp.
+5. `res/font/space_grotesk.xml` gains explicit `android:fontVariationSettings="'wght' 400|500|700"`
    per entry if the verification in `03-direction.md` 6.3 confirms that the default 300 instance is
    being rendered. **Run that verification before the type pass, not after.**
 
 **Banned, mechanically checkable:** `android:textSize` in any layout; `android:textStyle="bold"`
-anywhere; weight 600; 15sp, 18sp or any step not in the ramp; italic; letter-spacing set per screen.
+anywhere; weight 600; 15sp, 18sp or any step not in the ramp; italic; letter-spacing set per screen;
+**a `textAppearance` overridden inline by any of `textSize`, `textColor`, `fontFamily` or
+`letterSpacing`** - if a role needs a variant, the variant is declared in `styles.xml` and named,
+the way `SettingsSectionLabel.Inline` is.
 
-### 4.2 The ramp in use, per screen
+### 4.2 The ramp in use, per rendered frame
 
-Every screen uses a **subset**. A screen that uses more than five roles is doing too much. Display
-appears exactly twice in the entire app.
+Every screen uses a **subset**. The governing rule is **per rendered frame, not per screen: no
+single frame the user can actually see may use more than six roles.** The distinction matters,
+because an empty state and a loaded state cannot coexist, so counting a screen's whole state set
+against one budget is a rule nobody can either check or comply with. The frame column below says
+which state each row is counted in; roles that only ever appear in another state are listed on their
+own row and are not concurrent with it.
 
-| Screen | Display | Headline | Title | Body | Subtitle | Caption | Chip | Numeric |
-|---|---|---|---|---|---|---|---|---|
-| Home, populated | - | - | status word, section headers, server row title, sub-card title | - | server row subtitle, sub-card expiry | - | state chip, protocol | speeds, uptime, traffic, days |
-| Home, first run | - | empty title | CTA label | empty line | - | - | - | - |
-| Sign-in | - | «Вход» | CTA labels | - | subtitle line | field labels, helper, error | - | 2FA code field |
-| Servers | - | empty title | toolbar title, row titles, section headers | empty line | transport line, count line | - | protocol | ping |
-| Server actions sheet | - | - | sheet title, row titles | - | server subtitle | - | protocol | - |
-| Account | **balance** | empty title | name, section headers, row titles, card title | empty line | row values, expiry | «Баланс» label | tariff badge, state chip | balance, devices, traffic, price |
-| Buy | - | - | tariff names, «Итого» value, CTA | error line | tariff info, option duration | «Примерная сумма» note | - | prices, device count |
-| Devices | - | empty title | row titles | empty line | platform + last-seen | hwid tail | «Это устройство» | date |
-| Payment history | - | empty title | row titles | empty line | date | - | status chip | amount, date |
-| Settings hub | - | - | row titles, section headers | - | row values | - | - | - |
-| Settings sub-page | - | - | row titles, section headers | explanatory paragraphs | row values, subtitles | helper text | segment labels | numeric fields |
-| Server editor | - | - | section headers, save CTA | - | - | field labels, helper, error | - | port, mtu |
-| About | - | - | row titles, app name | - | row subtitles | version, build | - | version numbers |
-| Logs | - | - | toolbar title | - | - | - | level chip | timestamp, log body (mono) |
+`Numeric` is a **modifier applied to a role**, not an eleventh face - it changes weight and font
+features on whatever role carries the figure - so it is shown for completeness and does **not** count
+against the six.
+
+| Screen · frame | Display | Headline | Title | Body | Subtitle | Caption | Chip | Nav label | Roles in this frame |
+|---|---|---|---|---|---|---|---|---|---|
+| Home · connected / disconnected | - | - | status word, section headers, server row title, card title | - | server row subtitle, card caption, ledger labels | - | state chip | bar | **5** |
+| Home · first run | - | empty title | CTA label | empty line | - | - | - | bar | 5 |
+| Sign-in · credentials | - | «Вход» | CTA labels | - | subtitle line | field labels, helper | - | - | 5 |
+| Sign-in · error | - | «Вход» | CTA labels | - | subtitle line | field labels, helper, **error** | - | - | 5 |
+| Servers · loaded | - | - | toolbar title, row titles, group headers | - | transport line, count line, ping | - | protocol | bar | **5** |
+| Servers · empty | - | empty title | toolbar title | empty line | - | - | - | bar | 5 |
+| Server actions sheet | - | - | sheet title, row titles | - | server subtitle | - | protocol | - | 4 |
+| Account · loaded | **balance** | - | name, section headers, row titles, card title | - | «Баланс» label, row values, card caption | - | state chip | bar | **6** |
+| Account · empty / gate | - | empty title | CTA label, section headers | empty line | row values | - | - | bar | 6 |
+| Buy · loaded | - | - | tariff names, «Итого», CTA | - | tariff info, option duration, per-month line | «Примерная сумма» note | - | - | **5** |
+| Buy · empty / error | - | empty title | CTA label | empty line | - | - | - | - | 4 |
+| Devices · loaded | - | - | row titles, summary CTA | - | summary line, platform + last-seen | - | - | - | **3** |
+| Devices · empty | - | empty title | CTA label | empty line | - | - | - | - | 4 |
+| Payment history · loaded | - | - | row titles, month headers | - | date, amount | - | status chip | - | **4** |
+| Payment history · empty | - | empty title | CTA label | empty line | - | - | - | - | 4 |
+| Settings hub | - | - | row titles, group headers | - | row values | - | - | bar | **4** |
+| Settings sub-page | - | - | row titles, group headers | explanatory paragraph | row values, subtitles | helper text | segment labels | - | **6** |
+| Server editor | - | - | group headers, save CTA | - | - | field labels, helper, error | - | - | **3** |
+| About | - | - | row titles, app name | - | row subtitles | version, build | - | - | 4 |
+| Журнал | - | - | toolbar title | log body (mono 12sp) | - | timestamp | level chip | - | 5 |
+| TV shell (22.7) | - | screen titles | row titles | body lines | row values | - | - | rail | 5 |
+
+**Two things were cut to make the rule true rather than aspirational.** Аккаунт's loaded frame was
+at eight roles; «Баланс» moves from `Caption` 12sp to `Subtitle` 13sp (it is a label for a figure,
+not metadata about it), and the **tariff-badge chip is deleted** - the tariff name was duplicating
+the card title's job and is now folded into the card's caption line, «Базовый · действует до
+12.08.2026» (11.6). That leaves one chip on the card, the state chip, which is the one that carries
+the six-state machine. Устройства's `Chip` role went with the «Это устройство» badge, which moves
+into the row subtitle (17.3) where it cannot collide with the unlink button.
+
+Display appears **exactly once** in the entire app, on Аккаунт, on the balance.
 
 ### 4.3 Number formatting, mandatory and global
 
@@ -337,23 +423,132 @@ One formatter, `util/NumberFormat.kt`, replacing every ad-hoc `String.format` in
 | Uptime | `HH:MM:SS`, hours unpadded above 99 | `02:14:07` | `tnum lnum zero` |
 | Money | `1 290 ₽`, U+2009 thin space thousands, U+00A0 before `₽` | `1 290 ₽` | `tnum lnum`, **`zero` off** |
 | Device count | `3 / 5`, spaces around the slash; unlimited renders the word | `3 / 5`, `без ограничений` | `tnum lnum` |
-| Days remaining | bare integer plus a pluralised noun | `27 дней`, `3 дня`, `1 день` | `tnum lnum` |
+| Days remaining | bare integer plus a pluralised noun, from 4.4 | `27 дней`, `3 дня`, `1 день` | `tnum lnum` |
 | Date | `dd.MM.yyyy`; with time when two records can share a day | `12.08.2026`, `12.08.2026 19:41` | `tnum lnum zero` |
+| Short date | `dd.MM` where the year is implied by a month header or by "this session" | `09.07` | `tnum lnum zero` |
 | Percent | `N %` with U+00A0 | `92 %` | `tnum lnum` |
 
 `∞` is **deleted from the product**. `@string/account_unlimited` becomes «без ограничений».
 A mathematical symbol standing in for a Russian phrase is the same defect class as `↑` standing in
 for an icon.
 
+### 4.4 The plural dictionary
+
+**Every counted noun in this product is a `<plurals>` resource with all four Russian categories
+written out here.** Russian has `one` (1, 21, 31, 101 …), `few` (2-4, 22-24 …), `many` (0, 5-20,
+25-30, 11-14 …) and `other` (fractional values, which `getQuantityString` reaches through a
+`float`). "With correct plural resources" is not an instruction, it is a judgement call handed to an
+implementer, and section 0 forbids that; this table is the answer.
+
+**A format string can host at most one `<plurals>`.** Where a line counts two different things it is
+assembled from two plural lookups and a joiner, never from one string with two `%d`.
+
+| Resource | `one` | `few` | `many` | `other` | Used by |
+|---|---|---|---|---|---|
+| `plural_servers` | `%d сервер` | `%d сервера` | `%d серверов` | `%d сервера` | 12.3 count line, 19.3, 20.8, 14.5 |
+| `plural_providers` | `%d провайдер` | `%d провайдера` | `%d провайдеров` | `%d провайдера` | 12.3 count line, 19.3 |
+| `plural_days` | `%d день` | `%d дня` | `%d дней` | `%d дня` | 11.6, 15.5, 22.1 |
+| `plural_devices` | `%d устройство` | `%d устройства` | `%d устройств` | `%d устройства` | 16.5 tariff info |
+| `plural_devices_of` | `%1$d из %2$d устройства` | `%1$d из %2$d устройств` | `%1$d из %2$d устройств` | `%1$d из %2$d устройств` | 17.5 summary. Quantity argument is **%2$d**, the allowance |
+| `plural_apps` | `%d приложение` | `%d приложения` | `%d приложений` | `%d приложения` | 19.3, 20.2 |
+| `plural_rules` | `%d правило` | `%d правила` | `%d правил` | `%d правила` | 19.3, 20.3 |
+| `plural_records` | `%d запись` | `%d записи` | `%d записей` | `%d записи` | 20.4 «Свои записи» |
+| `plural_settings_applied` | `%d настройка` | `%d настройки` | `%d настроек` | `%d настройки` | 19.3, 20.9 |
+| `plural_hours` | `%d час` | `%d часа` | `%d часов` | `%d часа` | 20.8 update interval |
+| `plural_minutes_ago` | `%d минуту назад` | `%d минуты назад` | `%d минут назад` | `%d минуты назад` | 11.6, 20.8 «обновлён …» |
+| `plural_import_servers` | `Добавить %d сервер` | `Добавить %d сервера` | `Добавить %d серверов` | `Добавить %d сервера` | 14.5 CTA |
+| `plural_selected_of` | `Выбрано %1$d из %2$d` | `Выбрано %1$d из %2$d` | `Выбрано %1$d из %2$d` | `Выбрано %1$d из %2$d` | 20.2. Identical in all four; declared as plurals anyway so the call site is uniform |
+| `plural_removed_servers` | `Удалён %d сервер` | `Удалены %d сервера` | `Удалено %d серверов` | `Удалено %d сервера` | 12.8 prune undo strip |
+
+Assembled lines, each of which is a plain format string over the plurals above:
+
+| Resource | Value | Assembled from |
+|---|---|---|
+| `servers_count` | `%1$s · %2$s` | `plural_servers` + `plural_providers`, e.g. «15 серверов · 2 провайдера» |
+| `account_sub_left_days` | `Осталось %1$s` | `plural_days`, e.g. «Осталось 3 дня» |
+| `devices_summary` | `%1$s подключено к подписке «%2$s»` | `plural_devices_of` + the subscription name |
+| `devices_summary_limit` | `%1$s. Отвяжите одно, чтобы подключить новое.` | `plural_devices_of` |
+| `buy_tariff_info` | `%1$s · %2$s` | `plural_devices` + the traffic figure or «без ограничений» |
+| `providers_row_sub` | `%1$s · обновлён %2$s` | `plural_servers` + a relative time or a date |
+
+**Never** `%d серверов` as a bare format string. The mechanical check is
+`grep -rn '%[0-9$]*d [а-яё]' res/values*/strings*.xml` returning nothing outside `<plurals>`.
+
 ---
 
 ## 5. Spacing rhythm and grid
 
-### 5.1 The scale, and nothing outside it
+### 5.1 The dp dictionary - one table, and nothing outside it
 
-`4 · 8 · 12 · 16 · 24 · 32`, as `@dimen/space_4` … `@dimen/space_32`. Derived and already
-tokenised: `screen_gutter` 16, `row_min_height` 56, `tile_size` 40, `tile_glyph` 22.
-**6, 10, 13, 14, 18, 20, 26, 27, 34, 42, 45, 60, 68 (as a margin), 76, 88, 140, 200 do not exist.**
+**This is the only list of legal dp values in this document.** T5 does not carry a second one and
+neither does any screen section. A value is legal only if it appears here, and only for the
+**category** it appears under: 40 is a legal component size and an illegal gap; 24 is a legal gap
+and a legal glyph and is not a legal row height. Two numbers being equal does not make them the
+same value.
+
+| dp | Category | Token | What it is for |
+|---|---|---|---|
+| 0 | Spacing | - | No gap. A margin of 0 is written, not omitted |
+| 1 | Stroke | `stroke_hairline` | Every hairline, every card stroke, every field stroke at rest |
+| 2 | Stroke | `stroke_focus` | The focus ring, the avatar badge ring, the scanner bracket |
+| 3 | Stroke | `connect_track` | The connect arc. The one 3dp stroke in the product |
+| 4 | Spacing | `space_4` | Glyph to label, title to subtitle, label to field, chip inner vertical |
+| 4 | Component | `meter_height`, `sheet_handle_height` | The meter bar, the sheet handle |
+| 6 | Component | `dot_size` | A carousel page dot at rest (`00-rules.md` 3.3) |
+| 8 | Spacing | `space_8` | Tightly related siblings, chip inner horizontal, minimum gap between two touch targets |
+| 8 | Component | `dot_size_active`, `status_dot` | The active carousel dot; the connect status dot |
+| 12 | Spacing | `space_12` | Row inner vertical, tile to text, card inner tight |
+| 12 | Radius | `radius_chip`, `radius_tile` | Chips, badges, the 40dp tile, input fields |
+| 16 | Spacing | `space_16`, `screen_gutter` | The screen gutter, card padding, object to object |
+| 16 | Component | `glyph_chip`, `skeleton_bar_sm` | The glyph inside a chip; a skeleton subtitle bar |
+| 20 | Component | `glyph_inline` | Chevrons, state markers, inline status glyphs, button leading icons |
+| 20 | Radius | `radius_card` | Cards, dialogs, the 56dp empty-state tile, the 64dp brand tile |
+| 22 | Component | `tile_glyph` | The glyph inside a 40dp tile. **This size exists nowhere else** |
+| 24 | Spacing | `space_24` | Between sections; what replaces a divider under a section header |
+| 24 | Component | `glyph_toolbar`, `chip_height`, `skeleton_bar_md` | Toolbar and navigation glyphs; chip height; a skeleton title bar |
+| 24 | Radius | `radius_sheet` | Bottom-sheet top corners only |
+| 27 | TV overscan | `tv_overscan_v` | **Television only.** 5 % of a 540dp-tall 10-foot surface. It is a percentage of a screen, not a rhythm value, and it is legal in `values-television/` and nowhere else (22.7) |
+| 28 | Component | `empty_glyph`, `flag_tile` | The empty-state glyph; the flag raster inside a 40dp tile |
+| 32 | Spacing | `space_32` | After a hero; before a bottom CTA bar; the top of a first-run column. **At most twice per screen** |
+| 32 | Component | `sheet_handle_width`, `nav_indicator_height`, `brand_glyph` | The sheet handle; the navigation pill's height; the shield inside a 64dp brand tile |
+| 40 | Component | `tile_size` | The leading icon tile on every tiled row. Also the search field's clear button |
+| 48 | Spacing | `tv_overscan_h` | **Television only.** 5 % of a 960dp-wide 10-foot surface (22.7) |
+| 48 | Component | `touch_min`, `cta_height_secondary` | Minimum touch target; every icon button; secondary and tonal buttons; input fields' inner height in a sheet |
+| 52 | Component | `cta_height` | The primary filled CTA, and the height of a form input field |
+| 56 | Component | `row_min_height`, `toolbar_height`, `empty_tile` | Every row; every toolbar; the empty-state tile; the bottom navigation bar |
+| 64 | Component | `nav_indicator_width`, `brand_tile` | The navigation indicator pill; the sign-in and About brand tile |
+| 64 | Reserved width | `value_w_ping` | The latency column (5.6) |
+| 68 | Origin | `text_origin` | The text origin and hairline inset of a **tiled** group (16 gutter + 40 tile + 12 gap). It is an origin, never a margin, never a size |
+| 80 | Component | `connect_glyph` | The shield inside the connect disc |
+| 80 | Reserved width | `value_w_uptime` | The uptime column (5.6) |
+| 88 | Reserved width | `value_w_money`, `value_w_date` | The money and date columns (5.6) |
+| 88 | Component | `nav_rail_tv` | **Television only.** The 10-foot navigation rail width (22.7) |
+| 96 | Reserved width | `value_w_speed` | The speed columns (5.6) |
+| 100 | Radius | `radius_pill` | Full-round: the primary CTA, the segmented thumb, the connect disc, the nav pill |
+| 176 | Component | `connect_disc` | The connect disc. The one 176 in the product |
+| 208 | Component | `qr_image` | The QR bitmap inside its 240 frame |
+| 240 | Component | `qr_frame`, `scan_frame` | The white QR plate; the scanner's framing bracket |
+| 320 | Layout max | `empty_max_width` | The maximum measure of an empty-state column |
+| 480 | Layout max | `form_max_width` | The maximum measure of a form column (sign-in, editors) |
+| 720 | Layout max | `content_max_width` | The maximum measure of content at `sw600dp` |
+
+**Everything else does not exist**, including every value the current build ships that is not in
+this table: 10, 13, 14, 18, 26, 34, 36, 42, 44, 45, 60, 72, 76, 110, 120, 140, 152, 160, 200, 212,
+230, 336. Section 5.5 is the conversion list for the ones that appear most often.
+
+Three notes an implementer will otherwise ask about:
+
+- **The skeleton bars are 16 and 24**, not 14 and 18. A skeleton is the shape of the result, and the
+  result's subtitle sits on a 13sp line inside a 16dp box while its title sits on a 16sp line inside
+  a 24dp box. Rounding them to the dictionary changed nothing about the silhouette and removed two
+  values that existed only inside skeletons.
+- **36 and 44 are deleted, not tolerated.** Every 36dp icon button becomes 48, every 44dp control
+  becomes 48. They are below the touch minimum, which is why they are on the cleanup list in 5.5 and
+  absent here.
+- **Television is the one qualified exception** and it is qualified in the resource system, not in
+  prose: `tv_overscan_h` / `tv_overscan_v` / `nav_rail_tv` live in `res/values-television/dimens.xml`
+  and are unreachable from a phone build. Overscan is a percentage of a physical panel; it cannot be
+  rounded to a rhythm without clipping a control off the edge of somebody's television.
 
 ### 5.2 The melody
 
@@ -367,26 +562,81 @@ A screen uses four gap values and they are not interchangeable. A screen where e
 | **24** | Sections; the space that replaces a divider under a section header | 1 to 3 |
 | **32** | After a hero; before a bottom CTA bar; the top of a first-run column | **at most twice** |
 
-### 5.3 The grid
+### 5.3 The grid, and the two row species
+
+There are exactly **two** row species in this product, and which one a group uses is **derived, not
+chosen**. This is the single rule that replaces the previous revision's claim that one 68dp origin
+was held identically on every screen - a claim that was false the moment a settings sub-page of
+toggles opened, and false on most screens in the app.
 
 ```
-|<-16->|<-------- 40 -------->|<-12->|<------------ content column ------------>|<-12->|<-tr->|<-16->|
- gutter        icon tile        gap              title / subtitle                 gap  trailing gutter
-       |<---------------- 68dp text origin ---------------->|
-       |<---------------- hairline starts here ------------>|--------------------------------------|
+TILED group - text origin 68
+|<-16->|<-------- 40 -------->|<-12->|<---------- content column ---------->|<-12->|<-tr->|<-16->|
+ gutter        icon tile        gap            title / subtitle              gap  trailing gutter
+       |<-------------- 68dp text origin -------------->|
+       |<-------------- hairline starts here ---------->|------------------------------------|
+
+PLAIN group - text origin 16
+|<-16->|<---------------------- content column ---------------------->|<-12->|<-tr->|<-16->|
+ gutter                    title / subtitle                             gap  trailing gutter
+       |<---- 16dp text origin
+       |<---- hairline starts here -------------------------------------------------------|
 ```
 
-- **Text origin: 68dp** on every screen that uses tiled rows, without exception. Every title on
-  every screen starts at the same x. Every hairline starts at the same x. Add
-  `<dimen name="text_origin">68dp</dimen>`.
-- **Rows without a leading tile** (form fields, dense value rows inside a sub-page) start at 16dp
-  and their hairlines start at 16dp. A screen picks one origin and holds it; it never mixes 16 and
-  68 in one list.
-- **Trailing column** is right-aligned at the gutter. Its content is one of: a 20dp chevron, a
-  `MaterialSwitch`, a value in `Subtitle`, a 48dp icon button, or a 20dp state marker. See 8.2 for
+**The derivation rule, mechanical and with no judgement in it.**
+
+> A group is **tiled** if, and only if, its rows carry a leading glyph that **differs between
+> rows** - a flag, a platform glyph, an app icon, a per-row settings glyph - or carries one of the
+> two category tiles (accent, destructive). If every row of a group would carry the **same** neutral
+> glyph, or no glyph at all, the group is **plain** and no tile is drawn.
+
+That rule does two jobs at once. It resolves the origin of every group in this document without
+anyone deciding anything, and it deletes the uniform-tile wall - N identical 40dp tiles down the
+left edge of a list - which is the single most recognisable generated-settings tell in the category
+and which both reference apps ship. A tile that is the same on every row of a group carries zero
+bits and costs 52dp of every row's width.
+
+**The scope of an origin is a group, not a screen.** A group is a section header plus its rows plus
+their hairlines. Within a group the origin is invariant and every hairline starts at it. A screen
+may hold a tiled group and a plain group - Прокси по приложениям holds a plain control group above a
+tiled app list - because the 24dp gap plus a section header between them is a full visual reset, and
+because the alternative is inventing a tile for a switch or dropping the flag from a server row.
+**What is forbidden is mixing the two inside one group**, which is what produces a ragged left edge.
+
+**The screen-to-screen transition, stated so it cannot break.** Настройки (tiled hub, origin 68)
+pushes into Режим подключения (plain page, origin 16) on the most-travelled route in the product.
+The rule that keeps that from reading as a 52dp jolt: **a sub-page never opens with a row.** Its
+first element after the toolbar is always a section header, a segmented control, or a lead
+paragraph, all of which sit at the 16dp gutter on both surfaces. The eye therefore lands on a new
+kind of object, not on the same object shifted. Combined with the 300ms 16dp translationX push
+(7.3), the transition reads as arrival rather than displacement. Every page in section 20 obeys
+this, and it is a review item in 26's per-wave checks.
+
+**Section headers always start at the 16dp gutter**, on both species. A header is a label for a
+group, not a member of it, so it does not adopt the group's origin.
+
+- **Trailing column** is right-aligned at the gutter. Its content is exactly one of: a 20dp chevron,
+  a `MaterialSwitch`, a value in `Subtitle`, a 48dp icon button, or a 20dp state marker. See 8.1 for
   the one sanctioned pairing (value + state marker).
-- **Vertical row padding is 8dp**, which with a 40dp tile produces exactly `row_min_height` 56dp.
-  A two-line subtitle grows the row; it never clips.
+- **Vertical row padding is 8dp**, which with a 40dp tile produces exactly `row_min_height` 56dp on
+  a tiled row. A plain row uses 12dp padding on a 16sp title plus a 13sp subtitle to reach the same
+  56dp, so the two species have **identical row heights** and a list of one never looks denser than
+  a list of the other.
+- A two-line subtitle grows the row; it never clips.
+
+**Which species every group in this document is**, resolved by the rule above so no implementer has
+to apply it himself:
+
+| Tiled (origin 68) | Plain (origin 16) |
+|---|---|
+| Настройки hub - 16 distinct glyphs (6.4) | Every settings sub-page's own controls: 20.1, 20.4, 20.5, 20.6, 20.7, 20.11, 20.12, 20.13, 20.15 |
+| Аккаунт «Управление» - 5 distinct glyphs | Купить - tariff rows and period rows both (the glyph would repeat) |
+| Серверы list - flags differ | История платежей - `ic_acc_history` would repeat on every row |
+| Устройства - platform glyphs differ | Провайдеры - `ic_subscriptions_24dp` would repeat |
+| Прокси по приложениям, the app list - icons differ | Маршрутизация, the rule list - `ic_routing_24dp` would repeat |
+| О приложении - 7 distinct glyphs | Что настроил провайдер, Журнал, Схемы URL |
+| `ServerActionsSheet`, the add-source sheet, the payment-method sheet - glyphs differ | The import-confirmation sheet's `Row.Fact` rows, the top-up sheet |
+| Home's server row (a one-row group carrying a flag) | The server editor's fields; the proxy-chain member list (21.C) |
 
 ### 5.4 The screen frame
 
@@ -413,6 +663,59 @@ A screen uses four gap values and they are not interchangeable. A screen where e
 | 3dp nav margins, 34x3dp dot | `activity_main.xml:560,570-572` | 8dp margins, 64x32dp indicator pill |
 | 13dp padding to fake a 22dp glyph | `layout_subscription_meta_bar.xml` | file deleted |
 | 12dp gutter, 14dp padding, 10dp vertical, 60dp rows | `activity_local_proxy.xml`, `activity_provider_settings.xml`, `activity_url_scheme_list.xml`, `activity_backup.xml`, `activity_bypass_list.xml`, `activity_routing_setting.xml`, `activity_user_asset.xml` | 16 / 16 / 8 / 56 via the shared row include |
+| 18dp radius on a list item | `item_recycler_bypass_list.xml` (the only 18 in the app) | radius is a group property, not an item property: the item loses its own background and joins a divided list |
+| 6dp vertical item margin, 12dp horizontal | `item_recycler_user_asset.xml`, `item_payment.xml`, `item_device.xml` | 0. A divided list has no per-item margin (8.3) |
+| 45dp widget glyph, 110dp implicit widget width | `widget_switch.xml`, `res/xml/app_widget_provider.xml` | 40dp tile, declared size classes (22.3) |
+| 320dp `fitXY` QR, 336dp QR dialog | `activity_tv_receive.xml`, `item_qrcode.xml` | 240 frame / 208 image, `fitCenter` (13.3) |
+| `Spinner` at platform metrics ×6 | `activity_server_group.xml`, `dialog_config_filter.xml`, `activity_routing_edit.xml` | `FormSelect` (21.A). The `Spinner` leaves the product |
+
+### 5.6 Measurement law: what shrinks, and what never does
+
+A layout that only works at 411dp is not a layout. **The narrowest supported width is 320dp**, and
+every horizontal composition in this document resolves at it by the following rule, which is stated
+once here and referenced rather than re-argued per screen.
+
+> **In any row, the fixed elements measure first and never shrink; exactly one element carries
+> `layout_weight="1"` and absorbs the remainder; and that element declares `maxLines` and
+> `ellipsize="end"`.** A row with two weighted children, or with none, is a defect.
+
+| Element | Measures | Shrinks? | At 320dp |
+|---|---|---|---|
+| Leading tile | 40dp fixed | never | 40 |
+| Tile-to-text gap | 12dp | never | 12 |
+| Title / primary text | weight 1 | **yes, it is the only thing that does** | whatever is left, minimum 0, ellipsised |
+| Chip (protocol, status) | `wrap_content` | never. A chip that ellipsises its own label is worse than a missing chip | its natural width |
+| Trailing value (ping, price, date) | `minWidth` = the widest formatted value at tabular advances | never | reserved |
+| Trailing state marker | 20dp | never | 20 |
+| Trailing icon button | 48dp | never | 48 |
+| Trailing switch | Material default (~52dp) | never | ~52 |
+
+**The three collisions this resolves, each of which the previous revision left open:**
+
+1. **The subscription card's title and state chip** (11.6). The chip's longest label is «Пробный
+   период» - 15 characters at 11sp with +0.04em tracking, plus a 16dp glyph, plus 8dp padding each
+   side, which measures ~112dp. On a 320dp screen behind a 16dp gutter and 16dp card padding, that
+   leaves 144dp for a name the user typed. **Resolution: they are not on the same line.** Card row 1
+   is the chip alone; card row 2 is the title. The chip is the state, the state is what changed, and
+   putting it first is the correct reading order for the object anyway (11.6).
+2. **The device row's «Это устройство» badge** (17.3). Chip 95dp + unlink button 48dp + tile 40 +
+   gaps leaves 77dp for a device model. **Resolution: there is no chip.** The current device sorts
+   first and its subtitle reads «Это устройство · Android», which is one line of text in a slot that
+   already exists and which reads better besides.
+3. **The server row's protocol chip and transport line** (12.4). Both sit on the subtitle line. The
+   chip measures first at ~56dp for «VLESS»; the transport text takes the remainder with
+   `layout_weight="1"`, `minWidth="0"` and `ellipsize="end"`, giving ~68dp at 320dp - about
+   «Reality…». That is acceptable because the chip already carries the protocol and the transport is
+   supporting detail. **Below 6 rendered characters the transport text is set `gone`** rather than
+   shown as three characters and an ellipsis; that is one measured check in the binder, not a
+   judgement call.
+
+**Reserved numeric widths** are computed once, from the tabular 620/1000 advance, and written into
+`dimens.xml` as real values rather than measured at runtime: ping `value_w_ping` 64dp
+(«нет ответа» is longer and is allowed to be the one value that wraps the row), money
+`value_w_money` 88dp (fits `100 000 ₽`), speed `value_w_speed` 96dp (fits `100,0 Мбит/с`), uptime
+`value_w_uptime` 80dp (fits `999:59:59`), date `value_w_date` 88dp (fits `12.08.2026`). These are
+the widths that make Moment 2 true; a column that re-measures per frame is a column that moves.
 
 ---
 
@@ -462,6 +765,13 @@ Draw these to the family rules before screen work begins. All 24dp viewport, 2dp
 | `ic_device_android.xml`, `ic_device_apple.xml`, `ic_device_windows.xml`, `ic_device_router.xml`, `ic_device_unknown.xml` | Devices list, one glyph per platform (desktop already resolves these) |
 | `ic_eye.xml`, `ic_eye_off.xml` | Password fields (rename the existing `ic_lp_eye*` and use everywhere) |
 | `ic_chevron_down.xml` | Expandable rows (rotates 0 to 90 for the inline-expand affordance) |
+| `ic_database.xml` | Файлы ресурсов (20.15), the geoip / geosite rows |
+| `ic_drag_handle.xml` | The proxy-chain member row's reorder grip (21.C) |
+| `ic_code.xml` | The custom-config editor (21.B), and the «JSON» server row |
+| `ic_layers.xml` | A policy group in the server list (21.D) |
+| `ic_chain.xml` | A proxy chain in the server list (21.C) |
+| `ic_restore.xml` | «Восстановить из копии» in the add-source sheet (14.3) |
+| `ic_arrow_up.xml`, `ic_arrow_down.xml` | Proxy-chain reorder, keyboard and TalkBack equivalents of the drag (21.C) |
 
 ### 6.3 The unified server icon (owner request 0.4.7)
 
@@ -485,9 +795,13 @@ row, the action sheet header, the notification, the TV screen, the widget.**
 - The selected server on Home, in the notification and on the widget uses the **same 40dp tile**.
   No screen invents its own server visual.
 
-### 6.4 Glyph-to-row assignment for the settings tree
+### 6.4 Glyph-to-row assignment for the two tiled hubs
 
-Every settings row's glyph is fixed here so no implementer picks one. All neutral tiles.
+Every glyph on a tiled row is fixed here so no implementer picks one. All neutral tiles unless
+marked. **Rows on plain groups have no glyph at all** (5.3), which is why this table covers the two
+hubs and Аккаунт rather than every row in the product.
+
+Настройки (19.3):
 
 | Row | Glyph |
 |---|---|
@@ -495,9 +809,10 @@ Every settings row's glyph is fixed here so no implementer picks one. All neutra
 | Прокси по приложениям | `ic_per_apps_24dp` |
 | Маршрутизация | `ic_routing_24dp` |
 | DNS | `ic_globe_24dp` |
-| Локальный прокси | `ic_hub_local_proxy` |
+| Файлы ресурсов | `ic_database` (new) |
 | Обход блокировок | `ic_lock_24dp` |
 | Проверка серверов | `ic_ping_24dp` |
+| Локальный прокси | `ic_hub_local_proxy` |
 | Провайдеры | `ic_subscriptions_24dp` |
 | Что настроил провайдер | `ic_ps_fingerprint` |
 | Перенести подписку | `ic_tv_24dp` |
@@ -506,11 +821,27 @@ Every settings row's glyph is fixed here so no implementer picks one. All neutra
 | Запуск при загрузке | `ic_qu_start_24dp` |
 | Резервное копирование | `ic_backup_24dp` |
 | О приложении | `ic_about_24dp` |
-| Купить подписку | `ic_acc_upgrade` (accent tile: this is Account's primary action row) |
+
+Аккаунт «Управление» (15.3), and О приложении (20.14):
+
+| Row | Glyph |
+|---|---|
+| Купить подписку | `ic_acc_upgrade` (**accent tile**: this is Аккаунт's one primary-action row) |
 | Устройства | `ic_acc_devices` |
 | История платежей | `ic_acc_history` |
 | Привязать Telegram | `ic_link` |
-| Выйти | `ic_logout` |
+| Пригласить друга | `ic_acc_gift` |
+| Телеграм-канал | `ic_telegram_24dp` |
+| Написать в поддержку | `ic_support_24dp` |
+| Политика конфиденциальности | `ic_privacy_24dp` |
+| Открытые лицензии | `ic_description_24dp` |
+| Журнал | `ic_logcat_24dp` |
+| Схемы URL | `ic_hub_url_scheme` |
+| Исходный код | `ic_source_code_24dp` |
+
+Server-list rows that are not endpoints (21.C, 21.D) carry a distinct glyph in place of the flag
+tile, which is what makes the Серверы list a tiled group even for them: `ic_chain` for a proxy
+chain, `ic_layers` for a policy group, `ic_code` for a custom JSON config.
 
 ---
 
@@ -522,26 +853,43 @@ Every settings row's glyph is fixed here so no implementer picks one. All neutra
 
 | Token | ms | Interpolator | Applies to |
 |---|---|---|---|
-| `motion_press_in` | 90 | `@interpolator/ease_out_quart` | Finger down: scale to 0.97 |
+| `motion_press_in` | 90 | `@interpolator/ease_out_quart` | Finger down: scale to 0.97 (0.94 on the connect disc, 7.2) |
 | `motion_press_out` | 160 | `@interpolator/ease_out_quint` | Release: scale back to 1.0 |
-| `motion_state` | 220 | `@interpolator/ease_standard` | Tint crossfade, selection, enable/disable, tab crossfade, toolbar hairline |
-| `motion_reveal` | 300 | `@interpolator/ease_out_quint` | Sheets, sub-page entrance, expand, first appearance of a block |
-| `motion_exit` (new, 225) | 225 | `@interpolator/ease_standard` | Sub-page exit, sheet dismiss. 75% of reveal |
-| `motion_stagger` | 40 | n/a | Per-item list delay, total capped at 400ms |
+| `motion_state` | 220 | `@interpolator/ease_standard` | Tint crossfade, selection, enable/disable, tab crossfade, toolbar hairline, skeleton to content, ledger to live strip |
+| `motion_exit_state` (new, 165) | 165 | `@interpolator/ease_standard` | The reverse of any `motion_state` change. 75 % of 220 |
+| `motion_reveal` | 300 | `@interpolator/ease_out_quint` | Sheets, sub-page entrance, inline expand, first appearance of a block |
+| `motion_exit_reveal` (new, 225) | 225 | `@interpolator/ease_standard` | The reverse of any `motion_reveal`. 75 % of 300. **Sub-page exit and sheet dismiss are this, not 150** |
 | `motion_emphasis` | 600 | `@interpolator/ease_out_quint` | Signature moment 1 only |
 | `motion_handoff` (new, 450) | 450 | `@interpolator/ease_out_expo` (new file) | Sign-in to Home, once per session |
+| `motion_indeterminate` (new, 1200) | 1200 | `linear` | One rotation of the connect arc. **The only linear curve in the product**, because a genuine indeterminate indicator must not appear to accelerate |
 
-**Exit is 75% of enter.** State reverse = 165ms. Reveal reverse = 225ms.
-**Ease-out only.** No bounce, no elastic, no spring, no linear, no `AccelerateDecelerate`.
-The existing 900ms `AccelerateDecelerateInterpolator` skeleton pulse in `AccountFragment.kt:413-430`
-is off-token and is deleted (see 8.9).
+**There is no single "exit" duration, and pretending there is one is what let the two platforms
+drift.** Exit is always **75 % of the enter it reverses**, which yields exactly two tokens: 165 for a
+state change and 225 for a reveal. `motion_exit` as a single 225 token is deleted and replaced by
+the pair; the desktop's competing `Dur.Exit` 150 is deleted in the same reconciliation (25.3).
+
+**`motion_stagger` is deleted.** A 40ms per-item cascade on a list load is the single most
+recognisable generated-UI signature in existence, it delays the last visible row by up to 400ms for
+no information gain, and it contradicts 7.4's own rule that a screen appears rather than performs. A
+list arrives the way every other block in this product arrives: the skeleton crossfades to the
+content over `motion_state` 220ms, as one object. Recorded as D-A20.
+
+**Ease-out only**, with the one documented linear exception above. No bounce, no elastic, no spring,
+no `AccelerateDecelerate`. The existing 900ms `AccelerateDecelerateInterpolator` skeleton pulse in
+`AccountFragment.startSkeletonPulse()` is off-token and is deleted (see 8.9).
 
 ### 7.2 Press physics, unified
 
-**One press language: scale 0.97, 90ms in `ease_out_quart`, 160ms out `ease_out_quint`.**
+**One press language: scale 0.97, 90ms in `ease_out_quart`, 160ms out `ease_out_quint`, with
+exactly one documented exception.**
 
 - `res/anim/press_scale.xml` changes from 0.96 to **0.97** and is applied via
   `android:stateListAnimator` to every clickable row, card, chip, tile and button in the app.
+- **The exception: `res/anim/press_scale_hero.xml` at 0.94, used by the connect disc and by nothing
+  else.** 0.97 of a 176dp object is a 5dp travel that is below the perceptual floor at arm's length;
+  0.94 is 11dp and reads. The file carries a comment saying so, and the desktop carries the same
+  exception for the same object at the same value (25.3). One exception, named, on one object, is a
+  system; an undocumented per-object value is the seven-press-scale mess both clients ship today.
 - `res/anim/nav_press.xml` (0.92 at 100/120ms) is **deleted**; the bottom navigation uses
   `press_scale` like everything else, with `android:background="@null"` so there is no ripple
   (owner request 0.4.8).
@@ -553,25 +901,24 @@ is off-token and is deleted (see 8.9).
 
 | Event | What moves | Duration | Curve | Notes |
 |---|---|---|---|---|
-| Tap anything | scale 1.0 to 0.97 | 90 | quart | Visible acknowledgement inside 100ms is a hard requirement |
-| Release | scale 0.97 to 1.0 | 160 | quint | |
+| Tap anything | scale 1.0 to 0.97 (connect disc: 0.94) | 90 | quart | Visible acknowledgement inside 100ms is a hard requirement |
+| Release | scale back to 1.0 | 160 | quint | |
 | Tab switch | outgoing alpha 1 to 0 **and simultaneously** incoming alpha 0 to 1 + translationY 8dp to 0 | 220 | standard (out), quint (in) | Simultaneous, not sequential. Plus `tickHaptic()`. The current 150+200 sequence is replaced |
 | Bottom-nav indicator | pill translationX to the new item | 220 | quint | The pill moves; it does not fade and re-appear |
 | Sub-page enter | translationX 16dp to 0 + alpha 0 to 1 | 300 | quint | `res/anim/subpage_enter.xml` |
-| Sub-page exit | translationX 0 to 16dp + alpha 1 to 0 | 225 | standard | `res/anim/subpage_exit.xml` |
+| Sub-page exit | translationX 0 to 16dp + alpha 1 to 0 | 225 | standard | `res/anim/subpage_exit.xml` (`motion_exit_reveal`) |
 | Bottom sheet enter | standard Material sheet slide | 300 | quint | Scrim fades 0 to 60% over the same 300 |
 | Bottom sheet exit | slide down | 225 | standard | |
-| Toolbar hairline | alpha 0 to 1 | 220 | standard | On `scrollY > 0`; reverse at 0 |
+| Toolbar hairline | alpha 0 to 1 | 220 | standard | On `scrollY > 0`; reverse at 165 (`motion_exit_state`) |
 | Row selection | background crossfade to P3 + state glyph alpha 0 to 1 | 220 | standard | |
 | Switch toggle | Material's own switch animation, untouched | - | - | |
 | Segmented change | thumb translationX + label weight step | 220 | quint | |
-| Expand-in-place row | chevron rotation 0 to 90 + content height reveal | 220 / 300 | standard / quint | The only sanctioned height animation in the app |
-| Skeleton to content | crossfade | 220 | standard | |
-| List first load | per-item alpha 0 to 1 + translationY 8dp to 0 | 220, staggered 40 | quint | Cap total stagger at 400ms, so items 11+ arrive together. Fresh loads only, never on scroll |
-| Connect: idle to connecting | arc appears, indeterminate sweep starts | 220 | standard | The sweep runs **only** while the core is negotiating |
+| Expand-in-place row | chevron rotation 0 to 90 + content height reveal | 220 / 300 | standard / quint | The only sanctioned height animation in the app. Collapse is 220 / 225 |
+| Skeleton to content | crossfade of the whole block, as one object | 220 | standard | **This is what a list load looks like.** There is no per-item entrance and no stagger |
+| Connect: idle to connecting | the disc's 1dp outline crossfades to the 3dp accent arc, which then sweeps | 220 then continuous | standard then **linear** | The sweep is one rotation per `motion_indeterminate` 1200ms and runs **only** while the core is negotiating. A 200ms `ease_out_quint` wind-up takes the sweep from 0 to 90 degrees so it starts decisively |
 | Connect: connecting to connected | signature moment 1 | 600 | quint | Section 1.2 |
-| Connect: any to disconnected | shield crossfades to outline, arc removed | 220 | standard | No motion beyond the crossfade |
-| Balance change | count-up from previous to new figure, reformatted per frame | 300 | quart | Only when the value changes while visible. First paint is instant |
+| Connect: connected to live figures | the last-session ledger crossfades to the live strip **in place** | 220 | standard | Signature moment 2. Nothing translates, because both sets sit on the reserved widths of 5.6 |
+| Connect: any to disconnected | shield crossfades to outline, arc removed, live strip crossfades back to the ledger | 220 | standard | No motion beyond the crossfades. Emits no ring |
 | Status strip enter | translationY 8dp to 0 + alpha | 300 | quint | Exit 225 |
 | Sign-in to Home | signature hand-off | 450 | **ease_out_expo** | Once per session, the only 450ms in the app |
 | Screen rotation, theme change, font-scale change | nothing | 0 | - | State is restored, not animated |
@@ -585,31 +932,45 @@ is off-token and is deleted (see 8.9).
 - Skeletons. **They are static** (decision D-A5): a placeholder that pulses is a decoration that
   outlives its own purpose, and there is no token for 900ms.
 - Any icon at rest. No idle spin, no breathe, no bob.
-- The connect disc at idle. `bg_connect_glow`'s 850ms infinite-reverse breathe
-  (`MainActivity.kt:1741`) is deleted with the drawable.
+- The connect disc at idle. `bg_connect_glow`'s 850ms infinite-reverse breathe (the
+  `ValueAnimator` with `duration = 850` and `repeatMode = REVERSE` in `MainActivity`; find it with
+  `grep -n 'duration = 850' MainActivity.kt`) is deleted with the drawable.
 - The sonar at idle. One ring, once, at confirmation, and never otherwise.
-- Section entrances. A screen appears; it does not perform. Stagger applies to a list of siblings,
-  never to a screen's sections.
-- Numbers, other than the one sanctioned balance count-up. A ping result lands; it does not tick up.
-- Chips, badges, meters on first paint. A traffic meter animates only when the value changes while
-  the screen is visible, over `motion_state` 220.
+- **Any status dot, anywhere.** No opacity pulse while connecting, on the connect status dot, on a
+  navigation dot or on a tray dot. The arc is the indeterminate indicator; a pulsing dot beside it
+  is a second one saying the same thing. The desktop's 1.2s rail-dot pulse is deleted in the same
+  reconciliation (25.3).
+- Section entrances, and list entrances. A screen appears; it does not perform. There is no
+  per-item stagger anywhere in the product (D-A20).
+- **Numbers. Any number, in any role, including the balance.** A figure is replaced, not counted up
+  to. A ping result lands; it does not tick. This is the same defect as an animated placeholder
+  (D-A5) at higher contrast: the largest, most legible type in the app spending 300ms telling the
+  user something he already knew when the first digit rendered, on a screen whose entire thesis is
+  that quantities hold still. Recorded as D-A19; it supersedes the previous revision's count-up
+  carve-out, which contradicted the paragraph it sat under.
+- Chips, badges, meters on first paint. A traffic meter animates its **fill width** only when the
+  value changes while the screen is visible, over `motion_state` 220; its label does not animate.
 - Scroll-linked anything. No parallax, no collapsing hero, no scroll-driven alpha except the
   toolbar hairline.
 
 ### 7.5 Reduced motion is a contract
 
 `util/MotionUtils.animationsEnabled(context)` / `View.reducedMotion()` already exists and already
-guards the hero assemble, the connect confirm, the tab fade-through, the list stagger, the balance
-count-up and the skeleton pulse. **Every new animator checks it and jumps to the end state.**
-Declarative `stateListAnimator` collapses automatically at animator scale 0. An animation added
-without the check is a P1 accessibility defect.
+guards the hero assemble, the connect confirm and the tab fade-through. **Every new animator checks
+it and jumps to the end state.** Declarative `stateListAnimator` collapses automatically at animator
+scale 0. An animation added without the check is a P1 accessibility defect.
 
 Under reduced motion:
 - Signature moment 1 becomes an instant shield fill plus the haptic. No ring.
-- Signature moment 2 becomes an instant appearance of the numeric strip.
+- Signature moment 2 becomes an instant swap from the ledger to the live strip.
 - Tab switch, sub-page transitions and sheet transitions become instant.
-- The list stagger becomes a single instant appearance.
-- The balance count-up lands on the final figure.
+- Skeleton to content becomes an instant swap.
+- The connect arc becomes a **static** 90-degree accent segment on the disc rim: still an honest
+  "something is happening" signal, with no rotation.
+- The inline expand becomes an instant height change with no chevron rotation.
+
+Three of the guards the previous revision listed - the list stagger, the balance count-up and the
+skeleton pulse - no longer need one, because none of those animations exists any more.
 
 ### 7.6 Haptics
 
@@ -621,7 +982,8 @@ Under reduced motion:
 
 ## 8. The component atlas
 
-Fourteen components. Every screen in this document is assembled from them. **Anything a screen
+**Seventeen components**, 8.1 through 8.17, one per numbered subsection so the count and the
+numbering cannot disagree. Every screen in this document is assembled from them. **Anything a screen
 needs that is not here is a new component and gets added here first, with a spec, before it is
 drawn in a layout.** The current build's central failure is that no component library exists, so 23
 settings rows, 7 local-proxy rows, 9 provider rows, 4 backup rows and 6 sheet rows are six
@@ -632,9 +994,12 @@ hand-copies of the same object that drifted 2 to 4dp apart.
 Added to `res/values/dimens.xml` and `res/values/colors.xml` **before** any screen work, each with
 a comment stating its purpose and, for colours, its measured contrast ratio.
 
+Every value below is in the dp dictionary (5.1). Nothing here introduces a number that table does
+not carry.
+
 ```xml
-<!-- dimens.xml additions -->
-<dimen name="text_origin">68dp</dimen>        <!-- gutter 16 + tile 40 + gap 12; every hairline and every title -->
+<!-- res/values/dimens.xml : additions -->
+<dimen name="text_origin">68dp</dimen>        <!-- gutter 16 + tile 40 + gap 12; the tiled-group origin -->
 <dimen name="cta_height">52dp</dimen>         <!-- primary filled button; mirrors desktop Size.CtaTall -->
 <dimen name="cta_height_secondary">48dp</dimen>
 <dimen name="touch_min">48dp</dimen>          <!-- Material minimum; replaces view_height_dp48 in new code -->
@@ -649,36 +1014,105 @@ a comment stating its purpose and, for colours, its measured contrast ratio.
 <dimen name="connect_disc">176dp</dimen>
 <dimen name="connect_glyph">80dp</dimen>
 <dimen name="connect_track">3dp</dimen>
+<dimen name="status_dot">8dp</dimen>
+<dimen name="dot_size">6dp</dimen>            <!-- carousel page dot, rest -->
+<dimen name="dot_size_active">8dp</dimen>
 <dimen name="empty_tile">56dp</dimen>
 <dimen name="empty_glyph">28dp</dimen>
+<dimen name="brand_tile">64dp</dimen>         <!-- sign-in, About -->
+<dimen name="brand_glyph">32dp</dimen>
 <dimen name="sheet_handle_width">32dp</dimen>
 <dimen name="sheet_handle_height">4dp</dimen>
-<dimen name="skeleton_bar_sm">14dp</dimen>
-<dimen name="skeleton_bar_md">18dp</dimen>
+<dimen name="skeleton_bar_sm">16dp</dimen>    <!-- a 13sp subtitle's box -->
+<dimen name="skeleton_bar_md">24dp</dimen>    <!-- a 16sp title's box -->
 <dimen name="nav_indicator_width">64dp</dimen>
 <dimen name="nav_indicator_height">32dp</dimen>
 <dimen name="flag_tile">28dp</dimen>
+<dimen name="qr_frame">240dp</dimen>
+<dimen name="qr_image">208dp</dimen>
+<dimen name="scan_frame">240dp</dimen>
+<!-- reserved numeric columns, from the 620/1000 tabular advance (5.6) -->
+<dimen name="value_w_ping">64dp</dimen>
+<dimen name="value_w_uptime">80dp</dimen>
+<dimen name="value_w_money">88dp</dimen>
+<dimen name="value_w_date">88dp</dimen>
+<dimen name="value_w_speed">96dp</dimen>
+<!-- layout maxima -->
+<dimen name="empty_max_width">320dp</dimen>
+<dimen name="form_max_width">480dp</dimen>
 <dimen name="content_max_width">720dp</dimen>  <!-- values-sw600dp only -->
 ```
 
 ```xml
-<!-- colors.xml / values-night/colors.xml additions -->
-<!-- Warning. Amber is a status colour only: expiring, pending, meter over 90%. Never a button. -->
-<color name="warning">#EAB308</color>          <!-- night: 9.6:1 on #141619 -->
-<color name="warning">#A16207</color>          <!-- day:   4.9:1 on #FFFFFF -->
-<!-- Chip fills: 12% of the status hue over the surface. Text uses the full hue. -->
-<color name="chip_bg_success">#1F22C55E</color> <!-- green text on it: 6.6:1 -->
-<color name="chip_bg_warning">#1FEAB308</color> <!-- amber text on it: 7.5:1 -->
-<color name="chip_bg_error">#1FF04452</color>   <!-- #FF6069 on it:    5.5:1 -->
+<!-- res/values-television/dimens.xml : the one qualified exception (22.7) -->
+<dimen name="tv_overscan_h">48dp</dimen>      <!-- 5 % of a 960dp-wide 10-foot surface -->
+<dimen name="tv_overscan_v">27dp</dimen>      <!-- 5 % of a 540dp-tall  10-foot surface -->
+<dimen name="nav_rail_tv">88dp</dimen>
+```
+
+**Colours. Two files, both complete, no key declared twice.** The previous revision printed
+`<color name="warning">` twice inside one block with the theme named only in a trailing comment,
+which does not compile, and printed the chip fills once with no theme at all. Every key below exists
+in **both** files with its own value, and every stated ratio names the plane the text actually sits
+on.
+
+```xml
+<!-- res/values/colors.xml  (LIGHT) : additions -->
+<!-- Amber is a status colour only: expiring, pending, meter at or above 90 %. Never a button. -->
+<color name="warning">#7C4A03</color>            <!-- 7.4:1 on #FFFFFF (P1), 6.6:1 on #F4F7FC (P0) -->
+<!-- Status chip fills: 12 % of the status text hue over the plane. -->
+<color name="chip_bg_success">#E1EDE8</color>    <!-- flattened, not alpha: a chip may sit on P1 or P3 -->
+<color name="chip_bg_warning">#EFE9E0</color>
+<color name="chip_bg_error">#F8E5E6</color>
+<!-- Status chip text. -->
+<color name="chip_text_success">#0A6B3F</color>  <!-- 5.5:1 on chip_bg_success -->
+<color name="chip_text_warning">#7C4A03</color>  <!-- 6.1:1 on chip_bg_warning -->
+<color name="chip_text_error">#C42B32</color>    <!-- 4.6:1 on chip_bg_error -->
+<!-- The destructive tile fill, light. 20 % of the light error hue. -->
+<color name="icon_tile_red">#33C42B32</color>    <!-- glyph ?attr/colorError #BA1A1A on it: 5.1:1 -->
+<!-- icon_tile_neutral #E3EAF4 and icon_glyph_neutral #54607A already exist here (5.6:1) -->
+```
+
+```xml
+<!-- res/values-night/colors.xml  (DARK) : additions and one correction -->
+<color name="warning">#EAB308</color>            <!-- 9.5:1 on #141619 (P1), 10.3:1 on #0A0B0D (P0) -->
+<color name="chip_bg_success">#162B21</color>    <!-- flattened 12 % of #22C55E over #141619 -->
+<color name="chip_bg_warning">#2E2917</color>
+<color name="chip_bg_error">#2F1C20</color>
+<color name="chip_text_success">#22C55E</color>  <!-- 6.6:1 on chip_bg_success -->
+<color name="chip_text_warning">#EAB308</color>  <!-- 7.6:1 on chip_bg_warning -->
+<color name="chip_text_error">#FF6069</color>    <!-- 5.4:1 on chip_bg_error -->
+<!-- CORRECTION: ping_bad currently ships as #F04452 here, which measures 4.88:1 as text on P0.
+     00-rules.md 18 (2026-07-26) sets error TEXT on dark to #FF6069. Change it in wave 1. -->
+<color name="ping_bad">#FF6069</color>           <!-- 6.7:1 on #0A0B0D, 5.9:1 on #141619 -->
+<!-- icon_tile_red #33F04452 already exists in values/ and is correct for dark; the light
+     override above is what was missing. icon_tile_neutral #20242B / icon_glyph_neutral #9BA1AD
+     already exist here (5.3:1). -->
+```
+
+**The chip fills are flattened hex, not `#1F`-prefixed alpha, deliberately.** A 12 % alpha over an
+unknown plane is a different colour on P0, P1 and P3, and status chips appear on all three (Home's
+card is P1, Серверы' rows are P0, a sheet row is P1). Flattening against the plane each chip
+actually sits on - P1 in both themes, which is where every status chip in this document lives -
+makes the measured ratio true rather than approximately true.
+
+**New theme attributes**, declared in `res/values/attrs.xml` and mapped in all three themes
+(`Theme.Departament`, its `-night` variant, and `ThemeOverlay.Mono`), so the neutral tile survives
+the mono overlay without a raw colour in a layout (2.2.6):
+
+```xml
+<attr name="iconTileNeutral"  format="color"/>   <!-- day #E3EAF4  night #20242B  mono #1E1E20 -->
+<attr name="iconGlyphNeutral" format="color"/>   <!-- day #54607A  night #9BA1AD  mono #A0A0A6 -->
+<attr name="iconTileRed"      format="color"/>   <!-- day #33C42B32 night #33F04452 mono #33FFFFFF -->
 ```
 
 Deleted in the same change: `bg_home_gradient.xml` (+night, +mono), `bg_connect_glow.xml` (+mono),
-`bg_bottom_nav_scrim.xml`, `bg_nav_header.xml`, `nav_header_bg.png`, `bg_traffic_gradient.xml`,
-`bg_settings_glass.xml`, `bg_icon_green/orange/purple/yellow.xml`, `bg_chip_gold.xml`,
-`bg_speed_chip.xml`, `bg_acc_option.xml`, `ripple_card.xml`, `ic_circle.xml`,
+`bg_connect_ring.xml` (+mono), `bg_bottom_nav_scrim.xml`, `bg_nav_header.xml`, `nav_header_bg.png`,
+`bg_traffic_gradient.xml`, `bg_settings_glass.xml`, `bg_icon_green/orange/purple/yellow.xml`,
+`bg_chip_gold.xml`, `bg_speed_chip.xml`, `bg_acc_option.xml`, `ripple_card.xml`, `ic_circle.xml`,
 `res/font/montserrat_thin.ttf`, `res/menu/menu_bottom_nav.xml`,
 `res/color/bottom_nav_item_color.xml`, `style/TabLayoutTextStyle`, `style/BrandedSwitch`,
-`item_recycler_footer.xml`.
+`style/BottomNavLabel`, `item_recycler_footer.xml`, and `res/anim/nav_press.xml`.
 
 ---
 
@@ -692,23 +1126,33 @@ and unused by any layout today) and replacing 60+ hand-inlined copies.
 LinearLayout (horizontal, gravity center_vertical)
     minHeight            @dimen/row_min_height        56dp
     paddingStart/End     @dimen/screen_gutter         16dp
-    paddingTop/Bottom    @dimen/space_8               8dp
+    paddingTop/Bottom    @dimen/space_8               8dp   (tiled)  |  @dimen/space_12 (plain)
     background           ?attr/selectableItemBackground
     stateListAnimator    @anim/press_scale
     focusable            true
-├── FrameLayout  id=tile        40x40  (@dimen/tile_size)
-│      background @drawable/bg_icon_neutral   (radius 12, #20242B)
-│      └── ImageView  22x22 (@dimen/tile_glyph), tint @color/icon_glyph_neutral, gravity center
-├── Space  12dp   (@dimen/space_12)
+├── FrameLayout  id=tile        40x40  (@dimen/tile_size)     <- TILED groups only (5.3);
+│      background @drawable/bg_icon_neutral                       visibility=gone on a plain group,
+│      background tint ?attr/iconTileNeutral                      and the row then starts at 16dp
+│      cornerRadius @dimen/radius_tile 12dp
+│      └── ImageView  22x22 (@dimen/tile_glyph), tint ?attr/iconGlyphNeutral, gravity center
+├── Space  12dp   (@dimen/space_12)                            <- gone with the tile
 ├── LinearLayout (vertical, weight 1)
 │   ├── TextView  id=title      @style/TextAppearance.App.Title      maxLines 2, ellipsize end
 │   └── TextView  id=subtitle   @style/TextAppearance.App.Subtitle   maxLines 2, marginTop 4dp
 │                               visibility gone when empty
 ├── Space  12dp
 ├── TextView   id=value    @style/TextAppearance.App.Subtitle   marginEnd 8dp, maxLines 1
+│                          minWidth = the reserved column for its quantity (5.6), or wrap_content
 │                          (numeric variants add fontFeatureSettings via App.Numeric)
 └── [ one trailing affordance ]
 ```
+
+**The tile's fill and glyph are theme attributes, never raw colours.** `?attr/iconTileNeutral` and
+`?attr/iconGlyphNeutral` are declared in 8.0 and mapped in all three themes. Writing
+`#20242B` into this layout - as the previous revision's tree did - paints a near-black tile on the
+light theme's `#F4F7FC` ground on every row in the app, and it is a hole in mono besides. The
+drawable `bg_icon_neutral.xml` therefore declares `radius_tile` and a **tint attribute**, not a
+literal fill.
 
 **The trailing affordance is exactly one of these six, and it declares what the row will do.**
 This is the affordance-honesty grammar that `30-reference-analysis.md` 6.3a promotes to law, ported
@@ -731,10 +1175,11 @@ exists: never a chevron and a switch, never two glyphs, never a value and a cycl
 **Rules.**
 - The whole row is the touch target, minimum 48dp, and it is 56dp in practice. Where the trailing
   is a switch, tapping the row toggles the switch.
-- The hairline below a row is a sibling `View`, 1dp, `?attr/colorOutlineVariant`,
-  `marginStart="@dimen/text_origin"`. The last row of a group has none.
+- The hairline below a row is a sibling `View`, 1dp, `?attr/colorOutlineVariant`, with
+  `marginStart` equal to **its own group's origin**: `@dimen/text_origin` on a tiled group,
+  `@dimen/screen_gutter` on a plain one (2.3, 5.3). The last row of a group has none.
 - **The tile is always neutral** except the one accent row and the one destructive row per screen
-  (3.4).
+  (3.4), and it is **absent entirely** on a plain group (5.3).
 - A subtitle that restates its title is deleted, not written. «DNS / Настройки DNS» is noise.
   Say what the row does in six words or say nothing.
 - **The current value belongs on the row** (Incy's single best idea, `30` 2.1.6). A user must be
@@ -757,11 +1202,25 @@ selected (P3 background `?attr/colorSurfaceContainerHighest` + state marker).
 ### 8.2 `SectionHeader`
 
 `@style/SettingsSectionLabel` applied to a `TextView`. 16sp/700, sentence case, no tracking, no
-caps, `?attr/colorOnSurface`. Padding 16 / 24 top / 16 / 8 bottom.
+caps, **`?attr/colorOnSurfaceVariant`**. Padding 16 start / 24 top / 16 end / 8 bottom. It always
+starts at the 16dp gutter, on both row species (5.3).
+
+**The one differentiating channel is luminance, and it is a decision.** A header and the row title
+beneath it are the same face at the same size and weight; the header is one step back in the colour
+ramp (8.2:1 against the row title's 17.4:1 on `#0A0B0D`) so that on the densest screen in the app -
+sixteen settings rows under four headers - the rows read as the figure and the headers read as their
+labels. Hierarchy is carried by luminance plus the 24dp above and 8dp below, and by nothing else.
+The alternative, a size step, would put an eleventh value in a ten-value ramp whose adjacent-step
+ratio law (`00-rules.md` 3.4) is already tight. Recorded as D-A22.
+
+**Variant.** `@style/SettingsSectionLabel.Inline` inherits everything and sets all four paddings to
+**0**, for the two places a section label is composed into a layout that already owns its spacing:
+the sticky server-group header (12.5) and a sheet title (8.16). It is a declared style with a name,
+not a per-screen padding override; an inline `android:padding="0dp"` on a ramp role is a defect
+under 4.1.
 
 **Never** an ALL-CAPS tracked eyebrow, never a divider under it, never a count in parentheses,
-never blue. The 24dp above and 8dp below is the group rhythm; a header is what replaces a divider
-between groups.
+never blue. A header is what replaces a divider between groups.
 
 ---
 
@@ -800,18 +1259,24 @@ TextView (or Chip with the Material chip style stripped to these values)
     (optional) leading 16dp glyph + 4dp gap
 ```
 
-| Variant | Fill | Text | Glyph | Used for |
-|---|---|---|---|---|
-| Neutral | `?attr/colorSurfaceContainerHighest` | `?attr/colorOnSurfaceVariant` | none | Protocol (`VLESS`), transport, tariff badge, «JSON» |
-| Success | `@color/chip_bg_success` | `?attr/colorTertiary` | `ic_action_done` 16dp | «Активна», «Оплачено» |
-| Warning | `@color/chip_bg_warning` | `@color/warning` | `ic_warning` 16dp | «Истекает», «В обработке» |
-| Error | `@color/chip_bg_error` | `@color/ping_bad` | `ic_error` 16dp | «Истекла», «Ошибка» |
-| Selected | `?attr/colorPrimaryContainer` | `?attr/colorOnPrimaryContainer` | `ic_action_done` 16dp | A chosen filter or option |
+| Variant | Fill | Text | Glyph | Contrast (text on fill) | Used for |
+|---|---|---|---|---|---|
+| Neutral | `?attr/colorSurfaceContainerHighest` | `?attr/colorOnSurfaceVariant` | none | 6.0:1 dark, 5.6:1 light | Protocol (`VLESS`), transport, «JSON» |
+| Success | `@color/chip_bg_success` | `@color/chip_text_success` | `ic_action_done` 16dp | 6.6:1 dark, 5.5:1 light | «Активна», «Оплачено» |
+| Warning | `@color/chip_bg_warning` | `@color/chip_text_warning` | `ic_warning` 16dp | 7.6:1 dark, 6.1:1 light | «Истекает», «В обработке», «Лимит устройств» |
+| Error | `@color/chip_bg_error` | `@color/chip_text_error` | `ic_error` 16dp | 5.4:1 dark, 4.6:1 light | «Истекла», «Ошибка» |
+| Trial | `?attr/colorSurfaceContainerHighest` | `?attr/colorOnSurfaceVariant` | `ic_clock` 16dp | as Neutral | «Пробный период» - a trial is a fact, not a warning |
+| Selected | `?attr/colorPrimaryContainer` | `?attr/colorOnPrimaryContainer` | `ic_action_done` 16dp | 9.6:1 dark, 13.9:1 light | A chosen filter or option |
 
 **A chip never carries both a fill and a stroke** (that would be a hole with a rim, plane rule
 2.1). A status chip **always** carries a word; the glyph is the second channel, never the only one.
-The protocol chip's current 4.0:1 failure (`item_recycler_main.xml:86`, `chip_type_text` on
-`colorPrimaryContainer`) is fixed by moving it to the Neutral variant, which measures 6.0:1.
+**A chip never shrinks and never ellipsises its own label** (5.6): it measures `wrap_content` and the
+text beside it yields. The protocol chip's current 4.0:1 failure (`chip_type_text` on
+`colorPrimaryContainer` in `item_recycler_main.xml`; find it with `grep -n chip_type_text`) is fixed
+by moving it to the Neutral variant, which measures 6.0:1.
+
+**The tariff badge is deleted** (4.2). One chip per object: the subscription card carries its state
+chip and nothing else, and the tariff name moves into the card's caption line.
 
 ---
 
@@ -821,7 +1286,15 @@ The protocol chip's current 4.0:1 failure (`item_recycler_main.xml:86`, `chip_ty
 |---|---|---|---|---|---|---|
 | Primary | `MaterialButton` filled | `@dimen/cta_height` 52dp | `@dimen/radius_pill` | `?attr/colorPrimary` | `App.Title` 16/700 in `?attr/colorOnPrimary` | **One per screen.** Full width at the gutter unless it sits in a row |
 | Secondary | `MaterialButton` tonal | `@dimen/cta_height_secondary` 48dp | `@dimen/radius_pill` | `?attr/colorSecondaryContainer` | `App.Title` in `?attr/colorOnSecondaryContainer` | Never adjacent to another tonal button of equal weight |
-| Tertiary | `MaterialButton` text | 48dp | - | none | `App.Title` in `?attr/colorPrimary` | Links, «Забыли пароль?», «Другой способ», undo |
+| Tertiary, **action** | `MaterialButton` text | 48dp | - | none | `App.Title` in `?attr/colorPrimary` | A link or an action the screen is offering: «Забыли пароль?», «Другой способ», «Отменить», «Вернуть мои настройки» |
+| Tertiary, **destination** | `MaterialButton` text | 48dp | - | none | `App.Title` in `?attr/colorOnSurfaceVariant` | A route to somewhere else that the screen is not asking you to take: «Создать аккаунт», «Добавить провайдера» under a sign-in CTA, «Отмена» |
+
+**Why the tertiary tier splits in two.** A text button in `?attr/colorPrimary` spends accent, and
+the budget is four elements per screen (3.2). A screen that offers two blue labels beside a blue
+CTA, a blue tile and a blue focus ring is at five before anyone counts. The split is not a new tier;
+it is the same widget with the colour chosen by one question: **is this the thing the screen wants
+you to do next, or is it somewhere else you could go?** An action is blue. A destination is not.
+Both are still 48dp, still `App.Title`, still full-width where they sit under a CTA.
 
 - `app:cornerRadius="26dp"` appears on five buttons today and is deleted; `@dimen/radius_pill` 100
   fully rounds any of these heights.
@@ -878,18 +1351,26 @@ LinearLayout (horizontal)  height 56dp + navigationBar inset as bottom padding
     ├── FrameLayout 64x32 (@dimen/nav_indicator_*)
     │     background: radius 100 pill, ?attr/colorPrimaryContainer, alpha 0 when inactive
     │     └── ImageView 24dp glyph, centred
-    └── TextView  @style/BottomNavLabel  11sp, marginTop 4dp
+    └── TextView  @style/TextAppearance.App.NavLabel  11sp, marginTop 4dp
 ```
 
 | | Inactive | Active |
 |---|---|---|
-| Indicator pill | alpha 0 | alpha 1, `?attr/colorPrimaryContainer` `#17325C` |
-| Glyph | outline, `?attr/colorOnSurfaceVariant` | filled, `?attr/colorOnPrimaryContainer` `#CFE0FF` (9.57:1) |
+| Indicator pill | alpha 0 | alpha 1, `?attr/colorPrimaryContainer` `#17325C` dark / `#D8E4FF` light |
+| Glyph | outline, `?attr/colorOnSurfaceVariant` | filled, `?attr/colorOnPrimaryContainer` `#CFE0FF` (9.6:1) dark / `#001A43` (13.9:1) light |
 | Label | `?attr/colorOnSurfaceVariant`, weight 500 | `?attr/colorOnSurface`, weight 700 |
+| Focus (TV, keyboard) | - | 2dp `?attr/colorPrimary` ring at 2dp offset around the 64x32 pill, radius 100 |
 
-Two channels (pill + weight), plus a third (glyph fill), and **no blue label**, so the accent budget
-is spent on a tinted container rather than a saturated surface. The pill translates to the new
-destination over 220ms `ease_out_quint` rather than fading out and in.
+Three channels - a tinted container, a glyph fill and a weight step - and **no blue label and no
+accent bar**, so the accent budget is spent on a container rather than on a saturated surface. The
+pill **translates** to the new destination over 220ms `ease_out_quint`; it does not fade out and in,
+and there is no separate travelling bar or dot.
+
+**This is the navigation language on both platforms.** The desktop rail's blue label plus 3x28
+accent bar, and the desktop compact bar's 34x3 accent pill, are replaced by this component's tinted
+pill in the same reconciliation (25.3). The 34x3 pill is doubly settled: it is on this document's
+own cleanup list at 5.5 as a defect in `activity_main.xml`, so it cannot simultaneously be the
+sanctioned marker on the other client. Recorded as D-A18.
 
 The bar is **always visible on every tab**, including first run. The current
 `updateBottomNavVisibility()` (`MainActivity.kt:713`) hides the whole bar when signed out with no
@@ -929,15 +1410,21 @@ a blue glyph, never an emoji.
 
 ### 8.9 `Skeleton`
 
-**Static.** Fill `?attr/colorSurfaceContainerHigh` `#1A1D21`, radius 12 for bars and 20 for card
-silhouettes. No pulse, no shimmer, no animator (decision D-A5: the 900ms
-`AccelerateDecelerateInterpolator` in `AccountFragment.kt:413-430` is off-token and is deleted).
+**Static.** Fill `?attr/colorSurfaceContainerHigh` (`#1A1D21` dark / `#EAEFF7` light), radius 12 for
+bars and 20 for card silhouettes. No pulse, no shimmer, no animator (decision D-A5: the 900ms
+`AccelerateDecelerateInterpolator` in `AccountFragment.startSkeletonPulse()` is off-token and is
+deleted).
 
 - A skeleton is **the shape of the result**, not a grey block: a subscription skeleton is a 20dp
-  card with a 18dp title bar, a 14dp subtitle bar and a 4dp meter bar at the real positions; a
-  server-list skeleton is six 56dp rows each with a 40dp tile square and two bars at 68dp.
+  card with a `skeleton_bar_md` 24dp title bar, a `skeleton_bar_sm` 16dp subtitle bar and a 4dp
+  meter bar at the real positions; a server-list skeleton is six 56dp rows each with a 40dp tile
+  square and two bars starting at 68dp.
+- **The two bar heights are 24 and 16**, which are the boxes a 16sp title and a 13sp subtitle
+  actually occupy, and which are in the dp dictionary. The previous revision's 18 and 14 were two
+  values that existed nowhere else in the product and were invented for this component alone.
 - It appears only after **300ms** of waiting; a faster response never flashes a skeleton.
-- Skeleton to content is a 220ms `ease_standard` crossfade.
+- Skeleton to content is a 220ms `ease_standard` crossfade **of the block as one object**. There is
+  no per-item entrance and no stagger (7.1, D-A20).
 - A centred indeterminate spinner over a blank screen is banned as a content loading state
   (`00-rules.md` 15). It survives only inside a button and inside a 48dp inline slot.
 
@@ -1028,58 +1515,80 @@ TextView  helper  @style/TextAppearance.App.Caption, marginTop 4dp, minHeight 16
 
 ---
 
-### 8.13 `Segmented`, `Stepper`, `SearchField`
+### 8.13 `Segmented`
 
-**Segmented** - `MaterialButtonToggleGroup`, 2 to 4 options only, 5+ becomes a push screen.
-Height 48dp, container radius 12 with fill `?attr/colorSurfaceContainerHighest`, thumb =
-`?attr/colorPrimaryContainer` with `?attr/colorOnPrimaryContainer` label at weight 700; unselected
-label `?attr/colorOnSurfaceVariant` at weight 500. Thumb slides 220ms `ease_out_quint`.
-It replaces four of the six single-choice `AlertDialog`s.
-
-**Stepper** - two 48dp `MaterialButton.IconButton`, radius 12, fill
-`?attr/colorSurfaceContainerHighest`, glyph 20dp `?attr/colorOnSurface`, with a value between them
-in `App.Title` + Numeric in a 48dp-minimum box. Disabled uses alpha **0.38** (the current
-imperative `alpha = 0.4f` in `BuyTariffActivity:616` is off-token).
-
-**SearchField** - 48dp, radius 12, fill `?attr/colorSurfaceContainerHighest`, leading 20dp
-`ic_search` at 12dp padding, hint `?attr/colorOnSurfaceVariant` (6.0:1 on P3), trailing 40dp clear
-button with `ic_close` visible only when non-empty. Filters in place; never navigates. Its empty
-result is a designed state, not a blank list. `bg_search_pill.xml` (radius 14) is replaced by
-`bg_input_field.xml` (radius 12).
+`MaterialButtonToggleGroup`, **2 to 4 options only**; 5+ becomes a list of `Row.Selectable` on the
+page or one level down. Height 48dp, container radius 12 with fill
+`?attr/colorSurfaceContainerHighest`, thumb `?attr/colorPrimaryContainer` with
+`?attr/colorOnPrimaryContainer` label at weight 700; unselected label `?attr/colorOnSurfaceVariant`
+at weight 500. Thumb slides 220ms `ease_out_quint`. Each option is `layout_weight="1"`, so a
+three-option segment on a 320dp screen gives 96dp per option and a label that does not fit is a
+signal that the option needs a row, not a smaller font. It replaces four of the six single-choice
+`AlertDialog`s. States: default, selected, pressed (0.97), disabled (0.38 on the whole group),
+focused (2dp ring around the container, not around one option).
 
 ---
 
-### 8.14 `Sheet` and `Dialog`
+### 8.14 `Stepper`
 
-**Sheet** (`BottomSheetDialogFragment`) is the per-item action surface and the choice-among-many
-surface.
+Two 48dp `MaterialButton.IconButton`, radius 12, fill `?attr/colorSurfaceContainerHighest`, glyph
+20dp `?attr/colorOnSurface`, with a value between them in `App.Title` + Numeric in a 48dp-minimum
+box. Long-press repeats at 4 steps per second after a 400ms delay. `tickHaptic()` per step.
+At the range end the corresponding button disables at alpha **0.38** and the reason appears as a
+caption under the row (the current imperative `alpha = 0.4f` in `BuyTariffActivity.setEnabled…`
+- `grep -n '0.4f' BuyTariffActivity.kt` - is off-token). The value itself never becomes an input
+field; a stepper is for small ranges, and a range that needs typing is a `FormField`.
+
+---
+
+### 8.15 `SearchField`
+
+48dp, radius 12, fill `?attr/colorSurfaceContainerHighest`, leading 20dp `ic_search` at 12dp
+padding, hint `?attr/colorOnSurfaceVariant` (6.0:1 on P3), trailing 40dp clear button with
+`ic_close` visible only when non-empty. `imeOptions="actionSearch"`, `inputType="text"`.
+**Filters in place; never navigates.** Debounce 150ms. Its empty result is a designed state, not a
+blank list, and the field keeps its text and its focus when the result is empty.
+`bg_search_pill.xml` (radius 14) is replaced by `bg_input_field.xml` (radius 12). Back with a
+non-empty query clears the query before it leaves the screen.
+
+---
+
+### 8.16 `Sheet`
+
+`BottomSheetDialogFragment`, the per-item action surface and the choice-among-many surface.
 
 ```
 background @drawable/bg_sheet_top   (radius_sheet 24dp top only, ?attr/colorSurface)
 scrim 60% ?attr/colorScrim
 ├── View handle  32x4 (@dimen/sheet_handle_*), radius 100, ?attr/colorOutline, marginTop 12dp
-├── [ optional header: 40dp tile + title + subtitle, 56dp, gutter 16 ]
-├── 1dp hairline at 68dp   (only between the header and the first row)
-├── rows, 56dp, from 8.1, neutral tiles
+├── [ optional title: @style/SettingsSectionLabel.Inline, gutter 16, marginTop 12dp ]
+├── [ optional header: 40dp tile + 12 + title/subtitle, 56dp, gutter 16 ]
+├── 1dp hairline at the group's own origin   (only between the header and the first row)
+├── rows, 56dp, from 8.1
 └── bottom padding = navigationBar inset + 16dp
 ```
 
 Esc and system Back close it, focus returns to the trigger, and the trigger keeps its position.
+A sheet is never taller than 60 % of the screen at rest; beyond that it scrolls inside itself with
+the handle and the title pinned. A sheet never contains a card and never contains another sheet.
 
-**Dialog** - `MaterialAlertDialogBuilder` with the existing `ThemeOverlay.Departament.Dialog`
-(radius 20, themed title, accent text buttons). **A dialog is the last resort.** It survives for
-exactly two purposes:
+---
 
-1. A genuinely irreversible, costly action: deleting a device, deleting a server, deleting a
-   subscription, restoring a backup, resetting all settings. The confirm button is red, says the
-   noun it destroys («Удалить устройство»), and sits on the right; «Отмена» is neutral on the left.
+### 8.17 `Dialog`
+
+`MaterialAlertDialogBuilder` with the existing `ThemeOverlay.Departament.Dialog` (radius 20, themed
+title, accent text buttons). **A dialog is the last resort.** It survives for exactly two purposes:
+
+1. A genuinely irreversible, costly action: deleting a subscription, deleting a provider, restoring
+   a backup, signing out, discarding unsaved edits. The confirm button is red, says the noun it
+   destroys («Удалить провайдера»), and sits on the right; «Отмена» is neutral on the left.
 2. A single free-text entry that has no sensible inline home: the manual-config paste box.
 
 Everything else that is a dialog today becomes inline, a segment, a cycle row, a push screen or a
-sheet. See section 24.6 for the full conversion table.
+sheet. **See section 23 for the full conversion table** - all eighteen of them, one row each.
 
 Everything reversible uses **undo instead of confirmation**: the item is removed immediately and
-the status strip offers «Отменить» for 5 seconds.
+the status strip offers «Отменить» for 5 seconds (8.10, D-A11).
 
 
 ---
@@ -1088,10 +1597,7 @@ the status strip offers «Отменить» for 5 seconds.
 
 ### 9.1 The destination set
 
-Four destinations, always visible, in this order. `30-reference-analysis.md` 5.8 flagged that
-Android and desktop disagree and that the parity contract (`00-rules.md` 13) requires one answer;
-this is it, and desktop follows Android here because Android is the surface with the real user
-volume and because a VPN with 80 to 150 servers per provider needs servers to be a destination.
+Four destinations, always visible, in this order.
 
 | # | Id | Label | Glyph | Purpose |
 |---|---|---|---|---|
@@ -1100,15 +1606,33 @@ volume and because a VPN with 80 to 150 servers per provider needs servers to be
 | 3 | `nav_account` | **Аккаунт** | `ic_nav_account` | Money, subscription, devices, payments |
 | 4 | `nav_settings` | **Настройки** | `ic_nav_settings` | Everything else |
 
+**The order is a contested decision and it is settled here, against the desktop plan.**
+`33-master-plan-pc.md` 1.2 lists «Главная · Серверы · Настройки · Аккаунт» in a table headed "not
+allowed to drift", its 3.4 rail is built in that order, and its 11 certifies the parity as
+satisfied. Both documents could not be right. The order above wins for three reasons, and the PC
+plan is patched to match in 25.3:
+
+1. **Настройки is defined in this very table as "everything else".** A terminal, least-frequented
+   destination belongs at the end of a bar; putting it third and the commercial half fourth inverts
+   the frequency order on the surface with the highest volume.
+2. **Аккаунт is where money lives.** On a paid product it is the second-most-opened destination
+   after the connect screen, well ahead of a settings tree a user visits twice a year.
+3. **The two adjacent destinations should be the two related ones.** Серверы and Аккаунт are both
+   "what I have"; Настройки is "how it behaves". The seam belongs between 3 and 4.
+
+Until this is recorded in `00-rules.md` 18 by the owner it is listed as **D-A1 in section 25.2, not
+25.1** - it contradicts a shipped parity table, so it is not "inside existing law" and this document
+does not get to pretend otherwise.
+
 Three changes from today:
 
 1. **«Сервера» becomes «Серверы».** The current form is a colloquial plural
    (`@string/title_servers`, `@string/bottom_nav_servers`).
 2. **Аккаунт moves ahead of Настройки** and is **always present**, signed in or out. Today
-   `updateAccountGate()` (`MainActivity.kt:1048-1064`) removes the tab when signed out, which makes
-   the bar change shape under the user and hides the product's whole commercial half from a new
-   installer. Signed out, the destination is a sign-in gate (decision D-A3, and it answers the open
-   question at the end of `21-account-survey.md`).
+   `MainActivity.updateAccountGate()` removes the tab when signed out, which makes the bar change
+   shape under the user and hides the product's whole commercial half from a new installer. Signed
+   out, the destination is a sign-in gate (decision D-A3, and it answers the open question at the
+   end of `21-account-survey.md`).
 3. **The bar never disappears.** See 8.7.
 
 ### 9.2 The map
@@ -1660,7 +2184,7 @@ Toolbar 56dp (8.6)
   ├── TextView "Серверы"  @style/TextAppearance.App.Title, marginStart @dimen/screen_gutter
   └── ImageButton 48dp  ic_more_vert_24dp   cd "Ещё"
 [ 8 ]
-SearchField 8.13   id=et_search, marginHorizontal @dimen/screen_gutter, 48dp
+SearchField 8.15   id=et_search, marginHorizontal @dimen/screen_gutter, 48dp
      hint "Поиск по названию или стране"
 [ 12 ]
 LinearLayout (horizontal, gravity center_vertical, marginHorizontal 16dp, height 40dp)
@@ -1811,7 +2335,7 @@ by `servers_title` / «Серверы».
 `ui/ServerActionsSheet.kt`. **Verdict: RESTYLE and REWIRE.** It is well built and completely dead.
 
 ```
-Sheet 8.14
+Sheet 8.16
 ├── handle 32x4
 ├── header 56dp:  unified server icon 40dp  +  12  +  [ title App.Title / subtitle App.Subtitle ]
 │                 title = the remark with the flag stripped; subtitle = "VLESS · Reality · 48 мс"
@@ -1848,7 +2372,7 @@ action, shown inside a bare `AlertDialog`. **REBUILD as a sheet.**
 ### 13.3 Component tree
 
 ```
-Sheet 8.14
+Sheet 8.16
 ├── handle 32x4
 ├── TextView  title  App.Title, gutter 16, marginTop 12dp    "Сервер: Нидерланды, Амстердам"
 ├── TextView  caption App.Caption, marginTop 4dp             "Отсканируйте код в другом устройстве"
@@ -1886,12 +2410,12 @@ with one confirmation surface and no silent mutation.
 | `res/menu/menu_main.xml` (the `+` menu) | **REBUILD** as a sheet |
 | `ui/ScannerActivity.kt` + `res/layout/activity_none.xml` (an empty `RelativeLayout`) + `res/menu/menu_scanner.xml` (two items with `android:title=""`) | **REBUILD**: the app's own scan screen currently has zero branding, zero instruction and zero framing |
 | `MainActivity.showManualEntryDialog()` with two hardcoded Russian error literals at `:2016` and `:2018` | **RESTYLE**; strings move to resources |
-| `ui/UrlSchemeActivity.kt` (`depv://import/{base64}` mutates the server list with no confirmation) | **REBUILD** the confirmation surface (24.5) |
+| `ui/UrlSchemeActivity.kt` (`depv://import/{base64}` mutates the server list with no confirmation) | **REBUILD** the confirmation surface (14.5, 22.6) |
 
 ### 14.3 The add-source sheet
 
 ```
-Sheet 8.14
+Sheet 8.16
 ├── handle
 ├── TextView "Добавить"  App.Title, gutter, marginTop 12dp
 ├── 1dp hairline at 68dp
@@ -1931,7 +2455,7 @@ Shown for **every** import path, including `depv://` and `v2rayng://` deep links
 the server list with no confirmation at all.
 
 ```
-Sheet 8.14
+Sheet 8.16
 ├── handle
 ├── header 56dp: 40dp neutral tile ic_subscriptions_24dp + "Добавить провайдера"
 ├── 1dp hairline
@@ -2124,7 +2648,7 @@ a small sub-page carrying the code, a copy action, the share sheet, and the stat
   **webhook-confirmed**: returning from the browser proves nothing, so the pending state and the
   6 x 8s poll stay exactly as they are. **Never claim success on return.**
 - **«Выйти»** is the one destructive confirmation on this screen, because a session is not
-  re-creatable by undo. Dialog per 8.14, red «Выйти» on the right.
+  re-creatable by undo. Dialog per 8.17, red «Выйти» on the right.
 - **Avatar** tap opens a sheet, not a list dialog: «Выбрать из галереи» / «Убрать фото» / «Отмена»
   is a sheet of two rows.
 - **The subscription card's rename** is reached by long-pressing nothing; it is a row inside the
@@ -2142,7 +2666,7 @@ Replaces `dialog_top_up.xml`, whose hint is its only label, which has no helper 
 state is a toast, and whose buttons are the system «OK» / «Отмена».
 
 ```
-Sheet 8.14
+Sheet 8.16
 ├── handle
 ├── TextView "Пополнить баланс"  App.Title, gutter, marginTop 12dp
 ├── [ 16 ]
@@ -2225,7 +2749,7 @@ Card 8.3  id=card_checkout   -- the ONE card on this screen
 ├── [ 12 ]
 ├── Row (inside the card, no tile, 16dp origin, 56dp)
 │      title "Дополнительные устройства"  subtitle "50 ₽ за устройство"
-│      trailing: Stepper 8.13, two 48dp buttons + a Numeric value
+│      trailing: Stepper 8.14, two 48dp buttons + a Numeric value
 ├── [ 16 ]  1dp ?attr/colorOutlineVariant
 ├── LinearLayout (horizontal): TextView "Итого" App.Body onSurfaceVariant, weight 1
 │                              TextView App.Title + Numeric, onSurface   "1 020 ₽"
@@ -2639,7 +3163,7 @@ Segmented, full width, 48dp:  [ Только выбранные ] [ Все, кр
 [ 8 ]
 TextView App.Caption, gutter: "Через туннель пойдут только отмеченные приложения."
 [ 16 ]
-SearchField 8.13  "Поиск приложений"
+SearchField 8.15  "Поиск приложений"
 [ 8 ]
 TextView App.Subtitle + Numeric, gutter: "Выбрано 12 из 214"
 [ 8 ]
@@ -2754,7 +3278,7 @@ TextView App.Body, gutter, maxWidth 60 characters:
 SectionHeader "Соединение"
 Row.Toggle  "Мультиплексирование"   subtitle "Объединяет запросы в один канал"   switch
    [ revealed inline when on, expanding over motion_reveal 300 ]
-   Row.Value  "Число соединений"    value "8"      Stepper 8.13 inline, range 1..128
+   Row.Value  "Число соединений"    value "8"      Stepper 8.14 inline, range 1..128
    Row.Toggle "XUDP через QUIC"                                        switch
 Row.Toggle  "Фрагментация пакетов"  subtitle "Разбивает TLS-рукопожатие против DPI"  switch
    [ revealed inline when on ]

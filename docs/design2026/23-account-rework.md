@@ -1,33 +1,62 @@
 # 23 - Account tab rework (Android + Desktop)
 
 **Status: specification. Implementable as written.** Where this file gives a number, that number ships.
-Where it gives a Russian string, that string ships. Nothing here is a sketch.
+Where it gives a Russian string, that string ships. Nothing here is a sketch. The one precondition this
+file used to carry - which Cyrillic face the Russian UI is set in - is **resolved in section 4.0** and
+recorded as decision A-15.
 
 **Supersedes**, on every point where they disagree: any earlier document or habit that treats
 `Views/AccountView.axaml` as the parity reference for Android. Both Account surfaces are subjects of
 this redesign. The desktop is richer in *function* and wrong in *form*; the Android tab is wrong in
 both. Neither is copied.
 
-**Authority.** `docs/design2026/00-rules.md` is law and is cited as **§n**. `03-direction.md` is the
-design direction and is cited as **D§n**. The factual baseline is `20-control-survey.md` (cited as
-**CS**) and `21-account-survey.md` (cited as **AS**). Where this file adds a token, a rule or a
-terminology entry, it says so explicitly in section 13 in `00-rules.md` §18 row format, because §18 is
-the only way law changes.
+**Authority.**
+
+1. `docs/design2026/00-rules.md` is law and is cited as **§n**.
+2. **`22-components.md` is the control vocabulary and is cited as C§ with the section's own title**
+   (`C§8.3 Row.Value`, `C§6 Segmented control`), per that file's §0.3 convention. It declares itself
+   the entire component library (its R15) and rules at its §0.4 that *"if a screen needs a control
+   that is not here, the control is added here first."* **This file invents no control.** Every
+   button, row, chip, field, sheet, snackbar, skeleton and meter on the Account tab is a
+   `22-components.md` component called by its registry name from that file's §19. The three things
+   this tab needs that the library does not yet have are listed in section 3.3 as amendments to be
+   made **to `22-components.md` first**, in its own format.
+3. `03-direction.md` is the design direction and is cited as **D§n**.
+4. The factual baseline is `20-control-survey.md` (cited as **CS**) and `21-account-survey.md`
+   (cited as **AS**).
+
+Where this file adds a token, a rule or a terminology entry, it says so explicitly in section 13 in
+`00-rules.md` §18 row format, because §18 is the only way law changes. Where it takes a position
+against `22-components.md`, it says so in the same format, naming the ruling it overrides
+(section 13.2).
+
+**Sibling specs, and who owns what.**
+
+| Surface | Owner | This file |
+|---|---|---|
+| The component library | `22-components.md` | calls it, never redefines it |
+| The signed-out gate, both platforms | `14-auth.md` §5 | states the two contract points the tab depends on (5.1) and one geometry correction (13.2) |
+| The Android tab, implementation depth | `15-account-tab.md` | agrees with it; this file is the cross-platform contract both halves are held to |
+| The token layer | `10-design-system.md` + `22-components.md` §20 | adds four tokens (section 12) |
 
 **Scope.** The Account tab on both clients, plus the four surfaces that only it opens: Devices,
-Payment history, Sign-in methods, and the shared payment sheet. The Buy catalogue screen
+Payment history, Sign-in methods, and the shared payment surface. The Buy catalogue screen
 (`BuyTariffActivity` / `BuyView`) is specified separately; this file specifies its entry points, its
-money contract and the payment sheet it must adopt.
+money contract and the payment surface it must adopt.
 
 ---
 
 ## 0. Reading order for the implementer
 
 1. Section 1 - what the tab is for. If a decision later in this file surprises you, it is derived here.
-2. Section 3 - the control vocabulary. Every control on the tab is one of nine variants. Learn the nine.
-3. Section 4 - typesetting. Money, dates and counts are the product's voice (D§3.1); get them wrong and
-   nothing else matters.
-4. Then your platform: section 6 (Android) or section 7 (Desktop).
+2. Section 3 - **which library components this tab uses**, by registry name. It is a mapping table,
+   not a vocabulary: geometry, type and the eight states live in `22-components.md` and are not
+   restated here, because two files describing one button is how the two apps drifted apart.
+3. Section 4 - typesetting. The UI face (4.0), then money, dates and counts, which are the product's
+   voice (D§3.1); get them wrong and nothing else matters.
+4. Then your platform: section 6 (Android) or section 7 (Desktop). **The two sections carry the same
+   twelve states and the same row lists.** Where a desktop value equals Android's, section 7 says
+   "as 6.x" against that element rather than omitting it.
 5. Section 8 is the complete copy. Do not invent a string; if you need one that is not here, the design
    is incomplete and you stop.
 6. Section 9 binds every rendered value to the field it comes from. **A value not in section 9 does not
@@ -45,7 +74,7 @@ Four questions, in this order of urgency:
 
 | # | Question | Answered by | Rank on the screen |
 |---|---|---|---|
-| 1 | **До какого числа у меня есть доступ?** | the subscription card's time block | the one Display figure, when it is urgent |
+| 1 | **До какого числа у меня есть доступ?** | the subscription card's time block | the one Display figure, always |
 | 2 | **Что у меня есть?** | the card's name, tariff badge, traffic, and the devices row | Title weight, under the time block |
 | 3 | **Сколько спишется дальше?** | the card's auto-renew line and the CTA's price suffix | Subtitle weight |
 | 4 | **Что я могу с этим сделать?** | one CTA on the card, then rows | one filled button at most, then a ledger |
@@ -61,15 +90,27 @@ this tab because of **time**, not money.
 
 So:
 
-- **The hero figure is the remaining time**, and it exists **only when the time is short**. Above 7 days
-  the tab has no Display figure at all and reads as a quiet statement. Under 7 days a large amber
-  number appears and the CTA lights up. The screen's silhouette changes with the account's state.
+- **The hero figure is time, and it is always there.** The card's second line is always
+  `[figure][word]` - a 34sp figure-face number beside a 16sp UI-face word, baseline-aligned. The
+  **silhouette is constant**; the **colour is the state channel**. Healthy, it is the expiry date's
+  day number in `colorOnSurface` («Активна до / **3** августа»). Under 7 days it becomes the day
+  count in amber («Осталось / **5** дней»). Expired it becomes the date it died, in red
+  («Истекла / **31** мая»). One shape, three temperatures, no layout change between them.
 - **Balance drops to a row value** in the «Оплата» group, at Title/Numeric weight.
 - **Identity drops to a two-line head** with a 40dp tile, no card, no 52dp avatar frame, no camera badge
   floating on it. This is owner request §0.4.5 («tightened profile») taken literally.
 
+**Why a constant figure and not a state-dependent one.** An earlier draft of this file removed the
+Display figure above 7 days, on the theory that a calm account deserves a calm screen. That failed
+§4.3: with the figure gone the healthy tab - which is the state the overwhelming majority of sessions
+open in - had one bordered card, three section headers at 16/700 and eight rows whose titles are also
+16/700, and nothing visually dominant. Blurred, it was a dark settings list. Calm still needs a
+hierarchy. Keeping the figure gives the tab a permanent first object; making its **colour** carry
+health keeps the state legible without a second Display figure, a chip, or a badge, and it keeps
+D§7.3's "one display figure per screen" at exactly one.
+
 That inversion is also the answer to the category-reflex test (§2.4.1, D§2.3): a VPN account screen
-whose largest element is a countdown, not a wallet, is not the category default, and it is honest about
+whose largest element is a date, not a wallet, is not the category default, and it is honest about
 what the product sells - time.
 
 ### 1.3 What leaves the tab, and where it goes
@@ -77,6 +118,7 @@ what the product sells - time.
 | Today | Verdict | New home |
 |---|---|---|
 | Balance as Display 34sp | demoted | row value in «Оплата», Title 16/700 numeric |
+| Icon tiles on the tab's own rows | deleted | see 1.4; the Account tab's rows are tile-less, text origin 16 |
 | Filled «Пополнить» button in the hero | deleted | the «Баланс» row opens the top-up sheet |
 | Referral chip in the hero | moved | row «Реферальный код» in «Оплата», tap copies |
 | Avatar 52dp frame + 18dp camera badge | deleted | 40dp tile; tapping it opens the avatar options |
@@ -101,33 +143,67 @@ what the product sells - time.
 D§3.2 allows one lit element per screen and says the Account tab's is «Купить», *"only when the account
 state needs it"*. Made mechanical:
 
+Accent-tinted means anything drawn in `colorPrimary` / `colorPrimaryContainer`: a Tertiary label, the
+tariff badge, a selected segment, a focus ring while it is showing. C§R14 caps Tertiary at two visible
+at once and allows the tariff badge as item 7; both caps hold here.
+
 | Account state | Filled accent surfaces | Accent-tinted elements | Total |
 |---|---|---|---|
-| Signed out (gate) | 1 - «Войти через Telegram» | 0 | 1 |
-| No subscription | 1 - «Купить» in the empty card | 0 | 1 |
-| Trial | 1 - «Купить тариф» | 0 | 1 |
-| Expired | 1 - «Продлить · 450 ₽» | 0 | 1 |
-| Expiring (1-7 days) | 1 - «Продлить · 450 ₽» | 0 | 1 |
-| **Active (> 7 days)** | **0** | 1 - «Улучшить тариф» text button, when it exists | 1 |
-| Perpetual | 0 | 1 - «Улучшить тариф», when it exists | 1 |
-| Loading / error / offline | 0 | 0 (the «Повторить» is tonal) | 0 |
+| Signed out (gate) | 1 - «Войти через Telegram» | 1 - «Войти по почте» Tertiary label | 2 |
+| No subscription, trial available | 1 - «Начать пробный период» | 1 - «Купить» Tertiary label | 2 |
+| No subscription, trial used | 1 - «Купить» | 0 | 1 |
+| Trial | 1 - «Купить тариф» | 0 - the «Пробный» badge is `Chip.Neutral` | 1 |
+| Expired | 1 - «Продлить, 450 ₽» | 1 - tariff badge | 2 |
+| Expiring (1-7 days) | 1 - «Продлить, 450 ₽» | 1 - tariff badge | 2 |
+| **Active (> 7 days)** | **0** | 2 - tariff badge, «Улучшить тариф» Tertiary label when it exists | 2 |
+| Perpetual | 0 | 2 - tariff badge, «Улучшить тариф» when it exists | 2 |
+| Loading / error / offline | 0 | 1 - the «Повторить» / «Обновить» Tertiary label | 1 |
 
-**Everything else on this tab is neutral.** Every icon tile on the tab and on all four of its sub-pages
-is `icon_tile_neutral` `#20242B` / `Brush.Tile.Neutral` with a `#9BA1AD` glyph. There are no blue tiles,
-no green tile on the balance payment row, no accent-coloured row titles. That single ruling removes
-CS §C.4.22 ("56 of 65 Android icon tiles are blue"), AS §1.4.6, AS §2.3.3 and AS §1.8's green tile in
-one line.
+**Retry is `Button.Tertiary` everywhere on this tab and its sub-pages** - in the cold error card, in
+the partial-failure half, in the offline bar, in the payment-polling bar, in every snackbar action.
+One control, one colour, one word. It is counted as one accent-tinted element in the last row above.
+An accent *label* on a transparent control is not a lit surface and does not compete with a CTA; and
+an error state must never spend the screen's one **filled** accent on recovering from a failure. (An
+earlier draft said "tonal" in two places and "V3 accent" in a third for the same «Повторить»; this
+line is the resolution.)
+
+**The tariff badge is the product's one `Chip.Accent`** - `colorPrimaryContainer` `#17325C` with
+`colorOnPrimaryContainer` `#CFE0FF`, 9.57:1 - per C§R14 item 7 and C§10 Chip ("the tariff badge, and
+nothing else"). D§3.2's Account row says "everything else, including the tariff badge" is neutral;
+that sentence governs what may be **lit**, meaning `colorPrimary` at full strength, and a
+container-tinted chip is not that. Recorded as decision 13.2 C-4. The **trial** badge is
+`Chip.Neutral`: «Пробный» names a state, not a tariff.
+
+**Icon tiles: the tab has none.** The earlier ruling - "every tile on the tab is neutral" - fixed the
+colour and kept the noise: twelve identical 40dp grey squares with twelve identical grey glyphs,
+distinguishing nothing, pushing every text origin to 68 on rows whose *value* is the point («Баланс»,
+«Реферальный код», «История платежей»). §2.4.4 asks what each non-text pixel communicates; those
+communicated nothing. So:
+
+| Surface | Tiles? | Text origin | Why |
+|---|---|---|---|
+| The Account tab's three row groups | **none** | **16** | the group header already carries the category; the row's noun is the whole content |
+| Devices | 40dp neutral tile, 22dp glyph | 68 | the platform glyph (Android / Apple / Windows / Router) is the one thing that tells two identically-named rows apart |
+| Sign-in methods | 40dp neutral tile, 22dp glyph | 68 | the brand mark *is* the method's identity and is read faster than the word |
+| Payment sheet / flyout, Payment history | none (ledger rows) | 16 | transaction surfaces, decision A-2 |
+
+Every tile that survives is `icon_tile_neutral` `#20242B` / `Brush.Tile.Neutral` with a `#9BA1AD`
+glyph. There are no blue tiles, no green tile on the balance payment row, no accent row titles, and
+the tab uses **zero** of C§R14 item 8's three permitted categorical coloured tiles. That removes
+CS §C.4.22 ("56 of 65 Android icon tiles are blue"), AS §1.4.6, AS §2.3.3 and AS §1.8's green tile,
+and it makes the Account tab visibly quieter than Settings - which is correct, because Settings is a
+catalogue of categories and this is a statement of account.
 
 Non-accent colour on the tab, and its only permitted uses:
 
 | Colour | Where, and nowhere else |
 |---|---|
-| Amber `?attr/colorWarning` | the Display figure and its unit in the **expiring** state; the traffic meter fill at ≥ 90 % |
-| Red `?attr/colorErrorText` | the **expired** card title; the traffic meter fill at 100 %; the «Выйти» row title; inline form errors; the «Ошибка» status word in history |
+| Amber `?attr/colorWarning` / `Brush.WarnText` | the Display figure and its word in the **expiring** and **expiring-today** states; the traffic meter fill at ≥ 90 %; the «В обработке» status word in payment history (C§R12) |
+| Red `?attr/colorErrorText` / `Brush.RedText` | the **expired** card's figure, word and label line; the traffic meter fill at 100 %; the «Выйти» row title; inline form errors; the «Ошибка» status word in history |
 | Green `?attr/colorTertiary` | the «Оплачено» status word in history, and nothing else |
 
-Colour is never alone (§6.3): the expiring state also carries the word «дней» and a filled CTA; the
-expired state also carries the words «Подписка истекла»; «Оплачено» is a word before it is a colour.
+Colour is never alone (§6.3): the expiring state also carries the word «Осталось» and a filled CTA;
+the expired state also carries the word «Истекла»; «Оплачено» is a word before it is a colour.
 
 ---
 
