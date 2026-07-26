@@ -53,17 +53,28 @@ them.
 
 ## 2. The destination set
 
-### 2.0 Owner decision, 2026-07-26 — desktop has no Серверы destination
+### 2.0 Owner decision, 2026-07-26 — NEITHER platform has a Серверы destination
 
-**The owner has decided that the desktop must not gain a Серверы tab.** Per `00-rules.md` 0.1 the
-owner's explicit request outranks this document, so section 2.1 below stands for **Android only**.
+**Three destinations on both platforms: Главная · Аккаунт · Настройки.** Per `00-rules.md` 0.1 the
+owner's explicit request outranks this document, so section 2.1's four-destination set is **overruled
+in full** — on desktop, where the tab was never built, and on Android, where it exists today and is
+being removed. Sections 3.2 and 4.2 no longer apply anywhere.
 
-Desktop keeps **three** destinations: **Главная**, **Аккаунт**, **Настройки**. `Geo.Nav.Servers`
-stays declared and unused, and `Nav_Servers` is not added to `Common/L.Shell.cs`. Section 2.3's
-argument is recorded but overruled; sections 3.2 and 4.2 apply to Android alone, and the desktop rail
-does **not** gain a fourth item at index 1.
+Desktop: `Geo.Nav.Servers` stays declared and unused, `Nav_Servers` is not added to
+`Common/L.Shell.cs`, and the rail does not gain a fourth item. The server list stays inside Главная,
+where it already was.
 
-The server list therefore stays inside Главная on desktop.
+Android: `nav_servers` and its glyph go, `ServersFragment` and `fragment_servers.xml` go, and the
+bottom navigation drops to three items. **The tab's own capabilities are not relocated** — per the
+owner, «функции из вкладки сервера не надо никуда пихать». Главная keeps the server list it already
+has, unchanged.
+
+**The cost, written down so it stays a decision and not an accident.** Android's Серверы tab carries
+things Главная's list does not: search over the list, provider section headers with collapse, and the
+bulk actions — refresh all providers, check latency on all, collapse all. Removing the tab without
+relocating them removes those capabilities from the product on Android. The owner was told this
+before deciding and chose it. If any of them is wanted back it needs somewhere to live, and that is a
+new decision, not a silent addition to Главная.
 
 **Главная keeps the functionality it has today, on both platforms.** The owner has been explicit
 twice: no Серверы destination on desktop, and **no search on Главная** — «как выглядела главная по
