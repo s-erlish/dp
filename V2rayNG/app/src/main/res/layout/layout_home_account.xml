@@ -28,7 +28,9 @@
   «Вход, подписка, устройства» and is not styled as a button; the verb «Войти» lives
   on the gate primary, exactly once. The dead `group_login` block and the dead
   «Привязать Telegram» CTA it owned (with its text-glyph close button, ban 1.4.4) are
-  this rewrite - W-13. Linking Telegram belongs to Аккаунт.
+  gone from this rewrite - W-13. That CTA was doubly unreachable here, but it is NOT
+  lost: it lives on the gate block's secondary slot (layout_home_empty.xml), offered on
+  the same condition it always was - signed in, no подписка, Telegram not yet attached.
 
   THE SKELETON IS THE SILHOUETTE OF THE TEXT COLUMN, not a spinner: two bars at the
   title's and the subtitle's own heights, shown only if the account outlasts 300ms

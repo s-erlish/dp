@@ -1246,7 +1246,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      */
     private fun onDelayResult(time: Long) {
         if (mainViewModel.isRunning.value == true) {
-            val wasSilent = pingProbeFailures >= SILENT_SERVER_FAILURES
             if (time >= 0) {
                 pingMs = time.toInt()
                 pingProbeFailures = 0
@@ -1254,11 +1253,13 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
                 pingMs = null
                 pingProbeFailures++
             }
-            // A reading only repaints the identity line. A full render is for the frame the "server
-            // is not answering" condition actually appears or clears on.
-            if (isBindingInitialized) {
-                if (wasSilent != (pingProbeFailures >= SILENT_SERVER_FAILURES)) render() else paintFigures()
-            }
+            // A FULL render, and it has to be: the reading is drawn beside the server IDENTITY, and
+            // that line is written by paintStatusLine. paintFigures() only fills the two speed
+            // columns, so repainting those alone left the «мс» figure at whatever the screen last
+            // resolved — which on a tunnel nobody navigates away from is "never shown at all".
+            // MSG_STATE_DELAY_RESULT arrives once per 30s probe and once per health check, never
+            // once per row of a bulk test, so this is not a hot path.
+            if (isBindingInitialized) render()
         }
 
         if (!healthCheckPending) return
@@ -1359,6 +1360,12 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // Fire the one-shot post-login import only on a genuine logged-out -> logged-in transition,
         // not on the state replay that happens every time the activity restarts while signed in.
         if (loggedIn && !accountLoggedIn) onLoggedIn()
+        // AND THE OTHER DIRECTION. An explicit sign-out (`AccountSession.wipe`) removes the
+        // account's подписки and their серверы from the store, but nothing rebuilds the cache this
+        // screen's list is painted from — so the rows outlived the session and stayed selectable
+        // with no account behind them. The reload publishes through the shell, which repaints the
+        // list, the carousel and the nav gates together.
+        if (!loggedIn && accountLoggedIn) mainViewModel.reloadServerList()
         accountLoggedIn = loggedIn
     }
 
@@ -2157,13 +2164,21 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         }
     }
 
-    /** Starts the VPN, requesting the system VPN permission first when needed. */
+    /**
+     * Starts the VPN, requesting the system VPN permission first when needed.
+     *
+     * The watchdog is STOOD DOWN while that system prompt is up, and re-armed by the result
+     * callback when the permission comes back granted. It bounds a start that stalls; a decision the
+     * user has not made yet is not a stalled start, and counting the prompt against the 20s deadline
+     * reported a failure to anyone who read it before answering.
+     */
     private fun startVpnWithPermission() {
         if (SettingsManager.isVpnMode()) {
             val intent = VpnService.prepare(requireContext())
             if (intent == null) {
                 startV2Ray()
             } else {
+                cancelConnectWatchdog()
                 requestVpnPermission.launch(intent)
             }
         } else {

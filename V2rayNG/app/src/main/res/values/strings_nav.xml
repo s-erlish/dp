@@ -5,19 +5,19 @@
 
   Russian, sentence case, «подписка» never «провайдер», departament always lowercase.
 
-  The «Привязать Telegram» banner's two strings used to live here. The banner is gone — linking
-  Telegram belongs to Аккаунт, and the onboarding gate already offers it — so the strings went with
-  it rather than waiting for a screen that was never coming back.
+  Two rounds of orphans have been cleared out of this file, both for the same reason: a string with
+  no consumer is copy nobody can review against the register and nobody can see on screen.
+
+    · the «Привязать Telegram» banner's pair — the banner is gone, linking Telegram belongs to
+      Аккаунт and the onboarding gate already offers it;
+    · «Войти через сайт» / «Управление аккаунтом» — the old home account card's labels. That card
+      now draws from `strings_home.xml` (`home_account_title` / `home_account_subtitle`) and the
+      sign-in screen from `strings_auth.xml` (`auth_btn_email`, `auth_btn_telegram`), so these two
+      named nothing. No affordance went with them: only the duplicate wording did.
 -->
 <resources>
     <!-- Bottom-nav tab, visible only when signed in. -->
     <string name="bottom_nav_account">Аккаунт</string>
-
-    <!-- Signed-out home entry point: open the login screen for a site (email) login. -->
-    <string name="auth_sign_in_site">Войти через сайт</string>
-
-    <!-- Signed-in account chip subtitle. -->
-    <string name="auth_open_account">Управление аккаунтом</string>
 
     <!-- Gray status toast shown after subscriptions are auto-imported post-login. -->
     <string name="toast_subscription_linked">Подписка привязана</string>

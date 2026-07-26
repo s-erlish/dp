@@ -31,7 +31,7 @@ import com.v2ray.ang.handler.MmkvManager
  * The adapter holds no ViewModel reference: everything it needs arrives as a lambda.
  */
 class HomeMetaPagerAdapter(
-    private val bindPage: (LayoutSubscriptionMetaBarBinding, String, SubscriptionItem) -> Unit,
+    private val bindPage: (LayoutSubscriptionMetaBarBinding, String, SubscriptionItem?) -> Unit,
     private val onToggleList: () -> Unit,
     private val onPingAll: () -> Unit,
     private val onRefreshAll: () -> Unit,
@@ -79,9 +79,12 @@ class HomeMetaPagerAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val subId = subIds[position]
-        val sub = MmkvManager.decodeSubscription(subId) ?: return
         val meta = holder.binding
-        bindPage(meta, subId, sub)
+        // Bound even when the подписка has just left the store: [bindPage] hides an empty card, and
+        // the actions below are re-pointed at THIS position's id either way. Returning early here
+        // instead would leave a recycled holder wired to the id it last showed — so the long press
+        // that deletes a подписка could act on a different one from the card under the thumb.
+        bindPage(meta, subId, MmkvManager.decodeSubscription(subId))
         meta.btnCollapse.rotation = if (collapsed()) -90f else 0f
         meta.btnCollapse.setOnClickListener { onToggleList() }
         meta.btnPing.setOnClickListener { onPingAll() }

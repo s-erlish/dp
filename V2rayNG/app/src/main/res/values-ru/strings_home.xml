@@ -94,7 +94,9 @@
     <string name="home_cd_connect">Отключено. Нажмите, чтобы подключить</string>
     <string name="home_cd_cancel">Подключение. Нажмите, чтобы отменить</string>
     <string name="home_cd_disconnect">Подключено. Нажмите, чтобы отключить</string>
-    <string name="home_cd_locked">Недоступно. Нет подписки</string>
+    <!-- The gated object. The gate's one test is "there is not a server to connect to", and it
+         holds in all five of its shapes — «нет подписки» named only one of them. -->
+    <string name="home_cd_locked">Недоступно. Нет серверов</string>
 
     <!-- ===================================================================== -->
     <!-- THE SUBSCRIPTION CARD under the connect object - the pill, the meta    -->
@@ -130,7 +132,10 @@
     <string name="home_sub_delete_message">Подписка и её серверы будут удалены с этого устройства.</string>
     <string name="home_sub_delete_confirm">Удалить</string>
     <string name="home_sub_deleted">Подписка удалена</string>
-    <string name="home_sub_refresh_failed">Не удалось обновить подписки</string>
+    <!-- The card's support / Telegram links, when the device has no app that can open one.
+         It says what actually failed: the old copy here reported a failed REFRESH for a link
+         that was never opened. -->
+    <string name="home_sub_link_failed">Не удалось открыть ссылку</string>
 
     <!-- What the status strip says when a refresh failed and the screen keeps its
          last values rather than emptying. -->

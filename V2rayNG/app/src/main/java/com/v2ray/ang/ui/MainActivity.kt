@@ -181,11 +181,12 @@ interface MainHost {
      * The three add methods «Добавить подписку» no longer carries: a typed link, a hand-built
      * server, a config file. Unchanged in behaviour — only their entry point left the add menu.
      *
-     * **Nothing calls this yet**, exactly as [showServerActions] is kept with no caller: the owner
-     * removed them from the add menu and said where they belong next is his to say. They are one
-     * row away from a home — a «Другие способы добавления» row in the Настройки tab's ПОДПИСКА
+     * **Nothing calls this yet, and that is the one unfinished piece of the owner's cut**: he
+     * removed the three from the add menu and said where they belong next is his to say. They are
+     * one row away from a home — a «Другие способы добавления» row in the Настройки tab's ПОДПИСКА
      * section calling this — and until that row exists the capability is preserved rather than
-     * deleted. Do not inline these back into the add menu.
+     * deleted. Do not inline these back into the add menu, and do not delete them for being
+     * unreachable: the entry point is what moved, not the feature.
      */
     fun showAdvancedAddMethods()
 
@@ -370,7 +371,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
         // Аккаунт exists only while signed in, so a restored selection of it is honoured only if
         // that is still true — otherwise the tab would be attached (and would start loading) for a
         // user refreshNavGates is about to move off it anyway.
-        val start = if (initialNav == R.id.nav_account && !accountAccessAllowed()) {
+        val start = if (initialNav == R.id.nav_account && !accountTabAvailable()) {
             R.id.nav_home
         } else {
             initialNav
@@ -751,7 +752,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * Each action delegates to an existing per-server flow; duplicate reuses
      * [MmkvManager.encodeServerConfig] with a blank guid to mint a fresh copy.
      *
-     * Nothing calls this today — see [MainHost.showServerActions] for why it is kept whole.
+     * Opened by a long press on a row of Главная's list — see [MainHost.showServerActions].
      */
     override fun showServerActions(guid: String) {
         val profile = MmkvManager.decodeServerConfig(guid) ?: return
@@ -770,7 +771,9 @@ class MainActivity : HelperBaseActivity(), MainHost {
                 mainViewModel.reloadServerList()
             },
             onSetDefault = { setSelectServer(guid) },
-            // -1: no list is on screen to drop a row from, so the removal is store-only.
+            // -1 = "no row index": the sheet knows the guid, not the adapter position. Главная
+            // repaints its whole list from the cache on a removal (HomeFragment.removeServerRow),
+            // so an index would buy nothing here.
             onDelete = { removeServer(guid, -1) },
         ).show()
     }
@@ -823,8 +826,9 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * servers — so the sign-in screen reads as a clean solid background with no tab buttons. It
      * returns as soon as EITHER is true (logged in OR at least one server). The nav is an overlay
      * in a FrameLayout (it never reserved layout space), so hiding it leaves no phantom bottom gap.
-     * When it reappears we guarantee a valid selected tab (the Account tab is only valid while
-     * signed in; otherwise fall back to Home).
+     * The selected tab is corrected in BOTH directions: when the bar reappears the selection has to
+     * be one that still exists (Аккаунт only while signed in), and when it disappears the tab on
+     * screen has to be Главная, since a hidden bar leaves no way back to it.
      *
      * **The count is the STORED one, never `serversCache`** (D15). `serversCache` is a *view*: it
      * is rebuilt by `MainViewModel.updateCache()` through `subscriptionId` and `keywordFilter`, so
@@ -844,10 +848,17 @@ class MainActivity : HelperBaseActivity(), MainHost {
         if (becomingVisible) {
             val valid = when (MainTab.fromNavId(selectedNavId)) {
                 MainTab.HOME, MainTab.SETTINGS -> true
-                MainTab.ACCOUNT -> accountAccessAllowed()
+                MainTab.ACCOUNT -> accountTabAvailable()
                 null -> false
             }
             if (!valid) selectTabWhenIdle(R.id.nav_home)
+        } else if (!show && selectedNavId != R.id.nav_home) {
+            // The other half of the same invariant: with no bar there is no way back to Главная
+            // except the BACK key, so the onboarding state must never be entered while another
+            // tab's content is on screen. (Reaching it needs the last server to go while Настройки
+            // is open; the correction is here rather than at each such site so the invariant is
+            // total — bar hidden implies Главная — instead of true only on the way back.)
+            selectTabWhenIdle(R.id.nav_home)
         }
     }
 
@@ -860,13 +871,23 @@ class MainActivity : HelperBaseActivity(), MainHost {
         AccountSession.isLoggedIn()
 
     /**
+     * The one gate for "the Аккаунт tab exists": signed in, and a backend to sign in to.
+     *
+     * ONE expression, because [updateAccountNav] and [dropAccountTab] must not be able to disagree
+     * — the item hiding while the fragment stays added and collecting is D12 itself, and two
+     * copies of the condition is how that comes back.
+     */
+    private fun accountTabAvailable(): Boolean =
+        BackendConfig.isConfigured() && accountAccessAllowed()
+
+    /**
      * Recomputes the visibility of the Аккаунт nav item from that gate. Called whenever the account
      * state changes (login/logout) and whenever the subscription / server list changes — a pasted
      * subscription never unlocks the tab. Главная applies the same gate to its account chip
      * (`HomeFragment.applyAccountHeaderGate`); the bar itself is the shell's.
      */
     private fun updateAccountNav() {
-        val available = BackendConfig.isConfigured() && accountAccessAllowed()
+        val available = accountTabAvailable()
         binding.navAccount.isVisible = available
         // Hiding the item is not enough: the tab BEHIND it has to go too — see dropAccountTab.
         if (!available) dropAccountTab()
@@ -884,8 +905,13 @@ class MainActivity : HelperBaseActivity(), MainHost {
      *
      * Posted, not inline, for the same reason [selectTabWhenIdle] is: the account state arrives on
      * a fragment's own collector, inside the FragmentManager's dispatch, where a second commit
-     * throws. Every precondition is re-read inside the runnable, so a sign-in that lands in that
-     * one frame cancels the removal instead of racing it.
+     * throws. Every precondition is re-read inside the runnable — through the SAME
+     * [accountTabAvailable] gate the caller used — so a sign-in that lands in that one frame
+     * cancels the removal instead of racing it.
+     *
+     * Being posted also keeps the removal behind the sign-out repaint: `AccountFragment` reloads
+     * the server list from its own collector when the session ends (the store has just lost that
+     * account's подписки), and that runs while this runnable is still queued.
      */
     private fun dropAccountTab() {
         val attached = supportFragmentManager.findFragmentByTag(MainTab.ACCOUNT.tag) != null
@@ -893,7 +919,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
         binding.bottomNav.post {
             if (isFinishing || isDestroyed) return@post
             // Signed back in within the frame: the tab is legitimate again, leave it alone.
-            if (accountAccessAllowed()) return@post
+            if (accountTabAvailable()) return@post
             val fm = supportFragmentManager
             if (fm.isStateSaved) return@post
             // Off the tab first — removing the fragment the user is looking at would empty the
@@ -1007,10 +1033,13 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * different server, the running tunnel is left untouched and an explicit "apply it" action is
      * offered instead, so a tap in the list can never silently tear down a working connection.
      *
-     * The shell still owns the write, and still fans it out, because more than one surface reads the
-     * selected server: Главная's under-shield label today, and whatever list is plugged into
-     * [serverActions] next. A list that is on screen mirrors the change through
-     * [MainRecyclerAdapter.setSelectServer]; there is none right now, so only Главная is told.
+     * The shell owns the write, and fans it out, because more than one surface reads the selected
+     * server: Главная's under-shield label, its subscription card, and its inline list. The one
+     * call below carries both halves — `HomeFragment.onSelectedServerChanged` repaints the labels
+     * AND mirrors the change into the adapter via [MainRecyclerAdapter.setSelectServer], which is
+     * what guarantees exactly one row is ever painted selected. Never write the store here without
+     * that call: a row painted from MMKV instead of the mirrored guid is how two rows end up
+     * looking selected at once.
      */
     private fun setSelectServer(guid: String) {
         val selected = MmkvManager.getSelectServer()
