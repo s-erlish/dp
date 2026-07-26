@@ -6,6 +6,7 @@ import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
+import com.v2ray.ang.auth.BackendConfig
 import com.v2ray.ang.databinding.ActivityProviderSettingsBinding
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
@@ -61,12 +62,20 @@ class ProviderSettingsActivity : BaseActivity() {
         // ОБНОВЛЕНИЕ
         binding.rowAutoUpdate.setOnClickListener { toggleAutoUpdate() }
         binding.rowInterval.setOnClickListener { pickInterval() }
-        binding.rowNotify.setOnClickListener { toggleLocalBool(PREF_NOTIFY_ON_UPDATE, binding.switchNotify) }
+        binding.rowNotify.setOnClickListener {
+            toggleBool(AppConfig.PREF_SUB_NOTIFY_ON_UPDATE, binding.switchNotify, SettingsManager.isNotifyOnSubscriptionUpdate())
+        }
 
         // ПРИ ЗАПУСКЕ
-        binding.rowUpdateOnLaunch.setOnClickListener { toggleLocalBool(PREF_UPDATE_ON_LAUNCH, binding.switchUpdateOnLaunch) }
-        binding.rowPingOnLaunch.setOnClickListener { toggleLocalBool(PREF_PING_ON_LAUNCH, binding.switchPingOnLaunch) }
-        binding.rowPingOnUpdate.setOnClickListener { toggleLocalBool(PREF_PING_ON_UPDATE, binding.switchPingOnUpdate) }
+        binding.rowUpdateOnLaunch.setOnClickListener {
+            toggleBool(AppConfig.PREF_SUB_UPDATE_ON_LAUNCH, binding.switchUpdateOnLaunch, SettingsManager.isUpdateSubscriptionOnLaunch())
+        }
+        binding.rowPingOnLaunch.setOnClickListener {
+            toggleBool(AppConfig.PREF_PING_ON_LAUNCH, binding.switchPingOnLaunch, SettingsManager.isPingOnLaunch())
+        }
+        binding.rowPingOnUpdate.setOnClickListener {
+            toggleBool(AppConfig.PREF_PING_ON_UPDATE, binding.switchPingOnUpdate, SettingsManager.isPingOnSubscriptionUpdate())
+        }
 
         // СЕТЬ
         binding.rowSendHwid.setOnClickListener { toggleSendHwid() }
@@ -82,11 +91,11 @@ class ProviderSettingsActivity : BaseActivity() {
     private fun bindState() {
         binding.switchAutoUpdate.isChecked = isAutoUpdateOn()
         binding.valueInterval.text = intervalLabel(storedIntervalMinutes())
-        binding.switchNotify.isChecked = MmkvManager.decodeSettingsBool(PREF_NOTIFY_ON_UPDATE, true)
+        binding.switchNotify.isChecked = SettingsManager.isNotifyOnSubscriptionUpdate()
 
-        binding.switchUpdateOnLaunch.isChecked = MmkvManager.decodeSettingsBool(PREF_UPDATE_ON_LAUNCH, false)
-        binding.switchPingOnLaunch.isChecked = MmkvManager.decodeSettingsBool(PREF_PING_ON_LAUNCH, false)
-        binding.switchPingOnUpdate.isChecked = MmkvManager.decodeSettingsBool(PREF_PING_ON_UPDATE, true)
+        binding.switchUpdateOnLaunch.isChecked = SettingsManager.isUpdateSubscriptionOnLaunch()
+        binding.switchPingOnLaunch.isChecked = SettingsManager.isPingOnLaunch()
+        binding.switchPingOnUpdate.isChecked = SettingsManager.isPingOnSubscriptionUpdate()
 
         binding.switchSendHwid.isChecked = SettingsManager.isSendHwid()
         binding.valueUserAgent.text = currentUserAgent()
@@ -165,9 +174,13 @@ class ProviderSettingsActivity : BaseActivity() {
         binding.switchSendHwid.isChecked = enabled
     }
 
+    /**
+     * The User-Agent subscription fetches will actually send: the global override when set,
+     * otherwise the operator default the build ships with. Showing the effective value keeps the
+     * row honest instead of advertising a string the app never sends.
+     */
     private fun currentUserAgent(): String =
-        MmkvManager.decodeSettingsString(PREF_SUB_USER_AGENT, DEFAULT_USER_AGENT)
-            ?.ifBlank { DEFAULT_USER_AGENT } ?: DEFAULT_USER_AGENT
+        SettingsManager.getSubscriptionUserAgent() ?: BackendConfig.subscriptionUserAgent
 
     private fun editUserAgent() {
         val input = EditText(this).apply {
@@ -180,8 +193,8 @@ class ProviderSettingsActivity : BaseActivity() {
             .setTitle(R.string.ps_user_agent)
             .setView(input)
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                val value = input.text.toString().trim().ifEmpty { DEFAULT_USER_AGENT }
-                MmkvManager.encodeSettings(PREF_SUB_USER_AGENT, value)
+                // An empty field clears the override rather than storing a blank User-Agent.
+                MmkvManager.encodeSettings(AppConfig.PREF_SUB_USER_AGENT, input.text.toString().trim())
                 bindState()
             }
             .setNegativeButton(android.R.string.cancel, null)
@@ -190,12 +203,11 @@ class ProviderSettingsActivity : BaseActivity() {
 
     // ---------------- СПИСОК СЕРВЕРОВ ----------------
 
-    private fun currentSortOrder(): String =
-        MmkvManager.decodeSettingsString(PREF_SERVER_SORT_ORDER, sortValues.first()).orEmpty()
+    private fun currentSortOrder(): String = SettingsManager.getServerSortOrder()
 
     private fun sortLabelRes(value: String): Int = when (value) {
-        "ping" -> R.string.ps_sort_ping
-        "name" -> R.string.ps_sort_name
+        AppConfig.SERVER_SORT_PING -> R.string.ps_sort_ping
+        AppConfig.SERVER_SORT_NAME -> R.string.ps_sort_name
         else -> R.string.ps_sort_default
     }
 
@@ -205,7 +217,10 @@ class ProviderSettingsActivity : BaseActivity() {
         AlertDialog.Builder(this)
             .setTitle(R.string.ps_sort_order)
             .setSingleChoiceItems(entries, idx) { dialog, which ->
-                MmkvManager.encodeSettings(PREF_SERVER_SORT_ORDER, sortValues[which])
+                MmkvManager.encodeSettings(AppConfig.PREF_SERVER_SORT_ORDER, sortValues[which])
+                // Order lives in storage, so reorder now — the servers list renders what is stored
+                // and never re-sorts on its own.
+                SettingsManager.applyServerSortOrder()
                 bindState()
                 dialog.dismiss()
             }
@@ -215,9 +230,13 @@ class ProviderSettingsActivity : BaseActivity() {
 
     // ---------------- helpers ----------------
 
-    /** Flip a locally-persisted boolean pref and reflect it on its switch. */
-    private fun toggleLocalBool(key: String, switch: com.google.android.material.materialswitch.MaterialSwitch) {
-        val enabled = !MmkvManager.decodeSettingsBool(key, key == PREF_NOTIFY_ON_UPDATE || key == PREF_PING_ON_UPDATE)
+    /** Flip a boolean pref and reflect it on its switch. [current] carries the default. */
+    private fun toggleBool(
+        key: String,
+        switch: com.google.android.material.materialswitch.MaterialSwitch,
+        current: Boolean
+    ) {
+        val enabled = !current
         MmkvManager.encodeSettings(key, enabled)
         switch.isChecked = enabled
     }

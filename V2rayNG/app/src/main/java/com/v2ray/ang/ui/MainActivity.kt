@@ -1585,6 +1585,9 @@ class MainActivity : HelperBaseActivity() {
             }
             if (mainViewModel.isRunning.value == true) {
                 connectInProgress = false
+                // Nothing restarted, so an auto-fallback restart is no longer in flight — leaving
+                // the flag set would make the next real disconnect look internal.
+                mainViewModel.fallbackInProgress = false
                 showStatusToast(getString(R.string.toast_status_failed))
                 applyRunningState(isLoading = false, isRunning = true)
                 return@launch

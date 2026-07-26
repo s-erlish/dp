@@ -115,8 +115,9 @@ object FlagUtil {
     }
 
     /**
-     * "NL - Amsterdam", "US·LA", "DE". The code must open the remark in upper case and be
-     * followed by a separator or nothing — "IT support" and "in-1" are prose, not countries.
+     * "NL - Amsterdam", "US·LA", "DE", "US East". The code must open the remark in upper case
+     * and not be glued to a longer word; what follows it may be a separator, nothing, or a
+     * place name — but not prose, which is what makes "IT support" and "NO LIMIT" globes.
      */
     private fun leadingCode(remark: String): String? {
         var start = 0
@@ -126,10 +127,28 @@ object FlagUtil {
         val b = remark[start + 1]
         if (a !in 'A'..'Z' || b !in 'A'..'Z') return null
         var after = start + 2
-        while (after < remark.length && remark[after] == ' ') after++
         if (after < remark.length && remark[after].isLetter()) return null
+        while (after < remark.length && remark[after].isWhitespace()) after++
+        if (after < remark.length && remark[after].isLetter() && looksLikeProse(remark, after)) return null
         val c = "$a$b"
         return if (isKnownCode(c)) normalizeCode(c) else null
+    }
+
+    /**
+     * Tells "US East"/"DE Berlin"/"IR تهران" (place names) from "IT support"/"NO LIMIT" (prose)
+     * by the word starting at [at]: a lower-case opener or an all-upper word is prose, a
+     * capitalised word with lower-case letters — or a caseless script — is a name.
+     */
+    private fun looksLikeProse(remark: String, at: Int): Boolean {
+        if (remark[at].isLowerCase()) return true
+        var i = at
+        var sawUpper = false
+        while (i < remark.length && remark[i].isLetter()) {
+            if (remark[i].isLowerCase()) return false
+            if (remark[i].isUpperCase()) sawUpper = true
+            i++
+        }
+        return sawUpper
     }
 
     /** Word-boundaried search, so "india" doesn't match "Indiana" nor "usa" "Usain". */

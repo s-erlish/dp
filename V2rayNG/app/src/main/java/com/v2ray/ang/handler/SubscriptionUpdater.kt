@@ -38,7 +38,8 @@ object SubscriptionUpdater {
      *
      * Startup/boot callers should use the default mode so existing periodic work is kept.
      * Use forceReschedule=true only when the next run time needs to be recalculated from
-     * the latest persisted subscription state (for example after a manual refresh).
+     * the latest persisted subscription state (for example after a manual refresh); that mode also
+     * skips the once-per-process launch tasks in [runLaunchTasks].
      * Call from: MainActivity.onCreate(), BootReceiver.onReceive().
      */
     fun sync(
