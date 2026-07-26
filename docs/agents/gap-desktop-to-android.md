@@ -373,7 +373,7 @@ Two things that look like N/A cases and are not, so nobody files them as such la
 | A3 | **Provider controls: notify on update, update on launch, ping on launch, ping on update, HWID toggle, list sort order** | `res/layout/activity_provider_settings.xml:174,260,313,366,438,590` | `Views/ProviderSettingsPage.axaml` has auto-update `:70`, interval `:89`, HWID readout `:104`, User-Agent `:125`, and nothing else - and it is referenced by nothing (`11-app-structure.md` 10.2 verdict WIRE) | **PORT to desktop NOW**, M. `12-settings.md` 5.6 has already ordered part of it: `Проверять при запуске` and `Проверять после обновления подписки` bind to `SpeedTestItem.PingOnLaunch` / `PingOnUpdate`, both marked **NEW** on the desktop side. The remaining four rows and the page's own wiring are the rest |
 | A4 | **Hysteria v1 profiles** | `enums/EConfigType.kt:16` `HYSTERIA(900)` | `Enums/EConfigType.cs` has `Hysteria2` only | **NO** - Hysteria v1 is superseded; nothing in the provider issues it. Logged so it is not mistaken for a desktop defect |
 | A5 | **In-app memory reading for the core process** | `util/MemoryStatsManager.kt`, gated by `pref_show_memory` | none | **NO** - `12-settings.md` 6.1 deletes the memory card and its toggle on Android. Do not port a feature that is being removed |
-| A6 | **Subscription-user-info parsing (traffic and expiry from the provider header)** | `util/SubscriptionUserInfo.kt`, `util/HttpUtil.kt:264` `getUrlContentWithUserAgentEx` | not found in `ServiceLib/` | **PORT to desktop LATER**, S. Needs verification of the desktop side, see section 10 |
+| A6 | **`subscription-userinfo` header parsing (traffic and expiry straight from the provider URL)** | `util/SubscriptionUserInfo.kt`, `util/HttpUtil.kt:261-275` `getUrlContentWithUserAgentEx`, which reads the header alongside the body | no header path. `Views/SubscriptionMetaView.axaml:227-249` renders traffic and expiry, but the values come from the Departament backend account response (`ViewModels/AccountViewModel.cs:2232` reads `raw?.TrafficUsed` / `raw?.UserTraffic?.UsedTrafficBytes`), not from the subscription response | **PORT to desktop LATER**, S. For a Departament provider the two paths agree, so this only bites on a third-party provider URL, where desktop shows nothing and Android shows the real figures |
 
 ### 8.2 Android-only by platform, already logged
 
@@ -471,26 +471,26 @@ Twenty-three capabilities, matching the count in section 1.
 
 ---
 
-## 10. What could not be verified
+## 10. Open points
 
-Stated rather than guessed, per the task's instruction.
+Items 1, 2 and 4 could not be verified from the source and are stated as such rather than guessed.
+Item 3 was verified and is recorded because it belongs to somebody else's pass.
 
-1. **Whether the desktop parses `subscription-userinfo` (A6).** Android does, at
-   `util/SubscriptionUserInfo.kt` and `util/HttpUtil.kt:264`. A grep of `ServiceLib/` for
-   `subscription-userinfo` and `SubscriptionUserInfo` found no match, but the desktop
-   `SubscriptionMetaView` does render traffic and expiry, so the data reaches the UI by **some**
-   path this pass did not locate. A6 is therefore filed as PORT LATER with a verification step in
-   front of it, not as a confirmed gap.
-2. **Whether desktop `Speedtest` and `Mixedtest` differ in more than concurrency.** Both dispatch to
+1. **Whether desktop `Speedtest` and `Mixedtest` differ in more than concurrency.** Both dispatch to
    `RunMixedTestAsync` at `Services/SpeedtestService.cs:60` and `:64`, with `concurrencyCount` 1
    versus `_config.SpeedTestItem.MixedConcurrencyCount` and `blSpeedTest` true in both. That reading
    is what F3's refusal rests on; if the two differ deeper in the call chain, F3 should be
    re-examined.
-3. **Whether the real `libv2ray` artefact is Xray-only.** `app/libs/` contains only
+2. **Whether the real `libv2ray` artefact is Xray-only.** `app/libs/` contains only
    `libv2ray-stub.jar` on this checkout, so the engine claim in section 4 rests on
    `core/CoreNativeManager.kt:7-10` (which imports `libv2ray` and nothing else), on
    `enums/EConfigType.kt` and on the absence of any sing-box or mihomo symbol anywhere in
    `app/src/main/java/`. The real AAR was not present to inspect.
+3. **`ProviderSettingsPage.axaml:109` carries a raw em-dash character in its `Text=` attribute** as the HWID
+   placeholder. That is a defect against `00-rules.md` 1.4.11 and 9.2, and it is outside this
+   document's scope to fix, but it is recorded here because the 1.5 desktop dash grep only scans
+   `Common/L.*.cs` and would never find it. Whoever runs the desktop copy pass should widen that
+   grep to `Views/`.
 4. **Effort estimates are unvalidated.** Nothing in this document was built. S/M/L is a reading of
    how much code the equivalent occupies on desktop plus what Android is missing underneath it, and
    it should be re-checked by whoever picks up the work order.
