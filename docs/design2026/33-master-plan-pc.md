@@ -2256,38 +2256,53 @@ meets, so its action must work: it triggers the elevation prompt, which on Linux
 
 ### 5.8 Every state of Главная
 
+Fifteen states. The status words are 2.12.1 and are not paraphrased.
+
 | State | Rendering |
 |---|---|
-| **Default, disconnected** | Neutral disc, «Не подключено», no stats row, three ledger rows |
-| **Default, connected** | Filled shield, green dot, «Подключено», stats row visible with live values |
-| **Connecting** | Arc, «Подключение…», stats row hidden, disc still clickable to cancel |
-| **First run** | Reached only past onboarding, so: disc **disabled**, gate line «Купите тариф, чтобы подключаться к серверам Departament.», `#rowServer` in its "no server" form, `#rowSubscription` in its `нет подписки` form with the chip absent and one `Button.Primary` «Купить подписку» as the row's trailing element instead of a chevron |
-| **Loading** | The three ledger rows render as skeletons; the disc is disabled with no gate line. Appears only after 300ms |
-| **Empty (no servers, signed in)** | Disc disabled, `#rowServer` reads «Серверов пока нет» / «Добавьте провайдера, чтобы появились серверы», chevron → `servers` |
-| **Error (tunnel)** | Red ring, `Brush.RedText` shield outline, status «Не удалось подключиться», gate line = the taxonomy's cause, «Нажмите, чтобы повторить» under the disc, and the status strip carries the recovery action |
-| **Offline** | Persistent info strip `Нет сети. Показаны последние данные.` with «Повторить»; the ledger keeps its last values; the disc is enabled (connecting is the way out of offline) |
-| **Partial** | The subscription row failed but servers loaded: the subscription row shows «Не удалось загрузить» with a `Button.Text` «Повторить» as its trailing element; everything else renders |
-| **Long content** | A 70-character server remark wraps to two lines and the row grows; a 40-character Telegram handle ellipsises at the end |
-| **Short content** | One server, no subscription: the layout still has three rows and does not look broken |
-| **Gated** | Expired subscription: disc disabled, gate line, and `#rowSubscription`'s trailing element becomes `Button.Primary` «Продлить» |
-| **Success** | The hero moment (5.3.6), then stillness |
+| **Default, disconnected** | Neutral P3 disc, grey dot + «Отключено», no stats row, server row + subscription card |
+| **Default, connected** | Filled accent shield, green dot + «Подключено», stats row visible with live values |
+| **Connecting** | Arc over the ring, accent dot + «Подключение…», stats row hidden, disc still clickable to cancel |
+| **Disconnecting** | Shield crossfades filled → outline over 220ms, grey dot + «Отключение…», stats row fades out over 165ms |
+| **First run, signed out** | Disc at 0.38 and not clickable, grey dot + «Отключено». Below: `Border.EmptyIcon` 64 + Title «Начните с входа» + Body «Войдите, чтобы получить серверы Departament и управлять подпиской.» + `Button.Primary` «Войти» + `Button.Text` «Добавить провайдера». No server row, no card |
+| **First run, signed in, no subscription** | Same disc. Below: `Border.EmptyIcon` + Title «Подписки пока нет» + Body «Купите тариф, чтобы подключаться к серверам Departament.» + `Button.Primary` «Купить» + `Button.Text` «Добавить провайдера» |
+| **Loading** | The disc is **live and usable immediately**; the server row and the subscription card render as skeletons after 300ms. A returning user never waits to press the one control they came for |
+| **Empty (no servers, signed in)** | Disc at 0.38, grey dot + «Сервер не выбран». The server row reads «Серверов пока нет» / «Добавьте провайдера, чтобы появились серверы», chevron → `servers` |
+| **Error (tunnel)** | Red ring, `Brush.RedText` shield outline, red dot + «Не подключено», the taxonomy's cause on the gate line, «Нажмите, чтобы повторить» under the disc, and the status strip carries the recovery action |
+| **Offline** | Persistent info strip `Нет сети. Показаны последние данные.` with «Повторить»; the card keeps its last values under a `Caption` «Данные могли устареть»; «Продлить» and «Купить» are disabled; **the disc stays enabled**, because connecting is the way out of offline |
+| **Partial** | The subscription failed but servers loaded: the card renders its error state; the disc, the status line and the server row are normal |
+| **Long content** | A 70-character server remark wraps to two lines and the row grows to 72px; a subscription name over 40 characters wraps to two lines inside the card |
+| **Short content** | One server, no subscription: the server row plus the empty-state card. The column does not collapse and the disc stays centred |
+| **Gated** | Expired subscription: disc at 0.38, grey dot + «Подписка истекла», gate line `Подписка истекла. Продлите её, чтобы подключаться.`, and the card's row 6 is `Button.Primary` «Продлить» |
+| **Success** | Bounded moment 1 (5.3.6), then stillness |
 
 ### 5.9 Keyboard path
 
-`Tab` order: rail, then `#connectFrame`, then `#rowServer`, `#rowSubscription`, `#rowAccount`, then
-the status strip's action if present. `Ctrl+Enter` toggles from anywhere. `Ctrl+2` leaves for
+`Tab` order: rail → `#connect` → `#rowServer` → `#cardSubscription`'s action button, if it has one →
+the status strip's action, if present. The card itself is one tab stop and `Enter` opens
+`account/subscription/{id}`. `Ctrl+Enter` toggles the tunnel from anywhere. `Ctrl+2` leaves for
 Серверы. Every task on this page is completable with no mouse.
 
 ### 5.10 Главная acceptance
 
 - [ ] Zero gradients, zero glows, zero looping idle animation
-- [ ] Exactly one accent element at rest (the rail); two when connected or connecting
-- [ ] The disc is neutral when disconnected
-- [ ] Stats appear only when connected; uptime is the middle and largest figure; nothing jitters
-- [ ] One card, three rows, one section header, and gaps of 32 / 24 / 16 / 8 / 4 present
+- [ ] **Accent count is 0 when disconnected and 1 when connected or connecting.** Counted on the
+      running screen against 2.2, excluding the rail and the focus ring
+- [ ] The disc is neutral P3 at rest and carries no blue at all
+- [ ] **Someone opened the light theme and looked at the disc.** It is a 1.13:1 fill inside a
+      1.53:1 ring; if it does not read as an object, the ring is wrong, not the fill
+- [ ] The same check in mono dark and mono light
+- [ ] Ring, arc and sonar all draw on the same 176 circle; there is no 200px frame
+- [ ] Stats appear only when connected; three equal columns at 16/500; the unit is inside the
+      value; download is first; nothing jitters
+- [ ] The composition matches 2.12.3 exactly: object, status, gate, strip, «Сервер» + one row,
+      «Подписка» + one card. **No account row, no second card, no list**
+- [ ] The status word is one of the six in 2.12.1, and «Не подключено» appears only after a failure
+- [ ] No `Headline` and no `Display` anywhere on this screen (5.1)
 - [ ] Two panes above 980, one column below, no divider between panes
-- [ ] All thirteen states in 5.8 implemented and looked at
-- [ ] The server row and the subscription row use the same vocabulary as Серверы and Аккаунт
+- [ ] All fifteen states in 5.8 implemented and looked at
+- [ ] `ConnectControl.axaml` under 120 lines and `ConnectControl.axaml.cs` under 260 (5.3)
+- [ ] The server row and the subscription card use the same vocabulary as Серверы and Аккаунт
 
 ---
 
@@ -2359,25 +2374,60 @@ Group headers are **sticky** here because the list is long enough to lose contex
 ### 6.3 The list toolbar
 
 ```
-Grid  Height 56  Margin 16,0  ColumnDefinitions="*,Auto,Auto,Auto"  ColumnSpacing 8
+Grid  Height 56  Margin 16,0  ColumnDefinitions="*,Auto,Auto,Auto,Auto"  ColumnSpacing 8
 ├─ [0] TextBox.Field.search   Height 40   MaxWidth 360   HorizontalAlignment=Left
 │        watermark «Поиск серверов…»   leading Geo.Action.Search 20
 │        trailing clear button when non-empty     Ctrl+F focuses, Esc clears
-├─ [1] Button.IconButton40  Geo.Action.Sort     ToolTip «Сортировка»       → flyout
+├─ [1] Button.IconButton40  Geo.Action.Sort     ToolTip «Сортировка»       → sort flyout
 ├─ [2] Button.IconButton40  Geo.Action.Speed    ToolTip «Проверить задержку (Ctrl+P)»
-└─ [3] Button.IconButton40  Geo.Action.Add      ToolTip «Добавить (Ctrl+N)» → MenuFlyout
+├─ [3] Button.IconButton40  Geo.Action.Add      ToolTip «Добавить (Ctrl+N)» → add flyout
+└─ [4] Button.IconButton40  Geo.Action.More     ToolTip «Ещё»              → list flyout
 ```
 
 - **Search filters in place; it never navigates.** It matches the remark, the address, the protocol
   and the provider name, case-insensitive, and it is debounced at 120ms.
-- **Sort flyout**, three options, radio semantics with a filled check on the current one:
-  «По умолчанию» · «По задержке» · «По названию». Persisted per provider. This mirrors the
-  `sort-order: none | ping | name` header both reference protocols carry.
-- **Add flyout**: «Добавить провайдера» · «Добавить по QR-коду (Ctrl+S)» · «Добавить из буфера
-  обмена (Ctrl+V)» · hairline · «Создать сервер вручную» → route `servers/editor`.
-- Four trailing controls is the ceiling. A fifth goes into a kebab. (Android's header today carries
-  four 36px icon buttons crammed against the right edge, all under the 48dp floor; desktop's are 40px
-  and meet the desktop floor.)
+- **Sort flyout**, **five** options, radio semantics with a filled check on the current one:
+
+  | Item | Backing | Note |
+  |---|---|---|
+  | «Как у провайдера» | the subscription's own order | the default |
+  | «Вручную» | `MoveTopCmd` / `MoveUpCmd` / `MoveDownCmd` / `MoveBottomCmd`, `ProfilesViewModel.cs:76-80` | **selecting it enables drag and `Alt+Up` / `Alt+Down`** on the list; while any other order is active, dragging a row is refused with the strip line `Перетаскивание работает в ручной сортировке` and an action `Включить` |
+  | «По задержке» | `SortServerResultCmd` on the ping column | |
+  | «По названию» | remark, natural sort | |
+  | «По протоколу» | protocol then remark | |
+
+  Persisted per provider. The first three mirror the `sort-order: none \| ping \| name` header both
+  reference protocols carry. **«Вручную» is the item the first issue of this document omitted**, and
+  with it went the only UI for four shipping commands (F7).
+- **Add flyout**: «Добавить провайдера» · «Добавить по QR-коду (Ctrl+Shift+S)» · «Добавить из буфера
+  обмена (Ctrl+V)» · «Импорт из файла…» · hairline · «Создать сервер вручную» → `servers/editor`.
+  Everything in it is also reachable by dropping the same thing on the window (3.12).
+- **List flyout** («Ещё»), the bulk hygiene set, which today has no UI at all outside the dead
+  `ProfilesView`:
+
+  ```
+  ├─ Проверить скорость всех            Geo.Action.Speed    (Ctrl+Shift+P)   → SpeedServerCmd
+  ├─ Проверить UDP                      Geo.Action.Udp                       → UdpTestServerCmd
+  ├─ Полная проверка                    Geo.Action.Check                     → MixedTestServerCmd
+  ├─ hairline
+  ├─ Отсортировать по результатам       Geo.Action.Sort                      → SortServerResultCmd
+  ├─ Удалить дубликаты                  Geo.Action.Broom                     → RemoveDuplicateServerCmd
+  ├─ Удалить не отвечающие              Geo.Action.Broom                     → RemoveInvalidServerResultCmd
+  ├─ hairline
+  ├─ Собрать группу из всех             Geo.Server.Group                     → GenGroupAllServerCmd
+  └─ Собрать группы по странам          Geo.Server.Group                     → GenGroupRegionServerCmd
+  ```
+
+  Each of the three destructive-ish items («Удалить дубликаты», «Удалить не отвечающие») reports
+  through the status strip with a count and an undo: `Удалено дубликатов: 14` · `Отменить`, 5
+  seconds, exactly like a single delete (6.6). Neither opens a dialog: they are batch operations on
+  a list the user can rebuild by refreshing the provider.
+  «Собрать группу из всех» and «Собрать группы по странам» create **balancer profiles** and report
+  `Создана группа «Все серверы» · 147 участников` · `Открыть`, which opens
+  `servers/editor/{id}` in its «Группа» mode (8.1).
+- Five trailing controls is the ceiling and the fifth is itself the overflow. Android's header today
+  carries four 36px icon buttons crammed against the right edge, all under the 48dp floor; desktop's
+  are 40px and meet the desktop floor.
 
 ### 6.4 The provider pane (wide only)
 
@@ -2399,8 +2449,10 @@ Border  Width 300  Background Brush.Bg
    └─ [Bottom] Button.Text  «Добавить провайдера»   Margin 16,8,16,16
 ```
 
-Selection is `Brush.SelectedFill` plus a 2px `Brush.Accent` left-edge **indicator is banned**
-(side-stripe). Instead: `Brush.SelectedFill` fill plus the title stepping to weight 700. Two channels.
+**Selection is `Brush.SelectedFill` plus the title stepping to weight 700.** Two channels, one fill
+and one weight. **A left-edge accent indicator is banned** - a side stripe is the affordance this
+product does not use anywhere, and a 2px bar hanging off a row's leading edge breaks the 68px text
+origin that every other list obeys.
 
 **Provider `MenuFlyout`:** «Обновить» · «Переименовать» · «Закрепить» / «Открепить» · «Открыть
 поддержку» · «Скопировать ссылку» · hairline · «Удалить провайдер» in `Brush.RedText`.
@@ -2452,36 +2504,93 @@ so an adapter can still call `setBackgroundColor` is an Android artefact; deskto
 
 ### 6.6 Actions
 
-**Discovery is the problem today**: the context menu is the only route to seven actions and nothing
-on the row says so. Three entrances, all opening the same `MenuFlyout`:
+**Discovery is the problem today**: the context menu is the only route to the per-item actions and
+nothing on the row says so. Three entrances, all opening the same `MenuFlyout`:
 
 - Right-click anywhere on the row.
 - The kebab, which fades in at `Opacity 0 → 1` over 150ms on hover or keyboard focus.
 - The `Menu` key or `Shift+F10` when the row has focus.
 
+**6.6.1 The row flyout**, twelve items in five groups. Two of the groups are submenus, because a
+flat twelve-item menu is a wall and both groups have a natural label:
+
 ```
 MenuFlyout, 40px rows, 20px leading glyph, 12 gap
-├─ Подключиться                Geo.Action.Connect        (Enter)
-├─ Сделать основным            Geo.State.Check
-├─ Проверить задержку          Geo.Action.Speed          (Ctrl+P)
+├─ Подключиться                Geo.Action.Connect     (Enter)          → SetDefaultServer + connect
+├─ Сделать основным            Geo.State.Check                         → SetDefaultServerCmd
 ├─ hairline
-├─ Изменить                    Geo.Action.Edit           → route servers/editor/{id}
-├─ Дублировать                 Geo.Action.Copy
-├─ Поделиться · QR-код         Geo.Action.Qr             → QR dialog (9.2)
-├─ Поделиться · ссылка         Geo.Action.Link           → copies, status strip confirms
+├─ Проверить                                                       ▸   submenu
+│    ├─ Задержку               Geo.Action.Speed       (Ctrl+P)         → RealPingServerCmd
+│    ├─ Задержку по TCP        Geo.Action.Speed                        → TcpingServerCmd
+│    ├─ Скорость               Geo.Action.Download    (Ctrl+Shift+P)   → SpeedServerCmd
+│    ├─ UDP                    Geo.Action.Udp                          → UdpTestServerCmd
+│    └─ Всё сразу              Geo.Action.Check                        → MixedTestServerCmd
 ├─ hairline
-└─ Удалить                     Geo.Action.Delete   Brush.RedText   (Delete)
+├─ Изменить                    Geo.Action.Edit                         → servers/editor/{id}
+├─ Дублировать                 Geo.Action.Copy                         → CopyServerCmd
+├─ Переместить                                                     ▸   submenu, manual order only
+│    ├─ В начало               Geo.Action.ToTop       (Alt+Home)       → MoveTopCmd
+│    ├─ Выше                   Geo.Action.ArrowUp     (Alt+Up)         → MoveUpCmd
+│    ├─ Ниже                   Geo.Action.ArrowDown   (Alt+Down)       → MoveDownCmd
+│    ├─ В конец                Geo.Action.ToBottom    (Alt+End)        → MoveBottomCmd
+│    └─ В другую группу…       Geo.Server.Group                        → MoveToGroupCmd, PickerFlyout
+├─ Поделиться                                                      ▸   submenu
+│    ├─ Скопировать ссылку     Geo.Action.Link                         → Export2ShareUrlCmd
+│    ├─ QR-код                 Geo.Action.Qr                           → QR dialog (9.2)
+│    ├─ Ссылка в Base64        Geo.Action.Link                         → Export2ShareUrlBase64Cmd
+│    ├─ Конфиг в файл…         Geo.Action.Save                         → Export2ClientConfigCmd
+│    ├─ Конфиг в буфер         Geo.Action.Copy                         → Export2ClientConfigClipboardCmd
+│    └─ Внутренняя ссылка      Geo.Action.Link                         → Export2InnerUriCmd
+├─ hairline
+└─ Удалить                     Geo.Action.Delete   Brush.RedText  (Delete)  → RemoveServerCmd
 ```
+
+Rules that keep this a menu rather than a dump:
+
+- **«Переместить» is present only while the sort order is «Вручную»** (6.3). Under any other order
+  the whole submenu is hidden, not disabled, because moving a row in a sorted list has no meaning
+  and a disabled item that can never enable under the user's current choice is noise. The strip's
+  `Включить` action is how the user gets there.
+- **«Проверить» collapses to one item when the row is in a multi-selection**, reading «Проверить
+  выбранные», with the same five children.
+- **The four export formats are one submenu, not four top-level items.** «Скопировать ссылку» is the
+  one a normal user wants and it is first; the other four are for someone moving a config into
+  another client and they are labelled by what they produce, not by the command that produces them.
+  All five report through the status strip: `Ссылка скопирована`, `Конфиг сохранён` · `Показать в
+  папке`.
+- Every item that is a shortcut carries the shortcut in the item text, right-aligned.
 
 **Delete is undo, not confirm** (`00-rules.md` 7.5): the row disappears immediately and the status
 strip shows `Сервер удалён` with `Отменить` for 5 seconds. A dialog is reserved for genuinely
 irreversible costly actions, and deleting one server out of 147 is not one.
 
-**Multi-select.** `Ctrl+click` toggles, `Shift+click` extends, `Ctrl+A` selects all in the current
-group, `Esc` clears. With two or more selected, the list toolbar's right side is replaced by a
-selection bar: `«Выбрано 12»` plus `Button.Text` «Проверить задержку», `Button.Text` «Дублировать»,
-`Button.Text` «Удалить» in `Brush.RedText`, and a 40px close button. Deleting many is still undo, one
-strip for the whole batch.
+**6.6.2 Manual ordering, in full.** This is the interaction the first issue deleted by omission, and
+it needs a real spec because reordering by drag is where desktop lists usually go wrong.
+
+| Input | Behaviour |
+|---|---|
+| Drag a row | Available only in «Вручную». The grabbed row lifts to `Brush.SurfaceHigh` (P2, the one legal at-rest use of P2 being drag), `scale(1.02)`, `Opacity` 0.9, and follows the pointer. A 2px `Brush.Accent` insertion line draws between the two rows it would land between - this is a **line between rows**, not a stripe on a row, so it is not the banned side stripe |
+| Auto-scroll | Dragging within 48px of the viewport edge scrolls at 240px/s, accelerating to 720px/s at the edge |
+| Drop | The row settles into place over `Dur.State` 220ms `Ease.OutQuint`; the rows it displaced slide, they do not jump. The status strip says nothing: the result is visible |
+| Escape mid-drag | Cancels; the row returns to its origin over 220ms |
+| `Alt+Up` / `Alt+Down` | Moves the focused row one place and **keeps focus on the row**, so a user can press it four times. The list scrolls to keep the row visible. Announced to the screen reader as «Нидерланды, Amsterdam, позиция 4 из 147» |
+| `Alt+Home` / `Alt+End` | To the top or the bottom, same announcement |
+| `.lite` | Drag still works; the lift, the settle and the displacement all snap |
+
+Manual order is persisted per provider and survives a subscription refresh: a server that is still
+present keeps its position, a new server appends, and a vanished one is removed silently.
+
+**6.6.3 Multi-select.** `Ctrl+click` toggles, `Shift+click` extends, `Ctrl+A` selects all in the
+current group, `Esc` clears. With two or more selected, the list toolbar's right side is replaced by
+a selection bar:
+
+```
+«Выбрано 12»  ·  Button.Text «Проверить» ▸  ·  Button.Text «Дублировать»
+              ·  Button.Text «В другую группу…»  ·  Button.Text «Удалить» Brush.RedText
+              ·  Button.IconButton40 Geo.Action.Close  «Снять выделение (Esc)»
+```
+
+Deleting many is still undo, one strip for the whole batch: `Удалено серверов: 12` · `Отменить`.
 
 ### 6.7 The provider group header (compact, and «Все серверы» in wide)
 
@@ -2554,14 +2663,22 @@ container itself, not rely on realisation.
 ### 6.10 Серверы acceptance
 
 - [ ] Search exists, filters in place, and has a designed no-results state
-- [ ] Sort exists with three options and persists per provider
-- [ ] Every one of the seven per-item actions is reachable by mouse **and** by keyboard
-- [ ] Delete is undo; no confirmation dialog for a single server
+- [ ] Sort exists with **five** options including «Вручную», and persists per provider
+- [ ] **Every one of the 29 `ProfilesViewModel` commands is either reachable here or has a numbered
+      deletion in 12.2.** Section 8B is the checklist; a command with neither is a defect
+- [ ] Manual order works by drag **and** by `Alt+Up` / `Alt+Down` / `Alt+Home` / `Alt+End`, survives
+      a provider refresh, and announces the new position
+- [ ] All four export formats are reachable, and each says what it produced
+- [ ] All four probe types are reachable: задержка, TCP, скорость, UDP, and «всё сразу»
+- [ ] Bulk hygiene is reachable: дубликаты, не отвечающие, сортировка по результатам
+- [ ] Both group generators are reachable and open the resulting group in the editor
+- [ ] Delete is undo, single and batch; no confirmation dialog for a server
 - [ ] One unified server icon; no emoji in the tile and none left in the remark text
 - [ ] Ping never uses colour as its only signal, and never jitters
 - [ ] Group headers carry two buttons, both 40x40; no local size overrides
-- [ ] The list is virtualised and stays smooth at 500 rows
+- [ ] The list is virtualised and stays smooth at 500 rows, **including during a drag**
 - [ ] Two panes above 900px of content width, one column below; no nested scrollers
+- [ ] Accent count is **2** (the selected row's fill and its check), counted on the running screen
 - [ ] All twelve states in 6.8 implemented and looked at
 
 ---
@@ -2617,34 +2734,57 @@ Three sub-zones, two 1px `Brush.OutlineVariant` hairlines, one card. **No nested
 ```
 Border.Card #hero  Padding 16
 ├─ A identity     Grid ColumnDefinitions="48,12,*"
-│   ├─ Border.Avatar 48   monogram TextBlock.Headline 24/700 Brush.OnAccent on Brush.Tile.Blue
+│   ├─ Border.Avatar 48   r16   Brush.Tile.Blue
+│   │     monogram TextBlock.Headline 24/700 Brush.Accent, or the photo clipped to r16
 │   └─ StackPanel
 │        TextBlock.Title      «Александр»            16/700, ellipsises   ← was Headline 24
 │        TextBlock.Caption    «Тариф · Base»          or «Пробный период»
 ├─ hairline  Margin 0,16,0,16
-├─ B money        Grid ColumnDefinitions="*,Auto"  VerticalAlignment=Bottom
-│   ├─ StackPanel
-│   │    TextBlock.Caption  «Баланс»
+├─ B the number that matters      Grid ColumnDefinitions="*,Auto"  VerticalAlignment=Bottom
+│   ├─ StackPanel                                   ← the ONE Display in the product (2.3)
+│   │    TextBlock.Caption  «Осталось»
 │   │    StackPanel Orientation=Horizontal  VerticalAlignment=Bottom
-│   │      TextBlock.Display.Numeric «1 240»   34/700, tnum lnum, zero OFF (money)
-│   │      TextBlock.Title «₽»  Brush.OnSurfaceVariant  Margin 4,0,0,4
-│   └─ Button.Tonal  «Пополнить»   48h            ← was Primary; see the accent note
+│   │      TextBlock.Display.Numeric «14»    34/700, tnum lnum +zero
+│   │      TextBlock.Title «дней»  Brush.OnSurfaceVariant  Margin 6,0,0,5
+│   └─ StackPanel  HorizontalAlignment=Right         ← money, demoted
+│        TextBlock.Caption «Баланс»  HorizontalAlignment=Right
+│        TextBlock.Title.Numeric «1 240 ₽»  16/700   HorizontalAlignment=Right
+│        Button.Text «Пополнить»  40h  HorizontalAlignment=Right  Margin 0,4,0,0
 ├─ hairline  (only when HasReferral)
 └─ C referral     Grid ColumnDefinitions="*,Auto"
     ├─ TextBlock.Caption «Код друга» + Border.Chip.neutral with the code in Font.Numeric
     └─ Button.IconButton40.Row  Geo.Action.Copy   ToolTip «Скопировать код»
 ```
 
-Two changes with reasons:
+**Zone B's six substitutions**, because a 34px figure has to be right in every state:
 
-- **The name drops from `Headline` 24 to `Title` 16/700.** Today `Display` 34 (balance) plus
-  `Headline` 24 (name) plus `Headline` 24 (the ₽ symbol) sit inside one card and the identity fights
-  the money at the same weight. One `Display` per screen is the rule; the *second* loudest thing
-  should not tie with it.
-- **«Пополнить» becomes `Button.Tonal`.** The tab's single filled accent belongs to «Продлить» on the
-  subscription, or to «Купить подписку» when there is none. Today a default logged-in view carries
-  simultaneously: a filled «Пополнить», a filled «Продлить», an accent-coloured «Купить подписку» row
-  title, a blue Telegram tile, a blue buy tile and an accent traffic fill. The allowance is one.
+| Subscription state | Figure | Unit | Colour |
+|---|---|---|---|
+| `активна`, `триал` | days to expiry, e.g. `14` | `дней` / `день` / `дня`, agreeing | `Brush.OnSurface` |
+| `истекает` | `3` | `дня` | `Brush.Icon.Yellow` |
+| `истекла` | `0` | `дней` | `Brush.RedText` |
+| perpetual (`IsEffectivelyPerpetual`) | no figure; `Headline` 24 «бессрочно» | - | `Brush.OnSurface` |
+| `лимит устройств` | the day figure, unchanged; the limit is the chip's job | | |
+| `нет подписки` | no figure. Zone B collapses to the balance column alone, right-aligned, and the caption «Осталось» is absent | - | - |
+
+Four changes with reasons:
+
+- **The `Display` moves from the balance to days remaining** (2.3). `Баланс` reads `0 ₽` for every
+  user who has never topped up, and a 34px zero as the loudest thing on the tab is the product
+  telling the user about the least important fact it knows. Days remaining is the number that
+  decides whether the product works tomorrow.
+- **The balance drops to `Title` 16/700 with `Button.Text` «Пополнить» under it.** The tab's single
+  filled accent belongs to «Продлить» on the subscription, or to «Купить» when there is none. Today
+  a default logged-in view carries simultaneously: a filled «Пополнить», a filled «Продлить», an
+  accent-coloured «Купить подписку» row title, a blue Telegram tile, a blue buy tile and an accent
+  traffic fill. The allowance is one.
+- **The name drops from `Headline` 24 to `Title` 16/700.** Today `Display` 34 plus `Headline` 24
+  (name) plus `Headline` 24 (the ₽ symbol) sit inside one card and the identity fights the money at
+  the same weight.
+- **The avatar is `Brush.Tile.Blue` with an accent monogram, and it counts** (2.2). It is one of the
+  tab's three tinted elements, alongside the Telegram row's `.Blue` tile; the third slot is
+  deliberately left empty, and that is why the «Купить подписку» row tile becomes neutral (7.1.5).
+  A six-digit balance (`1 284 371 ₽`) reserves `9 x 0.62 x 16 = 90px` and does not shift the column.
 
 **Top-up flyout**, anchored to «Пополнить», `IncyFlyoutTheme`, Width 280, Spacing 12:
 Title «Пополнение баланса» → Caption «Введите сумму в рублях. Откроется страница оплаты.» →
@@ -2725,8 +2865,14 @@ Google sign-in ships.
 #### 7.1.5 Zone 4, «Управление», and sign-out
 
 One card, three rows: «История платежей» with the latest payment date as its value and a chevron;
-«Купить подписку» with a `.Blue` tile and a chevron (the title is **not** accent-coloured; an
-accent-tinted row title is a fifth accent element on a tab that already has its one); «Веб-кабинет».
+«Купить подписку» with a **neutral** tile and a chevron; «Веб-кабинет».
+
+**The «Купить подписку» tile is neutral, and the title is not accent-coloured.** Three `.Blue` tiles
+on one tab (avatar, Telegram, buy) is the tile-category system at its ceiling and it reads as
+scatter rather than as a system. A row in «Управление» is navigation, not a category, so it takes
+the neutral tile that twenty-three of the twenty-four settings rows take. The accent-tinted row
+title that ships today is a separate defect: it is a fifth accent element on a tab whose budget is
+one filled surface plus three tints.
 
 Sign-out is a `Border.Row` **outside** the card, 24 below it: neutral tile with
 `Geo.Action.SignOut`, title in `Brush.RedText`, no fill, no chevron. Clicking it opens the one
@@ -2748,11 +2894,14 @@ StackPanel  MaxWidth Size.Form 480  VerticalAlignment=Center  Spacing 16
 
 #### 7.1.7 Every state of Аккаунт
 
-Signed out · loading (hero skeleton plus subscription skeleton) · signed in with no subscription ·
-one subscription in each of the six subscription states · two or more subscriptions · balance zero ·
-balance six digits (`1 284 371 ₽`, and the column does not shift) · Telegram pending · error on
-profile · error on subscriptions only (partial: hero renders, zone 2 shows its error card) · offline
-· sign-out in flight (row disabled with an inline arc).
+Signed out · loading (hero skeleton plus subscription skeleton) · signed in with no subscription
+(zone B collapses to the balance column; no 34px figure) · one subscription in each of the six
+subscription states, each with its zone-B substitution from the table above · **perpetual
+subscription** («бессрочно» at `Headline` 24, no figure) · two or more subscriptions · balance zero
+(`0 ₽` at `Title` 16, which is a caption-sized fact, not a headline) · balance six digits
+(`1 284 371 ₽`, and the column does not shift) · Telegram pending · error on profile · error on
+subscriptions only (partial: hero renders, zone 2 shows its error card) · offline · sign-out in
+flight (row disabled with an inline arc).
 
 #### 7.1.8 Motion
 

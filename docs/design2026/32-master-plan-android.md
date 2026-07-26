@@ -1824,8 +1824,9 @@ centred, `paddingHorizontal @dimen/screen_gutter`.
 [ status-bar inset ]
 [ 48dp ImageButton ic_chevron_left, start, only when reached from inside the app ]
 [ 32 ]
-FrameLayout 64x64, radius @dimen/radius_card 20, fill ?attr/colorPrimaryContainer
-  └── ImageView 32dp ic_shield_outline, tint ?attr/colorOnPrimaryContainer          [9.57:1]
+FrameLayout @dimen/brand_tile 64x64, radius @dimen/radius_card 20, fill ?attr/colorPrimaryContainer
+  └── ImageView @dimen/brand_glyph 32dp ic_shield_outline,
+        tint ?attr/colorOnPrimaryContainer          [9.6:1 dark, 13.9:1 light]
 [ 16 ]
 TextView   "departament"        @style/ToolbarBrandTitle    20sp/700 onBackground
 [ 24 ]
@@ -1843,10 +1844,12 @@ TextView   "Пароль"             @style/TextAppearance.App.Caption
 [ 4 ]
 TextInputLayout  id=til_password  8.12, inputType=textPassword, 48dp eye toggle,
                                   autofillHints=password, imeOptions=actionDone
+                                  NO placeholder text (see 10.5)
 [ 4 ]
 TextView   id=helper_password   @style/TextAppearance.App.Caption, minHeight 16dp   [reserved]
 [ 8 ]
 MaterialButton text  "Забыли пароль?"   48dp, gravity end
+                     label ?attr/colorPrimary       <- the ONE blue label on this screen
 [ 16 ]
 MaterialButton filled  id=btn_login  "Войти"   52dp, full width, radius_pill    <- THE lit element
 [ 24 ]
@@ -1859,11 +1862,24 @@ MaterialButton tonal  id=btn_telegram  "Войти через Telegram"  48dp, f
                       leading 20dp ic_telegram_24dp
 [ 12 ]
 MaterialButton text   id=btn_register  "Создать аккаунт"  48dp, full width
+                      label ?attr/colorOnSurfaceVariant   <- a destination, not an action (8.5)
 [ 32 ]
 ```
 
-**Everything that is not «Войти» is text or tonal.** The screen carries one filled accent surface,
-one tinted tile, and one focus ring at a time: three accent elements against a budget of four.
+**The accent count, counted rather than asserted.** Four elements carry blue and the budget is four:
+
+| # | Element | Role |
+|---|---|---|
+| 1 | `btn_login` filled `?attr/colorPrimary` | the one **lit** surface |
+| 2 | the 64dp shield tile, `?attr/colorPrimaryContainer` | tinted |
+| 3 | the focused field's 2dp box stroke | tinted, and only one field is focused at a time |
+| 4 | «Забыли пароль?» in `?attr/colorPrimary` | tinted |
+
+The previous revision claimed three and shipped five, because it counted the two text buttons as one
+plural ("link text buttons") in 3.2's ledger. **«Создать аккаунт» is demoted to
+`?attr/colorOnSurfaceVariant`**: it is a destination somewhere else, not the action this screen is
+asking for, and the tertiary tier now splits on exactly that question (8.5). `btn_telegram` is
+tonal - `?attr/colorSecondaryContainer` - and carries no blue at all.
 
 ### 10.4 States
 
@@ -1876,7 +1892,7 @@ one tinted tile, and one focus ring at a time: three accent elements against a b
 | **Submitting** | `btn_login`'s label swaps for a 20dp indeterminate indicator in `?attr/colorOnPrimary`; the button keeps its 52dp height and full width; every control on the screen is disabled; the keyboard is dismissed |
 | **Auth error** | The status strip (8.10) appears above the bottom edge with the cause and «Повторить». The strip persists. No dialog. The `BuildConfig.DEBUG`-only raw-detail dialog is kept, debug-only |
 | **Awaiting Telegram** | `btn_telegram` is replaced in place by a 48dp block: 20dp indeterminate indicator + «Ждём подтверждения в Telegram…» in Body + a text button «Начать заново». The email form stays visible and enabled, so the user can change his mind without cancelling anything |
-| **Two-factor** | The whole column is **replaced by a step**, not extended: back affordance, 64dp tile, «Подтверждение» Headline, «Введите 6-значный код из приложения» Subtitle, a single 6-digit `InputField` (`inputType=numberPassword`, `maxLength=6`, `autofillHints=smsOTPCode`), a 52dp «Подтвердить» CTA, and a text button «Другой способ входа». Back returns to the password step with the email preserved |
+| **Two-factor** | The whole column is **replaced by a step**, not extended: back affordance, 64dp tile, «Подтверждение» Headline, «Введите 6-значный код из приложения» Subtitle, a single 6-digit `InputField` labelled «Код» with **no placeholder** (`inputType=numberPassword`, `maxLength=6`, `autofillHints=smsOTPCode`, `letterSpacing` inherited from `App.Numeric`), a 52dp «Подтвердить» CTA, and a text button «Другой способ входа» in `?attr/colorPrimary` - here it **is** the action, because the CTA is the only other thing on the step. Back returns to the password step with the email preserved |
 | **Offline** | The status strip shows «Нет подключения к интернету. Проверьте сеть и повторите.» with «Повторить»; `btn_login` and `btn_telegram` are disabled at alpha 0.38 |
 | **Rate limited** | Status strip: «Слишком много попыток. Повторите через минуту.», no action; the CTA stays disabled with a live countdown in its label: «Повторить через 42 с» |
 | **Success** | No success screen, no checkmark flourish. The screen hands off (10.7) |
@@ -1894,8 +1910,7 @@ marks, sentence case, no trailing periods on labels.
 | `auth_subtitle` | `Почта и пароль, или Telegram` |
 | `auth_label_email` | `Почта` |
 | `auth_label_password` | `Пароль` |
-| `auth_hint_email` | `name@example.com` |
-| `auth_hint_password` | `Не менее 8 символов` |
+| `auth_hint_email` | `name@example.com` — a **format example**, which is what a placeholder is for |
 | `auth_forgot` | `Забыли пароль?` |
 | `auth_submit` | `Войти` |
 | `auth_or` | `или` |
@@ -1925,7 +1940,19 @@ marks, sentence case, no trailing periods on labels.
 | `auth_retry` | `Повторить` |
 
 Deleted: `auth_tg_headline`, `auth_tg_desc`, `auth_site_headline`, `auth_site_desc`, `auth_btn_site`,
-`auth_register_site`, `auth_fields_required`, `auth_email_invalid`, `auth_success`.
+`auth_register_site`, `auth_fields_required`, `auth_email_invalid`, `auth_success`, and
+**`auth_hint_password`**.
+
+**Why the password field has no placeholder.** Its previous value was «Не менее 8 символов», which
+is a **registration constraint** shown on a **sign-in** screen: a returning user with a legacy
+seven-character password is told, before he types anything, that his own password is invalid. The
+field does not need one - 8.12 already guarantees the «Пароль» label is always visible above it, so
+there is nothing to disambiguate - and the constraint has no home on Android because registration
+happens on the site (10.6). If in-app registration is ever ported, the rule belongs in that form's
+**helper** line, under the field, where a constraint belongs. The same audit was run on the 2FA
+field: its instruction lives in the Subtitle above the step, so it too has no placeholder. The rule
+generalises: **a placeholder is a format example or it is absent; it is never a label and never a
+rule.**
 
 ### 10.6 Interaction
 
@@ -1948,7 +1975,9 @@ Deleted: `auth_tg_headline`, `auth_tg_desc`, `auth_site_headline`, `auth_site_de
 - **Out on success:** the one hand-off in the product. The sign-in column fades and scales
   0.98 to 1.0 while Главная fades in beneath it, over `motion_handoff` **450ms**
   `ease_out_expo`. It happens once per session. Under reduced motion it is an instant cut.
-  Главная arrives with its subscription card already in skeleton, never blank.
+  **Главная arrives in its «Синхронизация» state** - specified as a real state with its own copy,
+  its own failure path and its own row in the state matrix at **11.10**, never as a blank screen and
+  never as an unexplained set of skeletons.
 - **Out on Back:** sub-page exit 225ms, returning to whatever called it with its scroll intact.
 
 ---
@@ -1974,8 +2003,8 @@ whether the subscription behind it is healthy.
 
 **Why rebuild.** Graded **C-**. The first frame of the product is a navy radial gradient
 (`#1B2D50` through `#0E141F` to `#0A0B0D`, 560dp) plus a blue radial glow plus two concentric blue
-rings plus a 212dp indeterminate sweep plus a 176dp disc plus a 230dp ring frame: **five layers to
-communicate one boolean**, and four of them carry no information. That is the category reflex
+rings plus a 212dp indeterminate sweep plus a 176dp disc plus a 230dp ring frame: **six layers to
+communicate one boolean**, and five of them carry no information. That is the category reflex
 verbatim and it is four separate law violations in the most-seen pixels of the app. On top of it:
 three live counters showing zero at the top of the page before the user has done anything, built
 around a 42dp invisible spacer used to fake optical centring; `↑` and `↓` as literal text; a memory
@@ -1993,45 +2022,72 @@ Toolbar 56dp  (8.6, no back button)
   ├── TextView "departament"   @style/ToolbarBrandTitle, marginStart @dimen/screen_gutter
   └── ImageButton 48dp  ic_add_24dp 24dp ?attr/colorOnSurface   cd "Добавить сервер"
 [ 32 ]
-FrameLayout   id=connect_disc   176x176 (@dimen/connect_disc), layout_gravity center_horizontal
-    background: 176dp oval, fill ?attr/colorSurfaceContainerHighest (P3),
-                stroke 1dp ?attr/colorOutline
-    stateListAnimator @anim/press_scale, contentDescription bound to the state word
-  ├── CircularProgressIndicator  id=connect_arc  176dp, trackThickness @dimen/connect_track 3dp,
+FrameLayout   id=connect_frame   176x176 (@dimen/connect_disc), layout_gravity center_horizontal
+    clipChildren=false, clipToPadding=false        <- the pulse scales to 1.35 and must not clip;
+                                                      every ancestor up to the NestedScrollView
+                                                      sets these two, or the ring is a square
+    stateListAnimator @anim/press_scale_hero (0.94, 7.2)
+    contentDescription bound to the state word
+  ├── View  id=connect_disc  176dp oval, fill ?attr/colorSurfaceContainerHighest (P3),
+  │     stroke 1dp ?attr/colorOutline               <- THE ring. There is no second, larger ring
+  ├── CircularProgressIndicator  id=connect_arc  176dp,
+  │     trackThickness @dimen/connect_track 3dp, indicatorInset 0dp,
   │     indicatorColor ?attr/colorPrimary, trackColor @android:color/transparent,
-  │     indeterminate, visibility GONE except while negotiating
+  │     indeterminate, one rotation per motion_indeterminate 1200ms, linear,
+  │     visibility GONE except while negotiating.
+  │     While it runs it sits exactly on the disc rim and the 1dp outline fades to 0,
+  │     so the arc REPLACES the ring rather than orbiting outside it
   ├── ImageView  id=img_shield_outline  80dp (@dimen/connect_glyph) ic_shield_outline,
   │     tint ?attr/colorOnSurfaceVariant
   ├── ImageView  id=img_shield_filled   80dp ic_shield_filled, tint ?attr/colorPrimary, alpha 0
   └── View       id=view_connect_pulse  176dp oval, 1dp ?attr/colorPrimary stroke, alpha 0
-                 (signature moment 1 only)
+                 (signature moment 1 only; scales 1.0 to 1.35 outside the frame bounds)
 [ 16 ]
 LinearLayout (horizontal, gravity center)   id=status_line
-  ├── View 8x8 oval  id=status_dot   tint per state
+  ├── View 8x8 oval (@dimen/status_dot)  id=status_dot   tint per state, NEVER animated (7.4)
   ├── Space 8
   └── TextView id=tv_status  @style/TextAppearance.App.Title  16sp/700
 [ 24 ]
-LinearLayout (horizontal)  id=numeric_strip   visible only when connected
+TextView  id=tv_strip_header  @style/TextAppearance.App.Caption, gravity center
+          "Последний сеанс"  when disconnected  /  "Сеанс"  when connected
+[ 8 ]
+LinearLayout (horizontal)  id=numeric_strip
      paddingHorizontal @dimen/screen_gutter, weightSum 3
-  ├── column: ImageView 16dp ic_speed_down + Space 8 + TextView Numeric 16sp/500  "24,8 Мбит/с"
-  ├── column: ImageView 16dp ic_clock      + Space 8 + TextView Numeric 16sp/500  "02:14:07"
-  └── column: ImageView 16dp ic_speed_up   + Space 8 + TextView Numeric 16sp/500  "3,1 Мбит/с"
-     each column: weight 1, gravity center, glyph tint ?attr/colorOnSurfaceVariant,
-     value tint ?attr/colorOnSurface, reserved width from the 620/1000 advance so digits never shift
+     present whenever a completed session exists; absent only on a device that has never connected
+  ├── column: ImageView 16dp ic_speed_down + Space 8 + TextView Numeric 16sp/500
+  │           minWidth @dimen/value_w_speed   live "24,8 Мбит/с" / last-session "12,4 ГБ"
+  ├── column: ImageView 16dp ic_clock      + Space 8 + TextView Numeric 16sp/500
+  │           minWidth @dimen/value_w_uptime  live "02:14:07"    / last-session "02:14:07"
+  └── column: ImageView 16dp ic_speed_up   + Space 8 + TextView Numeric 16sp/500
+              minWidth @dimen/value_w_speed  live "3,1 Мбит/с"   / last-session "09.07"
+     each column: weight 1, gravity center, glyph tint ?attr/colorOnSurfaceVariant.
+     Value tint is ?attr/colorOnSurfaceVariant while disconnected and ?attr/colorOnSurface while
+     connected; the crossfade between the two sets is signature moment 2 (1.2), 220ms, in place.
+     Reserved widths come from 5.6, so the columns hold their x through the swap and through every
+     subsequent value change.
 [ 32 ]
 TextView  "Сервер"    @style/SettingsSectionLabel
 [ (the header's own 8dp bottom padding) ]
-Row  id=row_server    8.1 Row.Navigation
+Row  id=row_server    8.1 Row.Navigation, a one-row TILED group (5.3)
      tile: the unified server icon (6.3)
      title: "Нидерланды, Амстердам"          (remark, flag stripped, maxLines 1)
      subtitle: "VLESS · Reality"              (chip-free plain text on this surface)
-     value: "48 мс"  Numeric
+     value: "48 мс"  Numeric, minWidth @dimen/value_w_ping
      trailing: chevron
 [ 24 ]
 TextView  "Подписка"  @style/SettingsSectionLabel
 Card  id=card_subscription    8.3, the ONE card on this screen        <- 11.6
 [ 32 ]
 ```
+
+**The connect object is four layers and it is the same four on both clients.** A 176 disc carrying
+its own 1dp outline, an arc that replaces that outline while the core negotiates, a shield, and a
+one-shot pulse. The previous revision deleted `bg_connect_ring.xml` and its 230dp frame here while
+the desktop plan kept a separate 200px ring outside its 176px disc and its parity table certified
+the two objects identical - they were not, and side by side a user would have seen a different
+control. **Android is right and the desktop drops its ring** (25.3, D-A17): a concentric second
+circle 12dp outside the first is a stroke that says what the first stroke already said, and with it
+gone `Size.ConnectFrame` disappears from the desktop's token list too.
 
 **Nothing else is on this screen.** No memory card, no account chip, no welcome heading, no stats
 row above the fold, no server list (Incy duplicates its list onto Home and it is an IA failure;
@@ -2041,20 +2097,22 @@ row above the fold, no server list (Incy duplicates its list onto Home and it is
 
 | State | Disc | Status line | Numeric strip | Below |
 |---|---|---|---|---|
-| **Отключено** | P3 fill, 1dp outline, outline shield in `?attr/colorOnSurfaceVariant`. **Nothing blue** | grey dot + «Отключено» | absent | server row + subscription card |
-| **Подключение** | Arc visible, indeterminate, `?attr/colorPrimary`, running **only** while the core negotiates | grey dot + «Подключение…» | absent | unchanged, actions that need the tunnel disabled |
-| **Подключено** | Filled shield `?attr/colorPrimary`; arc gone | green dot `?attr/colorTertiary` + «Подключено» | present, entered once (moment 2) | unchanged |
-| **Отключение** | Filled shield crossfades back to outline over 220 | grey dot + «Отключение…» | fades out 165 | unchanged |
-| **Ошибка туннеля** | Disc returns to idle | red dot `?attr/colorError` + «Не подключено» | absent | status strip with the taxonomy message (11.8) and a recovery action |
-| **Нет сервера** | Disc at alpha 0.38, not clickable | grey dot + «Сервер не выбран» | absent | the server row is replaced by a Row whose title is «Выбрать сервер» and whose trailing is a chevron |
-| **First run, signed out** | Disc at alpha 0.38, not clickable | grey dot + «Не подключено» | absent | EmptyState (8.8): «Начните с входа» / «Войдите, чтобы получить серверы Departament и управлять подпиской.» / filled «Войти» + text «Добавить провайдера» |
+| **Отключено** | P3 fill, 1dp outline, outline shield in `?attr/colorOnSurfaceVariant`. **Nothing blue** | grey dot + «Отключено» | «Последний сеанс» + 3 columns in `onSurfaceVariant` | server row + subscription card |
+| **Подключение** | The 1dp outline fades to 0 and the 3dp accent arc takes the rim, sweeping once per 1200ms, running **only** while the core negotiates | grey dot + «Подключение…». **The dot does not pulse** | unchanged, still the last session | unchanged, actions that need the tunnel disabled |
+| **Подключено** | Filled shield `?attr/colorPrimary`; arc gone, 1dp outline back | green dot `?attr/colorTertiary` + «Подключено» | crossfades in place to «Сеанс» + live values in `onSurface` (moment 2) | unchanged |
+| **Отключение** | Filled shield crossfades back to outline over 220 | grey dot + «Отключение…» | crossfades back to the last-session set over 220 as the session closes | unchanged |
+| **Ошибка туннеля** | Disc returns to idle | red dot `?attr/colorError` + «Не подключено» | last session | status strip with the taxonomy message (11.8) and a recovery action |
+| **Нет сервера** | Disc at alpha 0.38, not clickable | grey dot + «Сервер не выбран» | last session, if any | the server row is replaced by a Row whose title is «Выбрать сервер» and whose trailing is a chevron |
+| **First run, signed out** | Disc at alpha 0.38, not clickable | grey dot + «Не подключено» | **absent** - there is no session to show | EmptyState (8.8): «Начните с входа» / «Войдите, чтобы получить серверы Departament и управлять подпиской.» / filled «Войти» + text «Добавить провайдера» (`onSurfaceVariant`, a destination) |
 | **First run, signed in, no subscription** | same | same | absent | EmptyState: «Подписки пока нет» / «Купите тариф, чтобы подключаться к серверам Departament.» / filled «Купить» + text «Добавить провайдера» |
-| **Подписка истекла** | Disc at alpha 0.38, not clickable | grey dot + «Подписка истекла» | absent | subscription card in its `истекла` state with «Продлить» |
-| **Лимит устройств** | Disc clickable; a connect attempt fails with the taxonomy message | - | - | status strip: «Достигнут лимит устройств. Отвяжите одно из устройств в разделе «Устройства».» + «Устройства» |
-| **Загрузка** (cold start with a session) | Disc live and usable immediately | live | live | server row and subscription card render as skeletons (8.9) after 300ms |
-| **Оффлайн** | Disc live (the tunnel may still work) | live | live | subscription card shows its last known data plus a caption «Данные могли устареть»; a persistent status strip says «Нет сети. Показаны последние данные.» with «Повторить»; «Продлить» and «Купить» are disabled |
-| **Частично** | - | - | - | Servers loaded, subscription failed: the card renders its error state; the rest of the screen is normal |
-| **Long content** | - | - | - | A 70-character remark ellipsises at the end on one line; the subscription name wraps to 2 lines |
+| **Подписка истекла** | Disc at alpha 0.38, not clickable | grey dot + «Подписка истекла» | last session | subscription card in its `истекла` state with «Продлить» |
+| **Лимит устройств** | Disc clickable; a connect attempt fails with the taxonomy message | grey dot + «Отключено» | last session | status strip: «Достигнут лимит устройств. Отвяжите одно из устройств в разделе «Устройства».» + «Устройства» |
+| **Синхронизация** (just signed in) | Live and usable | live | last session | See **11.10**. A 48dp inline progress row under the toolbar carries the stage; the card and the server row are skeletons |
+| **Загрузка** (cold start with a session) | Disc live and usable immediately | live | last session, rendered from local storage with no network | server row and subscription card render as skeletons (8.9) after 300ms |
+| **Оффлайн** | Disc live (the tunnel may still work) | live | live or last session | subscription card shows its last known data plus a caption «Данные могли устареть»; a persistent status strip says «Нет сети. Показаны последние данные.» with «Повторить»; «Продлить» and «Купить» are disabled |
+| **Частично** | live | live | live | Servers loaded, subscription failed: the card renders its error state; the rest of the screen is normal |
+| **Long content** | - | - | columns hold their reserved widths | A 70-character remark ellipsises at the end on one line; the subscription name wraps to 2 lines under its chip (11.6) |
+| **Font scale 200 %** | 176dp, unchanged - it is a control, not text | wraps to 2 lines, centred | columns stack to one per line at 3 x 56dp rather than clipping | the page scrolls |
 
 ### 11.5 Copy
 
@@ -2081,6 +2139,14 @@ row above the fold, no server list (Incy duplicates its list onto Home and it is
 | `home_connect_cd_idle` | `Подключиться` |
 | `home_connect_cd_active` | `Отключиться` |
 | `home_stale_data` | `Данные могли устареть` |
+| `home_strip_last` | `Последний сеанс` |
+| `home_strip_live` | `Сеанс` |
+| `home_sync_account` | `Проверяем аккаунт` |
+| `home_sync_subscriptions` | `Загружаем подписки…` |
+| `home_sync_servers` | `Обновляем серверы` |
+| `home_sync_failed` | `Не удалось синхронизировать. Проверьте соединение и повторите.` |
+| `home_sync_retry` | `Повторить` |
+| `home_sync_relogin` | `Войти заново` |
 
 Deleted: `home_welcome_title` («Приветствуем!» - an exclamation mark, banned), `home_empty_title`
 («У вас пока не добавлены подписки.» - a trailing period on a title, passive voice),
@@ -2094,28 +2160,39 @@ This is `30-reference-analysis.md` 6.1 made concrete.
 
 ```
 Card 8.3  (P1, radius 20, 1dp hairline, padding 16)
-├── row 1   TextView title  @style/TextAppearance.App.Title, weight 1, maxLines 2
-│           Chip 8.4, state variant, marginStart 8dp
-├── row 2   TextView caption @style/TextAppearance.App.Caption, marginTop 4dp
-│           "Обновлено 5 минут назад"   (or the expiry sentence, see the state table)
+├── row 1   Chip 8.4, state variant, gravity start          <- ALONE on its line
+│           + a 48dp ic_more_vert_24dp overflow at the end (15.7), gravity end
+├── [ 8 ]
+├── row 2   TextView title  @style/TextAppearance.App.Title, maxLines 2, ellipsize end
+│           "Домашняя"      (the user's own name, or the tariff name when unnamed)
+├── row 3   TextView caption @style/TextAppearance.App.Subtitle, marginTop 4dp
+│           "Базовый · действует до 12.08.2026"   (tariff, then the expiry sentence)
 ├── [ 16 ]
-├── row 3   Meter 8.11  "Трафик" / "12,4 из 50 ГБ"     (omitted entirely when root-only data
+├── row 4   Meter 8.11  "Трафик" / "12,4 из 50 ГБ"     (omitted entirely when root-only data
 │           is unavailable or when the operator sent subscription-userinfo: 0)
 ├── [ 12 ]
-├── row 4   Meter 8.11  "Устройства" / "3 / 5"          (bar omitted when unlimited)
+├── row 5   Meter 8.11  "Устройства" / "3 / 5"          (bar omitted when unlimited)
 ├── [ 16 ]  1dp ?attr/colorOutlineVariant, full width inside the card
-├── row 5   operator message, dismissible, max 200 chars, max 5 lines  (24.4)
-└── row 6   action zone: at most ONE filled accent button (52dp, full width)
+├── row 6   operator message, dismissible, max 200 chars, max 5 lines  (24.4)
+└── row 7   action zone: at most ONE filled accent button (52dp, full width)
             plus at most one text button beside it
 ```
+
+**The chip is on its own line, above the title, and that is a measurement decision** (5.6). The
+longest state label, «Пробный период», measures about 112dp with its glyph and padding; on a 320dp
+screen behind a 16dp gutter and 16dp card padding, sharing a line with a weight-1 title that may
+itself wrap to two lines leaves under 150dp for a name the user typed. Putting the state first also
+happens to be the correct reading order for this object: what changed is the state, and the name is
+how you tell two subscriptions apart. **There is exactly one chip on this card** - the tariff badge
+was deleted in 4.2 and its content moved into the caption line.
 
 | `SubscriptionState` | Condition | Chip | Caption | Action |
 |---|---|---|---|---|
 | `нет подписки` | no managed subscription | none; the card is replaced by the EmptyState | - | `Купить` |
-| `триал` | `Subscription.isTrial` **from the backend**, never inferred from tariff name or squad | neutral «Пробный период» | `Активен до 12.08.2026` | text `Купить тариф` |
-| `активна` | expiry > 7 days and quota < 90% | success «Активна» | `Действует до 12.08.2026` | **none.** A CTA that is always present is furniture |
-| `истекает` | expiry <= 3 days **or** quota >= 90% | warning «Истекает» | `Осталось 3 дня` | filled `Продлить` |
-| `истекла` | expiry in the past | error «Истекла» | `Истекла 09.07.2026` | filled `Продлить` |
+| `триал` | `Subscription.isTrial` **from the backend**, never inferred from tariff name or squad | Trial variant «Пробный период» (neutral fill, `ic_clock`) | `Пробный период · активен до 12.08.2026` | text `Купить тариф` |
+| `активна` | expiry > 7 days and quota < 90 % | success «Активна» | `Базовый · действует до 12.08.2026` | **none.** A CTA that is always present is furniture |
+| `истекает` | expiry <= 3 days **or** quota >= 90 % | warning «Истекает» | `Базовый · осталось 3 дня` | filled `Продлить` |
+| `истекла` | expiry in the past | error «Истекла» | `Базовый · истекла 09.07.2026` | filled `Продлить` |
 | `лимит устройств` | devices used == allowed | warning «Лимит устройств» | `Отвяжите устройство, чтобы подключить это` | filled `Устройства` |
 
 Rules that make it one object rather than four renderings:
@@ -2170,9 +2247,52 @@ no exit codes, ever.
 - **In from cold start:** no entrance animation. The screen is simply there. Skeletons appear after
   300ms if data is not ready.
 - **In from a tab switch:** 220ms crossfade, scroll position restored.
-- **In from sign-in:** the 450ms `ease_out_expo` hand-off (10.7). The only time Главная animates in.
+- **In from sign-in:** the 450ms `ease_out_expo` hand-off (10.7), landing in 11.10. The only time
+  Главная animates in.
 - **Out to a sub-page:** 300ms `ease_out_quint`, translationX 16dp.
 - **Back:** on Главная, Back finishes the activity (predictive Back honoured).
+
+### 11.10 «Синхронизация» - the post-sign-in state
+
+The desktop ships this as a screen (`33-master-plan-pc.md` 7.23) and its parity table calls the
+Android counterpart identical. **It is not a screen here, and that is deliberate**: a phone has
+already shown a splash, the connect control is usable the instant the shell exists, and a full-page
+blocking gate after a sign-in is a second wait the user did not ask for. It is a **state of
+Главная**, with the same three stages, the same failure copy and the same two exits, so the two
+clients report the same facts in the same words. Logged as a deliberate difference in 25.3 rather
+than left as an undocumented drift.
+
+```
+Toolbar 56dp                     (unchanged, wordmark + «+»)
+[ 48dp inline progress row, full width, background ?attr/colorSurfaceContainerHigh (P2),
+  1dp hairline below, paddingH 16 ]
+  ├── CircularProgressIndicator 20dp indeterminate, ?attr/colorPrimary
+  ├── Space 12
+  └── TextView  @style/TextAppearance.App.Subtitle, weight 1   the stage caption
+[ the rest of Главная, live ]
+```
+
+| Stage | Caption | What is real behind it |
+|---|---|---|
+| 1 | «Проверяем аккаунт» | Token exchange, profile fetch |
+| 2 | «Загружаем подписки…» | `/subscription/all` |
+| 3 | «Обновляем серверы» | Provider refresh for every managed provider |
+
+Captions crossfade over `motion_state` 220ms as the stage advances. **The connect disc stays live
+throughout** if a server and a valid subscription already exist locally - a returning user who signs
+in on a device that already works can connect while the sync runs. The subscription card and the
+server row are skeletons (8.9) until stage 3 resolves.
+
+**Failure.** The progress row is replaced by a persistent status strip: «Не удалось
+синхронизировать. Проверьте соединение и повторите.» with two actions, «Повторить» (primary) and
+«Войти заново» (which returns to 10). Skeletons resolve to whatever the cache holds, or to the
+first-run EmptyState if the cache is empty. **The user is never stranded on a spinner.**
+
+**Success.** The progress row exits over `motion_exit_reveal` 225ms and the skeletons crossfade to
+content over 220ms. There is no success message; the content arriving is the message.
+
+**Cold start with an existing session** uses the same row with a single caption «Загружаем данные»
+and no stage list, which is what keeps a returning user from seeing a sign-in gate for one frame.
 
 
 ---

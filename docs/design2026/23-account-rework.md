@@ -286,98 +286,192 @@ there is nothing to add), recorded as decision A-2, extended by A-16.
 
 ---
 
-## 3. The control vocabulary of this tab
+## 3. Which library components this tab uses
 
-Nine variants. Every interactive thing on the tab and its sub-pages is one of them. Anything that is
-not on this list is a defect. Heights, radii and type are fixed here and are not overridden per
-instance (CS §C.1 is the disease this cures).
+**There is no vocabulary in this file.** `22-components.md` is the vocabulary: it declares at its R15
+that its components "are the entire vocabulary", and at its §0.4 that a screen needing a control the
+library lacks amends the library first. This section is a **mapping**: control on the tab → registry
+name in C§19 → why that one. Geometry, type, radius, the eight states, motion and both platform
+mappings live in `22-components.md` and are not restated, because two files describing one button is
+how these two apps drifted apart in the first place.
 
-| # | Variant | Android | Desktop | Box | Radius | Label type | Used on this tab for | Accent |
-|---|---|---|---|---|---|---|---|---|
-| V1 | **Button / Primary** | `MaterialButton` filled, insets 0 | `Button.Primary.Tall` | full width × **52** | `radius_pill` / `Radius.Pill` | `App.Title` 16/700, UI face | the one CTA: «Купить» / «Продлить» / «Войти через Telegram» | **filled accent** |
-| V2 | **Button / Tonal** | `MaterialButton` tonal, insets 0 | `Button.Tonal` | full width × **48** | pill | `App.Title.Medium` 16/500 | «Продлить» when the sub is healthy; «Повторить» in error states; «Отмена» in sheets | neutral fill `colorSurfaceContainerHighest` |
-| V3 | **Button / Text** | `MaterialButton` text | `Button.LinkAction` | ≥ 48 tall | pill | `App.Title.Medium` 16/500 | «Улучшить тариф» in the card; «Войти по почте» on the gate | accent **label**, no fill |
-| V4 | **Icon button** | `ImageButton`, `?attr/selectableItemBackgroundBorderless` | `Button.IconButton40` | **48×48** Android / **40×40** desktop, glyph **20** | pill | - | rename, refresh, unlink | neutral glyph |
-| V5 | **Row / value** | `layout_row_value.xml` | `RowItem` with `Value` | min **56**, pad 16/8 | - | title `App.Title` 16/700, value `App.Subtitle` 13/400 numeric | Устройства, История, Реферальный код | none |
-| V5s | **Row / value strong** | same layout, `App.Title` + Numeric on the value | same, `Classes="strong"` | min 56 | - | value 16/700 numeric `colorOnSurface` | **Баланс only** (and «Итого» in the sheet) | none |
-| V6 | **Row / nav** | `layout_row_nav.xml` | `RowItem` with `Chevron` | min 56 | - | title `App.Title`, subtitle `App.Subtitle` | Улучшить тариф, Купить подписку, Способы входа, Выйти | none (Выйти title = `colorErrorText`) |
-| V7 | **Row / switch** | `layout_row_switch.xml`, switch `clickable=false` | `RowItem` with `ToggleSwitch.iOS` | min 56 | - | title `App.Title`, subtitle `App.Subtitle` | Автопродление | accent = switch track when on (a state the user controls, §5.1) |
-| V8 | **Segmented control** | `MaterialButtonToggleGroup`, `singleSelection`, `selectionRequired` | `ToggleButton.Segment` | **44** tall, weight 1 each | `radius_chip` 12 | `App.Title.Medium` → 16/**700** when selected | the 2-3 subscription switcher | 12 % accent fill + 1dp accent border + accent label |
-| V9 | **Sheet / flyout** | `BottomSheetDialogFragment`, `bg_sheet_top` r24 top | `Flyout` with `IncyFlyoutTheme` r20, anchored | - | 24 top / 20 | - | payment, top-up, upgrade, sub-pick, QR, add-devices | none |
+### 3.1 The mapping
 
-Notes that resolve open contradictions in CS:
+| Control on this tab | Component (C§19 registry) | Android | Desktop | Where it is specified |
+|---|---|---|---|---|
+| The card's CTA («Купить» / «Продлить, 450 ₽» / «Начать пробный период»), the gate's «Войти через Telegram», a sheet's «Перейти к оплате», «Открыть бота», «Отправить» | **`Button.Primary.Tall`** | `@style/Widget.Departament.Button.Primary.Tall` | `Button.Primary.Tall` | C§2 Buttons, C§2.5 Primary |
+| The card's CTA when the subscription is healthy; «Скопировать ссылку» in the QR sheet; «Сохранить» in the rename dialog | **`Button.Secondary`** | `…Button.Secondary` | `Button.Secondary` | C§2.5 Secondary |
+| «Улучшить тариф» in the card; «Повторить»; «Обновить»; «История»; «Отмена» in every dialog and sheet; the gate's «Войти по почте»; every snackbar action | **`Button.Tertiary`** | `…Button.Tertiary` | `Button.Tertiary` | C§2.5 Tertiary |
+| Rename, list refresh, unlink a device, copy | **`Button.Icon`** | `…Button.Icon` (48×48 box, 22 glyph) | `Button.Icon` (40×40 box, 22 glyph) | C§2.5 Icon, C§3 Icon button |
+| The add-devices stepper's `−` and `+` | **`Button.Icon.Filled`** | `…Button.Icon.Filled` | `Button.Icon.Filled` | C§2.1 modifiers, C§4.4 "Stepper-backed numeric" |
+| The sign-out dialog's confirm | **`Button.Destructive`** | `…Button.Destructive` | `Button.Destructive` | C§2.5 Destructive |
+| Устройства, Баланс, История платежей, Реферальный код, Способы входа, the 4+ subscription select row, every row on Sign-in methods | **`Row.Value`** | `@layout/row_value` | `Border.Row.Value` | C§8.3 Row.Value |
+| Купить подписку; «Показать QR-код» / «Скопировать ссылку» on Devices; «Привязать Telegram» when Telegram is unlinked | **`Row.Navigation`** | `@layout/row_navigation` | `Border.Row` | C§8.2 Row.Navigation |
+| Автопродление | **`Row.Toggle`** | `@layout/row_toggle` | `Border.Row.Toggle` | C§8.5 Row.Toggle, C§7 Switch |
+| Выйти | **`Row.Destructive`** | `@layout/row_destructive` | `Border.Row.Destructive` | C§8.6 Row.Destructive |
+| Payment-method rows, the sub-pick list, the upgrade-target list, «Итого», payment-history rows, device rows | **`Row.Ledger`** *(amendment C-1)* | `@layout/row_ledger` | `Border.Row.Ledger` | 3.3 below, then C§8 |
+| The 2-3 subscription switcher | **Segmented control** | `MaterialButtonToggleGroup` + `@style/Widget.Departament.Segment` | `Border.SegmentTrack` + `ToggleButton.Segment` | C§6 Segmented control |
+| The tariff badge; «Пробный»; «Это устройство»; a payment's status word | **`Chip`** (`.Accent` for the tariff badge, `.Neutral` / `.Status.Ok` / `.Status.Warn` / `.Status.Error` otherwise) | `…Chip` | `Border.Chip` | C§10 Chip |
+| The top-up amount, the rename field, the link-email field | **Text field** | `…TextField` | `TextBox.Incy` | C§4 Text field |
+| The traffic meter | **Determinate bar** | `…Progress.Linear`, 6dp | `Border.Meter` + `.Fill`, 6px | C§17.2 Determinate bar |
+| Any in-flight indicator in a button, a row's trailing slot or a toolbar action | **Inline spinner** | `@drawable/spinner_arc`, 20dp | `Ellipse.Spinner.spinning`, 20px | C§17.1 Inline spinner, C§2.7 Loading |
+| «Код скопирован», «Устройство отвязано» + «Отменить», every optimistic failure | **Snackbar** | `…Snackbar` | `Border.Toast` | C§14 Snackbar |
+| Empty card, empty Devices, empty history, the cold error card | **Empty state** | `@layout/layout_state_empty` | `StackPanel.EmptyState` + `Border.EmptyIcon` | C§15 Empty state |
+| The offline bar and the payment-polling bar | **Status bar** *(amendment C-2)* | `@layout/layout_status_bar_inline` | `Border.StatusBar` | C§15 Empty state, "Offline state" |
+| Skeletons | **Skeleton** | `…Skeleton.Bar` / `.Block` | `Border.SkelBar` / `Border.SkelCard` | C§16 Skeleton |
+| The card's own boundary | **Card** | `…Card` | `Border.Card` | C§9 Card / surface |
+| The subscription card's selected state in the 4+ sheet | **Selection indicator** | `@drawable/bg_selectable_item` + `isActivated` | `Border.Selectable` + `.selected` | C§18 Selection indicator |
 
-- **V1/V2/V3 fix D5 and D6.** Android's five 52dp CTAs currently draw at 40dp because they never zero
-  `insetTop`/`insetBottom` (CS §C.1.3). Every button on this tab sets `android:insetTop="0dp"`
-  `android:insetBottom="0dp"` and its height comes from `@dimen/cta_height` 52 or
-  `@dimen/view_height_dp48`. Every button carries
-  `android:textAppearance="@style/TextAppearance.App.Title(.Medium)"` - so no button label is Roboto
-  by accident and **no button carries `android:textStyle="bold"`** (§3.4 bans synthetic bold).
-- **Tonal is neutral on both platforms.** `Button.Tonal` on desktop is already
-  `SurfaceHighest`/`OnSurface`; Android's `Widget.Material3.Button.TonalButton` is restyled to
-  `?attr/colorSurfaceContainerHighest` / `?attr/colorOnSurface`. This removes a second blue and makes
-  the two platforms agree (§13).
-- **V4 is 48 on Android and 40 on desktop** by §7.2. That is a permitted platform difference, not a
-  parity gap. Android's current 44dp delete button (CS §A.3) and the desktop's three `Height="32"`
-  shrinks (CS §B.3) both die.
-- **V8 replaces both carousels.** See section 5.2 for why.
+**The honest count of what this tab spends.** Five button variants (`Primary` with the `.Tall`
+modifier, `Secondary`, `Tertiary`, `Icon` with the `.Filled` modifier, `Destructive`), four of the
+library's five row archetypes (`Value`, `Navigation`, `Toggle`, `Destructive` - `Row.Action` is not
+used, because on this tab an action is either the whole row or a card button) plus the one new
+archetype `Row.Ledger`, and two surfaces (sheet/flyout, dialog). Nothing else. A control on this tab
+that is not in the table above is a defect.
 
-### 3.1 The eight states, per variant
+### 3.2 The three behaviours this tab does not get to choose
 
-Filled once here; not restated per screen. Reduced motion collapses every duration to 0 and jumps to the
-end state (§8.8).
+These are library rulings that an Account-tab implementer is most likely to break, restated here once
+so that no one has to guess:
 
-| Variant | Default | Hover (desktop) | Pressed | Focus | Disabled | Loading | Selected |
-|---|---|---|---|---|---|---|---|
-| V1 | accent fill, `colorOnPrimary` label | `Brush.AccentHover` 150 ms `Ease.Standard` | scale **0.97**, 90 in `ease_out_quart` / 160 out `ease_out_quint`; Android also ripple | 2dp accent ring, 2dp offset, pill | content alpha **0.38**, no ripple, `isEnabled=false` | label replaced in place by a **20dp** indeterminate indicator in `colorOnPrimary`; **the button keeps its width and height**; disabled while in flight | - |
-| V2 | `colorSurfaceContainerHighest` fill | `Brush.Hover` | same 0.97 | same ring | 0.38 | same contract, indicator in `colorOnSurface` | - |
-| V3 | accent label, no fill | `Brush.Hover` behind, r12 | same 0.97 | same ring, r12 | 0.38 | same contract | - |
-| V4 | glyph `colorOnSurfaceVariant` | `Brush.Hover`, pill | 0.97 | ring, pill | 0.38 | glyph replaced by a 20dp indicator | - |
-| V5 / V5s / V6 | transparent on P0 | `Brush.Hover` over the whole row | 0.97, whole row | 2dp ring inset to the row bounds, r12 | 0.38 on all content, row not clickable | the trailing value is replaced by a **16dp** indicator | - |
-| V7 | as V5 | as V5 | as V5 | ring on the row | 0.38 | the **subtitle** swaps to «Сохраняем…»; the row is not clickable; the switch shows the optimistic position | switch on = accent track |
-| V8 | transparent, 1dp `colorOutline`, label 16/500 `colorOnSurfaceVariant` | `Brush.Hover` on unselected only | 0.97 | ring, r12 | 0.38 | - | 12 % accent fill + 1dp `colorPrimary` + label 16/**700** `colorPrimary` - **two channels** (§5.4) |
-| V9 | `colorSurface`, scrim 60 % | - | - | focus moves into the sheet on open and returns to the trigger on close | - | - | - |
+1. **Buttons are radius 16, never a pill** (C§R1). `radius_button` / `Radius.Button` = 16 on every
+   labelled button on this tab and all four sub-pages: the card CTA, the upgrade button, the gate's
+   two buttons, every sheet button, every dialog button. `radius_pill` / `Radius.Pill` survives on
+   this tab **only** where width equals height or the shape is a track: the 48dp icon buttons, the
+   sheet handle, the traffic meter, the switch track, the avatar-photo mask is a 12 tile and not a
+   pill at all. The owner's recorded rejection of the 52×342 stadium
+   (`v2rayN/v2rayN.Desktop/Assets/GlobalStyles.axaml:3-14`, naming `android_buy.jpg` and
+   `android_login.jpg` in his own words: «Владелец отклонил эти капсулы») is precedence level 1 by
+   §0.1.1 and beats §3.2's "buttons are pill". The `00-rules.md` §18 row that records this is
+   C§R1's, and it is a **precondition** for implementing this tab (13.3).
 
-### 3.2 Every named control on this tab, and its variant
+2. **Rows do not scale; objects do** (C§R5). A row is a slice of a surface: at a 68 or 16 text origin
+   with 1dp hairlines above and below, a 3 % shrink visibly detaches the pressed row from its own
+   divider and reads as a rendering bug - a conclusion the desktop repo already reached in writing at
+   `GlobalStyles.axaml:650-655`. So on this tab:
 
-The demand was "every one of those is a control; say which component-system variant it uses and why,
-and where the accent is spent". Here is that list in full, in the order the tab renders them.
+   | Presses with a **background step** to `?attr/colorSurfaceContainerHigh` `#1A1D21`, 90 ms in / 160 ms out, plus the Android ripple | Presses with **`scale(0.97)`** plus the background step |
+   |---|---|
+   | every `Row.Value`, `Row.Navigation`, `Row.Toggle`, `Row.Destructive`, `Row.Ledger`; payment-method rows; sub-pick rows; upgrade-target rows; device rows; payment-history rows (which are not clickable at all) | every button; the subscription card when it is pressable; the account chip on Home; the avatar tile |
 
-| Control | Variant | Why this variant | Accent |
-|---|---|---|---|
-| Identity / plan hero | **not a control** - a 40dp tile + two `TextBlock`/`TextView` lines | it answers none of the four questions by being pressable; only the tile is a target (avatar options) | none |
-| Avatar | **V4** semantics inside a 48dp touch box | one icon-sized target, one action | none |
-| Subscription switcher, 2-3 | **V8** segmented | §11.2 "choice among 2-4"; both options stay visible, keyboard-navigable, no drag | 12 % fill + accent border + accent label on the selected segment (a state the user controls, §5.1) |
-| Subscription switcher, 4+ | **V5** value row → **V9** radio sheet | §11.2 "choice among many"; a 12-item segmented control does not exist | accent radio on the selected item |
-| Tariff badge | a **chip**, not a control | it is a label, not a target; it carries the tariff, which the card title does not (so it is not §2.4.4's repeating chip) | **none** - D§3.2 lists the badge among the things that are explicitly not lit |
-| Rename | **V4** icon button, 48/40 box | one icon, one action, no room for a labelled button in a header that already holds a name and a chip | none |
-| Time block (expiry) | **not a control** | a fact; the action it implies is the CTA below it | amber figure when expiring, red title when expired; **never blue** |
-| Traffic meter | **not a control** | a readout of a quantity the user does not directly control | **none** - neutral fill, amber ≥ 90 %, red at 100 % |
-| Renew | **V1 filled** when expiring / expired / trial / empty, **V2 tonal** otherwise | the single lit element earns its light only when the state needs action (D§3.2); a permanently blue button teaches nothing | the tab's one filled accent surface, conditionally |
-| Upgrade | **V3 text button** in the card, plus a **V6** row in the «Подписка» group | it is the second-most-wanted action, so it is one tap deep, but it must not compete with renew; a text button is visibly subordinate to a filled or tonal one | accent **label** only |
-| Add devices | **V5** row on the Devices page → **V9** stepper sheet | it changes a number that is printed on the Devices page; putting it anywhere else separates the control from its value | none |
-| Device management | **V5** value row → sub-page of tiled rows with a **V4** trailing unlink | the row is the target, the icon button is the exception; §4.5's "one trailing" is relaxed only here, and only because the row's content and its action are different things | none; the unlink glyph is neutral at rest (§6.4) |
-| Balance | **V5s** value row (16/700 numeric) → **V9** top-up sheet | money is the one trailing value on this tab that carries hierarchy; the 13sp grey default would bury it | none - «Пополнить» is **not** a filled button any more |
-| Top-up | **V9** sheet: label + field + method rows | §7.6 prefers a sheet over a dialog; §7.4 requires a visible label, a helper slot and blur validation, none of which the current dialog has | none |
-| Auto-renew | **V7** switch row inside the card | §11.2 "toggle → `MaterialSwitch`"; the row owns the switch so there is one hit target, not two | the switch track when on |
-| Payment method | **V9** sheet of tile-less **ledger rows**, one component for all five callers | the #1 defect in AS §5 is two components for one decision; a chevron on a row that charges money is a lie, so there is no chevron | none |
-| Payment history | **V5**-shaped **value row** → a sub-page of tile-less ledger rows | a payment is a fact, not an object; §2.4.3's uniform-card tell is exactly what the current card list is | green «Оплачено» / red «Ошибка» words only |
-| Referral code | **V5** value row, tap copies | one value, one action, one Snackbar; no chevron because it does not navigate | none |
-| Account linking | **V5** value row → sub-page of **V5/V6** rows → **V9** sheets | linking is three methods and two flows; a sub-page keeps the tab at three groups (D§7.3) | none |
-| Sign out | **V6** row, title in `colorErrorText`, then a confirm dialog | a dialog is correct here precisely because there is no undo path (§7.5) | red **text**, never a red button on the tab |
-| Retry, in every error state | **V2 tonal** | an error state must not spend the screen's one filled accent on recovering from a failure | none |
-| Sign-in gate | **V1** «Войти через Telegram» + **V3** «Войти по почте» | one primary, one alternate; D§10.1 forbids a card here | the gate's one filled surface |
+   `@anim/press_scale` is corrected from 0.96 → **0.97** and its release interpolator from
+   `ease_out_quart` → `@interpolator/ease_out_quint` (C§R4, §7.1), and it is applied to buttons and
+   objects only. `@anim/nav_press` is deleted.
 
-**Press physics are one recipe.** `@anim/press_scale` is corrected from **0.96 → 0.97** and its
-release interpolator from `ease_out_quart` → `@interpolator/ease_out_quint` (§7.1). Every clickable
-surface on this tab and its sub-pages carries it. `@anim/nav_press` (0.92, linear, off-token durations)
-is not used here.
+3. **Focus on a filled control is drawn inside it** (C§R7). An accent ring drawn immediately outside
+   an accent fill is 1:1 against the thing it surrounds - invisible, on the one control every
+   keyboard and TV user has to find, which §14.3 and §7.1 make a P1. So:
+
+   | Control | Focus ring |
+   |---|---|
+   | `Button.Primary(.Tall)`, `Button.Icon.Filled` | **inner** 2dp in `?attr/colorOnPrimary` `#00183A` at 40 % alpha, at the control's own radius (16, or pill for a filled icon button) |
+   | `Button.Destructive` | **inner** 2dp white at 40 % alpha, radius 16 |
+   | `Button.Secondary`, `Button.Tertiary`, `Button.Icon`, every row, every segment, the switch, every field | **outer** 2dp `?attr/colorPrimary` / `Brush.Accent` at 2dp offset, radius = the control's radius + 2 |
+
+   Android draws the inner ring with the MaterialButton stroke: `app:strokeWidth="2dp"` **always
+   present** (it draws inside the bounds, so there is no layout shift) plus a `strokeColor`
+   `ColorStateList` whose default item is `@android:color/transparent`. Desktop uses `FocusAdorner`,
+   inset for filled controls. Stated once here; not repeated per control.
+
+### 3.3 What this tab needs that the library does not have yet
+
+Per C§0.4, each of these is added to `22-components.md` **first**, in that file's format (anatomy,
+geometry, type, states, motion, both platform mappings, copy), and only then used here. Each is
+specified below to the depth C§0.2 demands, so the amendment is a paste, not a design task.
+
+**C-1. `Row.Ledger` - the sixth row archetype (tile-less transaction row).**
+
+```
+[ 16 gutter ][ text column, weight 1 ][ 12 ][ trailing ][ 16 gutter ]
+              Title    16/700 onSurface, max 2 lines
+              Subtitle 13/400 onSurfaceVariant, max 2 lines
+```
+
+| Property | Value |
+|---|---|
+| Min height | `row_min_height` 56 |
+| Vertical padding | `space_12` 12 |
+| Horizontal padding | `screen_gutter` 16 |
+| Text origin | **16** |
+| Divider inset | **16** |
+| Leading slot | none by default; **optionally** a 20dp radio (`MaterialRadioButton` / `RadioButton.Incy`) or a 20dp glyph, followed by `space_12`, which moves the origin to 48 for that whole surface |
+| Trailing | exactly one of: value text, `Button.Icon`, a status word, a 16dp inline spinner. **Never a chevron** - a ledger row either charges money or states a fact, and a chevron on either is a lie (AS §1.8) |
+| Title | `TextAppearance.App.Title` / `TextBlock.Title` |
+| Value | `TextAppearance.App.Subtitle` + the Numeric role; **`.strong`** modifier → `TextAppearance.App.Title` + Numeric + `colorOnSurface`, used for «Итого» and «Баланс» |
+| States | exactly C§8.1's: background step on press, no scale; outer focus ring; 0.38 disabled; 16dp trailing spinner when busy; `IsHitTestVisible=False` / `isClickable=false` when the row is a fact rather than an action |
+| Android | `res/layout/row_ledger.xml` |
+| Desktop | `Border.Row.Ledger`, the same templated control as `Border.Row` minus the tile column, `Padding="16,12"`, `ColumnDefinitions="*,12,Auto"` |
+
+Why it is a component and not a layout: it is used by five callers (the payment surface, the sub-pick
+surface, the upgrade-target list, Payment history, Devices) on two platforms, and the alternative -
+each caller styling a `Row.Value` with its tile hidden - is how the desktop ended up with 190
+view-local style rules (C§0.4).
+
+**C-2. The inline status bar, with its two variants.** C§15 already specifies the offline bar; this
+adds the polling variant and gives the pair a name so both platforms build one thing.
+
+| Property | Value |
+|---|---|
+| Fill | `?attr/colorSurfaceContainerHigh` `#1A1D21` / `Brush.SurfaceHigh` |
+| Radius | `radius_chip` 12 |
+| Padding | `space_12` 12 all round |
+| Height | `wrap_content` with `minHeight` 48 - **not** a fixed 40: a 48dp `Button.Tertiary` does not fit in a 40dp bar, and at font scale 200 % the text alone overruns it |
+| Text | `TextAppearance.App.Body` / `TextBlock.Body` 14/400 `colorOnSurface`, `maxLines=2`, weight 1 |
+| Leading slot | **offline: none** (C§15 is explicit: "no icon"). **Polling: a 20dp inline spinner**, then `space_12` |
+| Trailing | one `Button.Tertiary`, min 48 - «Повторить» offline, «Обновить» polling |
+| Position | the first child of the scroll content, at the gutter, `space_16` below it |
+| Enter / exit | `motion_reveal` 300 `ease_out_quint` fade + 8dp rise / 225 ms `ease_standard`; reduced motion appears and disappears with no translation |
+| Live region | `accessibilityLiveRegion="polite"` / `AutomationProperties.LiveSetting="Polite"` |
+| Android | `res/layout/layout_status_bar_inline.xml` |
+| Desktop | `Border.StatusBar` hosting the same three slots |
+
+Offline wins when both conditions hold; there is never more than one bar.
+
+**C-3. `Row.Value.strong` and `Row.Ledger.strong`** - a modifier, not a variant. It changes exactly
+one thing: the trailing value's ramp role from `Subtitle` 13/400 `colorOnSurfaceVariant` to `Title`
+16/700 `colorOnSurface`, keeping the Numeric role. It exists twice in the whole product («Баланс» on
+this tab, «Итого» in the payment surface) because money is the one trailing value that carries
+hierarchy and 13sp grey buries it. It is **not** a member of the vocabulary and does not get its own
+state table; every state is the host row's.
 
 ---
 
-## 4. Typesetting: money, dates, counts, traffic
+## 4. Typesetting: the two faces, money, dates, counts, traffic
 
 D§3.1 makes numbers the product's identity. This section is the contract.
+
+### 4.0 The UI face, resolved
+
+Every Russian string in this document - every row title, every button label, every error - is set in
+the **UI face**. D§11.2 left that face as an open owner decision (D-1), which made every ramp
+reference in this file provisional and the file itself not a specification. It is resolved here, in
+the terms D§6.1 asked for.
+
+**D-1 is resolved as: Golos Text.** It is the direction's own first recommendation (D§6.1: "OFL,
+variable, Cyrillic-first, designed for Russian UI. Humanist-leaning neo-grotesque, which gives real
+contrast against the geometric figures"), it is free to redistribute under the SIL Open Font License,
+and it is the only candidate on the list that is drawn for Russian rather than extended into it.
+
+| | Value |
+|---|---|
+| Family | **Golos Text** (SIL OFL 1.1) |
+| Vendored as | **three static instances**, not the variable file: `GolosText-Regular.ttf` (400), `GolosText-Medium.ttf` (500), `GolosText-Bold.ttf` (700), each subset to U+0000-U+00FF, U+0400-U+04FF, U+2010-U+2027, U+20BD, U+2116 |
+| Why static and not variable | the product already carries one variable-font risk (D§6.3: the vendored Space Grotesk defaults to `wght` 300 and `res/font/space_grotesk.xml` pins no `fontVariationSettings`, so every brand run may be rendering Light). The face that carries ~95 % of the product's strings does not get to share that risk. Three masters render identically on every API level and every desktop OS |
+| Android resource | `res/font/ui_sans.xml`, a `<font-family>` with three `<font>` entries - `fontWeight="400"` → `@font/golos_text_regular`, `500` → `@font/golos_text_medium`, `700` → `@font/golos_text_bold`, all `fontStyle="normal"` |
+| Android token | `font_ui` → `@font/ui_sans` (`10-design-system.md` §3.8). `32-master-plan-android.md`'s `@font/ui_face` is the same resource; the registry name is **`ui_sans`** and `ui_face` is corrected to it in that file |
+| Desktop resource | `Assets/Fonts/GolosText-Regular.ttf`, `-Medium.ttf`, `-Bold.ttf` |
+| Desktop token | `<FontFamily x:Key="Font.Ui">avares://departament/Assets/Fonts#Golos Text</FontFamily>` |
+| Weights used | 400 (body, subtitle, caption), 500 (`Title.Medium`, chip, value, inactive nav), 700 (display words, headline, title, section header, active nav). 300 and 600 do not exist (D§6.2); italic does not exist (D-G) |
+| Fallback chain, Android | `@font/ui_sans` → `sans-serif`. If the three binaries are absent from a build, the family resolves to Roboto and nothing else in this document changes |
+| Fallback chain, desktop | `Golos Text, Segoe UI, Inter, Noto Sans, DejaVu Sans, sans-serif` - explicit, so Windows, Linux and macOS stop rendering three different products |
+| Contrast | unchanged: the face does not change any colour pair in §3.5 |
+
+The **figure face** stays Space Grotesk (`font_grotesk` / `Font.Grotesk`), scoped by D-2 to digits,
+units, currency, Latin technical tokens, chip labels and the wordmark, and applied through
+`TextAppearance.App.Numeric` / `TextBlock.Numeric` and `TextAppearance.App.Display` /
+`TextBlock.Display` only.
+
+Recorded as decision A-15 (13.1) and pasted into `03-direction.md` §11.2 as the resolution of D-1.
 
 ### 4.1 One money formatter, one currency
 
@@ -411,52 +505,85 @@ Space Grotesk contains **zero Cyrillic** (D§6.1). Therefore:
 
 | Form | Face | Example | Where |
 |---|---|---|---|
-| Long, with a Russian month | **UI face** (the whole string) | `3 августа 2026` | card time lines, auto-renew line |
-| Long, current year | UI face | `3 августа` (year omitted when it is this year) | same |
-| Short numeric | **figure face**, `tnum`, `zero` off | `12.06.2026` | row trailing values, sub-pick sheet |
+| **Split**: day figure + month word | figure face for the day, **UI face** for the month word | `3` + `августа` | the card's time block, and nowhere else |
+| Long, with a Russian month, as one phrase | **UI face** (the whole string, digits included) | `3 августа 2026` | the auto-renew line, the expiring state's detail line |
+| Long, current year | UI face | `3 августа` (the year is omitted when it is this year) | same |
+| Short numeric | **figure face**, `tnum`, `zero` off | `12.06.2026` | row trailing values, the sub-pick surface |
 | Numeric with time | figure face | `12.06.2026, 14:32` | payment history rows |
 | Month header | UI face, sentence case | `Июнь 2026` | payment history group headers |
 
 **A string that contains Cyrillic is never set in the figure face** (§F5). Mechanically checkable: no
-`TextView` with `TextAppearance.App.Numeric` and no `TextBlock` with `FontFamily={DynamicResource
-Font.Numeric}` may contain a Cyrillic character.
+`TextView` with `TextAppearance.App.Numeric` or `.Display` and no `TextBlock` with
+`FontFamily={DynamicResource Font.Numeric}` may contain a Cyrillic character.
 
 The Display hero is the one place a figure gets its own slot: the number is a `TextView`/`TextBlock` in
 the figure face, the word beside it is a **separate** element in the UI face, baseline-aligned. That is
 exactly the split D§3.1 prescribes.
 
-### 4.3 How an expiry reads at 30 days, at 3 days, and expired
+**The year, when it is not the current year.** The card's word slot carries `августа 2026` - month and
+year together, in the UI face, digits included. Two faces never share one slot, and D§3.1's stated
+exception applies: a date phrase is a phrase, not a value column, and "a sentence never ripples
+between two faces". The branded figure stays the day, which is the part that changes most often. The
+year is omitted entirely when it equals the current year, on every surface.
+
+### 4.3 How an expiry reads at 214 days, at 24 days, at 3 days, and expired
 
 `daysLeft = ceil((expireAt - now) / 86 400 s)` in the device's local zone.
 `perpetual = year(expireAt) >= 2099 || daysLeft > 3650` (mirror of the desktop `IsEffectivelyPerpetual`;
 Android has no such handling today and would print «Действует до 04.06.2099», AS §4.2).
 
-| Health | Condition | Display figure | Line 1 | Line 2 | Colour | Card CTA |
-|---|---|---|---|---|---|---|
-| **Perpetual** | sentinel | none | «Бессрочная подписка» `App.Title` | «Срок не ограничен» `App.Subtitle` | onSurface / onSurfaceVariant | V2 tonal «Продлить · 450 ₽» (hidden if no price) |
-| **Active** | `daysLeft > 7` | **none** | «Активна до 3 августа 2026» `App.Title` | «Осталось 214 дней» `App.Subtitle` | onSurface / onSurfaceVariant | **V2 tonal** «Продлить · 450 ₽» |
-| **Expiring** | `1 ≤ daysLeft ≤ 7` | **`5`** `App.Display` 34/700 numeric + «дней» `App.Title` 16/700 UI face | *(the figure line is line 1)* | «Активна до 3 августа 2026» `App.Subtitle` | figure **and** unit `?attr/colorWarning`; line 2 onSurfaceVariant | **V1 filled** «Продлить · 450 ₽» |
-| **Expiring today** | `daysLeft == 0`, not yet past | none | «Истекает сегодня» `App.Title` | «Доступ прервётся в 23:59» - **no**, see below | `colorWarning` | **V1 filled** |
-| **Expired** | `expireAt` in the past | none | «Подписка истекла» `App.Title` | «Срок закончился 31 мая 2026» `App.Subtitle` | line 1 `?attr/colorErrorText`; line 2 onSurfaceVariant | **V1 filled** «Продлить · 450 ₽» |
-| **Unknown** | `expireAtIso` null/blank | none | «Срок неизвестен» `App.Title` | «Обновите страницу или проверьте позже» `App.Subtitle` | onSurfaceVariant both | V2 tonal, or hidden if no price |
+**The time block has one shape in every variant that has a date**, so the card's silhouette does not
+change with the account's health (1.2):
 
-For **expiring today**, line 2 is «Активна до 3 августа 2026» like the other expiring states. We do not
-print a wall-clock cut-off: the backend gives a date, and inventing an hour would be a value not in
-section 9.
+```
+LABEL      Subtitle 13/400                       «Активна до» / «Осталось» / «Истекает» / «Истекла»
+FIGURE  WORD                                     Display 34/700 figure face  +  Title 16/700 UI face
+DETAIL     Subtitle 13/400, optional             a count, or a date, or nothing
+```
 
-The three you were asked about, spelled out:
+| Health | Condition | LABEL | FIGURE | WORD | DETAIL | Colour of FIGURE + WORD | Card CTA |
+|---|---|---|---|---|---|---|---|
+| **Perpetual** | sentinel | *(none)* | *(none)* | *(none)* | *(none)* | - | `Button.Secondary` «Продлить, 450 ₽», hidden if no price |
+| **Active, > 30 d** | `daysLeft > 30` | «Активна до» | `3` | «августа» | *(none)* | `colorOnSurface` | `Button.Secondary` «Продлить, 450 ₽» |
+| **Active, 8-30 d** | `8 ≤ daysLeft ≤ 30` | «Активна до» | `3` | «августа» | «Осталось 24 дня» | `colorOnSurface` | `Button.Secondary` «Продлить, 450 ₽» |
+| **Expiring** | `1 ≤ daysLeft ≤ 7` | «Осталось» | `5` | «дней» | «Активна до 3 августа» | `?attr/colorWarning` | **`Button.Primary.Tall`** «Продлить, 450 ₽» |
+| **Expiring today** | `daysLeft == 0`, not yet past | «Истекает» | `26` | «июля» | «Сегодня последний день» | `?attr/colorWarning` | **`Button.Primary.Tall`** «Продлить, 450 ₽» |
+| **Expired** | `expireAt` in the past | «Истекла» | `31` | «мая» | *(none)* | `?attr/colorErrorText` | **`Button.Primary.Tall`** «Продлить, 450 ₽» |
+| **Unknown** | `expireAtIso` null/blank | *(none)* | *(none)* | *(none)* | *(none)* | - | `Button.Secondary`, hidden if no price |
 
-- **30 days:** no big number. The card says «Активна до 3 августа 2026» in 16/700 white, and under it
-  «Осталось 30 дней» in 13/400 grey. Nothing on the screen is coloured. The CTA is a neutral tonal
-  «Продлить · 450 ₽». The screen is calm because the account is calm.
-- **3 days:** the card's first line becomes `3` at 34sp in the figure face, amber, with «дня» at 16/700
-  amber beside it, baseline-aligned, and the date moves to line 2 in grey. The CTA becomes the filled
-  accent «Продлить · 450 ₽». Exactly one thing on the screen is blue and exactly one is amber.
-- **Expired:** the first line is «Подписка истекла» in `#FF6069`, line 2 «Срок закончился 31 мая 2026»
-  in grey, the traffic meter is hidden (its data is stale and meaningless), the auto-renew row keeps its
-  switch but its subtitle becomes «Продление вручную» or the next-charge line if one exists, and the CTA
-  is the filled «Продлить · 450 ₽». The «Улучшить тариф» button is hidden - you cannot upgrade a dead
-  subscription.
+The two variants with no date - **perpetual** and **unknown** - render the block as two text lines
+instead, since there is no figure to set: perpetual = «Бессрочная подписка» `App.Title` +
+«Срок не ограничен» `App.Subtitle`; unknown = «Срок неизвестен» `App.Title` + «Обновите страницу или
+проверьте позже» `App.Subtitle`. Both keep `colorOnSurface` / `colorOnSurfaceVariant`. These are the
+only two states in which the tab shows **zero** Display figures.
+
+**Why the count line comes and goes.** «Осталось 214 дней» is machine output: nobody counts a
+seven-month subscription in days, and printing the number invites the user to do arithmetic the
+interface has already done. A day count is the right unit only inside the window where time is
+becoming a decision. So: above 30 days the card states the date and stops; 8-30 days it adds the
+count as a detail line; at 7 days and below the count *becomes* the figure and the date drops to the
+detail line. The information moves up the hierarchy as it becomes urgent, which is the whole idea.
+
+**Expiring today** does not print a wall-clock cut-off. The backend gives a date; inventing an hour
+would be a value not in section 9. «Сегодня последний день» is a statement of fact from the same
+field.
+
+The four you were asked about, spelled out:
+
+- **214 days:** «Активна до», then `3` at 34sp in the figure face in white with «августа» at 16/700
+  beside it, baseline-aligned. No detail line. Nothing on the screen is coloured except the tariff
+  badge. The CTA is a neutral `Button.Secondary` «Продлить, 450 ₽». The screen is calm, and it still
+  has a first object.
+- **24 days:** identical, plus a grey detail line «Осталось 24 дня».
+- **3 days:** the label becomes «Осталось», the figure becomes `3` in amber with «дня» at 16/700 amber
+  beside it, and the date moves to the detail line in grey. The CTA becomes
+  `Button.Primary.Tall` «Продлить, 450 ₽». Exactly one thing on the screen is blue and exactly one is
+  amber.
+- **Expired:** «Истекла», then `31` + «мая» in `#FF6069`. No second line restating what the label
+  already said. The traffic meter is hidden (its data is stale and meaningless), the auto-renew row
+  keeps its switch but its subtitle becomes «Продление вручную» or the next-charge line if one exists,
+  and the CTA is `Button.Primary.Tall` «Продлить, 450 ₽». «Улучшить тариф» is hidden - you cannot
+  upgrade a dead subscription.
 
 ### 4.4 Russian plurals
 
@@ -471,8 +598,16 @@ form(n): let a = n % 100, b = n % 10
   else                    -> MANY
 ```
 
-Required plural sets: `account_days` (день / дня / дней), `devices_count` (устройство / устройства /
-устройств), `history_payments` (платёж / платежа / платежей - used only in accessibility labels).
+Required plural sets, and every one of them has a caller in section 8:
+
+| Set | Forms | Used by |
+|---|---|---|
+| `account_days` | день / дня / дней | the card's WORD slot in the expiring state; the detail line «Осталось %s»; «Улучшение до %s, +%s» |
+| `devices_count` | устройство / устройства / устройств | the add-devices sheet's subject line; the stepper's accessible name |
+
+A plural set with no caller is a dead string and is not created. (An earlier draft mandated
+`history_payments` "used only in accessibility labels" and then wrote no accessibility label that
+used it; the payment-history list's accessible name is the row's own text, so the set is dropped.)
 
 ### 4.5 Traffic and device counts
 
@@ -492,7 +627,7 @@ Required plural sets: `account_days` (день / дня / дней), `devices_co
 |---|---|---|
 | Active sub, limited | `2 / 5` figure face | none |
 | Active sub, unlimited (`hwidDeviceLimit <= 0`) | `2` | «Без ограничений» |
-| Secondary sub, limited | `5` | «Слотов на подписке» |
+| Secondary sub, limited | `5` | «Устройств на подписке» |
 | Secondary sub, unlimited | none | «Без ограничений» |
 | Count not yet loaded | the trailing 16dp indeterminate indicator (V5 loading) | none |
 
@@ -522,6 +657,26 @@ Reasons, in order:
 is false the destination is removed at start-up and never re-appears. A build without a backend has no
 account; a *session* without a token has a gate.
 
+**The gate itself is specified in `14-auth.md` §5**, which supersedes the four-line sketch this file
+used to carry, on both platforms. What this file still owns is the contract between the gate and the
+tab, and one geometry correction:
+
+| Contract point | Value |
+|---|---|
+| Where the gate lives | inside the tab's content area, replacing everything below the tab header; the header, the bottom navigation and the toolbar do not change |
+| Heading | «Вход в departament» - the brand token is lower-case **only** inside this Latin wordmark, which is how the product spells its own name in the title bar and in О приложении. In Russian prose the brand is **«Departament»**, capitalised, everywhere (8.5's «серверам Departament»). One rule, two forms, no third |
+| Primary | `Button.Primary.Tall` «Войти через Telegram», full width, `radius_button` 16, `minHeight` 52 |
+| Alternate | `Button.Tertiary` «Войти по почте», **`wrap_content`, left-aligned to the gutter**, `minHeight` 48, `radius_button` 16 |
+| Body | «Здесь будут подписка, устройства и платежи.» |
+| On success | the tab re-renders in place at `motion_state` 220 ms; no navigation event, no toast |
+| On `ApiError.Unauthorized` anywhere in the tab | the session clears and the gate renders; this is not an error state and shows no error card |
+
+The correction is the alternate's width. `14-auth.md` §5.2 sets `layout_width=match_parent` on
+«Войти по почте»; C§2.3 rules that Tertiary is **never full-width**, for the reason 13 states: a
+full-width 48dp button directly under a full-width 52dp button is not visibly subordinate, it is a
+second CTA in a lighter colour, and D§7.3 forbids a screen having two. `wrap_content` makes the size
+difference read before the fill difference. Recorded as decision 13.2 C-6.
+
 ### 5.2 One, two, or many subscriptions
 
 Both carousels are deleted: the Android `ViewPager2` + `SubscriptionPagerAdapter`, and the desktop's
@@ -533,13 +688,22 @@ because the control swallows its own card's button presses).
 |---|---|---|---|
 | **0** | the empty card | - | §15 "Short content": a single-item layout must not look broken; a zero-item layout is a designed empty state |
 | **1** | the card, full width, nothing above it | - | the overwhelmingly common case gets zero chrome |
-| **2-3** | **V8 segmented control**, 12 above the card | `MaterialButtonToggleGroup` / `ToggleButton.Segment` | §11.2 "Choice among 2-4 → segmented". Every subscription is **visible** rather than hidden off-screen; keyboard-navigable for free; no drag |
-| **4+** | **V6 nav row** «Подписка» + value = the selected name, 12 above the card | tap → **V9 sheet/flyout**, radio list | §11.2 "Choice among many → bottom sheet list with radio" |
+| **2-3** | **Segmented control** (C§6), 12 above the card | `MaterialButtonToggleGroup` + `Widget.Departament.Segment` / `Border.SegmentTrack` + `ToggleButton.Segment` | §11.2 and C§6 "2-4 mutually exclusive options with short labels". Every subscription is **visible** rather than hidden off-screen; keyboard-navigable for free; no drag |
+| **4+** | **`Row.Value`** «Подписка» + value = the selected name, 12 above the card | tap → the sub-pick surface (6.8 / 7.7), a `Row.Ledger` radio list | §11.2 and C§5 Select "5+ → sheet / flyout list with the current one marked" |
+
+The segmented control is C§6's, unchanged and unmeasured-by-nobody: track `btn_height` 48 at
+`radius_button` 16 in `colorSurfaceContainerHighest` with `space_4` padding; segments 40 tall at
+`radius_chip` 12 with `space_12` horizontal padding and `space_4` between; unselected label
+`Title.Medium` 16/500 in `colorOnSurfaceVariant`; selected = `colorPrimaryContainer` `#17325C` fill +
+`colorOnPrimaryContainer` `#CFE0FF` label at weight **700**, a measured 9.57:1 on three axes. The
+`Size.SegmentChip` 44 token this file used to revive stays retired (C§6.3, C§20.3), and the 12 %-fill
++ 1dp-accent-border treatment an earlier draft invented is dropped: it was a new colour pairing with
+no computed ratio, which C§20's own preamble forbids.
 
 Segment label = the subscription's display name, `maxLines=1`, ellipsize end, `layout_weight=1`. At
-three segments on a 320dp screen each segment is 96dp wide, which fits «Подписка 2» at 16sp; longer
-user names ellipsise, which is acceptable for a *switch* label because the card immediately below
-prints the full name.
+three segments inside a 288dp content width each segment is 88dp wide, which fits «Подписка 2» at
+16sp; longer user names ellipsise, which is acceptable for a *switch* label because the card
+immediately below prints the full name.
 
 The selected index lives in the ViewModel, survives configuration changes and tab switches, resets to
 the root subscription on a cold start, and is restored by Back (§7.7).
@@ -582,7 +746,7 @@ Deliberately **not** in the card:
 | `res/layout/activity_payment_history.xml`, `res/layout/item_payment.xml` | rewritten |
 | `res/layout/sheet_payment_method.xml`, `res/layout/item_payment_method.xml` | rewritten as the shared payment sheet |
 | `res/layout/dialog_top_up.xml` | → `res/layout/sheet_top_up.xml` |
-| `res/layout/layout_setting_row.xml`, `layout_setting_toggle_row.xml` | → the three row layouts below (they have **0 call sites** today, CS §A.4) |
+| `res/layout/layout_setting_row.xml`, `layout_setting_toggle_row.xml` | deleted by C§8.7; their replacements are the library's five row layouts, not new files invented here (they have **0 call sites** today, CS §A.4) |
 | `res/layout/layout_home_account.xml` | the dead `group_login` block and the `✕` **text glyph** are deleted; the chip's avatar becomes the 40dp tile |
 
 **New:**
