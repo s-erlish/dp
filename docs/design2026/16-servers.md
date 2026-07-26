@@ -1714,14 +1714,22 @@ there is updated.
    method list to two and five probe types on one screen is the sprawl that decision was fighting.
    **Decided by the owner**, on the evidence of whether anyone uses per-server throughput testing;
    if kept, they belong in a «Проверить» submenu on the desktop flyout and nowhere on Android.
-2. **OPEN: the flag set.** Sixteen countries is small for providers that name dozens. Growing it is a
-   content task with a per-flag licensing question. **Decided by the owner** on whether to vendor a
-   complete ISO 3166-1 set or to keep the globe fallback doing most of the work. The design does not
-   change either way.
+2. **DECIDED (owner, 2026-07-26): grow the flag set.** «Флаги расширь.» The recognition set becomes
+   the full ISO 3166-1 alpha-2 table on both platforms - recognition stays gated on an explicit
+   marker per 0.4.7's no-flag-beats-a-wrong-flag rule, so a larger table adds coverage, not false
+   positives. The desktop raster set is extended to the practical provider geography (Europe
+   complete, the Americas, Asia-Pacific and MEA majors, ~80 flags) in the existing 64x64 circular
+   RGBA format; a recognised code with no raster falls back to `xx.png` as before. Sources:
+   flagcdn.com (public domain flag imagery) masked to the existing circular format.
 3. **OPEN: the stale threshold.** 30 minutes is chosen, not measured. **Decided by the owner** after
    watching how often a stored reading is still right an hour later on a real subscription; the
    number is a dial, the two-tier presentation is the design.
-4. **OPEN: whether «Все серверы» exists in the desktop provider pane** (16.3). A cross-provider list
-   is useful for search and useless for anything else, and it is the one thing in the pane with no
-   Android counterpart. Kept for now. **Decided by the owner** on whether users search across
-   providers or within one.
+4. **DECIDED (owner, 2026-07-26): no cross-provider list, on either platform.** «Список не нужен,
+   его также надо убрать и на андроид приложении, на пк его как раз нету.» The desktop provider
+   pane ships without «Все серверы», and Android's equivalent - the unscoped server list on
+   Главная (`rv_home_servers`, which shows every provider's servers under one subscription's
+   card) - is REMOVED in the Главная rebuild, not restyled. Главная keeps the single «Серверы»
+   row with the count subtitle (13-start-screen.md); the only server list in the product is the
+   Серверы tab, grouped by провайдер. This also retires the home audit's de-virtualisation P1 by
+   deleting the list it applied to. Search lives in the Серверы tab and searches within the
+   grouped list.
