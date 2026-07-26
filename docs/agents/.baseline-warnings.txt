@@ -1,9 +1,11 @@
 w: AngConfigManager.kt:L:C Elvis operator (?:) always returns the left operand of non-nullable type 'ProfileItem'.
+w: AvatarManager.kt:L:C Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
 w: BackupActivity.kt:L:C Elvis operator (?:) always returns the left operand of non-nullable type 'String'.
 w: DepartamentApiClientImpl.kt:L:C Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
 w: HttpUtil.kt:L:C Elvis operator (?:) always returns the left operand of non-nullable type 'ResponseBody'.
 w: HttpUtil.kt:L:C Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
 w: MainViewModel.kt:L:C 'fun getSerializableExtra(p0: String!): Serializable?' is deprecated. Deprecated in Java.
+w: MiscDtos.kt:L:C Unnecessary non-null assertion (!!) on a non-null receiver of type 'DevicesWrapperDto'.
 w: ServerCustomConfigActivity.kt:L:C Unnecessary safe call on a non-null receiver of type 'ProfileItem'.
 w: build.gradle.kts:L:C: 'fun Project.android(configure: Action<BaseAppModuleExtension>): Unit' is deprecated. Replaced by com.android.build.api.dsl.ApplicationExtension.
 w: build.gradle.kts:L:C: 'fun srcDirs(vararg srcDirs: Any): Any' is deprecated. Use `directories` mutable set instead.

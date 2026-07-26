@@ -7,6 +7,16 @@
 # Prints BUILD result, warning count, and any warning NOT present in the recorded baseline.
 # The bar is: build succeeds AND "NEW WARNINGS: 0". Line:col are stripped before comparing,
 # because line numbers shift when code above them changes and that is not a regression.
+#
+# The baselines are a SUPERSET, and they must be re-recorded from a FULL build:
+#   ./gradlew :app:assembleFdroidDebug --rerun-tasks     (not an incremental run)
+#   dotnet build ... -c Release --no-incremental
+# An incremental run only recompiles what changed, so it emits only that subset's warnings. A
+# baseline taken from one makes the gate lie: the next agent whose change happens to recompile an
+# untouched file is told it introduced warnings that were always there. Warnings that appear only
+# sometimes — the Gradle build-script deprecations, which surface only when the build script itself
+# is recompiled — belong in the baseline too. A baseline entry that does not appear costs nothing,
+# because only NEW warnings fail the gate.
 set -uo pipefail
 
 DP=/home/user/dp
