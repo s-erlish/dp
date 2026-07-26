@@ -824,3 +824,58 @@ the file.
    motion reduction, per 7.1.
 7. **The sign-in loading state holds the control's width and hides the label** (`LoginView:433-460`),
    which is R8 done right and is rare in this codebase.
+8. **`Common/UiScaleState.cs` is clean.** A static broadcast with a real `Clamp` (NaN and 0 from an old
+   or corrupt config both fall back to `Default`), an `Initialize` that seeds without notifying, and a
+   `Set` that notifies only on a real change. Both consumers read `Current` on late attach. No defect
+   found; it is the model the settings-search and picker state should follow.
+9. **`Views/ISubPage.cs`** is the right contract shape - the page raises `BackRequested`, the shell
+   pops. The shell only needs to raise it from Esc and mouse-4 as well as from the arrow (W6).
+10. **`Common/L.Shell.cs`** carries no dash and no emoji in any shipped string; its two dash hits are in
+    file-header comments. Clean.
+
+---
+
+## 17. Evidence index
+
+Every claim above traces to one of these.
+
+| Claim | File:line |
+|---|---|
+| `AutoUpdateInterval` is the geo interval, in hours of uptime | `ServiceLib/Manager/TaskManager.cs:65, 111-121` |
+| Subscription auto-update is per feed, in minutes | `ServiceLib/Manager/TaskManager.cs:84-85` |
+| The desktop row writes minutes into it | `ViewModels/SettingsViewModel.cs:36, 431-437, 607-608` |
+| `Обход локальной сети` -> `AllowLANConn` | `ViewModels/SettingsViewModel.cs:160, 222` |
+| Language cycle is ru<->en only | `ViewModels/SettingsViewModel.cs:449` |
+| Silent port revert with no stated cause | `ViewModels/SettingsViewModel.cs:385-391` |
+| No Esc / Ctrl+F / Ctrl+`,` / mouse-4 | `Views/MainWindow.axaml.cs:1899-1951` (the whole handler) |
+| Single keep-alive `SettingsView` | `Views/MainWindow.axaml.cs:20` |
+| `LoginView` pushed onto the same sub-stack, special-cased | `Views/MainWindow.axaml.cs:1218`, `:1089` |
+| 6 card group wrappers on the hub | `Views/SettingsView.axaml:225, 524, 643, 688, 877, 974` |
+| Blue tile on the mode row | `Views/SettingsView.axaml:238, 243` |
+| Cycle-in-place on 4 rows | `Views/SettingsView.axaml:593, 800, 832, 909` + `.axaml.cs:53-58` |
+| Inline-expand local proxy | `Views/SettingsView.axaml:463-516` + `.axaml.cs:217-233` |
+| Hardcoded `Масштаб интерфейса` + dashed tooltip | `Views/SettingsView.axaml:776, 792` |
+| Raw hex + off-ramp 15px in the local field theme | `Views/SettingsView.axaml:75, 78` |
+| Off-scale 18 in the section-label margin | `Views/SettingsView.axaml:180` |
+| Divider inset 72 where the shared origin is 68 | `Views/SettingsView.axaml:145` |
+| Fixed `RowValue MaxWidth` | `Views/SettingsView.axaml:200` |
+| No pressed state on rows, by explicit decision | `Views/SettingsView.axaml.cs:106` comment; `Assets/GlobalStyles.axaml:958-975` has no `:pressed` selector |
+| Gradient page background | `Views/LoginView.axaml:237`, `Views/OnboardingView.axaml:43`; brush at `Assets/GlobalResources.axaml:147-155` |
+| Watermark-as-label on the sign-in form | `Views/LoginView.axaml:351, 370, 417`; swapped in code at `.axaml.cs:617` |
+| Validation per keystroke, not on blur | `Views/LoginView.axaml.cs:718-746` |
+| Helper slots collapse instead of reserving | `Views/LoginView.axaml:358, 404, 424` |
+| Russian in the brand face | `Views/LoginView.axaml:88` (content at :334, :339); `Views/DnsSubView.axaml:53` (content at :106, :118) |
+| 1.6 s breathing animation | `Views/LoginView.axaml:203-226` |
+| Fixed `Height` on a CTA | `Views/LoginView.axaml:64` |
+| Field boundary at 1.16:1 | `Assets/GlobalResources.axaml:550`; `Views/SettingsView.axaml:70` |
+| Retired `Radius.Search` still bound | `Assets/GlobalResources.axaml:552`; `Assets/GlobalStyles.axaml` `Border.SearchPill` |
+| Legacy 32px `Button.IconButton` is still the back button | `Assets/GlobalStyles.axaml:255-262` + the nine sub-pages |
+| `Button.BackNav` exists, unused by settings | `Assets/GlobalStyles.axaml:1237-1284` |
+| `Border.SubToolbar` exists, unused by settings | `Assets/GlobalStyles.axaml:1210-1234` |
+| `ProviderSettingsPage` has zero references | `grep 'new ProviderSettingsPage('` = 0; absent from `Common/SimpleViewLocator.cs:15-36` |
+| Dead views registered in the locator only | `Common/SimpleViewLocator.cs:18-36` |
+| Em dashes in shipped copy | `Common/L.Settings.cs:86, 104, 105, 112, 128, 132, 147, 168`; `Views/SettingsView.axaml:776`; `ProviderSettingsPage.axaml:109`; `GeoFilesPage.axaml:73, 80`; `UrlSchemesPage.axaml:74`; `AboutPage.axaml:95` |
+
+**Build gate:** not run, and correctly so - this audit edited no source file, so the recorded warning
+baseline is unchanged and the 14 `TextBox.Watermark` (AVLN5001) sites in section 11 stand exactly as
+listed. My own files are clean because I wrote none.

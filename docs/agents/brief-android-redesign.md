@@ -35,7 +35,7 @@ disk:
 | Interpolators | - | all four exist: `ease_out_quart`, `ease_out_quint`, `ease_standard`, `ease_out_expo` | `res/interpolator/` |
 | Fonts | - | Golos Text 400/500/700 + Space Grotesk vendored; family XMLs `golos_text.xml`, `space_grotesk.xml` | `res/font/` |
 | Type ramp | "being written now" | **landed**: 16 `TextAppearance.App.*` styles with declared `lineHeight`, per-role face, D-4 weight on Numeric | `res/values/styles.xml:65-296` |
-| Component styles | "being written now" | **landed**: ~95 `Widget.Departament.*` / `ShapeAppearance.Departament.*` styles, 5 button variants x 2 heights, rows, tiles, chips, fields, switch, nav, toolbar, sheet, dialog, snackbar, empty state, skeleton, progress | `res/values/styles.xml:298-1295` |
+| Component styles | "being written now" | **landed**: 122 styles in the file, 66 of them `Widget.Departament.*` / `ShapeAppearance.Departament.*` - 5 button variants x 2 heights, rows, tiles, chips, fields, switch, nav bar, nav rail, toolbar, sheet, dialog, snackbar, empty state, skeleton, progress, plus 30 `Widget.App.*` compatibility aliases | `res/values/styles.xml:298-1295` |
 | Colour state lists the styles depend on | - | **landed**, 33 files, none dangling | `res/color/`; every `@color/*` referenced by `styles.xml` resolves |
 | **Themes** | "being written now" | **NOT landed.** `res/values/themes.xml` last modified 14:20, four hours before `styles.xml` | see 0.1 |
 
@@ -99,7 +99,7 @@ Read before planning around them.
 
 | CONTINUE-HERE.md 4 item | Status now | Evidence |
 |---|---|---|
-| "19 amputated menu actions ... implementations are live but unreachable dead code" | **Closed.** `res/menu/menu_main.xml` declares `group_import` (6 items) and `group_server_list` (6 items); `MainActivity.onOptionsItemSelected` (`MainActivity.kt:2159-2228`) dispatches all 12 plus `sub_update` | `res/menu/menu_main.xml`, `MainActivity.kt:2159` |
+| "19 amputated menu actions […] implementations are live but unreachable dead code" | **Closed.** `res/menu/menu_main.xml` declares `group_import` (6 items) and `group_server_list` (6 items); `MainActivity.onOptionsItemSelected` (`MainActivity.kt:2159-2228`) dispatches all 12 plus `sub_update` | `res/menu/menu_main.xml`, `MainActivity.kt:2159` |
 
 Everything else in that list is still open and is scheduled below: `SettingsActivity` unreachable
 (0.5), no user-visible logout (0.5), `CheckUpdateActivity` unreachable (0.5), RAM panel unreachable
@@ -244,7 +244,7 @@ An agent that needs a change in a file it does not own reports the change and do
 | File | Why contested | Rule |
 |---|---|---|
 | `res/values/themes.xml` + `res/values-night/themes.xml` + `res/values/attrs.xml` | Every screen wants an attr; every component wants a default style | **Serialised to wave 2, agent T1, and then frozen.** After wave 2 a change here is a written request to the wave lead, not an edit. Adding an attr mid-wave invalidates every other agent's build |
-| `res/values/styles.xml` (72 KB, ~110 styles) | Every screen wants "just one more style" | One owner in wave 2 (T2). From wave 3 on it is **append-only, by request**: an agent that needs a style asks the wave lead, who appends it and tells everyone. A screen agent never edits it directly. Rationale: this file is the single largest merge hazard in the repo and two agents appending to it concurrently in a container that can restart is how a wave gets lost |
+| `res/values/styles.xml` (72 KB, 122 styles) | Every screen wants "just one more style" | One owner in wave 2 (T2). From wave 3 on it is **append-only, by request**: an agent that needs a style asks the wave lead, who appends it and tells everyone. A screen agent never edits it directly. Rationale: this file is the single largest merge hazard in the repo and two agents appending to it concurrently in a container that can restart is how a wave gets lost |
 | `res/values/dimens.xml` | Same | **Frozen after wave 2.** 57 tokens cover the whole spec. A new dimen is a spec change and needs a `00-rules.md` 18 entry or a documented derivation |
 | `res/values/colors.xml`, `res/values-night/colors.xml` | Same | **Frozen after wave 2.** 167 + 101 colours plus 33 state lists is already more than the spec needs |
 | `ui/MainActivity.kt` (3 339 lines) | Four screens live inside it | Split. See 2.2. This is the hardest case and it is answered plainly there |
@@ -364,8 +364,19 @@ stops - it does not edit.
 
 **Goal.** Close the theme hole (0.1), build the component layouts and binders that do not exist
 (0.2), and stand up a gallery so a component can be looked at in three themes at 200% font scale
-before any screen consumes it. Visible change: **none**. The app must look pixel-identical at the end
-of this wave.
+before any screen consumes it.
+
+**Visible change: T1's half is visible, the rest is not, and the two specs disagree about that.**
+`32` 26 waves 1 and 2 both say "Visible change: none." `24` 6.2 wave 1 is titled "The control layer
+(**every control changes at once**)" and its gate expects "button heights collapse from 11 to 2
+across the product; chevrons collapse from 6 sizes to 1". **`24` is right and `32`'s "none" applies
+only to the token files, which already landed.** Installing `materialButtonStyle`,
+`materialCardViewStyle`, `materialSwitchStyle`, `textInputStyle`, `chipStyle` and the three
+`shapeAppearance*Component` attributes re-skins every existing control by design; that is the
+leverage, not a side effect. Saying it out loud matters, because a reviewer told to expect no change
+would file the intended re-skin as a regression.
+
+So the wave carries two gates, one per half, both stated at the end of this wave block.
 
 **Serialisation inside the wave.** T1 lands first and alone. C1-C4 start only after T1's build is
 green, because every component layout resolves attrs T1 declares. This is the one intra-wave
@@ -384,11 +395,20 @@ dependency in the whole plan and it is worth the half-day it costs.
 a style, they file it with T1 and T1 appends. `dimens.xml` and `colors.xml` are frozen; a component
 that cannot be built from the 57 dimens and 268 colours on disk reports that as a spec gap.
 
-**Gate.** `verify-build.sh android` green with `NEW WARNINGS: 0` and `COMPILER: ran`. The gallery
-opens and shows every component in three themes. **A screenshot diff of Главная, Серверы, Настройки
-and Аккаунт before and after this wave shows no change.** If installing the component defaults moved
-a pixel on a shipped screen, the default is wrong or the screen was relying on a Material default
-that the spec replaces; either way it is investigated, not accepted.
+**Gate, T1's half (the re-skin).** `verify-build.sh android` green with `NEW WARNINGS: 0` and
+`COMPILER: ran`. Then, on all four tabs plus five sub-pages: every button is 48 or 52 tall and 16
+round with zero insets; every card is 20 round with a 1dp `colorOutlineVariant` hairline and
+elevation 0; every field is 16 round at 56 minimum; every switch is the Departament switch. **No
+control is clipped, no label is truncated and no layout is broken** at 100% and 200% font scale. A
+control that moved is expected; a control that broke is T1's defect and is fixed in this wave, not
+deferred - a broken control on a shipped screen is exactly the "visibly half-converted" state `24`
+6.1 exists to prevent.
+
+**Gate, C1-C4 and G1's half (the new components).** The gallery opens and renders every component in
+every state in dark, light and mono, at 100% and 200%, at 320dp and 600dp width. **No shipped screen
+references any `view_*.xml` yet**, so a screenshot of Главная, Серверы, Настройки and Аккаунт before
+and after C1-C4's changes alone is identical. If a component layout changed a shipped screen, it was
+wired in early and that is a scope breach.
 
 ---
 
@@ -436,11 +456,14 @@ model on one platform and logs nothing has broken it silently.
 
 - `setSelectServer()` at `MainActivity.kt:1537` and `promptApplySelectedServer()` at `:1562` - fixed
   defect 1 (tap selects, never connects).
-- `scheduleHealthCheckIfEnabled()` / `healthCheckConfirming` / `healthRecheckRunnable` around
-  `MainActivity.kt:2075` and the field block at `:175-195` - fixed defect 7 (auto-fallback waits for
-  a confirming re-probe). The comment at `:177-181` explains why one negative probe is not evidence;
-  do not "simplify" it.
-- `connectWatchdogRunnable` at `:195-205` and `scheduleConnectWatchdog()` at `:2106` - the recovery
+- `scheduleHealthCheckIfEnabled()` at `MainActivity.kt:2075`, the field block at `:174-195`
+  (`healthCheckPending` `:174`, `healthCheckConfirming` `:178`, `healthCheckRunnable` `:179`,
+  `healthRecheckRunnable` `:187`) **and the observer that consumes them inside `setupViewModel()` at
+  `:624-633`** - fixed defect 7. The `:624-633` half is the easy one to lose, because W4 splits
+  `setupViewModel` across four Fragments and this block belongs to none of them; it stays in the
+  Activity with the rest of the connect machine. The comment at `:175-177` explains why one negative
+  probe is not evidence; do not "simplify" it.
+- `connectWatchdogRunnable` at `:197-205` and `scheduleConnectWatchdog()` at `:2106` - the recovery
   path from a core that dies without broadcasting.
 - `serversAdapter.syncSelection()` / `homeAdapter.syncSelection()` in `onResume()` at `:2128-2135` -
   fixed defect 3 (two rows painted as selected). The comment says exactly why it is in `onResume`.
@@ -779,3 +802,90 @@ Neither would be caught by a build gate or by a grep. Only the question catches 
 A second review question, cheaper and worth asking anyway: **does this wave's screen pass the seven
 questions of the Departament slop test** (`00-rules.md` 2.4), answered out loud with the screenshot in
 front of you. A "yes" on any of 1-6 or a "no" on 7 is rework, not polish.
+
+---
+
+## 6. Known hazards
+
+Every item here is read off the code, not imagined.
+
+### 6.1 The eight Android fixes that must not regress
+
+`CONTINUE-HERE.md` 2 lists ten. Items 9 (the onboarding gate no longer greets a returning user;
+`_isEmpty` now means "we know it is empty", never "not loaded yet") and 10 (Windows autostart reads
+the registry, clears the `StartupApproved` disable flag, and reconciles at startup) are desktop-only
+and out of scope here; they are named so nobody reads this table as eight of ten and assumes two were
+dropped. The other eight are Android and are below. Each row says what the fix is, where it lives,
+and **why it is shaped the way it is** - because the shape is what a redesign quietly undoes. The
+comments quoted are in the source; read them before touching the function.
+
+| # | Fix | Lives in | Why the shape matters | At risk in |
+|---|---|---|---|---|
+| 1 | Tapping a server selects, never connects | `MainActivity.setSelectServer()` at `:1537`, `promptApplySelectedServer()` at `:1562` | The doc comment is explicit: "Connecting is the connect button's job alone. When a tunnel is already up and the user picks a different server, the running tunnel is left untouched and an explicit 'apply it' action is offered instead, so a tap in the list can never silently tear down a working connection." A redesign that makes the server row "one-tap connect" because it feels faster re-breaks this | W4 (the split), W6 (the row rebuild) |
+| 2 | The server-switch race, fixed at its root | `core/CoreServiceManager.stopCoreLoop()` at `:293-313` | `MSG_STATE_STOP_SUCCESS` is sent **after** `stopLoop()` returns, inside the coroutine, not before it. The comment at `:296-301` names both failure modes: VPN mode tore the tunnel down, proxy-only mode "silently kept the PREVIOUS server up while the UI showed the new one". Reordering those two lines for tidiness reintroduces both | Any wave that touches connect flow. **This file is in nobody's ownership list and must stay that way** |
+| 3 | Two rows painted as selected | `MainRecyclerAdapter.selectedGuid` at `:142`, `syncSelection()` at `:324`, called from `MainActivity.onResume()` at `:2128-2135` | Selection lives in MMKV, which cannot notify, and is written by subscription import, fast-connect and service start. The comment at `:316-322`: refreshing only the two affected rows "is only correct when BOTH rows are currently in `rows`" - the old row can sit in a collapsed section or have been rebuilt away - "so: fall back to a full refresh whenever either row cannot be located." A rebuild that switches to `ListAdapter` + `DiffUtil` (which `00-rules.md` 11.2 requires) must carry this fallback across, because `DiffUtil` does not know about MMKV either | W6 |
+| 4 | A template's server is read from its routing | `dto/V2rayConfig.getProxyOutbound()` at `:520`, `resolveRoutedOutbound()` at `:541` | Operator templates ship several proxy outbounds and pick one with a rule. Reading the first one showed the wrong protocol on the row, made the TCP ping probe a host that is not the server, and made the delay test measure the wrong outbound. Four consumers depend on it: `MainRecyclerAdapter.kt:285`, `fmt/CustomFmt.kt:19`, `viewmodel/MainViewModel.kt:277`, `core/CoreConfigManager.kt:262` | W6 (row rebuild reads `:285`), W9 (editors) |
+| 5 | Subscription format negotiation | `MainActivity.importConfigViaSub()` at `:2436` and the fetch path it calls | Precedence is per-subscription override -> provider override -> configured default, with a JSON-first `Accept`. The fetch used to overwrite the caller's value. A rebuild that "simplifies" this to one setting breaks panels that choose XRAY_JSON vs base64 from the User-Agent | W6, W7 (Провайдеры) |
+| 6 | Flags require an explicit country marker | `util/FlagUtil.kt`, `CODE_ALIASES` at `:264` maps `UK` -> `GB` | "No flag beats a wrong flag." The comment at `:82` explains that a non-ISO `UK` renders as boxed letters. The unified-server-icon agent (W6, A-SRV-ICON) is the one most likely to rewrite this file wholesale | W6 |
+| 7 | Auto-fallback waits for a confirming re-probe | `MainActivity` fields at `:174-195`, `scheduleHealthCheckIfEnabled()` at `:2075`, observer at `:624-633` | The comment at `:175-177`: "A single negative probe is not evidence that the tunnel is dead - one dropped packet on a fine connection would otherwise tear the user off a working server - so the fallback needs two consecutive failures." The re-check re-tests the same conditions so "a tunnel the user stopped meanwhile - or a fallback that already fired - cannot be probed back into action". Three separate regions of one file, which is why the split is the risk | W4 (the split moves fields and observer apart) |
+| 8 | Provider-settings toggles drive real behaviour | `ui/ProviderSettingsActivity.kt` | They used to only store a value. A rebuild that regenerates the screen from a preferences model can silently return to storing | W7 (A-SET-PROV) |
+
+Also load-bearing, and not on the CONTINUE-HERE list:
+
+- **The connect watchdog.** `connectWatchdogRunnable` at `MainActivity.kt:195-205`: if a start neither
+  succeeds nor reports a failure within `CONNECT_TIMEOUT_MS` - "e.g. the core/daemon process crashed
+  without broadcasting any state" - the UI recovers to idle instead of hanging on «Подключение…».
+  This is why the state machine cannot live in a Fragment (1.4, conflict 2).
+- **`connectInProgress` / live-transition gating**, same file. `32` 9.3 calls the whole cluster
+  "careful, correct work" and says preserve it verbatim.
+
+### 6.2 Unreachable features a redesign must restore, not bury
+
+Section 0.5 lists all five with evidence. The hazard is specifically that **four of the five produce
+no compile error and no warning**, so a wave can delete their code as "unused" and every gate stays
+green:
+
+| Feature | The trap |
+|---|---|
+| `SettingsActivity` + `pref_settings.xml` (~48 preferences, 29 with no editing UI at all) | It is declared in the manifest, so it looks reachable. Deleting it before W7's key-by-key table exists loses 29 settings silently. This is why A-SET-KILL runs last and owes a table |
+| `AccountViewModel.logout()` at `:400` | Zero call sites. An IDE "unused" cleanup deletes it and nobody notices until a user asks how to sign out |
+| `CheckUpdateActivity` | Zero call sites. `24` A-36 deletes it on Android while D-34 wires it on desktop. **That is a parity gap and must be written into `24` 7.3, not inherited by accident** |
+| RAM panel, `PREF_SHOW_MEMORY` | Read at `MainActivity.kt:2010`, never written anywhere. Either W7 gives it a row or W7 deletes the read and the key together. A dead read that survives the rebuild is the same defect one wave later |
+| Per-server actions via long-press | `MainRecyclerAdapter.kt:56` declares the callback; `MainActivity.kt:674` assigns it; nothing calls it. Five actions and nine editor activities unreachable, with a green build. W3 F1 fixes it; W6 must not undo it while rewriting the adapter |
+
+### 6.3 String and localisation coupling
+
+| Hazard | Detail |
+|---|---|
+| **Nine locale trees** | `values-ru/`, `values-ar/`, `values-bn/`, `values-fa/`, `values-vi/`, `values-zh-rCN/`, `values-zh-rTW/`, `values-bqi-rIR/`, plus `values-sw360dp-v13/`. Deleting a `<string>` from `values/` without deleting it from all of them leaves orphans; renaming one leaves eight stale translations that silently win on those locales |
+| **Renames are invisible to the compiler in XML** | A layout referencing a deleted `@string/x` fails the build. A **Kotlin** `getString(R.string.x)` also fails. But a *translation* left behind for a removed key fails nothing at all |
+| **321 keys have no `values-ru` entry, 24 of them Latin-only and user-facing** | `CONTINUE-HERE.md` 4.7. `00-rules.md` 1.4.10 bans Latin UI text outside protocol names, brand names, units and technical identifiers. So those 24 are live defects, not backlog |
+| **Dash and ellipsis debt is spread across default and translated files** | 23 dash hits and 10 three-dot hits measured today, in `strings.xml`, `strings_pay.xml`, `strings_account.xml`, `strings_local_proxy.xml`, `strings_devices.xml`, `strings_deeplink.xml`, `strings_perapp.xml`, `strings_auth.xml` **and** the translation trees (`00-rules.md` 9.7). A per-screen sweep that only touches `values/` leaves the translated dashes shipping |
+| **Hardcoded Russian literals in Kotlin** | `32` 14.2 names two in `MainActivity.showManualEntryDialog()`. Those never appear in any `strings*.xml` grep, so the copy sweep will not find them. Each screen agent greps its own Kotlin for Cyrillic literals: `grep -nP '"[^"]*[А-Яа-яЁё]' <its .kt files>` |
+| **Terminology lock 9.3 is global, not per screen** | «тариф», «подписка», «сервер», «провайдер», «подключение», «устройство», «баланс», «Аккаунт», «Купить», «Привязать Telegram», «Войти». A wave that renames a concept on one screen creates two vocabularies. `24` 6.3: "the terminology lock is applied globally rather than per screen" |
+| **`res/values/strings.xml` is 485 strings and is not per-screen** | Which is why nobody edits it until W9. A screen agent that needs a new string puts it in its own `strings_*.xml`, even when a nearly identical one exists in the legacy file |
+
+### 6.4 Operational hazards
+
+| Hazard | Mitigation |
+|---|---|
+| **A container restart kills a wave mid-flight** | This has already happened: a previous run of this documentation wave lost everything because nothing had been written to disk after thirty minutes. **Every agent writes a first draft of its deliverable within its first ten minutes and extends it in place.** For a code agent that means landing the smallest compiling slice early rather than composing the whole change and writing once at the end |
+| **Two Gradle runs on one tree contend for locks** | `verify-build.sh:41` wraps the build in `flock /tmp/dep-android-build.lock`. Agents must verify through the script, never by calling `./gradlew` directly. `verify-build.sh:37-38`: "agents share this build tree, and two concurrent Gradle runs on one project contend for the same locks. Waiting for a turn is slow; interleaving is broken" |
+| **`libv2ray.aar` is not in the repo and `github.com` is unreachable from this environment** | `V2rayNG/app/libs/libv2ray-stub.jar` is a gitignored type-check stub regenerated by `docs/agents/setup-env.sh`. Never reference it from app code, never commit it, and never reshape app code to fit it (`docs/agents/BUILD-VERIFY.md`) |
+| **`compileSdk = 37` needs `platforms;android-37.0`** | `platforms;android-37` does not exist and `sdkmanager` fails with "Failed to find package" (`BUILD-VERIFY.md`) |
+| **Agents must not commit** | `CONTINUE-HERE.md` 5: "Do not let an agent commit. Review, build, then commit centrally - concurrent agent commits race" |
+| **`styles.xml` is the single worst merge target** | 72 KB, ~110 styles, and every agent wants to append to it. Hence the append-by-request rule in 2.1. Two agents appending concurrently in a container that can restart is precisely how a wave is lost |
+| **Line numbers in every spec rot** | `32` 9.3 records that a third of its own `MainActivity.kt` citations had already drifted at revision time. Every line number in this brief is paired with a symbol; resolve by symbol, use the line only as a hint |
+
+### 6.5 Things this brief could not verify
+
+Stated rather than guessed.
+
+| Claim | Why it is unverified |
+|---|---|
+| The emoji grep on `values*/strings*.xml` | Not re-run; `00-rules.md` 1.5 gives it as a `python3` one-liner and the last recorded result is 0. Re-run it in W9 rather than trusting this document |
+| Whether tablet adaptivity exists in any form | `values-sw600dp/` **does not exist** (`ls -d values-*/` shows `values-sw360dp-v13/` and nothing at 600). `Widget.Departament.NavigationRail` was authored today at `styles.xml:947` and **no layout references `NavigationRailView`**. `00-rules.md` 3.1 and 11.4 require a 24dp gutter and a rail at `sw600dp`. The style exists, the qualifier does not, and the rail has no host - but the absence of a resource directory is not proof no adaptivity is implemented, only that none is done by qualifier. Whoever owns W4 confirms and schedules it |
+| That the 29-preferences-with-no-UI count is still 29 | Taken from `CONTINUE-HERE.md` 4.2. `res/xml/pref_settings.xml` is 354 lines today; the per-key audit that produces the real number is A-SET-KILL's deliverable in W7, and this brief did not redo it |
+| That `nav_press.xml`'s four consumers are still four | Its header comment says "delete it and its four references together". The four are the nav item containers in `activity_main.xml`; whether all four still reference it after W4 is S1's check, not this document's |
+| Which of `24` A-36 (delete `CheckUpdateActivity` on Android) and `33-master-plan-pc.md` D-34 (wire it on desktop) the owner actually wants | Two committed specs, opposite verdicts, no owner decision in `00-rules.md` 18. Flagged, not resolved |
+| Screenshot-level claims of any kind | Nothing in this environment renders the app. Every "looks like" statement here is inferred from markup and is marked as such |
