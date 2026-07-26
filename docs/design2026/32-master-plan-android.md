@@ -2371,10 +2371,13 @@ Row 8.1, variant Row.Selectable, minHeight 56dp
 ├── text column, weight 1
 │   ├── title     "Нидерланды, Амстердам"   App.Title, maxLines 1, ellipsize end
 │   │             (the leading flag emoji is stripped by the same transform that fills the tile)
-│   └── subtitle  Chip 8.4 neutral "VLESS"  +  8  +  TextView "Reality · TCP"  App.Subtitle
+│   └── subtitle  Chip 8.4 neutral "VLESS" (wrap_content, never shrinks)
+│                 +  8  +  TextView "Reality · TCP"  App.Subtitle
+│                 (weight 1, minWidth 0, ellipsize end; set `gone` below 6 rendered
+│                  characters rather than shown as an ellipsis — 5.6)
 │                 marginTop 4dp
 ├── 12
-├── value  id=tv_ping   App.Subtitle + Numeric, right-aligned, minWidth 64dp
+├── value  id=tv_ping   App.Subtitle + Numeric, right-aligned, minWidth @dimen/value_w_ping 64dp
 │          "48 мс"  in ?attr/colorOnSurfaceVariant
 │          untested: "" (blank, not a dash, not "n/a")
 │          testing:  16dp indeterminate indicator
@@ -2405,10 +2408,13 @@ chip becomes the same neutral chip; the word already carries the meaning.
 LinearLayout, height 48dp, paddingHorizontal 16dp, background ?attr/colorBackground (sticky)
 ├── ImageView 20dp ic_chevron_down, rotation 0 collapsed / 90 expanded, 220ms ease_standard
 ├── Space 8
-├── TextView  provider name   @style/SettingsSectionLabel (padding overridden to 0), weight 1
+├── TextView  provider name   @style/SettingsSectionLabel.Inline (8.2), weight 1
 ├── TextView  count  App.Subtitle + Numeric   "24"
 └── [ optional 16dp indeterminate indicator while that provider is updating ]
 ```
+
+The header uses the **declared zero-padding variant**, not an inline `padding="0dp"` override on a
+ramp role; 4.1 bans the latter and 8.2 declares the former for exactly this and one other place.
 
 Sticky, because the list is long enough to lose context (`00-rules.md` 4.6). Tapping the header
 collapses the group; the state survives Back, tab switches and rotation. A provider whose last
@@ -2423,7 +2429,7 @@ scanning affordance on a phone, it hides the provider count, and it makes one co
 
 | State | Rendering |
 |---|---|
-| **First load** | Six skeleton rows (40dp tile square + an 18dp bar at 68dp + a 14dp bar) after 300ms; crossfade to content over 220ms; then one 40ms-staggered entrance capped at 400ms |
+| **First load** | Six skeleton rows (40dp tile square + a `skeleton_bar_md` 24dp bar at 68dp + a `skeleton_bar_sm` 16dp bar) after 300ms; crossfade to content over 220ms **as one block**. No per-item entrance, no stagger (7.1) |
 | **Loaded** | The tree above. The selected row is P3-filled and carries the check |
 | **Empty, no providers** | EmptyState 8.8: glyph `ic_subscriptions_24dp`; «Серверов пока нет»; «Добавьте провайдера или отсканируйте QR-код, чтобы появились серверы.»; filled «Добавить провайдера» |
 | **Empty, provider returned nothing** | EmptyState inside the group: «Провайдер не вернул серверы»; «Проверьте ссылку в разделе «Провайдеры».»; tonal «Обновить» |
@@ -2442,7 +2448,7 @@ scanning affordance on a phone, it hides the provider count, and it makes one co
 |---|---|
 | `servers_title` | `Серверы` |
 | `servers_search_hint` | `Поиск по названию или стране` |
-| `servers_count` | `%1$d серверов · %2$d провайдера` (with correct plural resources for both numbers) |
+| `servers_count` | `%1$s · %2$s` — assembled from `plural_servers` and `plural_providers` (4.4), because one format string cannot host two `<plurals>` and «15 серверов · 2 провайдера» is wrong for eight of every ten values otherwise |
 | `servers_sort_ping` | `По задержке` |
 | `servers_sort_name` | `По названию` |
 | `servers_sort_none` | `Как у провайдера` |

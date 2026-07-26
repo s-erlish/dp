@@ -2912,16 +2912,23 @@ when the tab is not hit-test-visible, never under `.lite`. Everything else is st
 
 #### 7.1.9 Acceptance
 
-- [ ] Exactly one filled accent surface on the tab in every state
-- [ ] Exactly one `Display` figure
+- [ ] **Accent count is exactly 3**: one filled («Продлить» or «Купить»), the avatar tile, the
+      Telegram row tile. Counted on the running screen, in every state, per 2.2
+- [ ] Exactly one `Display` figure, and it is **days remaining**, not the balance
+- [ ] The `Display` is correct in all six subscription states plus perpetual (7.1.2's table)
 - [ ] No carousel, no four-panel flyout, no drag threshold, no tunnel pointer handlers
 - [ ] Both `TextBox`es use `TextBox.Field`; zero Semi defaults on the tab
-- [ ] Zero raw hex (`AccountView.axaml:65` `#3D7EF0` and `:68` `#3877E0` move to the button class)
+- [ ] Zero raw hex (`AccountView.axaml:65` `#3D7EF0` and `:68` `#3877E0` become
+      `Brush.AccentHover` / `Brush.AccentPressed`, which also gives them light values)
 - [ ] Zero off-scale spacing (today: `Spacing="6"` x2, `"10"`, `"20"`, `Margin="6,0,0,4"`)
 - [ ] The traffic meter fill is solid; the label is beside the bar
 - [ ] The health chip does not reuse payment-status class names
 - [ ] Both icon-only buttons without names get names
-- [ ] The file is under 400 lines and the sub-page carries the rest
+- [ ] **`AccountPage.axaml` under 400 lines and `AccountPage.axaml.cs` under 200** - today the
+      code-behind is 524 lines, and the carousel's drag-snap maths, the four-panel flyout's own
+      navigation and the top-up validation all live there. They go to `SubscriptionPage`, to
+      `AccountViewModel` and to the flyout's own control respectively. A 400-line view backed by a
+      524-line code-behind is not a rebuild
 
 ---
 
@@ -2995,18 +3002,27 @@ SubPage Title «Купить подписку»   MaxWidth Size.Content 720
    │    Border.TariffCard  Brush.Surface  r20  1.5px border (constant, colour changes on select)
    │      header  Border.Row MinHeight 56:
    │         Title «Base»   Subtitle.Numeric «3 устройства · трафик без ограничений»
-   │         20px Geo.State.Check, slot always reserved, fades in over 150ms
+   │         20px Geo.State.Check Brush.Accent, slot always reserved, fades in over 150ms
    │      options (revealed when selected, fade + 6px rise, Dur.Reveal 300 OutQuint)
    │         Border.Row.selectable  r12  MinHeight 48   ← was Border.PriceOption r14
-   │            Body.Numeric «30 дней»            Body Bold accent «1 290 ₽»
+   │            Body.Numeric «30 дней»            Body.Numeric «1 290 ₽»  Brush.OnSurface
+   │            selected: Brush.SelectedFill + the price steps to weight 700. NO check glyph
+   ├─ 24
    └─ Border.Card #checkout   (visible when a price option is chosen)
+        Grid  «Base · 30 дней»  Body  Brush.OnSurfaceVariant     ← the purchase summary
+        hairline
         Border.Row  «Дополнительные устройства»  value ExtraCostText  two Button.Stepper
         hairline
-        Grid  «Итого»  +  TextBlock.Headline.Numeric accent «1 440»  +  Title muted «₽»
+        Grid  «Итого»  +  TextBlock.Headline.Numeric «1 440 ₽»  Brush.OnSurface
         hairline
-        SectionHeader-less group: two Border.Row.selectable payment rows + filled check
+        two Border.Row.selectable payment rows: «С баланса · 1 500 ₽» / «Картой»
+             selected: Brush.SelectedFill + weight 700. NO check glyph
         Button.Primary.Tall  «Оплатить»  52h, wallet glyph swaps for an 18px arc while paying
 ```
+
+**The accent count on this screen is 4 and here is what the four are** (2.2): the filled
+«Оплатить»; the selected tariff card's 1.5px accent border; that card's check glyph; the selected
+price row's `Brush.SelectedFill`. Nothing else on Покупка is blue.
 
 **The six fixes:**
 

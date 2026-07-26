@@ -751,30 +751,25 @@ Deliberately **not** in the card:
 
 **New:**
 
+Screen-local files this tab adds. **No row layout, button style, drawable selector or colour selector
+for a library component appears here** - those are `22-components.md`'s files, created once by its
+§21 migration steps 1-4 and consumed by name:
+
 ```
 res/layout/fragment_account.xml                  the tab scaffold
 res/layout/layout_account_head.xml               identity
-res/layout/layout_account_switcher_segments.xml  V8, 2-3 subs
+res/layout/layout_account_switcher_segments.xml  the C§6 group, 2-3 subs
 res/layout/layout_account_card.xml               the subscription card, loaded state
 res/layout/layout_account_card_empty.xml
 res/layout/layout_account_card_error.xml
-res/layout/layout_account_skeleton.xml           head + card + rows, static
-res/layout/layout_account_gate.xml               signed out
-res/layout/layout_status_bar_inline.xml          offline / payment-polling bar
-res/layout/layout_row_nav.xml                    V6
-res/layout/layout_row_value.xml                  V5 / V5s
-res/layout/layout_row_switch.xml                 V7
-res/layout/layout_ledger_row.xml                 tile-less transaction row (sheet + history)
-res/layout/sheet_payment.xml                     V9, shared by buy / renew / upgrade / devices / top-up
+res/layout/layout_account_skeleton.xml           head + card + rows
+res/layout/sheet_payment.xml                     shared by buy / renew / upgrade / devices / top-up
 res/layout/sheet_top_up.xml
 res/layout/sheet_subscription_pick.xml
 res/layout/sheet_upgrade.xml
 res/layout/sheet_add_devices.xml
 res/layout/sheet_qr.xml
 res/layout/dialog_rename_subscription.xml
-res/drawable/bg_meter_track.xml, bg_meter_fill.xml
-res/drawable/bg_skeleton_bar.xml
-res/drawable/bg_segment.xml                      selector for V8
 res/drawable/ic_acc_edit.xml, ic_acc_logout.xml, ic_acc_key.xml, ic_acc_link_off.xml,
              ic_acc_qr.xml, ic_acc_cloud_off.xml, ic_acc_person.xml,
              ic_acc_telegram.xml, ic_acc_google.xml, ic_acc_mail.xml
@@ -782,6 +777,14 @@ res/drawable/ic_acc_edit.xml, ic_acc_logout.xml, ic_acc_key.xml, ic_acc_link_off
 
 The last three are **ports** of the desktop `Geo.Acc.Telegram` / `Geo.Acc.Google` / `Geo.Acc.Mail`
 `StreamGeometry` data into 24dp-viewport vector drawables, not redraws (§10.1).
+
+Consumed from `22-components.md`, created by its migration and not by this tab:
+`res/layout/row_navigation.xml`, `row_value.xml`, `row_toggle.xml`, `row_destructive.xml`,
+`row_ledger.xml` (amendment C-1), `layout_state_empty.xml`, `layout_status_bar_inline.xml`
+(amendment C-2), `res/layout/layout_account_gate.xml` (owned by `14-auth.md` §5),
+`@drawable/bg_segment_track.xml`, `@drawable/bg_row`, `@drawable/divider_row`,
+`@drawable/bg_selectable_item`, `@drawable/spinner_arc`, `@style/Widget.Departament.Skeleton.Bar`,
+`@style/Widget.Departament.Progress.Linear`, `@style/Widget.Departament.Chip(.Accent/.Status.*)`.
 
 ### 6.2 Scaffold, insets, toolbar
 
