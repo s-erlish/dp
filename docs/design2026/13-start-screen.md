@@ -1,5 +1,31 @@
 # 13 - Start screen (Главная)
 
+> ## ⚠ OWNER OVERRULE, 2026-07-26 — this file's SCOPE is void; only its VISUAL language survives
+>
+> This document specifies Главная "from nothing", and that is exactly what it must not do. The owner
+> has ruled, twice and then a third time on seeing the result:
+>
+> - «как выглядела главная по функционалу такая и должна остаться, ЧТО НА ПК, что на андроиде»
+> - «а что стало с главной на андроиде? оно же выглядело по другому»
+> - «и дизайн кнопки другой совсем, хотя был другой раньше и анимация была»
+>
+> A build made from this file replaced Главная's inline **server list** and **subscription card**
+> with two navigation rows, and replaced the connect visual — concentric rings, the country flag,
+> the running animation — with a bare disc. That is a regression, and it was shipped because this
+> file was read as authority over what the screen contains. It is not.
+>
+> **What Главная contains does not change.** The speed and uptime strip with its add action, the
+> connect object with its rings, its flag and its animation, the subscription card with the provider
+> name, traffic, auto-update time and its actions, and the server list inline beneath it — all of it
+> stays, on both platforms.
+>
+> **What this file still governs:** tokens, type, spacing, colour, state treatment and motion timing
+> for the elements that are already there. Sections 4, 5 and 8, which redesign the component tree and
+> replace the list and the card with ledger rows, are void.
+>
+> The rule, restated because it was expensive: **Главная is a restyle.** Same controls, same
+> capabilities, same information, drawn better. Anything else needs the owner to ask.
+
 **Departament VPN. The screen the app opens on, specified from nothing, for Android first and then
 for the desktop client.**
 
