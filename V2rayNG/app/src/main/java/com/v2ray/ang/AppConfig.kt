@@ -88,6 +88,22 @@ object AppConfig {
     const val PREF_MEMORY_LIMIT = "pref_memory_limit"
     const val PREF_MEMORY_LIMIT_ENABLED = "pref_memory_limit_enabled"
 
+    /**
+     * Provider-screen preferences. The key strings keep the `pref_provider_` prefix they were first
+     * written with, so values stored while they lived inside the screen stay readable.
+     */
+    const val PREF_SUB_NOTIFY_ON_UPDATE = "pref_provider_notify_on_update"
+    const val PREF_SUB_UPDATE_ON_LAUNCH = "pref_provider_update_on_launch"
+    const val PREF_PING_ON_LAUNCH = "pref_provider_ping_on_launch"
+    const val PREF_PING_ON_UPDATE = "pref_provider_ping_on_update"
+    const val PREF_SUB_USER_AGENT = "pref_provider_sub_user_agent"
+    const val PREF_SERVER_SORT_ORDER = "pref_provider_server_sort_order"
+
+    /** Values of [PREF_SERVER_SORT_ORDER]. */
+    const val SERVER_SORT_DEFAULT = "default"
+    const val SERVER_SORT_PING = "ping"
+    const val SERVER_SORT_NAME = "name"
+
     /** Cache keys. */
     const val CACHE_SUBSCRIPTION_ID = "cache_subscription_id"
 

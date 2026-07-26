@@ -401,6 +401,8 @@
     <string name="title_update_config_count">Update %d configs</string>
     <string name="title_update_subscription_result">Updated %1$d configs (%2$d success, %3$d failed, %4$d skipped)</string>
     <string name="title_update_subscription_no_subscription">No subscriptions</string>
+    <!-- Notification shown while a subscription is refreshing; %1$s is the subscription name. -->
+    <string name="msg_updating_subscription">Updating %1$s</string>
     <string name="toast_server_not_found_in_group">Selected server not found in current group</string>
     <string name="toast_fragment_not_available">Unable to locate current view</string>
     <string name="title_locate_selected_config">Locate the selected config</string>

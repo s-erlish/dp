@@ -166,8 +166,20 @@ class MainActivity : HelperBaseActivity() {
     // working server if the current tunnel doesn't actually pass traffic.
     // The "already fired this session" flag lives in the ViewModel (autoFallbackUsed).
     private var healthCheckPending = false
+    // True while the confirmation re-probe is armed or in flight. A single negative probe is not
+    // evidence that the tunnel is dead — one dropped packet on a fine connection would otherwise
+    // tear the user off a working server — so the fallback needs two consecutive failures.
+    private var healthCheckConfirming = false
     private val healthCheckRunnable = Runnable {
         if (mainViewModel.isRunning.value == true) {
+            healthCheckPending = true
+            mainViewModel.testCurrentServerRealPing()
+        }
+    }
+    // The confirmation probe. Re-checks the same conditions as the first one, so a tunnel the user
+    // stopped meanwhile — or a fallback that already fired — cannot be probed back into action.
+    private val healthRecheckRunnable = Runnable {
+        if (mainViewModel.isRunning.value == true && !mainViewModel.autoFallbackUsed) {
             healthCheckPending = true
             mainViewModel.testCurrentServerRealPing()
         }
@@ -196,6 +208,9 @@ class MainActivity : HelperBaseActivity() {
     private companion object {
         const val KEY_CONNECTION_START = "cache_connection_start_time"
         const val HEALTH_CHECK_DELAY_MS = 7000L
+        // Gap before the confirmation re-probe: long enough for a momentary DNS/test-URL hiccup
+        // to pass, short enough that a genuinely dead tunnel is not endured.
+        const val HEALTH_CHECK_RECHECK_MS = 2000L
         // Upper bound for a connect attempt before the UI gives up and returns to idle.
         const val CONNECT_TIMEOUT_MS = 20000L
         // A restart must not start the new core until the daemon process reports the old one
@@ -532,6 +547,8 @@ class MainActivity : HelperBaseActivity() {
             // One-shot event: ignore the retained value replayed on recreate/rotation.
             if (!mainViewModel.consumeFastConnectEvent()) return@observe
             if (guid == null) {
+                // No candidate, so no restart follows — the fallback attempt is over.
+                mainViewModel.fallbackInProgress = false
                 connectInProgress = false
                 showStatusToast(getString(R.string.toast_status_failed))
                 return@observe
@@ -580,14 +597,28 @@ class MainActivity : HelperBaseActivity() {
         mainViewModel.delayResultAction.observe(this) { time ->
             if (!healthCheckPending) return@observe
             healthCheckPending = false
-            val enabled = MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_FALLBACK, true)
-            if (enabled && !mainViewModel.autoFallbackUsed && time < 0 && mainViewModel.isRunning.value == true) {
-                // Mark used BEFORE restarting so the restart's own START_SUCCESS doesn't re-arm.
-                mainViewModel.autoFallbackUsed = true
-                toast(getString(R.string.auto_fallback_switching))
-                // Exclude the server that just failed so we don't switch back to it.
-                mainViewModel.fastConnect(excludeGuid = MmkvManager.getSelectServer())
+            if (!MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_FALLBACK, true)) return@observe
+            if (mainViewModel.autoFallbackUsed || mainViewModel.isRunning.value != true) return@observe
+            if (time >= 0) {
+                // The tunnel answered: whatever the earlier probe hit was transient.
+                healthCheckConfirming = false
+                return@observe
             }
+            if (!healthCheckConfirming) {
+                // First failure only asks again — a working server must not be abandoned on one blip.
+                healthCheckConfirming = true
+                timerHandler.postDelayed(healthRecheckRunnable, HEALTH_CHECK_RECHECK_MS)
+                return@observe
+            }
+            // Second consecutive failure: the tunnel really isn't passing traffic.
+            healthCheckConfirming = false
+            // Mark used BEFORE restarting so the restart's own START_SUCCESS doesn't re-arm.
+            mainViewModel.autoFallbackUsed = true
+            // The stop→start that follows is ours, not a user disconnect.
+            mainViewModel.fallbackInProgress = true
+            toast(getString(R.string.auto_fallback_switching))
+            // Exclude the server that just failed so we don't switch back to it.
+            mainViewModel.fastConnect(excludeGuid = MmkvManager.getSelectServer())
         }
         mainViewModel.startListenBroadcast()
         mainViewModel.initAssets(assets)
@@ -1481,8 +1512,14 @@ class MainActivity : HelperBaseActivity() {
     }
 
     private fun handleFabAction() {
-        // A manual connect/disconnect starts a fresh session: allow auto-fallback again.
+        // A manual connect/disconnect starts a fresh session: allow auto-fallback again, and end
+        // any fallback restart still considered in flight (the user's tap supersedes it).
         mainViewModel.autoFallbackUsed = false
+        mainViewModel.fallbackInProgress = false
+        healthCheckPending = false
+        healthCheckConfirming = false
+        timerHandler.removeCallbacks(healthCheckRunnable)
+        timerHandler.removeCallbacks(healthRecheckRunnable)
 
         if (mainViewModel.isRunning.value == true) {
             // Stop: no "connecting" visual, the isRunning observer will settle the idle state
@@ -1934,16 +1971,31 @@ class MainActivity : HelperBaseActivity() {
      * hasn't already run this session.
      */
     private fun scheduleHealthCheckIfEnabled() {
+        // A tunnel is up: the fallback's own restart (if there was one) has landed, and any
+        // half-finished probe from the previous tunnel is void.
+        mainViewModel.fallbackInProgress = false
+        healthCheckConfirming = false
+        timerHandler.removeCallbacks(healthRecheckRunnable)
         if (mainViewModel.autoFallbackUsed) return
         if (!MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_FALLBACK, true)) return
         timerHandler.removeCallbacks(healthCheckRunnable)
         timerHandler.postDelayed(healthCheckRunnable, HEALTH_CHECK_DELAY_MS)
     }
 
-    /** Cancels a pending health check (on disconnect) without clearing the session flag. */
+    /**
+     * Cancels a pending health check and its confirmation re-probe. On a *genuine* user disconnect
+     * it also clears the once-per-session fallback flag; during the fallback's own internal restart
+     * ([MainViewModel.fallbackInProgress]) the flag must survive, or the next START_SUCCESS re-arms
+     * the check and the switch/restart loop returns.
+     */
     private fun cancelHealthCheck() {
         healthCheckPending = false
+        healthCheckConfirming = false
         timerHandler.removeCallbacks(healthCheckRunnable)
+        timerHandler.removeCallbacks(healthRecheckRunnable)
+        if (!mainViewModel.fallbackInProgress) {
+            mainViewModel.autoFallbackUsed = false
+        }
     }
 
     /** Arms the connect watchdog so a stalled/crashed start can't hang the UI on "connecting". */
@@ -2832,6 +2884,7 @@ class MainActivity : HelperBaseActivity() {
     override fun onDestroy() {
         timerHandler.removeCallbacks(timerRunnable)
         timerHandler.removeCallbacks(healthCheckRunnable)
+        timerHandler.removeCallbacks(healthRecheckRunnable)
         timerHandler.removeCallbacks(memoryRunnable)
         timerHandler.removeCallbacks(connectWatchdogRunnable)
         stopConnectingAnim()

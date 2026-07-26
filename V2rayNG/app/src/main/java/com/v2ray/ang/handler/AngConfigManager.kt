@@ -6,6 +6,7 @@ import android.text.TextUtils
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.AuthTokenStore
+import com.v2ray.ang.auth.BackendConfig
 import com.v2ray.ang.core.CoreConfigManager
 import com.v2ray.ang.dto.SubscriptionUpdateResult
 import com.v2ray.ang.dto.UrlContentRequest
@@ -551,6 +552,33 @@ object AngConfigManager {
         return left.trim().equals(right.trim(), ignoreCase = true)
     }
 
+    /** Remnawave's own directive block (`injectHosts`, tag prefixes) — not an Xray root field. */
+    private const val VENDOR_ROOT_KEY = "remnawave"
+
+    /**
+     * Drops the vendor [VENDOR_ROOT_KEY] object from a raw Xray JSON template.
+     *
+     * Remnawave resolves and removes it server-side when it generates a subscription, but a
+     * template imported from a file or served by a panel that skipped that step still carries it,
+     * and the core refuses to start on an unknown root field. What is stored must be exactly what
+     * the core will run, so strip it before storage rather than at connect time.
+     *
+     * @param rawConfig The raw config JSON.
+     * @return The config without the vendor object, or [rawConfig] unchanged when there is nothing
+     *         to strip or it is not a JSON object.
+     */
+    private fun stripVendorRootKey(rawConfig: String): String {
+        if (!rawConfig.contains(VENDOR_ROOT_KEY)) return rawConfig
+        return try {
+            val root = JsonUtil.parseString(rawConfig) ?: return rawConfig
+            if (root.remove(VENDOR_ROOT_KEY) == null) return rawConfig
+            JsonUtil.toJsonPretty(root) ?: rawConfig
+        } catch (e: Exception) {
+            LogUtil.e(AppConfig.TAG, "Failed to strip vendor key from custom config", e)
+            rawConfig
+        }
+    }
+
     /**
      * Parses a custom configuration server.
      *
@@ -587,12 +615,14 @@ object AngConfigManager {
                     var count = 0
                     val keyToProfile = mutableMapOf<String, ProfileItem>()
                     for (srv in serverList.reversed()) {
-                        val config = CustomFmt.parse(JsonUtil.toJson(srv)) ?: continue
+                        // Pretty-printing also normalises Gson's doubles back to ints, which the core needs.
+                        val rawConfig = stripVendorRootKey(JsonUtil.toJsonPretty(srv) ?: "")
+                        val config = CustomFmt.parse(rawConfig) ?: continue
                         config.subscriptionId = subid
                         config.locked = locked
                         config.description = generateDescription(config)
                         val key = MmkvManager.encodeServerConfig("", config)
-                        MmkvManager.encodeServerRaw(key, TemplateManager.wrapRawForStorage(JsonUtil.toJsonPretty(srv) ?: "", locked))
+                        MmkvManager.encodeServerRaw(key, TemplateManager.wrapRawForStorage(rawConfig, locked))
                         keyToProfile[key] = config
                         count += 1
                     }
@@ -608,7 +638,8 @@ object AngConfigManager {
 
             try {
                 // For compatibility
-                val config = CustomFmt.parse(server) ?: return 0
+                val rawConfig = stripVendorRootKey(server)
+                val config = CustomFmt.parse(rawConfig) ?: return 0
                 config.subscriptionId = subid
                 config.locked = locked
                 config.description = generateDescription(config)
@@ -616,7 +647,7 @@ object AngConfigManager {
                     MmkvManager.removeServerViaSubid(subid)
                 }
                 val key = MmkvManager.encodeServerConfig("", config)
-                MmkvManager.encodeServerRaw(key, TemplateManager.wrapRawForStorage(server, locked))
+                MmkvManager.encodeServerRaw(key, TemplateManager.wrapRawForStorage(rawConfig, locked))
                 return 1
             } catch (e: Exception) {
                 LogUtil.e(AppConfig.TAG, "Failed to parse custom config server as single config", e)
@@ -756,7 +787,12 @@ object AngConfigManager {
                 }
             }
             LogUtil.i(AppConfig.TAG, url)
-            val userAgent = it.subscription.userAgent
+            // The panel picks the response format (XRAY_JSON template vs base64 link list) from
+            // the User-Agent, so a per-subscription override wins over everything; the
+            // operator-configured UA is the fallback, and HttpUtil supplies the last-resort
+            // default when neither is set.
+            val userAgent = it.subscription.userAgent?.trim()?.ifBlank { null }
+                ?: BackendConfig.subscriptionUserAgent
             val proxyUsername = SettingsManager.getSocksUsername()
             val proxyPassword = SettingsManager.getSocksPassword()
             // Stable per-install device id (HWID) header, opt-out via settings.

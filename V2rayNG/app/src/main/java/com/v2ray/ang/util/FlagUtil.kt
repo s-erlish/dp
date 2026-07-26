@@ -7,7 +7,8 @@ import com.v2ray.ang.dto.entities.ProfileItem
  *
  * Layered strategy (cheapest first, all offline):
  *  1. A flag emoji already present in the server remark (e.g. "🇳🇱 Amsterdam").
- *  2. A 2-letter ISO country code / common country name parsed from the remark.
+ *  2. An explicit country marker in the remark — a bracketed "[NL]" code, a known country or
+ *     city name, or an upper-case code in the leading token ("NL - Amsterdam").
  *  3. A globe fallback.
  *
  * Rendering a regional-indicator emoji pair in a TextView is zero-asset and matches how
@@ -73,11 +74,12 @@ object FlagUtil {
     }
 
     /**
-     * Converts a 2-letter ISO country code (e.g. "NL") to its flag emoji.
+     * Converts a 2-letter country code (e.g. "NL") to its flag emoji. Aliases such as the
+     * non-ISO "UK" are normalised first, otherwise the pair renders as boxed letters.
      */
     fun codeToFlag(code: String): String {
         if (code.length != 2) return GLOBE
-        val upper = code.uppercase()
+        val upper = normalizeCode(code.uppercase())
         val a = upper[0]
         val b = upper[1]
         if (a !in 'A'..'Z' || b !in 'A'..'Z') return GLOBE
@@ -88,22 +90,67 @@ object FlagUtil {
     }
 
     /**
-     * Parses a country code from a remark: a leading/wrapped 2-letter code, or a known
-     * country name. Returns an ISO-2 code or null.
+     * Parses a country code from a remark. Only an explicit marker counts — a bracketed code,
+     * a known country/city name, or an upper-case code in the leading token. Matching any
+     * two-letter token turned "No limit" into Norway, "IT support" into Italy and "in-1" into
+     * India — a missing flag is cheaper than a wrong one. Returns ISO-2 or null.
      */
     fun parseCountryCode(remark: String?): String? {
         if (remark.isNullOrBlank()) return null
+        bracketedCode(remark)?.let { return it }
         val lower = remark.lowercase()
         COUNTRY_NAME_TO_CODE.forEach { (name, code) ->
-            if (lower.contains(name)) return code
+            if (containsWord(lower, name)) return code
         }
-        // A standalone 2-letter token like "NL", "US" (word-boundaried).
-        Regex("\\b([A-Za-z]{2})\\b").findAll(remark).forEach { m ->
+        return leadingCode(remark)
+    }
+
+    /** "[NL] Amsterdam" or "Amsterdam (NL)" — the brackets are the marker, so case is free. */
+    private fun bracketedCode(remark: String): String? {
+        BRACKETED_CODE.findAll(remark).forEach { m ->
             val c = m.groupValues[1].uppercase()
-            if (ISO2_CODES.contains(c)) return c
+            if (isKnownCode(c)) return normalizeCode(c)
         }
         return null
     }
+
+    /**
+     * "NL - Amsterdam", "US·LA", "DE". The code must open the remark in upper case and be
+     * followed by a separator or nothing — "IT support" and "in-1" are prose, not countries.
+     */
+    private fun leadingCode(remark: String): String? {
+        var start = 0
+        while (start < remark.length && !remark[start].isLetter()) start++
+        if (start + 2 > remark.length) return null
+        val a = remark[start]
+        val b = remark[start + 1]
+        if (a !in 'A'..'Z' || b !in 'A'..'Z') return null
+        var after = start + 2
+        while (after < remark.length && remark[after] == ' ') after++
+        if (after < remark.length && remark[after].isLetter()) return null
+        val c = "$a$b"
+        return if (isKnownCode(c)) normalizeCode(c) else null
+    }
+
+    /** Word-boundaried search, so "india" doesn't match "Indiana" nor "usa" "Usain". */
+    private fun containsWord(haystack: String, needle: String): Boolean {
+        var from = 0
+        while (true) {
+            val at = haystack.indexOf(needle, from)
+            if (at < 0) return false
+            val before = at == 0 || !haystack[at - 1].isLetter()
+            val end = at + needle.length
+            val after = end == haystack.length || !haystack[end].isLetter()
+            if (before && after) return true
+            from = at + 1
+        }
+    }
+
+    private fun isKnownCode(code: String) = code in ISO2_CODES || code in CODE_ALIASES
+
+    private fun normalizeCode(code: String) = CODE_ALIASES[code] ?: code
+
+    private val BRACKETED_CODE = Regex("""[\[(]\s*([A-Za-z]{2})\s*[)\]]""")
 
     // Common country names (English) → ISO-2. Kept small and offline; extend as needed.
     private val COUNTRY_NAME_TO_CODE = linkedMapOf(
@@ -141,8 +188,11 @@ object FlagUtil {
     )
 
     private val ISO2_CODES = setOf(
-        "NL", "DE", "US", "GB", "UK", "FR", "FI", "SE", "DK", "NO", "PL", "LV", "LT", "EE",
+        "NL", "DE", "US", "GB", "FR", "FI", "SE", "DK", "NO", "PL", "LV", "LT", "EE",
         "RU", "UA", "TR", "JP", "SG", "HK", "KR", "CA", "CH", "ES", "IT", "AT", "CZ", "IR",
         "IN", "AU", "BR", "AE",
     )
+
+    // Codes panels actually write that are not ISO 3166-1 alpha-2, so they have no flag emoji.
+    private val CODE_ALIASES = mapOf("UK" to "GB")
 }

@@ -367,6 +367,7 @@
     <string name="title_update_config_count">Обновлено профилей: %d</string>
     <string name="title_update_subscription_result">Обновлено профилей: %1$d (успешно: %2$d, ошибки: %3$d, пропущено: %4$d)</string>
     <string name="title_update_subscription_no_subscription">Нет подписок</string>
+    <string name="msg_updating_subscription">Обновляем «%1$s»</string>
     <string name="toast_server_not_found_in_group">Выбранный профиль не найден в текущей группе</string>
     <string name="toast_fragment_not_available">Фрагмент недоступен</string>
     <string name="title_locate_selected_config">Найти выбранный профиль</string>
@@ -537,6 +538,9 @@
     <string name="settings_ping_method_tcp">TCP-соединение</string>
     <string name="settings_ping_method_http">HTTP-запрос</string>
     <string name="settings_ping_method_icmp">ICMP (системный ping)</string>
+    <string name="title_pref_auto_fallback">Автопереход на рабочий сервер</string>
+    <string name="summary_pref_auto_fallback">После подключения проверяет, идёт ли трафик, и переключает на самый быстрый рабочий сервер, если туннель молчит</string>
+    <string name="auto_fallback_switching">Соединение не отвечает — переключаемся на самый быстрый рабочий сервер…</string>
     <string name="settings_mux">Мультиплексирование (Mux)</string>
     <string name="settings_mux_sub">Объединяет запросы в один канал соединения</string>
     <string name="settings_mux_concurrency">Число соединений Mux</string>

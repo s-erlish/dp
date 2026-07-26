@@ -23,6 +23,31 @@ import java.util.concurrent.TimeUnit
 object HttpUtil {
 
     /**
+     * User-Agent sent for a subscription fetch when neither the subscription nor the operator
+     * configured one.
+     *
+     * Panels (Remnawave/3x-ui) pick the response format — XRAY_JSON template vs base64 link list —
+     * from this header and only recognise known client strings, so the fallback has to be the
+     * upstream one: a branding string is an unknown client and gets a plain link list, which
+     * silently drops the operator's routing/DNS template.
+     */
+    val DEFAULT_SUBSCRIPTION_USER_AGENT: String get() = "v2rayNG/${BuildConfig.VERSION_NAME}"
+
+    /**
+     * Ask for the XRAY_JSON template first, but keep accepting the base64 link list: a panel that
+     * honours Accept must not answer 406 for a plain-text subscription.
+     */
+    private const val SUBSCRIPTION_ACCEPT = "application/json, text/plain;q=0.9, */*;q=0.8"
+
+    /**
+     * Resolves the User-Agent of a subscription request. The caller-supplied value — the
+     * per-subscription override, else the operator-configured UA — always wins and is never
+     * rewritten, because the panel keys the response format off it; the default only fills a blank.
+     */
+    private fun resolveSubscriptionUserAgent(userAgent: String?): String =
+        userAgent?.trim()?.ifBlank { null } ?: DEFAULT_SUBSCRIPTION_USER_AGENT
+
+    /**
      * Converts the domain part of a URL string to its IDN (Punycode, ASCII Compatible Encoding) format.
      *
      * For example, a URL like "https://例子.中国/path" will be converted to "https://xn--fsqu00a.xn--fiqs8s/path".
@@ -152,15 +177,11 @@ object HttpUtil {
         while (redirects++ < maxRedirects) {
             if (currentUrl == null) continue
             val client = buildOkHttpClient(request.timeout, request.httpPort, request.proxyUsername, request.proxyPassword, followRedirects = false)
-            val finalUserAgent = if (request.userAgent.isNullOrBlank()) {
-                "departament/${BuildConfig.VERSION_NAME}"
-            } else {
-                request.userAgent
-            }
             val requestBuilder = Request.Builder()
                 .url(currentUrl)
                 .get()
-                .header("User-agent", finalUserAgent)
+                .header("User-agent", resolveSubscriptionUserAgent(request.userAgent))
+                .header("Accept", SUBSCRIPTION_ACCEPT)
                 .header("Connection", "close")
 
             attachDeviceHeaders(request, requestBuilder)
@@ -225,26 +246,11 @@ object HttpUtil {
         while (redirects++ < maxRedirects) {
             if (currentUrl == null) continue
             val client = buildOkHttpClient(request.timeout, request.httpPort, request.proxyUsername, request.proxyPassword, followRedirects = false)
-            // Subscription fetch: panels (Remnawave/3x-ui) key the response format
-            // (XRAY_JSON template vs base64 link list) off a recognised client User-Agent.
-            // The caller-supplied value can be a branding string (BackendConfig fallback
-            // "DepartamentVPN/1.0") or the provider-screen display field, neither of which
-            // the panel recognises -> it returns the wrong format. Force a v2rayNG-family
-            // UA whenever the supplied value is missing or not v2rayNG-family, so the panel
-            // always returns the managed JSON servers, independent of the display field.
-            val defaultSubUserAgent = "v2rayNG/${BuildConfig.VERSION_NAME}"
-            val requestedUserAgent = request.userAgent?.trim()
-            val finalUserAgent = if (!requestedUserAgent.isNullOrBlank()
-                && requestedUserAgent.contains("v2rayng", ignoreCase = true)
-            ) {
-                requestedUserAgent
-            } else {
-                defaultSubUserAgent
-            }
             val requestBuilder = Request.Builder()
                 .url(currentUrl)
                 .get()
-                .header("User-agent", finalUserAgent)
+                .header("User-agent", resolveSubscriptionUserAgent(request.userAgent))
+                .header("Accept", SUBSCRIPTION_ACCEPT)
                 .header("Connection", "close")
 
             attachDeviceHeaders(request, requestBuilder)

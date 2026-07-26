@@ -71,6 +71,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // and is NOT reset by the fallback's own service restart — prevents reconnect loops.
     var autoFallbackUsed = false
 
+    // True only while the auto-fallback's own stop→start restart is in flight. The anti-loop
+    // invariant rests on [autoFallbackUsed] surviving that restart, and this flag is what lets
+    // the disconnect handler tell the internal restart apart from a genuine user disconnect
+    // instead of leaving the distinction implicit in "nothing happens to clear the flag".
+    var fallbackInProgress = false
+
     /**
      * Returns true exactly once per emitted fast-connect result, so observers ignore
      * the LiveData value replayed when the Activity is recreated.

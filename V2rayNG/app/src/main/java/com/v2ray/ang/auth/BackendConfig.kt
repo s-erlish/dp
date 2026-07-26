@@ -1,6 +1,7 @@
 package com.v2ray.ang.auth
 
 import com.v2ray.ang.BuildConfig
+import com.v2ray.ang.util.HttpUtil
 
 /**
  * Central configuration for the Departament VPN backend + Telegram bot.
@@ -13,15 +14,28 @@ import com.v2ray.ang.BuildConfig
  */
 object BackendConfig {
 
+    /** Historic `SUB_USER_AGENT` default: our branding, not a client any VPN panel knows. */
+    private const val BRANDING_USER_AGENT = "DepartamentVPN/1.0"
+
     /** Backend base URL, e.g. https://web.departament.site/api (no trailing slash). */
     val baseUrl: String get() = BuildConfig.BACKEND_BASE_URL.trimEnd('/')
 
     /** Telegram bot username without the leading '@', e.g. departament_vpn_bot. */
     val botUsername: String get() = BuildConfig.BOT_USERNAME
 
-    /** User-Agent used for API + subscription requests (negotiates the response format). */
+    /**
+     * User-Agent used for API + subscription requests (negotiates the response format).
+     *
+     * Panels pick the subscription format — XRAY_JSON template vs base64 link list — from this
+     * header and only recognise known client strings, so the branding value the build still ships
+     * counts as "not configured": sending it makes Remnawave answer with a plain link list and the
+     * operator's routing/DNS template is never applied. An operator overrides this with whatever
+     * client string their panel maps to xray-json.
+     */
     val subscriptionUserAgent: String
-        get() = BuildConfig.SUB_USER_AGENT.ifBlank { "DepartamentVPN/1.0" }
+        get() = BuildConfig.SUB_USER_AGENT.trim()
+            .takeIf { it.isNotBlank() && !it.equals(BRANDING_USER_AGENT, ignoreCase = true) }
+            ?: HttpUtil.DEFAULT_SUBSCRIPTION_USER_AGENT
 
     /** True only when a backend base URL has been provided at build time. */
     fun isConfigured(): Boolean = BuildConfig.BACKEND_BASE_URL.isNotBlank()

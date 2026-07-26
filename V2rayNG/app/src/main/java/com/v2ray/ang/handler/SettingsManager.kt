@@ -381,6 +381,90 @@ object SettingsManager {
     }
 
     /**
+     * Whether a notification is posted while a subscription is being refreshed. Default TRUE.
+     */
+    fun isNotifyOnSubscriptionUpdate(): Boolean {
+        return MmkvManager.decodeSettingsBool(AppConfig.PREF_SUB_NOTIFY_ON_UPDATE, true)
+    }
+
+    /**
+     * Whether every subscription is refreshed once when the app starts. Default FALSE.
+     */
+    fun isUpdateSubscriptionOnLaunch(): Boolean {
+        return MmkvManager.decodeSettingsBool(AppConfig.PREF_SUB_UPDATE_ON_LAUNCH, false)
+    }
+
+    /**
+     * Whether the latency test runs once when the app starts. Default FALSE.
+     */
+    fun isPingOnLaunch(): Boolean {
+        return MmkvManager.decodeSettingsBool(AppConfig.PREF_PING_ON_LAUNCH, false)
+    }
+
+    /**
+     * Whether the latency test runs after a subscription refresh. Default TRUE.
+     */
+    fun isPingOnSubscriptionUpdate(): Boolean {
+        return MmkvManager.decodeSettingsBool(AppConfig.PREF_PING_ON_UPDATE, true)
+    }
+
+    /**
+     * Global fallback User-Agent for subscription fetches, or null when the user has not set one —
+     * a subscription's own User-Agent and then the operator default still apply, in that order.
+     */
+    fun getSubscriptionUserAgent(): String? {
+        return MmkvManager.decodeSettingsString(AppConfig.PREF_SUB_USER_AGENT)?.trim()?.takeIf { it.isNotEmpty() }
+    }
+
+    /**
+     * Server list order chosen on the provider screen, one of `AppConfig.SERVER_SORT_*`.
+     */
+    fun getServerSortOrder(): String {
+        return MmkvManager.decodeSettingsString(AppConfig.PREF_SERVER_SORT_ORDER)
+            ?.takeIf { it.isNotEmpty() } ?: AppConfig.SERVER_SORT_DEFAULT
+    }
+
+    /**
+     * Reorders every stored server list to match [getServerSortOrder].
+     *
+     * Order is a property of the stored guid list — every screen renders servers as stored, and a
+     * subscription refresh rewrites the list in the provider's order — so the choice is applied to
+     * storage instead of at render time. That is also why
+     * [AppConfig.SERVER_SORT_DEFAULT] does nothing here: the provider's own order is what the next
+     * refresh restores.
+     */
+    fun applyServerSortOrder() {
+        val order = getServerSortOrder()
+        if (order == AppConfig.SERVER_SORT_DEFAULT) return
+
+        val subIds = decodeSubsList()
+        // Ungrouped servers live under the default subscription, which is not always in the list.
+        if (!subIds.contains(DEFAULT_SUBSCRIPTION_ID)) {
+            subIds.add(DEFAULT_SUBSCRIPTION_ID)
+        }
+
+        subIds.forEach { subId ->
+            val guids = MmkvManager.decodeServerList(subId)
+            if (guids.size < 2) return@forEach
+
+            val sorted = when (order) {
+                AppConfig.SERVER_SORT_PING -> guids.sortedBy { guid ->
+                    // Untested and unreachable servers sink to the bottom instead of leading it.
+                    val delay = MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: -1L
+                    if (delay <= 0L) Long.MAX_VALUE else delay
+                }
+
+                AppConfig.SERVER_SORT_NAME -> guids.sortedBy { guid ->
+                    decodeServerConfig(guid)?.remarks?.lowercase(Locale.getDefault()).orEmpty()
+                }
+
+                else -> return@forEach
+            }
+            MmkvManager.encodeServerList(sorted.toMutableList(), subId)
+        }
+    }
+
+    /**
      * Soft memory cap (in megabytes) requested for the core runtime. Default 100.
      * Only meaningful when [isMemoryLimitEnabled] is true.
      */

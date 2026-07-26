@@ -17,7 +17,7 @@ import com.v2ray.ang.handler.SubscriptionUpdater
  * Groups four cards that mirror the Incy provider screen:
  *  1. ОБНОВЛЕНИЕ    — auto-update toggle + interval picker + update notification toggle.
  *  2. ПРИ ЗАПУСКЕ    — update-on-launch / ping-on-launch / ping-on-update toggles.
- *  3. СЕТЬ           — HWID toggle (real behavior) + subscription User-Agent editor.
+ *  3. СЕТЬ           — HWID toggle + subscription User-Agent editor.
  *  4. СПИСОК СЕРВЕРОВ — server list sort order (single choice).
  *
  * Wiring notes:
@@ -26,26 +26,21 @@ import com.v2ray.ang.handler.SubscriptionUpdater
  *    [com.v2ray.ang.dto.entities.SubscriptionItem.updateInterval]) across every stored
  *    subscription, then rescheduled via [SubscriptionUpdater.sync]. This mirrors the global
  *    picker in MainActivity's settings tab — it changes real update behavior.
- *  - HWID writes [AppConfig.PREF_SEND_HWID] via MMKV; the subscription updater reads it.
- *  - The remaining toggles/values have no existing global pref, so they are persisted under
- *    local keys (defined below) via MMKV. They are stored but not yet consumed by app logic.
+ *  - Every other row writes an [AppConfig] preference that the rest of the app reads: HWID and
+ *    the User-Agent are consumed by the subscription fetch, the notification and the
+ *    launch/update actions by [SubscriptionUpdater], the sort order by
+ *    [SettingsManager.applyServerSortOrder]. Defaults live in [SettingsManager], not here, so
+ *    the switch state and the behaviour can never drift apart.
  */
 class ProviderSettingsActivity : BaseActivity() {
 
     private val binding by lazy { ActivityProviderSettingsBinding.inflate(layoutInflater) }
 
     companion object {
-        // Local (this-screen-only) pref keys. Not added to AppConfig (owned by Agent 1).
-        private const val PREF_NOTIFY_ON_UPDATE = "pref_provider_notify_on_update"
-        private const val PREF_UPDATE_ON_LAUNCH = "pref_provider_update_on_launch"
-        private const val PREF_PING_ON_LAUNCH = "pref_provider_ping_on_launch"
-        private const val PREF_PING_ON_UPDATE = "pref_provider_ping_on_update"
-        private const val PREF_SUB_USER_AGENT = "pref_provider_sub_user_agent"
-        private const val PREF_SERVER_SORT_ORDER = "pref_provider_server_sort_order"
-        // Remembers the chosen interval even when no subscription is present yet.
+        // Screen-local: remembers the chosen interval even when no subscription is present yet.
+        // The interval that actually schedules work lives on each SubscriptionItem.
         private const val PREF_UPDATE_INTERVAL = "pref_provider_update_interval"
 
-        private const val DEFAULT_USER_AGENT = "DepartamentVPN/1.0"
         private const val DEFAULT_INTERVAL_MINUTES = 60L
     }
 
@@ -53,7 +48,11 @@ class ProviderSettingsActivity : BaseActivity() {
     private val intervalValues = longArrayOf(60L, 120L, 360L, 720L, 1440L)
 
     /** Sort-order values persisted for the server list. */
-    private val sortValues = arrayOf("default", "ping", "name")
+    private val sortValues = arrayOf(
+        AppConfig.SERVER_SORT_DEFAULT,
+        AppConfig.SERVER_SORT_PING,
+        AppConfig.SERVER_SORT_NAME
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

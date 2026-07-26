@@ -1,0 +1,28 @@
+v2rayN/GlobalHotKeys/src/GlobalHotKeys/HotKeyManager.cs(51,86): warning CS8625: Cannot convert null literal to non-nullable reference type.
+v2rayN/v2rayN.Desktop/Views/AccountView.axaml(1223,62,1223,62): Avalonia warning AVLN5001: 'TextBox.Watermark' is obsolete: Use PlaceholderText instead.
+v2rayN/v2rayN.Desktop/Views/AccountView.axaml(372,46,372,46): Avalonia warning AVLN5001: 'TextBox.Watermark' is obsolete: Use PlaceholderText instead.
+v2rayN/v2rayN.Desktop/Views/CompactServersView.axaml(100,22,100,22): Avalonia warning AVLN5001: 'TextBox.Watermark' is obsolete: Use PlaceholderText instead.
+v2rayN/v2rayN.Desktop/Views/ConnectHeroView.axaml.cs(170,32): warning CS0067: The event 'ConnectHeroView.AddRequested' is never used
+v2rayN/v2rayN.Desktop/Views/DnsSubView.axaml(128,30,128,30): Avalonia warning AVLN5001: 'TextBox.Watermark' is obsolete: Use PlaceholderText instead.
+v2rayN/v2rayN.Desktop/Views/LoginView.axaml(346,26,346,26): Avalonia warning AVLN5001: 'TextBox.Watermark' is obsolete: Use PlaceholderText instead.
+v2rayN/v2rayN.Desktop/Views/LoginView.axaml(363,26,363,26): Avalonia warning AVLN5001: 'TextBox.Watermark' is obsolete: Use PlaceholderText instead.
+v2rayN/v2rayN.Desktop/Views/LoginView.axaml(409,26,409,26): Avalonia warning AVLN5001: 'TextBox.Watermark' is obsolete: Use PlaceholderText instead.
+v2rayN/v2rayN.Desktop/Views/LoginView.axaml(599,34,599,34): Avalonia warning AVLN5001: 'TextBox.Watermark' is obsolete: Use PlaceholderText instead.
+v2rayN/v2rayN.Desktop/Views/LoginView.axaml.cs(617,9): warning CS0618: 'TextBox.Watermark' is obsolete: 'Use PlaceholderText instead.'
+v2rayN/v2rayN.Desktop/Views/PerAppProxyPage.axaml(115,22,115,22): Avalonia warning AVLN5001: 'TextBox.Watermark' is obsolete: Use PlaceholderText instead.
+v2rayN/v2rayN.Desktop/Views/PingSettingsPage.axaml(141,22,141,22): Avalonia warning AVLN5001: 'TextBox.Watermark' is obsolete: Use PlaceholderText instead.
+v2rayN/v2rayN.Desktop/Views/PingSettingsPage.axaml(151,22,151,22): Avalonia warning AVLN5001: 'TextBox.Watermark' is obsolete: Use PlaceholderText instead.
+v2rayN/v2rayN.Desktop/Views/ProviderSettingsPage.axaml(124,26,124,26): Avalonia warning AVLN5001: 'TextBox.Watermark' is obsolete: Use PlaceholderText instead.
+v2rayN/v2rayN.Desktop/Views/SettingsView.axaml(496,34,496,34): Avalonia warning AVLN5001: 'TextBox.Watermark' is obsolete: Use PlaceholderText instead.
+v2rayN/v2rayN.Desktop/Views/SettingsView.axaml(504,34,504,34): Avalonia warning AVLN5001: 'TextBox.Watermark' is obsolete: Use PlaceholderText instead.
+v2rayN/v2rayN.Desktop/Views/UrlSchemesPage.axaml.cs(117,26): warning CA1416: This call site is reachable on all platforms. 'Registry.CurrentUser' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416)
+v2rayN/v2rayN.Desktop/Views/UrlSchemesPage.axaml.cs(117,26): warning CA1416: This call site is reachable on all platforms. 'RegistryKey.CreateSubKey(string)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416)
+v2rayN/v2rayN.Desktop/Views/UrlSchemesPage.axaml.cs(118,9): warning CA1416: This call site is reachable on all platforms. 'RegistryKey.SetValue(string?, object)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416)
+v2rayN/v2rayN.Desktop/Views/UrlSchemesPage.axaml.cs(119,9): warning CA1416: This call site is reachable on all platforms. 'RegistryKey.SetValue(string?, object)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416)
+v2rayN/v2rayN.Desktop/Views/UrlSchemesPage.axaml.cs(120,27): warning CA1416: This call site is reachable on all platforms. 'RegistryKey.CreateSubKey(string)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416)
+v2rayN/v2rayN.Desktop/Views/UrlSchemesPage.axaml.cs(122,13): warning CA1416: This call site is reachable on all platforms. 'RegistryKey.SetValue(string?, object)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416)
+v2rayN/v2rayN.Desktop/Views/UrlSchemesPage.axaml.cs(124,26): warning CA1416: This call site is reachable on all platforms. 'RegistryKey.CreateSubKey(string)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416)
+v2rayN/v2rayN.Desktop/Views/UrlSchemesPage.axaml.cs(126,13): warning CA1416: This call site is reachable on all platforms. 'RegistryKey.SetValue(string?, object)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416)
+v2rayN/v2rayN.Desktop/Views/UrlSchemesPage.axaml.cs(79,29): warning CA1416: This call site is reachable on all platforms. 'Registry.CurrentUser' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416)
+v2rayN/v2rayN.Desktop/Views/UrlSchemesPage.axaml.cs(79,29): warning CA1416: This call site is reachable on all platforms. 'RegistryKey.OpenSubKey(string)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416)
+v2rayN/v2rayN.Desktop/Views/UrlSchemesPage.axaml.cs(80,27): warning CA1416: This call site is reachable on all platforms. 'RegistryKey.GetValue(string?)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416)
