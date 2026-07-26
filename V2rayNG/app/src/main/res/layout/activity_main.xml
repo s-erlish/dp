@@ -440,20 +440,13 @@
 
             </androidx.core.widget.NestedScrollView>
 
-            <!-- ==================== SETTINGS TAB ==================== -->
-            <include
-                android:id="@+id/group_settings"
-                layout="@layout/layout_settings_content"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent" />
-
             <!-- ==================== TAB HOST (fragment tabs) ==================== -->
             <!-- The shell's fragment container: one fragment per bottom-nav destination, added
                  lazily the first time its tab is opened and then kept alive (hide/show, never
                  replace) so scroll position and in-flight state survive a tab switch.
-                 Today it hosts Серверы (ServersFragment) and Аккаунт (AccountFragment); Главная
-                 and Настройки are still the sibling view groups above and move here in their
-                 own stages. -->
+                 Today it hosts Серверы (ServersFragment), Аккаунт (AccountFragment) and
+                 Настройки (SettingsTabFragment); Главная is still the sibling view group above
+                 and moves here in its own stage. -->
             <androidx.fragment.app.FragmentContainerView
                 android:id="@+id/tab_host"
                 android:layout_width="match_parent"
