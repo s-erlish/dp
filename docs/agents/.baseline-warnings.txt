@@ -1,21 +1,10 @@
-w: [33m[1m⚠️ Deprecated 'org.jetbrains.kotlin.android' plugin usage[0m[0m
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/auth/DepartamentApiClientImpl.kt:127:44 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/auth/DepartamentApiClientImpl.kt:185:27 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/auth/DepartamentApiClientImpl.kt:214:31 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/auth/DepartamentApiClientImpl.kt:305:31 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/auth/DepartamentApiClientImpl.kt:314:31 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/auth/dto/MiscDtos.kt:38:55 Unnecessary non-null assertion (!!) on a non-null receiver of type 'DevicesWrapperDto'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/handler/AngConfigManager.kt:590:76 Elvis operator (?:) always returns the left operand of non-nullable type 'ProfileItem'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/handler/AngConfigManager.kt:611:54 Elvis operator (?:) always returns the left operand of non-nullable type 'ProfileItem'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/handler/AngConfigManager.kt:627:74 Elvis operator (?:) always returns the left operand of non-nullable type 'ProfileItem'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/ui/BackupActivity.kt:296:73 Elvis operator (?:) always returns the left operand of non-nullable type 'String'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/ui/ServerCustomConfigActivity.kt:97:65 Unnecessary safe call on a non-null receiver of type 'ProfileItem'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/ui/ServerCustomConfigActivity.kt:99:36 Unnecessary safe call on a non-null receiver of type 'ProfileItem'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/ui/ServerCustomConfigActivity.kt:100:40 Unnecessary safe call on a non-null receiver of type 'ProfileItem'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/util/AvatarManager.kt:188:38 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/util/HttpUtil.kt:129:37 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/util/HttpUtil.kt:189:45 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/util/HttpUtil.kt:274:49 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/util/HttpUtil.kt:392:42 Elvis operator (?:) always returns the left operand of non-nullable type 'ResponseBody'.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/viewmodel/MainViewModel.kt:699:29 'fun getSerializableExtra(p0: String!): Serializable?' is deprecated. Deprecated in Java.
-w: file:///home/user/dp/V2rayNG/app/src/main/java/com/v2ray/ang/viewmodel/MainViewModel.kt:705:29 'fun getSerializableExtra(p0: String!): Serializable?' is deprecated. Deprecated in Java.
+w: AngConfigManager.kt:L:C Elvis operator (?:) always returns the left operand of non-nullable type 'ProfileItem'.
+w: BackupActivity.kt:L:C Elvis operator (?:) always returns the left operand of non-nullable type 'String'.
+w: DepartamentApiClientImpl.kt:L:C Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
+w: HttpUtil.kt:L:C Elvis operator (?:) always returns the left operand of non-nullable type 'ResponseBody'.
+w: HttpUtil.kt:L:C Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
+w: MainViewModel.kt:L:C 'fun getSerializableExtra(p0: String!): Serializable?' is deprecated. Deprecated in Java.
+w: ServerCustomConfigActivity.kt:L:C Unnecessary safe call on a non-null receiver of type 'ProfileItem'.
+w: build.gradle.kts:L:C: 'fun Project.android(configure: Action<BaseAppModuleExtension>): Unit' is deprecated. Replaced by com.android.build.api.dsl.ApplicationExtension.
+w: build.gradle.kts:L:C: 'fun srcDirs(vararg srcDirs: Any): Any' is deprecated. Use `directories` mutable set instead.
+w: ⚠️ Deprecated 'org.jetbrains.kotlin.android' plugin usage
