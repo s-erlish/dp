@@ -1,19 +1,31 @@
 package com.v2ray.ang.ui
 
-import android.annotation.SuppressLint
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.v2ray.ang.R
 import com.v2ray.ang.contracts.BaseAdapterListener
-import com.v2ray.ang.databinding.ItemRecyclerUserAssetBinding
+import com.v2ray.ang.databinding.ViewRowBinding
 import com.v2ray.ang.extension.toTrafficString
+import com.v2ray.ang.ui.component.RowBinder
 import com.v2ray.ang.viewmodel.UserAssetViewModel
 import java.io.File
 import java.text.DateFormat
 import java.util.Date
 
+/**
+ * One geo file per row (A-25).
+ *
+ * The old row was a bordered card with a blue icon tile and two 24dp glyphs in 8dp boxes - 36dp
+ * targets, below the 48dp floor (§14.2) - and the destructive one sat directly beside the edit one
+ * with no separation, so «Удалить» was one mis-tap away from «Изменить». §4.5 allows one trailing
+ * element, so both live behind a single overflow that opens the shared sheet, with delete separated
+ * by a hairline and carrying the red title.
+ *
+ * The subtitle states the file's size and date in the Numeric role, or says the file is missing -
+ * which is the state that actually matters here, because a `geoip.dat` recorded in settings but
+ * absent on disk is exactly why routing silently stops working.
+ */
 class UserAssetAdapter(
     private val viewModel: UserAssetViewModel,
     private val extDir: File,
@@ -22,50 +34,52 @@ class UserAssetAdapter(
 
     override fun getItemCount() = viewModel.itemCount
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserAssetViewHolder {
-        return UserAssetViewHolder(
-            ItemRecyclerUserAssetBinding.inflate(
-                LayoutInflater.from(parent.context),
-                parent,
-                false
-            )
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserAssetViewHolder =
+        UserAssetViewHolder(ViewRowBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+
+    override fun onBindViewHolder(holder: UserAssetViewHolder, position: Int) {
+        val item = viewModel.getAsset(position) ?: return
+        val context = holder.itemView.context
+        val file = extDir.listFiles()?.find { it.name == item.assetUrl.remarks }
+
+        val subtitle = if (file == null) {
+            context.getString(R.string.asset_missing)
+        } else {
+            val dateFormat = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+            "${file.length().toTrafficString()}  ·  ${dateFormat.format(Date(file.lastModified()))}"
+        }
+
+        // A locked asset, and one imported from a local file, has no URL to edit.
+        val editable = item.assetUrl.locked != true && item.assetUrl.url != "file"
+
+        RowBinder.bind(
+            root = holder.binding.root,
+            title = item.assetUrl.remarks,
+            subtitle = subtitle,
+            glyph = R.drawable.ic_file_24dp,
+            // The row itself does nothing; the overflow owns every action this item has, so the
+            // row is not a target (22-components 8.4).
+            trailing = RowBinder.Trailing.IconAction(
+                icon = R.drawable.ic_more_vert_24dp,
+                contentDescription = context.getString(R.string.editor_more_actions),
+                onClick = {
+                    val index = holder.bindingAdapterPosition
+                    if (index == RecyclerView.NO_POSITION) return@IconAction
+                    EditorActionsSheet(context, item.assetUrl.remarks)
+                        .action(
+                            labelRes = R.string.asset_action_edit,
+                            glyph = R.drawable.ic_edit_24dp,
+                            enabled = editable,
+                        ) { adapterListener?.onEdit(item.guid, index) }
+                        .destructive(R.string.asset_action_delete) {
+                            adapterListener?.onRemove(item.guid, index)
+                        }
+                        .show()
+                },
+            ),
         )
     }
 
-    @SuppressLint("SetTextI18n")
-    override fun onBindViewHolder(holder: UserAssetViewHolder, position: Int) {
-        val item = viewModel.getAsset(position) ?: return
-        val file = extDir.listFiles()?.find { it.name == item.assetUrl.remarks }
-
-        holder.itemUserAssetBinding.assetName.text = item.assetUrl.remarks
-
-        if (file != null) {
-            val dateFormat = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM)
-            holder.itemUserAssetBinding.assetProperties.text =
-                "${file.length().toTrafficString()}  •  ${dateFormat.format(Date(file.lastModified()))}"
-        } else {
-            holder.itemUserAssetBinding.assetProperties.text =
-                holder.itemUserAssetBinding.root.context.getString(R.string.msg_file_not_found)
-        }
-
-        if (item.assetUrl.locked == true) {
-            holder.itemUserAssetBinding.layoutEdit.visibility = View.GONE
-        } else {
-            holder.itemUserAssetBinding.layoutEdit.visibility = if (item.assetUrl.url == "file") {
-                View.GONE
-            } else {
-                View.VISIBLE
-            }
-        }
-
-        holder.itemUserAssetBinding.layoutEdit.setOnClickListener {
-            adapterListener?.onEdit(item.guid, position)
-        }
-        holder.itemUserAssetBinding.layoutRemove.setOnClickListener {
-            adapterListener?.onRemove(item.guid, position)
-        }
-    }
-
-    class UserAssetViewHolder(val itemUserAssetBinding: ItemRecyclerUserAssetBinding) :
-        RecyclerView.ViewHolder(itemUserAssetBinding.root)
+    class UserAssetViewHolder(val binding: ViewRowBinding) :
+        RecyclerView.ViewHolder(binding.root)
 }

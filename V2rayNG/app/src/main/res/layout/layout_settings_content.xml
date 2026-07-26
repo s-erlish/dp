@@ -1357,6 +1357,164 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
+                <!-- Расширенные настройки. SettingsActivity hosts the 19-preference tree; without
+                     this row it had no launch site anywhere in the app, so none of those settings
+                     had a reachable editor. -->
+                <LinearLayout
+                    android:id="@+id/row_advanced"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="@dimen/row_min_height"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
+
+                    <FrameLayout
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
+                        android:background="@drawable/bg_icon_blue">
+
+                        <ImageView
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
+                            android:layout_gravity="center"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_settings_24dp"
+                            app:tint="?attr/iconTintBlue" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_weight="1"
+                        android:text="@string/settings_advanced"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="@dimen/space_4"
+                        android:importantForAccessibility="no"
+                        app:srcCompat="@drawable/ic_chevron_right"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="72dp"
+                    android:background="?attr/colorOutlineVariant" />
+
+                <!-- Журнал -->
+                <LinearLayout
+                    android:id="@+id/row_logs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="@dimen/row_min_height"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
+
+                    <FrameLayout
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
+                        android:background="@drawable/bg_icon_blue">
+
+                        <ImageView
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
+                            android:layout_gravity="center"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_logcat_24dp"
+                            app:tint="?attr/iconTintBlue" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_weight="1"
+                        android:text="@string/settings_logs"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="@dimen/space_4"
+                        android:importantForAccessibility="no"
+                        app:srcCompat="@drawable/ic_chevron_right"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="72dp"
+                    android:background="?attr/colorOutlineVariant" />
+
+                <!-- Проверить обновления -->
+                <LinearLayout
+                    android:id="@+id/row_check_update"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="@dimen/row_min_height"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingVertical="@dimen/space_12">
+
+                    <FrameLayout
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
+                        android:background="@drawable/bg_icon_blue">
+
+                        <ImageView
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
+                            android:layout_gravity="center"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_check_update_24dp"
+                            app:tint="?attr/iconTintBlue" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_weight="1"
+                        android:text="@string/settings_check_update"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="@dimen/space_4"
+                        android:importantForAccessibility="no"
+                        app:srcCompat="@drawable/ic_chevron_right"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="72dp"
+                    android:background="?attr/colorOutlineVariant" />
+
                 <!-- О приложении -->
                 <LinearLayout
                     android:id="@+id/row_about"

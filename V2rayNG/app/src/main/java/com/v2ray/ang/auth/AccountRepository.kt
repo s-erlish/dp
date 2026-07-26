@@ -10,6 +10,7 @@ import com.v2ray.ang.auth.dto.PromoDto
 import com.v2ray.ang.auth.dto.PublicConfigDto
 import com.v2ray.ang.auth.dto.ReferralStatsDto
 import com.v2ray.ang.auth.dto.ServerStatusDto
+import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.auth.dto.SubscriptionAllDto
 import com.v2ray.ang.auth.dto.TariffCatalogDto
 import com.v2ray.ang.auth.dto.UpgradeQuoteDto
@@ -20,11 +21,13 @@ import kotlinx.coroutines.CancellationException
  * Coroutine wrapper over [DepartamentApiClient] that returns [Result] instead of throwing, maps
  * every failure to an [ApiError], and performs the higher-level account operations the UI needs.
  *
- * The local session is wiped via [AccountSession.wipe] ONLY when the authoritative identity
+ * The local session is ended via [AccountSession.endSession] ONLY when the authoritative identity
  * endpoint ([DepartamentApiClient.getMe], via [refreshProfile]) returns 401 — that is the single
  * reliable "the 7-day JWT is dead" signal, so a genuinely expired token self-heals into a
  * logged-out state. A 401/403 on any OTHER endpoint (a per-action permission or scope failure)
- * surfaces as a plain error and NEVER touches the session; only an explicit user logout does.
+ * surfaces as a plain error and NEVER touches the session. Ending a session is not the same as
+ * [AccountSession.wipe], which also deletes the imported subscriptions and belongs to an explicit
+ * user logout alone.
  */
 class AccountRepository(
     private val api: DepartamentApiClient = DepartamentApiClientImpl(),
@@ -69,7 +72,7 @@ class AccountRepository(
             AccountSession.updateProfile(profile)
             Result.success(profile)
         } catch (e: ApiError.Unauthorized) {
-            AccountSession.wipe()
+            AccountSession.endSession()
             Result.failure(e)
         } catch (e: ApiError) {
             Result.failure(e)
@@ -87,12 +90,66 @@ class AccountRepository(
     suspend fun loadSubscriptions(): Result<SubscriptionAllDto> = guard { api.getSubscriptionAll() }
 
     /**
-     * Fetches all subscriptions and imports them into the local plumbing. Returns the local guids
-     * so the caller (UI) can reload its server list.
+     * Fetches the account's subscriptions and imports them into the local plumbing. Returns the
+     * local guids so the caller (UI) can reload its server list.
+     *
+     * **Both endpoints are asked, and neither alone is enough.** The connect payload — the
+     * Remnawave record carrying `subscriptionUrl`, which is the only thing an import can act on —
+     * lives on `GET /client/subscription`, not on `/client/subscription/all` (see
+     * [com.v2ray.ang.auth.dto.SubInfoDto]: the field is documented as absent there). Importing from
+     * `/all` alone therefore found nothing to import for the commonest account of all — one active
+     * подписка, no secondaries — and the user got the onboarding «Купить» screen while the Аккаунт
+     * tab showed their real, paid подписка. Conversely `/all` is the only source of the secondary
+     * subscriptions and of the ids the root entry needs, so the two are merged.
+     *
+     * A failure of one is survivable; the import runs on whatever answered. Only when both fail is
+     * this a failure, and then nothing is imported and nothing is pruned.
      */
-    suspend fun autoImportSubscriptions(): Result<List<String>> = guard {
-        val all = api.getSubscriptionAll()
-        subs.importAll(all.items)
+    suspend fun autoImportSubscriptions(): Result<List<String>> {
+        val allResult = guard { api.getSubscriptionAll() }
+        val primaryResult = guard { api.getPrimarySubscription() }
+
+        val allError = allResult.exceptionOrNull()
+        val primaryError = primaryResult.exceptionOrNull()
+        if (allError != null && primaryError != null) {
+            return Result.failure(allError)
+        }
+
+        val candidates = importCandidates(
+            primary = primaryResult.getOrNull(),
+            all = allResult.getOrNull()?.items.orEmpty(),
+        )
+        return guard { subs.importAll(candidates) }
+    }
+
+    /**
+     * Merges the two subscription payloads into the list the importer consumes: the active/root
+     * subscription first, enriched with the connect payload that only the primary endpoint carries,
+     * then the secondaries from `/all` exactly as they arrived.
+     *
+     * The root keeps `/all`'s identity fields when it has them, so renew/upgrade still address it by
+     * the id the backend expects. It is NOT what the import remembers it by: the two endpoints do
+     * not agree on an identifier for the root, so [SubscriptionSyncManager] keys it by its type
+     * instead and a run where only one endpoint answered still updates the same подписка in place.
+     */
+    private fun importCandidates(
+        primary: PrimarySubscriptionDto?,
+        all: List<SubInfoDto>,
+    ): List<SubInfoDto> {
+        val rootType = SubscriptionSyncManager.TYPE_ROOT
+        val rootFromAll = all.firstOrNull { it.type.equals(rootType, ignoreCase = true) }
+        val secondaries = all.filter { !it.type.equals(rootType, ignoreCase = true) }
+
+        val rootCandidate = when {
+            primary?.hasActiveSubscription() == true -> (rootFromAll ?: SubInfoDto(type = rootType)).copy(
+                subscription = primary.subscription ?: rootFromAll?.subscription,
+                tariffDisplayName = primary.tariffDisplayName?.takeIf { it.isNotBlank() }
+                    ?: rootFromAll?.tariffDisplayName,
+            )
+
+            else -> rootFromAll
+        }
+        return listOfNotNull(rootCandidate) + secondaries
     }
 
     suspend fun renameSubscription(scope: String, id: String, name: String): Result<Unit> =

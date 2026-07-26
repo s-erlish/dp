@@ -1,171 +1,99 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  ============================================================================
+  A-33  settings/about - О приложении.  H3 · R1.
+  24-tab-conformance.md A-33.
+  ============================================================================
+
+  The old file was untouched 2018 upstream: five hand-rolled 16dp rows with untinted
+  24dp icons at `TextAppearance.AppCompat.Subhead`, and a centred pair of
+  `AppCompat.Small` labels at the bottom holding the version and the application id
+  as decoration - unlabelled, uncopyable, and below the fold.
+
+  Now it is a ledger: two Row.Value rows that state what they are and carry a copy
+  action, then the links group. Three rows in that group are the entry points for
+  screens the app declared, built and never launched - «Схемы URL-адресов»,
+  «Журнал» and «Проверить обновления» - so this file is also where three dead
+  activities become reachable.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true">
+    android:background="?android:attr/colorBackground"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical"
+    tools:context=".ui.AboutActivity">
 
-    <LinearLayout xmlns:app="http://schemas.android.com/apk/res-auto"
+    <include
+        android:id="@+id/toolbar"
+        layout="@layout/view_toolbar" />
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/main_content"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/space_32"
+        android:scrollbars="none">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="top"
+            android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <LinearLayout
-                android:id="@+id/layout_soure_ccode"
+            <TextView
+                style="@style/SettingsSectionLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="?attr/selectableItemBackground"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center|start"
-                android:orientation="horizontal"
-                android:padding="@dimen/padding_spacing_dp16">
+                android:text="@string/about_section_app" />
 
-                <ImageView
-                    android:layout_width="@dimen/image_size_dp24"
-                    android:layout_height="@dimen/image_size_dp24"
-                    android:importantForAccessibility="no"
-                    app:srcCompat="@drawable/ic_source_code_24dp" />
+            <include
+                android:id="@+id/row_version"
+                layout="@layout/view_row" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:paddingStart="@dimen/padding_spacing_dp16"
-                    android:text="@string/title_source_code"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Subhead" />
-            </LinearLayout>
+            <include
+                android:id="@+id/row_package"
+                layout="@layout/view_row" />
 
-            <LinearLayout
-                android:id="@+id/layout_oss_licenses"
+            <TextView
+                style="@style/SettingsSectionLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="?attr/selectableItemBackground"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center|start"
-                android:orientation="horizontal"
-                android:padding="@dimen/padding_spacing_dp16">
+                android:text="@string/about_section_links" />
 
-                <ImageView
-                    android:layout_width="@dimen/image_size_dp24"
-                    android:layout_height="@dimen/image_size_dp24"
-                    android:importantForAccessibility="no"
-                    app:srcCompat="@drawable/license_24px" />
+            <include
+                android:id="@+id/row_url_schemes"
+                layout="@layout/view_row" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:paddingStart="@dimen/padding_spacing_dp16"
-                    android:text="@string/title_oss_license"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Subhead" />
-            </LinearLayout>
+            <include
+                android:id="@+id/row_log"
+                layout="@layout/view_row" />
 
-            <LinearLayout
-                android:id="@+id/layout_feedback"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="?attr/selectableItemBackground"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center|start"
-                android:orientation="horizontal"
-                android:padding="@dimen/padding_spacing_dp16">
+            <include
+                android:id="@+id/row_check_update"
+                layout="@layout/view_row" />
 
-                <ImageView
-                    android:layout_width="@dimen/image_size_dp24"
-                    android:layout_height="@dimen/image_size_dp24"
-                    android:importantForAccessibility="no"
-                    app:srcCompat="@drawable/ic_feedback_24dp" />
+            <include
+                android:id="@+id/row_source_code"
+                layout="@layout/view_row" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:paddingStart="@dimen/padding_spacing_dp16"
-                    android:text="@string/title_pref_feedback"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Subhead" />
-            </LinearLayout>
+            <include
+                android:id="@+id/row_feedback"
+                layout="@layout/view_row" />
 
+            <include
+                android:id="@+id/row_tg_channel"
+                layout="@layout/view_row" />
 
-            <LinearLayout
-                android:id="@+id/layout_tg_channel"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="?attr/selectableItemBackground"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center|start"
-                android:orientation="horizontal"
-                android:padding="@dimen/padding_spacing_dp16">
+            <include
+                android:id="@+id/row_licenses"
+                layout="@layout/view_row" />
 
-                <ImageView
-                    android:layout_width="@dimen/image_size_dp24"
-                    android:layout_height="@dimen/image_size_dp24"
-                    android:importantForAccessibility="no"
-                    app:srcCompat="@drawable/ic_telegram_24dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:paddingStart="@dimen/padding_spacing_dp16"
-                    android:text="@string/title_tg_channel"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Subhead" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/layout_privacy_policy"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="?attr/selectableItemBackground"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center|start"
-                android:orientation="horizontal"
-                android:padding="@dimen/padding_spacing_dp16">
-
-                <ImageView
-                    android:layout_width="@dimen/image_size_dp24"
-                    android:layout_height="@dimen/image_size_dp24"
-                    android:importantForAccessibility="no"
-                    app:srcCompat="@drawable/ic_privacy_24dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:paddingStart="@dimen/padding_spacing_dp16"
-                    android:text="@string/title_privacy_policy"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Subhead" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:orientation="vertical"
-                android:padding="@dimen/padding_spacing_dp16">
-
-                <TextView
-                    android:id="@+id/tv_version"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/title_about"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Small" />
-
-                <TextView
-                    android:id="@+id/tv_app_id"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/title_about"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Small" />
-            </LinearLayout>
-
+            <include
+                android:id="@+id/row_privacy_policy"
+                layout="@layout/view_row" />
         </LinearLayout>
-
-    </LinearLayout>
-
-</ScrollView>
-
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

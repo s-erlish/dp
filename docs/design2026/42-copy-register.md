@@ -160,6 +160,12 @@ display. Volumes are **КБ / МБ / ГБ / ТБ** with a comma decimal (`12,4 �
 only when non-zero and with a comma: `1 290 ₽`, `1 290,50 ₽`, `0 ₽`. Six formatters exist today and
 three of them can print `$`. All six die.
 
+The two spaces in that example are **not** the space on your keyboard, and copying them out of a
+rendered document loses them. The thousands separator is **U+2009 THIN SPACE** and the space before
+the symbol is **U+00A0 NO-BREAK SPACE**, so that a price never wraps between the figure and the `₽`.
+No money string in this register is a resource value: the formatter builds all of them, which is why
+there is exactly one formatter per platform (`Money.format` / `Money.Format`).
+
 ### C7 - A placeholder is not a label
 
 A field's name is a persistent `Subtitle` above it. A watermark may only carry an example value.
@@ -253,7 +259,13 @@ inside Главная there. Every `Servers_*` key below therefore exists on bot
 
 - `A` on the four nav labels: `values/strings.xml` ships `Home`, `Servers`, `More` in the default
   locale (R-19). `bottom_nav_more` is dead (`menu_bottom_nav.xml` is referenced by nothing, the bar
-  is drawn by hand in `activity_main.xml`) and is deleted with the menu file.
+  is drawn by hand in `activity_main.xml`) and is deleted with the menu file. The three surviving
+  keys are also **renamed** `bottom_nav_*` to `nav_*`, because the desktop draws the same four
+  labels in a side rail and a key named for a bottom bar is a key that will be duplicated the moment
+  a tablet layout appears.
+- `Dns_Advanced` («Дополнительно») is kept as the DNS section header; `Dns_AdvancedHint`, which
+  currently carries the FakeIP explanation and names sing-box inside it, is retired in favour of
+  `Dns_FakeIpHint` on the row that actually owns the behaviour (3.6.4).
 - `AP` on «Повторить»: Android has four keys for it and PC has two, whose English halves disagree
   («Retry» vs «Try again»). One key, English **Try again**.
 - `A+` on «Назад»: `res/layout/view_toolbar.xml:70` hardcodes `android:contentDescription="Назад"`,
@@ -1037,7 +1049,7 @@ remaining em-dash carrier in the non-Russian locale files.
 | Адрес DNS-сервера | DNS server address | `set_dns_custom_label` | `Dns_CustomAddress` | `P` |
 | DoH-адрес (https://…/dns-query), DoT или обычный IP | A DoH address (https://…/dns-query), DoT, or a plain IP | `set_dns_custom_hint` | `Dns_CustomHint` | `P` |
 | Дополнительно | Advanced | `set_dns_sec_advanced` | `Dns_Advanced` | `=` |
-| Ускоряет подключение, отвечая на запросы локально | Speeds up connecting by answering queries locally | `set_dns_fakeip_hint` | `Dns_AdvancedHint` | `AP` (R-2) |
+| Ускоряет подключение, отвечая на запросы локально | Speeds up connecting by answering queries locally | `set_dns_fakeip_hint` | `Dns_FakeIpHint` | `AP` (R-2) |
 | Локальный резолвер | Local resolver | `set_dns_local` | `Dns_LocalResolver` | `P+` |
 | Разрешать домены внутри приложения | Resolve domains inside the app | `set_dns_local_hint` | `Dns_LocalResolverHint` | `P+` |
 | DNS для прямых подключений | DNS for direct connections | `set_dns_direct` | `Dns_Direct` | `AP` (R-2) |

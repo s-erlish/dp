@@ -1,19 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<!--
+  ============================================================================
+  A-25  settings/assets - Файлы ресурсов.  H3 · R3.
+  24-tab-conformance.md A-25.
+  ============================================================================
+
+  Was: a 12dp-inset card holding a 60dp row with an orange icon tile and an 18dp
+  chevron, then a RecyclerView of one bordered card per file, each with TWO 24dp
+  action glyphs in 8dp boxes (36dp targets, under the 48 floor), and no empty state
+  at all - a fresh install showed a section header above nothing.
+
+  Now: the source row cycles its three values in place, the files are rows in one
+  list with a single overflow each, «Обновить файлы» is a visible action row instead
+  of a toolbar menu item, and the empty state says what the files are for.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:attr/colorBackground"
     android:fitsSystemWindows="true"
+    android:orientation="vertical"
     tools:context=".ui.UserAssetActivity">
+
+    <include
+        android:id="@+id/toolbar"
+        layout="@layout/view_toolbar" />
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/main_content"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:clipToPadding="false"
-        android:paddingBottom="16dp"
+        android:paddingBottom="@dimen/space_32"
         android:scrollbars="none">
 
         <LinearLayout
@@ -21,99 +41,34 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <include
+                android:id="@+id/row_source"
+                layout="@layout/view_row" />
+
+            <include
+                android:id="@+id/row_download"
+                layout="@layout/view_row" />
+
             <TextView
+                android:id="@+id/label_files"
                 style="@style/SettingsSectionLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/asset_geo_files_sources" />
-
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="12dp"
-                app:cardBackgroundColor="?attr/colorSurface"
-                app:cardCornerRadius="20dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
-
-                <LinearLayout
-                    android:id="@+id/layout_geo_files_sources"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="60dp"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="10dp">
-
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_icon_orange">
-
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_globe_24dp"
-                            app:tint="?attr/iconTintOrange" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/asset_geo_files_sources"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp" />
-
-                        <TextView
-                            android:id="@+id/tv_geo_files_sources_summary"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:maxLines="2"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-
-                </LinearLayout>
-
-            </com.google.android.material.card.MaterialCardView>
-
-            <TextView
-                style="@style/SettingsSectionLabel"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/title_user_asset_setting" />
+                android:text="@string/asset_section_files" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/recycler_view"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:nestedScrollingEnabled="false"
-                tools:listitem="@layout/item_recycler_user_asset" />
+                tools:listitem="@layout/view_row" />
+
+            <include
+                android:id="@+id/empty_state"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_24"
+                layout="@layout/view_empty_state" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
-
-
-</RelativeLayout>
+</LinearLayout>

@@ -209,10 +209,19 @@ object MmkvManager {
         }
         profileFullStorage.remove(guid)
         serverAffStorage.remove(guid)
+        // The raw template goes with the profile, and after it, never before: a locked operator
+        // profile reads its config out of this store, so dropping the raw first would leave a live
+        // profile pointing at nothing.
+        serverRawStorage.remove(guid)
     }
 
     /**
      * Removes the server configurations via subscription ID.
+     *
+     * This is the hot path for the raw-template store: a subscription refresh replaces a
+     * провайдер's whole server set through here, so before the raw entries were removed with their
+     * profiles the store grew by a full copy of every сервер on every update, for the life of the
+     * install, with nothing able to read a single one of those entries again.
      *
      * @param subscriptionId The subscription ID.
      */
@@ -227,6 +236,7 @@ object MmkvManager {
             }
             profileFullStorage.remove(guid)
             serverAffStorage.remove(guid)
+            serverRawStorage.remove(guid)
         }
 
         serverList.clear()
@@ -282,13 +292,25 @@ object MmkvManager {
     /**
      * Removes all server configurations.
      *
+     * `mainStorage` is NOT cleared wholesale, and must not be: it is a shared store, not a server
+     * store. Alongside the per-subscription server lists it holds [KEY_SUB_IDS] — the провайдер
+     * order the user arranged — and [KEY_WEBDAV_CONFIG]. Clearing it took both down with the
+     * серверы, and [initSubsList] then rebuilt the провайдер list from `subStorage.allKeys()` in
+     * whatever order the store happened to enumerate. Only the keys that describe серверы go.
+     *
      * @return The number of server configurations removed.
      */
     fun removeAllServer(): Int {
         val count = profileFullStorage.allKeys()?.count() ?: 0
-        mainStorage.clearAll()
+        mainStorage.allKeys()
+            ?.filter { it.startsWith(KEY_SUB_SERVER_PREFIX) }
+            ?.forEach { mainStorage.remove(it) }
+        mainStorage.remove(KEY_SELECTED_SERVER)
         profileFullStorage.clearAll()
         serverAffStorage.clearAll()
+        // The raw templates are keyed by the same guids as the profiles just dropped, so every one
+        // of them is now unreachable (D23: nothing else deletes from this store).
+        serverRawStorage.clearAll()
         return count
     }
 
@@ -338,6 +360,27 @@ object MmkvManager {
      */
     fun decodeServerRaw(guid: String): String? {
         return serverRawStorage.decodeString(guid)
+    }
+
+    /**
+     * Deletes every raw template whose profile no longer exists.
+     *
+     * A one-time repair, not a routine sweep: the delete paths above now carry the raw entry with
+     * its profile, so nothing new is orphaned. What this clears is the backlog left by the builds
+     * that had no delete path at all — one copy of every сервер per subscription refresh, kept for
+     * the life of the install and read by nothing.
+     *
+     * @return The number of orphaned raw entries removed.
+     */
+    fun pruneOrphanServerRaw(): Int {
+        val keys = serverRawStorage.allKeys() ?: return 0
+        var count = 0
+        for (key in keys) {
+            if (profileFullStorage.containsKey(key)) continue
+            serverRawStorage.remove(key)
+            count++
+        }
+        return count
     }
 
     //endregion

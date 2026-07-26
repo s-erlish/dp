@@ -1,26 +1,93 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<!--
+  ============================================================================
+  A-35  settings/about/log - Журнал.  H3 · R3.
+  24-tab-conformance.md A-35.
+  ============================================================================
+
+  The screen was a bare SwipeRefreshLayout around a RecyclerView with a toast on
+  entry telling the user to pull down - i.e. it showed nothing at all until the user
+  guessed. It now loads on open, shows a skeleton while it does, and has the empty
+  state it never had («Записей пока нет»). Search moved out of the vanished ActionBar
+  onto the screen; copy / share / clear moved out of the same overflow into the
+  editors' shared sheet.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?android:attr/colorBackground"
     android:fitsSystemWindows="true"
+    android:orientation="vertical"
     tools:context=".ui.LogcatActivity">
 
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-        android:id="@+id/refresh_layout"
+    <include
+        android:id="@+id/toolbar"
+        layout="@layout/view_toolbar" />
+
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="wrap_content"
+        android:paddingStart="@dimen/screen_gutter"
+        android:paddingTop="@dimen/space_8"
+        android:paddingEnd="@dimen/screen_gutter"
+        android:paddingBottom="@dimen/space_8">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recycler_view"
+        <include
+            android:id="@+id/search"
+            layout="@layout/view_search_field" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/refresh_layout"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scrollbars="vertical"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+            android:layout_height="match_parent">
 
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="@dimen/space_32"
+                android:scrollbars="vertical"
+                tools:listitem="@layout/item_recycler_logcat" />
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
-</RelativeLayout>
+        <LinearLayout
+            android:id="@+id/skeleton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:importantForAccessibility="noHideDescendants"
+            android:orientation="vertical"
+            android:visibility="gone">
 
+            <include
+                android:id="@+id/skeleton_1"
+                layout="@layout/view_skeleton_row" />
 
+            <include
+                android:id="@+id/skeleton_2"
+                layout="@layout/view_skeleton_row" />
+
+            <include
+                android:id="@+id/skeleton_3"
+                layout="@layout/view_skeleton_row" />
+
+            <include
+                android:id="@+id/skeleton_4"
+                layout="@layout/view_skeleton_row" />
+        </LinearLayout>
+
+        <include
+            android:id="@+id/empty_state"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            layout="@layout/view_empty_state" />
+    </FrameLayout>
+</LinearLayout>

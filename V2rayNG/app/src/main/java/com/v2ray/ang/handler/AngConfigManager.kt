@@ -609,29 +609,41 @@ object AngConfigManager {
                     JsonUtil.fromJson(server, Array<Any>::class.java) ?: arrayOf()
 
                 if (serverList.isNotEmpty()) {
-                    val removedSelected = getRemovedSelectedProfile(subid, append)
-                    if (!append) {
-                        MmkvManager.removeServerViaSubid(subid)
-                    }
-                    var count = 0
-                    val keyToProfile = mutableMapOf<String, ProfileItem>()
+                    // Parse into a staging list FIRST, delete second — the same order the link-list
+                    // branch uses (`parseBatchConfig`, "if (configs.isNotEmpty())"). Deleting on
+                    // `serverList.isNotEmpty()` meant a провайдер answering with a non-empty but
+                    // unparseable XRAY_JSON body wiped every сервер it had, cleared the selected
+                    // one, and then discovered it had nothing to put back — the user was left with
+                    // an empty провайдер and no way to recover it from the device.
+                    val staged = ArrayList<Pair<String, ProfileItem>>(serverList.size)
                     for (srv in serverList.reversed()) {
                         // Pretty-printing also normalises Gson's doubles back to ints, which the core needs.
                         val rawConfig = stripVendorRootKey(JsonUtil.toJsonPretty(srv) ?: "")
                         val config = CustomFmt.parse(rawConfig) ?: continue
-                        config.subscriptionId = subid
-                        config.locked = locked
-                        config.description = generateDescription(config)
-                        val key = MmkvManager.encodeServerConfig("", config)
-                        MmkvManager.encodeServerRaw(key, TemplateManager.wrapRawForStorage(rawConfig, locked))
-                        keyToProfile[key] = config
-                        count += 1
+                        staged.add(rawConfig to config)
                     }
-                    if (count > 0) {
+                    if (staged.isNotEmpty()) {
+                        val removedSelected = getRemovedSelectedProfile(subid, append)
+                        if (!append) {
+                            MmkvManager.removeServerViaSubid(subid)
+                        }
+                        val keyToProfile = mutableMapOf<String, ProfileItem>()
+                        for ((rawConfig, config) in staged) {
+                            config.subscriptionId = subid
+                            config.locked = locked
+                            config.description = generateDescription(config)
+                            val key = MmkvManager.encodeServerConfig("", config)
+                            MmkvManager.encodeServerRaw(key, TemplateManager.wrapRawForStorage(rawConfig, locked))
+                            keyToProfile[key] = config
+                        }
                         val matchKey = resolveSelectedKey(keyToProfile, removedSelected, subid, append)
                         matchKey?.let { MmkvManager.setSelectServer(it) }
+                        return staged.size
                     }
-                    return count
+                    // Nothing in the array parsed. Fall through to the single-config path below
+                    // rather than returning 0: that path guards its own delete on a successful
+                    // parse, so the worst case is an honest "imported nothing" with the
+                    // already-stored серверы untouched.
                 }
             } catch (e: Exception) {
                 LogUtil.e(AppConfig.TAG, "Failed to parse custom config server JSON array", e)

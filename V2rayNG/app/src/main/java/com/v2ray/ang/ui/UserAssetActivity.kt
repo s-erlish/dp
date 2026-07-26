@@ -1,14 +1,13 @@
 package com.v2ray.ang.ui
 
 import android.annotation.SuppressLint
-import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
-import android.view.Menu
-import android.view.MenuItem
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
+import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.v2ray.ang.AppConfig
@@ -21,6 +20,10 @@ import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
+import com.v2ray.ang.ui.component.EmptyStateBinder
+import com.v2ray.ang.ui.component.RowBinder
+import com.v2ray.ang.ui.component.SubPage
+import com.v2ray.ang.ui.component.ToolbarBinder
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.Utils
 import com.v2ray.ang.viewmodel.UserAssetViewModel
@@ -29,28 +32,47 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+/**
+ * A-25 `settings/assets` - «Файлы ресурсов». H3 header, R3 rhythm.
+ *
+ * The four ways to get a file in here were toolbar menu items - «Добавить файл», «Добавить ссылку»,
+ * «Добавить по QR-коду», «Скачать» - on an ActionBar A-38 removes. Three of them are now the
+ * header's one trailing action opening a sheet, and «Обновить файлы» is a visible action row,
+ * because it is the thing a user actually comes here to do.
+ *
+ * The screen had no empty state: on a fresh install it drew a section header above nothing. It now
+ * says what geo files are for and offers the one action that fixes it.
+ */
 class UserAssetActivity : HelperBaseActivity() {
+
     private val binding by lazy { ActivityUserAssetBinding.inflate(layoutInflater) }
-    private val ownerActivity: UserAssetActivity
-        get() = this
     private val viewModel: UserAssetViewModel by viewModels()
     private lateinit var adapter: UserAssetAdapter
+    private var downloading = false
 
     val extDir by lazy { File(Utils.userAssetPath(this)) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
-        setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = getString(R.string.title_user_asset_setting))
+        setContentView(binding.root)
 
-        binding.recyclerView.setHasFixedSize(true)
-        binding.recyclerView.layoutManager = LinearLayoutManager(this)
+        ToolbarBinder.bind(
+            root = binding.toolbar.root,
+            title = getString(R.string.asset_title),
+            activity = this,
+            actionIcon = R.drawable.ic_add_24dp,
+            actionDescription = getString(R.string.asset_action_add_file),
+            onAction = { showAddActions() },
+        )
+        ToolbarBinder.attachTo(binding.toolbar.root, binding.mainContent)
+
         adapter = UserAssetAdapter(viewModel, extDir, ActivityAdapterListener())
+        binding.recyclerView.layoutManager = LinearLayoutManager(this)
         binding.recyclerView.adapter = adapter
 
-        binding.tvGeoFilesSourcesSummary.text = getGeoFilesSources()
-        binding.layoutGeoFilesSources.setOnClickListener {
-            setGeoFilesSources()
-        }
+        bindSourceRow()
+        bindDownloadRow()
     }
 
     override fun onResume() {
@@ -58,49 +80,69 @@ class UserAssetActivity : HelperBaseActivity() {
         refreshData()
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.menu_asset, menu)
-        return super.onCreateOptionsMenu(menu)
+    // -------------------------------------------------------------- source
+
+    private fun currentSource(): String =
+        MmkvManager.decodeSettingsString(AppConfig.PREF_GEO_FILES_SOURCES)
+            ?: AppConfig.GEO_FILES_SOURCES.first()
+
+    private fun bindSourceRow() {
+        val current = currentSource()
+        RowBinder.bind(
+            root = binding.rowSource.root,
+            title = getString(R.string.asset_source),
+            glyph = R.drawable.ic_globe_24dp,
+            value = current,
+            trailing = RowBinder.Trailing.Glyph(
+                icon = R.drawable.ic_arrow_drop_down,
+                contentDescription = getString(R.string.asset_source_cd),
+            ),
+            onClick = {
+                val sources = AppConfig.GEO_FILES_SOURCES
+                val next = sources[(sources.indexOf(current).coerceAtLeast(0) + 1) % sources.size]
+                MmkvManager.encodeSettings(AppConfig.PREF_GEO_FILES_SOURCES, next)
+                bindSourceRow()
+                refreshData()
+            },
+        )
     }
 
-    // Use when to streamline the option selection
-    override fun onOptionsItemSelected(item: MenuItem): Boolean = when (item.itemId) {
-        R.id.add_file -> showFileChooser().let { true }
-        R.id.add_url -> startActivity(Intent(this, UserAssetUrlActivity::class.java)).let { true }
-        R.id.add_qrcode -> importAssetFromQRcode().let { true }
-        R.id.download_file -> downloadGeoFiles().let { true }
-        else -> super.onOptionsItemSelected(item)
+    /** «Обновить файлы» reports its own progress in place, per §15: a row that is working says so. */
+    private fun bindDownloadRow() {
+        RowBinder.bind(
+            root = binding.rowDownload.root,
+            title = getString(
+                if (downloading) R.string.asset_downloading else R.string.asset_action_download
+            ),
+            subtitle = getString(R.string.asset_action_download_hint),
+            glyph = R.drawable.ic_cloud_download_24dp,
+            trailing = RowBinder.Trailing.None,
+            enabled = !downloading,
+            onClick = if (downloading) null else ({ downloadGeoFiles() }),
+        )
     }
 
-    private fun getGeoFilesSources(): String {
-        return MmkvManager.decodeSettingsString(AppConfig.PREF_GEO_FILES_SOURCES) ?: AppConfig.GEO_FILES_SOURCES.first()
-    }
+    // ------------------------------------------------------------- actions
 
-    private fun setGeoFilesSources() {
-        AlertDialog.Builder(this).setItems(AppConfig.GEO_FILES_SOURCES.toTypedArray()) { _, i ->
-            try {
-                val value = AppConfig.GEO_FILES_SOURCES[i]
-                MmkvManager.encodeSettings(AppConfig.PREF_GEO_FILES_SOURCES, value)
-                binding.tvGeoFilesSourcesSummary.text = value
-            } catch (e: Exception) {
-                LogUtil.e(AppConfig.TAG, "Failed to set geo files sources", e)
+    private fun showAddActions() {
+        EditorActionsSheet(this, getString(R.string.editor_actions_title))
+            .action(R.string.asset_action_add_file, R.drawable.ic_file_24dp) { showFileChooser() }
+            .action(R.string.asset_action_add_url, R.drawable.ic_globe_24dp) {
+                SubPage.open(this, Intent(this, UserAssetUrlActivity::class.java))
             }
-        }.show()
+            .action(R.string.asset_action_add_qrcode, R.drawable.ic_scan_24dp) {
+                importAssetFromQRcode()
+            }
+            .show()
     }
 
     private fun showFileChooser() {
         launchFileChooser { uri ->
-            if (uri == null) {
-                return@launchFileChooser
-            }
+            if (uri == null) return@launchFileChooser
 
             val assetId = Utils.getUuid()
             runCatching {
-                val assetItem = AssetUrlItem(
-                    getCursorName(uri) ?: uri.toString(),
-                    "file"
-                )
-
+                val assetItem = AssetUrlItem(getCursorName(uri) ?: uri.toString(), "file")
                 val assetList = MmkvManager.decodeAssetUrls()
                 if (assetList.any { it.assetUrl.remarks == assetItem.remarks && it.guid != assetId }) {
                     toast(R.string.msg_remark_is_duplicate)
@@ -139,76 +181,86 @@ class UserAssetActivity : HelperBaseActivity() {
         null
     }
 
-    private fun importAssetFromQRcode(): Boolean {
+    private fun importAssetFromQRcode() {
         launchQRCodeScanner { scanResult ->
-            if (scanResult != null) {
-                importAsset(scanResult)
-            }
+            if (scanResult != null) importAsset(scanResult)
         }
-        return true
     }
 
-
-    private fun importAsset(url: String?): Boolean {
-        try {
-            if (!Utils.isValidUrl(url)) {
-                toast(R.string.toast_invalid_url)
-                return false
-            }
-            // Send URL to UserAssetUrlActivity for Processing
-            startActivity(
-                Intent(this, UserAssetUrlActivity::class.java)
-                    .putExtra(UserAssetUrlActivity.ASSET_URL_QRCODE, url)
-            )
-        } catch (e: Exception) {
-            LogUtil.e(AppConfig.TAG, "Failed to import asset from URL", e)
-            return false
+    private fun importAsset(url: String?) {
+        if (!Utils.isValidUrl(url)) {
+            toastError(R.string.toast_invalid_url)
+            return
         }
-        return true
+        SubPage.open(
+            this,
+            Intent(this, UserAssetUrlActivity::class.java)
+                .putExtra(UserAssetUrlActivity.ASSET_URL_QRCODE, url),
+        )
     }
 
     private fun downloadGeoFiles() {
-        refreshData()
-        showLoading()
-        toast(R.string.msg_downloading_content)
+        downloading = true
+        bindDownloadRow()
 
         val proxyUsername = SettingsManager.getSocksUsername()
         val proxyPassword = SettingsManager.getSocksPassword()
         val httpPort = SettingsManager.getHttpPort()
-        lifecycleScope.launch(Dispatchers.IO) {
-            val result = viewModel.downloadGeoFiles(extDir, httpPort, proxyUsername, proxyPassword)
-            withContext(Dispatchers.Main) {
-                if (result.successCount > 0) {
-                    toast(getString(R.string.title_update_config_count, result.successCount))
-                } else {
-                    toast(getString(R.string.toast_failure))
-                }
-                refreshData()
-                hideLoading()
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                viewModel.downloadGeoFiles(extDir, httpPort, proxyUsername, proxyPassword)
             }
+            downloading = false
+            bindDownloadRow()
+            if (result.successCount > 0) {
+                toastSuccess(getString(R.string.title_update_config_count, result.successCount))
+            } else {
+                toastError(R.string.asset_download_failed)
+            }
+            refreshData()
         }
     }
 
-    fun initAssets() {
-        lifecycleScope.launch(Dispatchers.Default) {
-            SettingsManager.initAssets(this@UserAssetActivity, assets)
-            withContext(Dispatchers.Main) {
-                refreshData()
+    private fun initAssets() {
+        lifecycleScope.launch {
+            withContext(Dispatchers.Default) {
+                SettingsManager.initAssets(this@UserAssetActivity, assets)
             }
+            refreshData()
         }
     }
+
+    // -------------------------------------------------------------- states
 
     @SuppressLint("NotifyDataSetChanged")
     fun refreshData() {
-        viewModel.reload(getGeoFilesSources())
+        viewModel.reload(currentSource())
         adapter.notifyDataSetChanged()
+
+        val isEmpty = viewModel.itemCount == 0
+        binding.recyclerView.isVisible = !isEmpty
+        binding.labelFiles.isVisible = !isEmpty
+        if (isEmpty) {
+            EmptyStateBinder.bind(
+                root = binding.emptyState.root,
+                glyph = R.drawable.ic_file_24dp,
+                title = getString(R.string.asset_empty_title),
+                line = getString(R.string.asset_empty_line),
+                actionLabel = getString(R.string.asset_action_download),
+                emphasis = EmptyStateBinder.Emphasis.PRIMARY,
+                onAction = { downloadGeoFiles() },
+            )
+        } else {
+            EmptyStateBinder.hide(binding.emptyState.root)
+        }
     }
 
     private inner class ActivityAdapterListener : BaseAdapterListener {
         override fun onEdit(guid: String, position: Int) {
-            startActivity(
-                Intent(ownerActivity, UserAssetUrlActivity::class.java)
-                    .putExtra("assetId", guid)
+            SubPage.open(
+                this@UserAssetActivity,
+                Intent(this@UserAssetActivity, UserAssetUrlActivity::class.java)
+                    .putExtra("assetId", guid),
             )
         }
 
@@ -218,20 +270,18 @@ class UserAssetActivity : HelperBaseActivity() {
                 ?: return
             val file = extDir.listFiles()?.find { it.name == asset.assetUrl.remarks }
 
-            AlertDialog.Builder(ownerActivity).setMessage(R.string.del_config_comfirm)
-                .setPositiveButton(android.R.string.ok) { _, _ ->
+            AlertDialog.Builder(this@UserAssetActivity)
+                .setMessage(R.string.asset_delete_confirm)
+                .setPositiveButton(R.string.editor_delete) { _, _ ->
                     file?.delete()
                     MmkvManager.removeAssetUrl(guid)
                     initAssets()
                 }
-                .setNegativeButton(android.R.string.cancel) { _, _ ->
-                    // do nothing
-                }
+                .setNegativeButton(R.string.editor_cancel, null)
                 .show()
         }
 
-        override fun onShare(url: String) {
-        }
+        override fun onShare(url: String) {}
 
         override fun onRefreshData() {
             refreshData()

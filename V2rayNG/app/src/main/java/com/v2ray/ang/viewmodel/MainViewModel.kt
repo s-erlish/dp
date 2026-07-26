@@ -150,13 +150,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val icmpProbeGate = Semaphore(12)
 
     /**
+     * Whether [mMsgReceiver] is currently registered on the Application context.
+     *
+     * The registration is bound to this ViewModel's life, not to the Activity's: it is made
+     * against the **Application** context and released in [onCleared], and a configuration change
+     * runs neither. The Activity, however, calls [startListenBroadcast] again on every recreate,
+     * so without this flag the same receiver instance was registered N times — and Android
+     * delivers to a receiver once per registration, so after ten rotations every service
+     * broadcast, including the speed update that arrives about once a second while connected, was
+     * handled ten times.
+     */
+    private var broadcastRegistered = false
+
+    /**
      * Refer to the official documentation for [registerReceiver](https://developer.android.com/reference/androidx/core/content/ContextCompat#registerReceiver(android.content.Context,android.content.BroadcastReceiver,android.content.IntentFilter,int):
      * `registerReceiver(Context, BroadcastReceiver, IntentFilter, int)`.
+     *
+     * Safe to call on every Activity recreate, and meant to be: the handshake below is what makes
+     * a running service re-announce its state to the fresh Activity, so it is sent every time
+     * whether or not a registration was needed.
      */
     fun startListenBroadcast() {
         isRunning.value = false
-        val mFilter = IntentFilter(AppConfig.BROADCAST_ACTION_ACTIVITY)
-        ContextCompat.registerReceiver(getApplication(), mMsgReceiver, mFilter, Utils.receiverFlags())
+        if (!broadcastRegistered) {
+            val mFilter = IntentFilter(AppConfig.BROADCAST_ACTION_ACTIVITY)
+            ContextCompat.registerReceiver(getApplication(), mMsgReceiver, mFilter, Utils.receiverFlags())
+            broadcastRegistered = true
+        }
         MessageUtil.sendMsg2Service(getApplication(), AppConfig.MSG_REGISTER_CLIENT, "")
     }
 
@@ -164,7 +184,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Called when the ViewModel is cleared.
      */
     override fun onCleared() {
-        getApplication<AngApplication>().unregisterReceiver(mMsgReceiver)
+        if (broadcastRegistered) {
+            broadcastRegistered = false
+            getApplication<AngApplication>().unregisterReceiver(mMsgReceiver)
+        }
         // The real-ping batch is deliberately left alone: it is a foreground service with its own
         // notification and is meant to outlive this screen.
         cancelMeasurementsInFlight()

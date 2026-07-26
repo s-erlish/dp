@@ -1,254 +1,82 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<!--
+  ============================================================================
+  A-29  settings/data - Данные и резервные копии.  H3 · R1.
+  24-tab-conformance.md A-29.
+  ============================================================================
+
+  Four hand-rolled card rows, two of which opened an untranslated
+  `AlertDialog.setItems` («Local» / «WebDAV») to ask WHERE - a two-item picker dialog
+  §7.4 bans, and the only English left on a Russian screen.
+
+  The destination is the row now: «Создать копию на устройстве» and «Выгрузить в
+  облако» are separate, named, and each says what it does. That also lets the cloud
+  group state its own precondition - a row that cannot work yet is drawn disabled at
+  0.38 with the reason in its subtitle (R6), instead of failing with a toast after
+  the user taps it.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:attr/colorBackground"
-    android:clipToPadding="false"
     android:fitsSystemWindows="true"
-    android:paddingBottom="16dp"
-    android:scrollbars="none">
+    android:orientation="vertical"
+    tools:context=".ui.BackupActivity">
 
-    <LinearLayout
+    <include
+        android:id="@+id/toolbar"
+        layout="@layout/view_toolbar" />
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/main_content"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/space_32"
+        android:scrollbars="none">
 
-        <TextView
-            style="@style/SettingsSectionLabel"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/backup_section_local" />
+            android:orientation="vertical">
 
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="12dp"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
+            <TextView
+                style="@style/SettingsSectionLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:text="@string/backup_grp_device" />
 
-                <LinearLayout
-                    android:id="@+id/layout_backup"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="60dp"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="10dp">
+            <include
+                android:id="@+id/row_backup_local"
+                layout="@layout/view_row" />
 
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_icon_blue">
+            <include
+                android:id="@+id/row_restore_local"
+                layout="@layout/view_row" />
 
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_backup_24dp"
-                            app:tint="?attr/iconTintBlue" />
-                    </FrameLayout>
+            <include
+                android:id="@+id/row_share"
+                layout="@layout/view_row" />
 
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_weight="1"
-                        android:text="@string/title_configuration_backup"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
-                    android:background="?attr/colorOutlineVariant" />
-
-                <LinearLayout
-                    android:id="@+id/layout_share"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="60dp"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="10dp">
-
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_icon_green">
-
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_share_24dp"
-                            app:tint="?attr/iconTintGreen" />
-                    </FrameLayout>
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_weight="1"
-                        android:text="@string/title_configuration_share"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
-                    android:background="?attr/colorOutlineVariant" />
-
-                <LinearLayout
-                    android:id="@+id/layout_restore"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="60dp"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="10dp">
-
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_icon_orange">
-
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_restore_24dp"
-                            app:tint="?attr/iconTintOrange" />
-                    </FrameLayout>
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_weight="1"
-                        android:text="@string/title_configuration_restore"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-
-                </LinearLayout>
-
-            </LinearLayout>
-
-        </com.google.android.material.card.MaterialCardView>
-
-        <TextView
-            style="@style/SettingsSectionLabel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/backup_section_cloud" />
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="12dp"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
-                android:id="@+id/layout_webdav_config_setting"
+            <TextView
+                style="@style/SettingsSectionLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="?attr/selectableItemBackground"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center_vertical"
-                android:minHeight="60dp"
-                android:orientation="horizontal"
-                android:paddingHorizontal="14dp"
-                android:paddingVertical="10dp">
+                android:text="@string/backup_grp_cloud" />
 
-                <FrameLayout
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:background="@drawable/bg_icon_purple">
+            <include
+                android:id="@+id/row_webdav_settings"
+                layout="@layout/view_row" />
 
-                    <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
-                        android:layout_gravity="center"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_settings_24dp"
-                        app:tint="?attr/iconTintPurple" />
-                </FrameLayout>
+            <include
+                android:id="@+id/row_backup_webdav"
+                layout="@layout/view_row" />
 
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="14dp"
-                    android:layout_weight="1"
-                    android:text="@string/title_webdav_config_setting"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="16sp" />
-
-                <ImageView
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
-                    android:importantForAccessibility="no"
-                    app:srcCompat="@drawable/ic_chevron_right"
-                    app:tint="?attr/colorOnSurfaceVariant" />
-
-            </LinearLayout>
-
-        </com.google.android.material.card.MaterialCardView>
-
-    </LinearLayout>
-
-</ScrollView>
+            <include
+                android:id="@+id/row_restore_webdav"
+                layout="@layout/view_row" />
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

@@ -1,72 +1,108 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  ============================================================================
+  servers/server/{guid} - Цепочка прокси.  H3 · R4.
+  24-tab-conformance.md A-13.
+  ============================================================================
+
+  Deleted here: the `FloatingActionButton` - «the app has one FAB and it does not
+  earn a floating layer» (A-13) - which also sat INSIDE the scrolling column, so it
+  scrolled away from the list it belonged to. Adding a step is the header's one
+  trailing action now.
+
+  Save and delete were toolbar menu items on the ActionBar A-38 removes; they are the
+  Primary.Tall CTA and a Row.Destructive. And the screen finally has an empty state:
+  a chain with no steps used to draw a section header above nothing.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?android:attr/colorBackground"
     android:fitsSystemWindows="true"
+    android:orientation="vertical"
     tools:context=".ui.ServerProxyChainActivity">
+
+    <include
+        android:id="@+id/toolbar"
+        layout="@layout/view_toolbar" />
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/main_content"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/space_32"
+        android:scrollbars="none">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <LinearLayout
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_margin="@dimen/padding_spacing_dp16"
-                android:orientation="vertical">
+                android:layout_marginTop="@dimen/space_24"
+                android:paddingStart="@dimen/screen_gutter"
+                android:paddingEnd="@dimen/screen_gutter"
+                android:text="@string/srv_name_label"
+                android:textAppearance="@style/TextAppearance.App.Title.Medium" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/server_lab_remarks"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Subhead" />
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_remarks"
+                style="@style/Widget.Departament.TextField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/screen_gutter"
+                android:layout_marginTop="@dimen/space_8"
+                android:layout_marginEnd="@dimen/screen_gutter">
 
-                <EditText
+                <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_remarks"
+                    style="@style/Widget.Departament.TextField.EditText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/padding_spacing_dp8"
-                    android:hint="@string/server_lab_remarks"
-                    android:inputType="text" />
-            </LinearLayout>
+                    android:imeOptions="actionDone"
+                    android:inputType="text"
+                    android:maxLines="1" />
+            </com.google.android.material.textfield.TextInputLayout>
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/label_members"
+                style="@style/SettingsSectionLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_margin="@dimen/padding_spacing_dp16"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/server_proxy_chain_members"
-                    android:textAppearance="@style/TextAppearance.AppCompat.Subhead" />
-            </LinearLayout>
+                android:text="@string/srv_section_members" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/recycler_proxy_chain_members"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:nestedScrollingEnabled="false"
-                tools:listitem="@layout/item_recycler_proxy_chain_member" />
+                tools:listitem="@layout/view_row" />
 
-            <com.google.android.material.floatingactionbutton.FloatingActionButton
-                android:id="@+id/fab_add_proxy_chain_member"
-                android:layout_width="wrap_content"
+            <include
+                android:id="@+id/empty_state"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="end"
-                android:layout_margin="@dimen/padding_spacing_dp16"
-                android:contentDescription="@string/menu_item_add_config"
-                android:src="@drawable/ic_add_24dp" />
+                android:layout_marginTop="@dimen/space_24"
+                layout="@layout/view_empty_state" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_save"
+                style="@style/Widget.Departament.Button.Primary.Tall"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/screen_gutter"
+                android:layout_marginTop="@dimen/space_24"
+                android:layout_marginEnd="@dimen/screen_gutter"
+                android:text="@string/editor_save" />
+
+            <include
+                android:id="@+id/row_delete"
+                layout="@layout/view_row" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
-</RelativeLayout>
-
+</LinearLayout>

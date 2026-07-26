@@ -1,86 +1,112 @@
 package com.v2ray.ang.ui
 
 import android.os.Bundle
-import android.text.TextUtils
-import android.view.Menu
-import android.view.MenuItem
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.isVisible
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityUserAssetUrlBinding
 import com.v2ray.ang.dto.entities.AssetUrlItem
-import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.ui.component.RowBinder
+import com.v2ray.ang.ui.component.SubPage
+import com.v2ray.ang.ui.component.ToolbarBinder
+import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.Utils
 import java.io.File
 
+/**
+ * A-26 - the geo-file form. H3 header, R4 rhythm.
+ *
+ * Save and delete were toolbar menu items on the ActionBar A-38 removes; they are the screen's one
+ * Primary.Tall CTA and a `Row.Destructive` now. The three validation failures - empty name, empty
+ * URL, duplicate name - were three toasts that appeared over the form and named the field in
+ * English («remarks»); each is now an error under the field it belongs to, and focus moves there.
+ */
 class UserAssetUrlActivity : BaseActivity() {
-    // Receive QRcode URL from UserAssetActivity
+
     companion object {
         const val ASSET_URL_QRCODE = "ASSET_URL_QRCODE"
     }
 
     private val binding by lazy { ActivityUserAssetUrlBinding.inflate(layoutInflater) }
-
-    private var del_config: MenuItem? = null
-    private var save_config: MenuItem? = null
-
     private val extDir by lazy { File(Utils.userAssetPath(this)) }
     private val editAssetId by lazy { intent.getStringExtra("assetId").orEmpty() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
-        //setContentView(binding.root)
-        setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = getString(R.string.title_user_asset_add_url))
+        setContentView(binding.root)
 
         val assetItem = MmkvManager.decodeAsset(editAssetId)
+
+        ToolbarBinder.bind(
+            root = binding.toolbar.root,
+            title = getString(
+                if (assetItem == null) R.string.asset_url_title_new else R.string.asset_url_title_edit
+            ),
+            activity = this,
+        )
+        ToolbarBinder.attachTo(binding.toolbar.root, binding.mainContent)
+
         val assetUrlQrcode = intent.getStringExtra(ASSET_URL_QRCODE)
-        val assetNameQrcode = File(assetUrlQrcode.toString()).name
         when {
-            assetItem != null -> bindingAsset(assetItem)
+            assetItem != null -> {
+                binding.etRemarks.text = Utils.getEditable(assetItem.remarks)
+                binding.etUrl.text = Utils.getEditable(assetItem.url)
+            }
+
             assetUrlQrcode != null -> {
-                binding.etRemarks.setText(assetNameQrcode)
+                binding.etRemarks.setText(File(assetUrlQrcode).name)
                 binding.etUrl.setText(assetUrlQrcode)
             }
 
-            else -> clearAsset()
+            else -> {
+                binding.etRemarks.text = null
+                binding.etUrl.text = null
+            }
         }
+
+        binding.btnSave.onSingleClick { saveAsset() }
+
+        RowBinder.bind(
+            root = binding.rowDelete.root,
+            title = getString(R.string.asset_url_delete),
+            tone = RowBinder.RowTone.DESTRUCTIVE,
+            trailing = RowBinder.Trailing.None,
+            onClick = { confirmDelete() },
+        )
+        binding.rowDelete.root.isVisible = editAssetId.isNotEmpty()
     }
 
-    /**
-     * bingding seleced asset config
-     */
-    private fun bindingAsset(assetItem: AssetUrlItem): Boolean {
-        binding.etRemarks.text = Utils.getEditable(assetItem.remarks)
-        binding.etUrl.text = Utils.getEditable(assetItem.url)
-        return true
-    }
+    private fun saveAsset() {
+        val remarks = binding.etRemarks.text.toString().trim()
+        val url = binding.etUrl.text.toString().trim()
 
-    /**
-     * clear or init asset config
-     */
-    private fun clearAsset(): Boolean {
-        binding.etRemarks.text = null
-        binding.etUrl.text = null
-        return true
-    }
+        binding.tilRemarks.error = null
+        binding.tilUrl.error = null
 
-    /**
-     * save asset config
-     */
-    private fun saveServer(): Boolean {
+        if (remarks.isEmpty()) {
+            binding.tilRemarks.error = getString(R.string.asset_name_required)
+            binding.etRemarks.requestFocus()
+            return
+        }
+        if (url.isEmpty()) {
+            binding.tilUrl.error = getString(R.string.asset_url_required)
+            binding.etUrl.requestFocus()
+            return
+        }
+
         var assetItem = MmkvManager.decodeAsset(editAssetId)
         var assetId = editAssetId
         if (assetItem != null) {
-            // remove file associated with the asset
+            // The file on disk is named after the OLD remark, so renaming the asset orphans it.
             val file = extDir.resolve(assetItem.remarks)
             if (file.exists()) {
-                try {
-                    file.delete()
-                } catch (e: Exception) {
-                    LogUtil.e(AppConfig.TAG, "Failed to delete asset file: ${file.path}", e)
+                runCatching { file.delete() }.onFailure {
+                    LogUtil.e(AppConfig.TAG, "Failed to delete asset file: ${file.path}", it)
                 }
             }
         } else {
@@ -88,73 +114,28 @@ class UserAssetUrlActivity : BaseActivity() {
             assetItem = AssetUrlItem()
         }
 
-        assetItem.remarks = binding.etRemarks.text.toString()
-        assetItem.url = binding.etUrl.text.toString()
-
-        // check remarks unique
-        val assetList = MmkvManager.decodeAssetUrls()
-        if (assetList.any { it.assetUrl.remarks == assetItem.remarks && it.guid != assetId }) {
-            toast(R.string.msg_remark_is_duplicate)
-            return false
+        if (MmkvManager.decodeAssetUrls().any { it.assetUrl.remarks == remarks && it.guid != assetId }) {
+            binding.tilRemarks.error = getString(R.string.asset_name_duplicate)
+            binding.etRemarks.requestFocus()
+            return
         }
 
-
-        if (TextUtils.isEmpty(assetItem.remarks)) {
-            toast(R.string.sub_setting_remarks)
-            return false
-        }
-        if (TextUtils.isEmpty(assetItem.url)) {
-            toast(R.string.title_url)
-            return false
-        }
-
+        assetItem.remarks = remarks
+        assetItem.url = url
         MmkvManager.encodeAsset(assetId, assetItem)
         toastSuccess(R.string.toast_success)
-        finish()
-        return true
+        SubPage.close(this)
     }
 
-    /**
-     * save server config
-     */
-    private fun deleteServer(): Boolean {
-        if (editAssetId.isNotEmpty()) {
-            AlertDialog.Builder(this).setMessage(R.string.del_config_comfirm)
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    MmkvManager.removeAssetUrl(editAssetId)
-                    finish()
-                }
-                .setNegativeButton(android.R.string.cancel) { _, _ ->
-                    // do nothing
-                }
-                .show()
-        }
-        return true
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.action_server, menu)
-        del_config = menu.findItem(R.id.del_config)
-        save_config = menu.findItem(R.id.save_config)
-
-        if (editAssetId.isEmpty()) {
-            del_config?.isVisible = false
-        }
-
-        return super.onCreateOptionsMenu(menu)
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
-        R.id.del_config -> {
-            deleteServer()
-            true
-        }
-
-        R.id.save_config -> {
-            saveServer()
-            true
-        }
-
-        else -> super.onOptionsItemSelected(item)
+    private fun confirmDelete() {
+        if (editAssetId.isEmpty()) return
+        AlertDialog.Builder(this)
+            .setMessage(R.string.asset_delete_confirm)
+            .setPositiveButton(R.string.editor_delete) { _, _ ->
+                MmkvManager.removeAssetUrl(editAssetId)
+                SubPage.close(this)
+            }
+            .setNegativeButton(R.string.editor_cancel, null)
+            .show()
     }
 }

@@ -46,15 +46,42 @@ object AccountSession {
     }
 
     /**
-     * Clear session + managed subscriptions and flip to LoggedOut.
+     * The token is dead: end the session and leave everything else alone.
      *
-     * Called ONLY on an explicit user logout, or when the identity endpoint (getMe) confirms the
-     * JWT is dead with a 401. It must never be triggered by a 403 or by a 401 on any other
-     * endpoint (e.g. a background subscription-URL fetch or a per-action permission failure).
+     * Called when the identity endpoint (getMe) answers 401 — and only there; a 403, or a 401 from
+     * any other endpoint, is a per-action failure and must not touch the session at all.
+     *
+     * This deliberately does NOT remove the imported subscriptions. A 7-day JWT expiring is the
+     * most ordinary event in this app's life, and it says nothing about whether the user still has
+     * a подписка: the subscription URLs are Remnawave URLs with their own credentials, they keep
+     * refreshing, and the серверы keep working while the user is signed out. Wiping them here is
+     * how one visit to the Аккаунт tab used to delete every сервер on the device — including the
+     * selected one — for a token that simply timed out.
+     *
+     * Signing back in re-imports through the kept uuid->guid map, so the same провайдеры are
+     * updated in place rather than duplicated. Detaching the account's subscriptions is what
+     * [wipe] is for, and only an explicit sign-out asks for that.
+     */
+    fun endSession() {
+        AuthTokenStore.clearSession()
+        _state.value = AccountState.LoggedOut
+    }
+
+    /**
+     * Clear session + managed subscriptions and flip to LoggedOut. **Explicit user logout only.**
+     *
+     * Removing the subscriptions is the point here: the user asked to detach this device from the
+     * account, so the account's провайдеры go with it. Everything the user added by hand stays.
+     * An expired token takes [endSession] instead.
+     *
+     * Throws when the token could not actually be erased — the one outcome a sign-out must never
+     * paper over. The store is unopenable in that case, so nothing was removed either (the
+     * managed-guid map read back empty) and the session is untouched and the action retryable,
+     * which is exactly what the caller's failure branch promises the user.
      */
     fun wipe() {
         subs.removeAllManaged()
-        AuthTokenStore.clear()
+        check(AuthTokenStore.clear()) { "auth store unavailable: the session was not cleared" }
         _state.value = AccountState.LoggedOut
     }
 }

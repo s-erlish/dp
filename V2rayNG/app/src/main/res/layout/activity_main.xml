@@ -451,43 +451,6 @@
 
             </androidx.core.widget.NestedScrollView>
 
-            <!-- ==================== SERVERS TAB ==================== -->
-            <LinearLayout
-                android:id="@+id/group_servers"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="vertical"
-                android:visibility="gone">
-
-                <include
-                    android:id="@+id/layout_servers_header"
-                    layout="@layout/layout_servers_header"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <FrameLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1">
-
-                    <androidx.recyclerview.widget.RecyclerView
-                        android:id="@+id/rv_servers"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:clipToPadding="false"
-                        android:scrollbars="vertical" />
-
-                    <include
-                        android:id="@+id/layout_empty"
-                        layout="@layout/layout_servers_empty"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:visibility="gone" />
-
-                </FrameLayout>
-
-            </LinearLayout>
-
             <!-- ==================== SETTINGS TAB ==================== -->
             <include
                 android:id="@+id/group_settings"
@@ -495,12 +458,15 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />
 
-            <!-- ==================== ACCOUNT TAB ==================== -->
-            <!-- Host for AccountFragment (attached lazily the first time the tab is opened). A
-                 plain FrameLayout, not a FragmentContainerView, so the fragment is added manually
-                 and the tab only exists while signed in. -->
-            <FrameLayout
-                android:id="@+id/group_account"
+            <!-- ==================== TAB HOST (fragment tabs) ==================== -->
+            <!-- The shell's fragment container: one fragment per bottom-nav destination, added
+                 lazily the first time its tab is opened and then kept alive (hide/show, never
+                 replace) so scroll position and in-flight state survive a tab switch.
+                 Today it hosts Серверы (ServersFragment) and Аккаунт (AccountFragment); Главная
+                 and Настройки are still the sibling view groups above and move here in their
+                 own stages. -->
+            <androidx.fragment.app.FragmentContainerView
+                android:id="@+id/tab_host"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:visibility="gone" />

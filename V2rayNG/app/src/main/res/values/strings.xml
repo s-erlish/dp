@@ -3,8 +3,12 @@
     <string name="app_name" translatable="false">departament</string>
     <!-- Servers redesign (S3) -->
     <string name="title_servers">Серверы</string>
-    <string name="servers_count">%d серверов</string>
-    <string name="providers_count">%d провайдеров</string>
+    <!-- Joined with " · " into one subtitle at ServersFragment.updateServersChrome(), so the second
+         half stays lower-case. The "noun: %d" form is deliberate: it is grammatically correct for
+         every count, which "%d серверов" is not (it reads «1 серверов»), and the call site uses
+         getString(), not getQuantityString(), so plurals cannot be applied here. -->
+    <string name="servers_count">Серверов: %d</string>
+    <string name="providers_count">провайдеров: %d</string>
     <string name="search_hint">Поиск серверов…</string>
     <string name="servers_empty_title">Нет серверов</string>
     <string name="servers_add_clipboard">Добавить из буфера</string>
@@ -353,7 +357,9 @@
     <string name="sub_website">Website</string>
     <string name="sub_telegram">Telegram</string>
     <string name="memory_app_usage">App memory</string>
-    <string name="memory_value" translatable="false">%1$d MB · %2$s</string>
+    <!-- %1$d is megabytes, %2$s one of memory_normal/elevated/high. The unit abbreviation is
+         translated, so this string must stay translatable. -->
+    <string name="memory_value">%1$d MB · %2$s</string>
     <string name="memory_normal">Normal</string>
     <string name="memory_elevated">Elevated</string>
     <string name="memory_high">High</string>
@@ -511,7 +517,12 @@
         <item>Proxy only</item>
     </string-array>
 
-    <string-array name="browser_dialer_mode">
+    <!-- WARNING: ServerActivity uses this array as BOTH the spinner labels and the persisted
+         values (ServerActivity.kt:428,595 → ProfileItem.browserDialerMode), and
+         CoreServiceManager.kt:275,278 compares that field against the literals "OkHttp"/"WebView".
+         Translating an item silently disables browser dialer. Keep it untranslated until
+         ServerActivity is switched over to the parallel @array/browser_dialer_mode_value. -->
+    <string-array name="browser_dialer_mode" translatable="false">
         <item>Disable</item>
         <item>OkHttp</item>
         <item>WebView</item>
@@ -580,7 +591,7 @@
     <string name="settings_dns">DNS</string>
     <string name="settings_dns_hint">Адрес DNS-сервера</string>
     <string name="settings_ping_method">Пинг</string>
-    <string name="settings_ping_method_real">Реальная задержка (через ядро)</string>
+    <string name="settings_ping_method_real">Реальная задержка (через туннель)</string>
     <string name="settings_ping_method_tcp">TCP-соединение</string>
     <string name="settings_ping_method_http">HTTP-запрос</string>
     <string name="settings_ping_method_icmp">ICMP (системный пинг)</string>
@@ -614,4 +625,7 @@
     <string name="server_selected_reconnect_prompt">Selected %1$s. Reconnect to it now?</string>
     <string name="server_selected_reconnect_prompt_generic">Server selected. Reconnect to it now?</string>
     <string name="server_selected_reconnect_action">Reconnect</string>
+    <string name="settings_advanced">Расширенные настройки</string>
+    <string name="settings_logs">Журнал</string>
+    <string name="settings_check_update">Проверить обновления</string>
 </resources>

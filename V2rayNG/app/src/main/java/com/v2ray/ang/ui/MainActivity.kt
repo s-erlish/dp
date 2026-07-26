@@ -22,9 +22,11 @@ import android.widget.EditText
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.annotation.IdRes
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.Fragment
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.MenuCompat
 import androidx.core.view.ViewCompat
@@ -32,7 +34,6 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
-import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.color.MaterialColors
@@ -104,14 +105,141 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class MainActivity : HelperBaseActivity() {
+/**
+ * The four bottom-navigation destinations, in bar order.
+ *
+ * This is the shared vocabulary between the shell and its tab fragments. [navId] is the bar item's
+ * view id — the same value [MainActivity] persists across a theme/language recreate — and [tag] is
+ * the `FragmentManager` tag the tab's fragment is added under, which is how a restored instance is
+ * found again on recreate instead of being rebuilt from scratch.
+ *
+ * A tab is a fragment as soon as its stage of the shell split lands. Until then it is still one of
+ * the sibling view groups in `activity_main.xml`; both forms are selected through the same
+ * [MainHost.selectTab] call, so a caller never has to know which.
+ */
+enum class MainTab(@get:IdRes val navId: Int) {
+    HOME(R.id.nav_home),
+    SERVERS(R.id.nav_servers),
+    ACCOUNT(R.id.nav_account),
+    SETTINGS(R.id.nav_settings),
+    ;
+
+    /** FragmentManager tag for this tab's fragment. Stable across process death. */
+    val tag: String get() = "tab:$name"
+
+    companion object {
+        /** The tab a bottom-nav item id belongs to, or null for an id that is not a tab. */
+        fun fromNavId(@IdRes navId: Int): MainTab? =
+            values().firstOrNull { it.navId == navId }
+    }
+}
+
+/**
+ * What a tab fragment is allowed to ask of the shell.
+ *
+ * [MainActivity] keeps the window, the insets, the bottom bar, the connect state machine and the
+ * service binding; a tab owns its own content and reaches the shell only through this interface —
+ * never by casting to `MainActivity` and calling into its internals. Shared *state* does not come
+ * through here: every tab reads the one `MainViewModel` scoped to the activity
+ * (`BaseFragment.mainViewModel`).
+ *
+ * When a later stage needs something the shell owns and this interface does not expose, add it
+ * here rather than widening the cast.
+ */
+interface MainHost {
+
+    /** The tab currently on screen. */
+    val selectedTab: MainTab
+
+    /** Switches tabs, exactly as tapping the bar item does (repaint, fade-through, haptic). */
+    fun selectTab(tab: MainTab)
+
+    /**
+     * Connect or disconnect, whichever the current tunnel state calls for — the hero disc's own
+     * action, including the VPN-permission prompt, the connect watchdog and the status pill.
+     */
+    fun toggleConnection()
+
+    /**
+     * Stops the running tunnel and starts it again on the currently selected server. Waits for a
+     * real stopped state rather than a fixed delay; see `MainActivity.restartV2Ray`.
+     */
+    fun restartConnection()
+
+    /** The shell's transient status pill («Подключение…», «Отключено», …). */
+    fun showStatus(text: CharSequence)
+
+    /**
+     * Bottom padding a tab's scrolling list needs so its last row clears the overlaid bottom nav:
+     * the system inset plus the bar itself plus breathing room. The shell computes it once, from
+     * the window insets, and every list that needs it asks for it here rather than re-deriving the
+     * same figure from its own inset listener.
+     */
+    val listBottomInset: Int
+
+    /**
+     * The per-server row actions — select, edit, share, remove. ONE instance for every server list
+     * in the app, because a row must behave the same in the Серверы tab and in the Главная preview,
+     * which are two adapters over the same servers.
+     */
+    val serverActions: MainAdapterListener
+
+    /** Opens the server-actions sheet for one server (the row long-press entry point). */
+    fun showServerActions(guid: String)
+
+    /**
+     * Opens the add-source popup anchored to [anchor]. [withListActions] adds the whole-list group
+     * (sort / export / the three bulk deletes) — only the Серверы header passes it.
+     */
+    fun showAddMenu(anchor: View, withListActions: Boolean)
+
+    /** «Обновить подписки»: re-fetches every subscription and reloads the list. */
+    fun refreshSubscriptions()
+
+    /** «Проверить задержку» across the whole list, with the recovery actions for an empty one. */
+    fun startLatencyCheckAll()
+
+    /** Imports whatever the clipboard holds: a share link, a subscription URL or a raw config. */
+    fun importFromClipboard()
+
+    /** Opens the QR scanner and imports what it reads. */
+    fun importFromQrCode()
+}
+
+class MainActivity : HelperBaseActivity(), MainHost {
     private val binding by lazy {
         ActivityMainBinding.inflate(layoutInflater)
     }
 
     val mainViewModel: MainViewModel by viewModels()
-    private lateinit var serversAdapter: MainRecyclerAdapter
     private lateinit var homeAdapter: MainRecyclerAdapter
+
+    /**
+     * The Серверы tab's fragment, or null until that tab has been opened for the first time — tab
+     * fragments are added lazily (see [syncTabFragments]). Looked up by tag on every access rather
+     * than cached in a field, so the instance the FragmentManager restores after a theme/language
+     * recreate is found too.
+     */
+    private val serversFragment: ServersFragment?
+        get() = supportFragmentManager.findFragmentByTag(MainTab.SERVERS.tag) as? ServersFragment
+
+    /**
+     * The Серверы tab's adapter, or null while that tab has no view.
+     *
+     * The shell still owns the selected server, because Главная renders the same servers from
+     * [homeAdapter] and one selection has to reach both lists. That is the only reason this reaches
+     * into a tab at all; when Главная moves to its own fragment the two adapters go with it.
+     */
+    private val serversAdapter: MainRecyclerAdapter?
+        get() = serversFragment?.listAdapter
+
+    /**
+     * The one row-action listener shared by every server list (see [MainHost.serverActions]).
+     */
+    private val adapterListener: ActivityAdapterListener by lazy { ActivityAdapterListener() }
+
+    /** Last computed bottom-nav padding for a tab's scrolling list; see [MainHost.listBottomInset]. */
+    private var navListPadding = 0
     // Home server list collapse state, toggled by the meta-bar chevron.
     private var homeListCollapsed = false
 
@@ -164,9 +292,9 @@ class MainActivity : HelperBaseActivity() {
     private val durStagger get() = resources.getInteger(R.integer.motion_stagger).toLong()
 
     // The reveal stagger plays once per list, on first populated bind — never again on
-    // scroll or a later notify (see revealListStagger).
+    // scroll or a later notify (see revealListStagger). The Серверы tab keeps its own flag,
+    // next to the list it belongs to.
     private var homeListRevealed = false
-    private var serversListRevealed = false
 
     // Auto-fallback: one-shot post-connect health check that switches to the fastest
     // working server if the current tunnel doesn't actually pass traffic.
@@ -283,7 +411,7 @@ class MainActivity : HelperBaseActivity() {
 
         // All servers are shown in one flat, provider-grouped list (no subscription tabs).
         mainViewModel.subscriptionId = ""
-        setupServerLists()
+        setupHomeServerList()
 
         setupBottomNav()
         // Keep the user on the tab they were on when the activity is recreated
@@ -315,9 +443,8 @@ class MainActivity : HelperBaseActivity() {
         // Scrolling Home "+" opens the same add menu the toolbar "+" used (menu_main via PopupMenu).
         binding.btnHomeAdd.setOnClickListener { showImportMenu(it) }
 
-        setupServersHeader()
         setupHomeMetaPager()
-        setupEmptyState()
+        setupHomeEmptyState()
         setupAccountHeader()
         setupSettings()
         setupViewModel()
@@ -362,8 +489,8 @@ class MainActivity : HelperBaseActivity() {
         binding.navHome.setOnClickListener { selectNav(R.id.nav_home) }
         binding.navServers.setOnClickListener { selectNav(R.id.nav_servers) }
         binding.navSettings.setOnClickListener { selectNav(R.id.nav_settings) }
-        // The Account item is now a real in-place content tab (AccountFragment), selected like the
-        // others; its content is attached lazily the first time it is opened (see showTab).
+        // The Account item is a real in-place content tab (AccountFragment), selected like the
+        // others; its fragment is attached lazily the first time it is opened (see syncTabFragments).
         binding.navAccount.setOnClickListener { selectNav(R.id.nav_account) }
         selectNav(R.id.nav_home)
     }
@@ -377,6 +504,40 @@ class MainActivity : HelperBaseActivity() {
         selectedNavId = navId
         updateNavSelection(previous)
         showTab(navId, previous)
+    }
+
+    // ==================== MainHost ====================
+
+    override val selectedTab: MainTab
+        get() = MainTab.fromNavId(selectedNavId) ?: MainTab.HOME
+
+    override fun selectTab(tab: MainTab) = selectNav(tab.navId)
+
+    override fun toggleConnection() = handleFabAction()
+
+    override fun restartConnection() = restartV2Ray()
+
+    override fun showStatus(text: CharSequence) = showStatusToast(text)
+
+    override val listBottomInset: Int
+        get() = navListPadding
+
+    override val serverActions: MainAdapterListener
+        get() = adapterListener
+
+    override fun showAddMenu(anchor: View, withListActions: Boolean) =
+        showImportMenu(anchor, withListActions)
+
+    override fun refreshSubscriptions() {
+        importConfigViaSub()
+    }
+
+    override fun importFromClipboard() {
+        importClipboard()
+    }
+
+    override fun importFromQrCode() {
+        importQRcode()
     }
 
     /**
@@ -459,27 +620,87 @@ class MainActivity : HelperBaseActivity() {
         }
     }
 
-    // The Account tab's fragment is attached lazily (and only once) the first time the tab is
-    // opened, so signed-out users never pay for it.
-    private var accountFragmentAdded = false
+    /**
+     * The fragment that owns [tab], or null while that tab is still one of the sibling view groups
+     * in `activity_main.xml`.
+     *
+     * Called ONLY when the FragmentManager has no instance under [MainTab.tag] — a tab is built
+     * once per process and then kept, so this is not a place to pass per-open arguments.
+     *
+     * Аккаунт and Серверы have moved. Moving Главная or Настройки is: add the branch here, and
+     * point that tab's [tabGroup] entry at `binding.tabHost`.
+     */
+    private fun createTabFragment(tab: MainTab): Fragment? = when (tab) {
+        MainTab.ACCOUNT -> AccountFragment()
+        MainTab.SERVERS -> ServersFragment()
+        MainTab.HOME, MainTab.SETTINGS -> null
+    }
 
-    /** The tab-content group view for a nav id (null for an unknown id). */
+    /**
+     * Brings [navId]'s fragment on screen and takes the others off it, **keeping every instance
+     * added**: a tab is `add`ed once, then only ever hidden and shown again.
+     *
+     * That is the whole reason this is not `replace()`. A replaced fragment is destroyed and
+     * rebuilt on the way back, which throws away scroll position, a half-typed field and any
+     * request still in flight; hide/show leaves the view hierarchy and the fragment's lifecycle
+     * state untouched, so returning to a tab returns to it exactly as it was left. Hidden
+     * fragments stay RESUMED, which is also what the previous "toggle the container's visibility"
+     * code did, so nothing that was running keeps running any differently.
+     *
+     * On a theme/language recreate the FragmentManager restores each tab's fragment (and its
+     * hidden flag) under the same tag before this runs, so the lookup finds the restored instance
+     * and [createTabFragment] is never called for it.
+     */
+    private fun syncTabFragments(navId: Int) {
+        val fm = supportFragmentManager
+        // After onSaveInstanceState a commit is illegal; the restored activity will re-run this
+        // from its own onCreate, so there is nothing to lose by skipping it.
+        if (fm.isStateSaved) return
+        val tx = fm.beginTransaction()
+        var changed = false
+        for (candidate in MainTab.values()) {
+            val existing = fm.findFragmentByTag(candidate.tag)
+            if (candidate.navId == navId) {
+                if (existing == null) {
+                    val fragment = createTabFragment(candidate) ?: continue
+                    tx.add(R.id.tab_host, fragment, candidate.tag)
+                    changed = true
+                } else if (existing.isHidden) {
+                    tx.show(existing)
+                    changed = true
+                }
+            } else if (existing != null && !existing.isHidden) {
+                tx.hide(existing)
+                changed = true
+            }
+        }
+        // commitNow, not commit: the tab swap below reads and animates the container in this same
+        // frame, and a posted transaction would show it empty for one frame first.
+        if (changed) tx.commitNow()
+    }
+
+    /**
+     * The tab-content view for a nav id (null for an unknown id): either the tab's own sibling
+     * group, or the shared fragment container for a tab that has already been moved to a fragment.
+     */
     private fun tabGroup(navId: Int): View? = when (navId) {
         R.id.nav_home -> binding.groupHome
-        R.id.nav_servers -> binding.groupServers
+        R.id.nav_servers -> binding.tabHost
         R.id.nav_settings -> binding.groupSettings.root
-        R.id.nav_account -> binding.groupAccount
+        R.id.nav_account -> binding.tabHost
         else -> null
     }
 
+    /** Every tab-content view the shell can show, so exactly one is left visible. */
+    private fun tabGroups(): List<View> = listOf(
+        binding.groupHome,
+        binding.groupSettings.root,
+        binding.tabHost,
+    )
+
     private fun showTab(tab: Int, previous: Int = tab) {
-        // Attach the Account fragment on first entry into its tab (guarded so it is added once).
-        if (tab == R.id.nav_account && !accountFragmentAdded) {
-            accountFragmentAdded = true
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.group_account, AccountFragment())
-                .commit()
-        }
+        // Attach/show this tab's fragment before anything reads the container, and hide the rest.
+        syncTabFragments(tab)
         // No tab shows a title or "+" in the top bar, so the fixed AppBarLayout is hidden on ALL
         // tabs (each tab's content gets the status-bar top inset directly in setupEdgeToEdge). This
         // removes the empty top band the toolbar left on the Servers/Settings tabs.
@@ -487,14 +708,14 @@ class MainActivity : HelperBaseActivity() {
         supportActionBar?.title = ""
 
         val incoming = tabGroup(tab)
-        val outgoing = tabGroup(previous)?.takeIf { previous != tab }
+        // Two tabs that live in the same fragment container share one view: syncTabFragments has
+        // already swapped the content inside it, so there is nothing to fade BETWEEN and fading the
+        // container out and back in would just blink the new tab.
+        val outgoing = tabGroup(previous)?.takeIf { previous != tab && it !== incoming }
 
         // Instant swap on the initial paint, a same-tab reselect, or reduced motion.
         if (incoming == null || outgoing == null || binding.homeRoot.reducedMotion()) {
-            binding.groupHome.isVisible = tab == R.id.nav_home
-            binding.groupServers.isVisible = tab == R.id.nav_servers
-            binding.groupSettings.root.isVisible = tab == R.id.nav_settings
-            binding.groupAccount.isVisible = tab == R.id.nav_account
+            tabGroups().forEach { it.isVisible = it === incoming }
             maybeRevealServersTab(tab)
             return
         }
@@ -516,12 +737,13 @@ class MainActivity : HelperBaseActivity() {
         }.start()
     }
 
-    /** First time the Servers tab is shown with rows, plays the reveal stagger (once only). */
+    /**
+     * First time the Servers tab is shown with rows, plays the reveal stagger (once only). The
+     * once-only flag and the stagger itself live with the list, in [ServersFragment]; this is only
+     * the moment the tab comes on screen, which the shell is the one to know.
+     */
     private fun maybeRevealServersTab(tab: Int) {
-        if (tab == R.id.nav_servers && !serversListRevealed && mainViewModel.serversCache.isNotEmpty()) {
-            serversListRevealed = true
-            revealListStagger(binding.rvServers)
-        }
+        if (tab == R.id.nav_servers) serversFragment?.maybeRevealList()
     }
 
     /**
@@ -539,9 +761,10 @@ class MainActivity : HelperBaseActivity() {
             // bar itself: the Home scroll header, the Servers header, and the Settings first section
             // all start just below the clock with no empty band above them.
             binding.groupHome.updatePadding(top = bars.top)
-            binding.groupServers.updatePadding(top = bars.top)
             binding.groupSettings.root.updatePadding(top = bars.top)
-            binding.groupAccount.updatePadding(top = bars.top)
+            // The fragment container is padded once, here, on behalf of every tab it hosts — a tab
+            // fragment does not repeat the top inset for itself.
+            binding.tabHost.updatePadding(top = bars.top)
             // Pad the custom bar by the FULL bottom inset so its icons/labels sit ABOVE whatever the
             // system draws: the ~48dp of Android 3-button navigation, or the ~24dp gesture pill. The
             // bar has wrap_content height (min 56dp) and hugs the bottom, so this padding grows it
@@ -555,7 +778,11 @@ class MainActivity : HelperBaseActivity() {
             val breathingPx = (16 * density).toInt()
             val navPad = bars.bottom + navHeightPx + breathingPx
             binding.rvHomeServers.updatePadding(bottom = navPad)
-            binding.rvServers.updatePadding(bottom = navPad)
+            // Published for the tabs that own their own lists (see MainHost.listBottomInset) and
+            // pushed straight into the one that is already on screen — insets are not re-dispatched
+            // just because a fragment was added, and a fragment added later reads the field itself.
+            navListPadding = navPad
+            serversFragment?.applyListInsets()
             insets
         }
     }
@@ -651,19 +878,12 @@ class MainActivity : HelperBaseActivity() {
     }
 
     /**
-     * Creates the two RecyclerViews (Servers tab = grouped, Home = flat) sharing one
-     * adapter each, both driven by the same all-servers cache.
+     * Creates the Home server list (flat, no section headers), driven by the same all-servers cache
+     * as the Серверы tab. That tab's list is created by [ServersFragment]; both are wired to the
+     * one [adapterListener], so a row behaves identically wherever it is shown.
      */
-    private fun setupServerLists() {
-        val listener = ActivityAdapterListener()
-
-        serversAdapter = MainRecyclerAdapter(mainViewModel, listener)
-        binding.rvServers.setHasFixedSize(true)
-        binding.rvServers.layoutManager = LinearLayoutManager(this)
-        addCustomDividerToRecyclerView(binding.rvServers, this, R.drawable.custom_divider)
-        binding.rvServers.adapter = serversAdapter
-
-        homeAdapter = MainRecyclerAdapter(mainViewModel, listener)
+    private fun setupHomeServerList() {
+        homeAdapter = MainRecyclerAdapter(mainViewModel, adapterListener)
         binding.rvHomeServers.setHasFixedSize(false)
         binding.rvHomeServers.layoutManager = LinearLayoutManager(this)
         binding.rvHomeServers.isNestedScrollingEnabled = false
@@ -671,7 +891,6 @@ class MainActivity : HelperBaseActivity() {
         binding.rvHomeServers.adapter = homeAdapter
 
         // Long-press a server row -> Incy server-actions bottom sheet (S3 moved inline actions here).
-        serversAdapter.onItemLongClick = { guid -> showServerActions(guid) }
         homeAdapter.onItemLongClick = { guid -> showServerActions(guid) }
     }
 
@@ -680,7 +899,7 @@ class MainActivity : HelperBaseActivity() {
      * Each action delegates to an existing per-server flow; duplicate reuses
      * [MmkvManager.encodeServerConfig] with a blank guid to mint a fresh copy.
      */
-    private fun showServerActions(guid: String) {
+    override fun showServerActions(guid: String) {
         val profile = MmkvManager.decodeServerConfig(guid) ?: return
         ServerActionsSheet(
             context = this,
@@ -697,26 +916,8 @@ class MainActivity : HelperBaseActivity() {
                 mainViewModel.reloadServerList()
             },
             onSetDefault = { setSelectServer(guid) },
-            onDelete = { removeServer(guid, serversAdapter.positionOfGuid(guid)) },
+            onDelete = { removeServer(guid, serversAdapter?.positionOfGuid(guid) ?: -1) },
         ).show()
-    }
-
-    /** Wires the Servers tab header: title actions and search. */
-    private fun setupServersHeader() {
-        val header = binding.layoutServersHeader
-        header.btnCollapseAll.setOnClickListener { serversAdapter.toggleCollapseAll() }
-        header.btnRefreshAll.setOnClickListener { importConfigViaSub() }
-        // 10.7: the layout ships «Проверить соединение» here, which is the name of the live-tunnel
-        // check, not of a pass over the whole list. Named for what it does.
-        header.btnSpeedtestAll.contentDescription = getString(R.string.menu_actions_ping_cd)
-        header.btnSpeedtestAll.setOnClickListener { startLatencyCheckAll() }
-        // The Servers tab's single trailing control carries BOTH the add actions and the
-        // whole-list actions (32-master-plan-android.md 12.3 gives this header one trailing
-        // action holding exactly that set), so its accessible name is the menu it opens, not
-        // just "add". The glyph is still "+" until the header is rebuilt; see the report.
-        header.btnAdd.contentDescription = getString(R.string.menu_actions_more_cd)
-        header.btnAdd.setOnClickListener { showImportMenu(it, withListActions = true) }
-        header.etSearch.doAfterTextChanged { mainViewModel.filterConfig(it?.toString().orEmpty()) }
     }
 
     /**
@@ -793,10 +994,11 @@ class MainActivity : HelperBaseActivity() {
         }
     }
 
-    private fun setupEmptyState() {
-        binding.layoutEmpty.btnImportClipboard.setOnClickListener { importClipboard() }
-        binding.layoutEmpty.btnScanQr.setOnClickListener { importQRcode() }
-        // Home empty state (shown when no subscriptions/servers exist yet).
+    /**
+     * Home empty state (shown when no subscriptions/servers exist yet). The Серверы tab's empty
+     * state is wired by [ServersFragment].
+     */
+    private fun setupHomeEmptyState() {
         binding.layoutHomeEmpty.btnHomeAddQr.setOnClickListener { importQRcode() }
         binding.layoutHomeEmpty.btnHomeAddClipboard.setOnClickListener { importClipboard() }
         // Signed-in + no-subscription CTAs: buy a subscription (bound to the account) / link Telegram.
@@ -876,9 +1078,10 @@ class MainActivity : HelperBaseActivity() {
      */
     private fun refreshServerLists(index: Int) {
         val subs = mainViewModel.getProviderGroups()
-        serversAdapter.setSections(mainViewModel.serversCache, subs, showHeaders = true, index = index)
+        // The Серверы tab rebinds (and refreshes its own header counts / empty state) from the same
+        // cache; it is silent while its tab has never been opened and binds itself when it is.
+        serversFragment?.bindList(index)
         homeAdapter.setSections(mainViewModel.serversCache, subs, showHeaders = false, index = index)
-        updateServersChrome(subs.size)
         rebuildHomeMeta()
         updateHomeEmptyState()
         // The "link Telegram" CTA depends on whether a departament subscription is present, so
@@ -900,6 +1103,9 @@ class MainActivity : HelperBaseActivity() {
      * rest) so the whole reveal never runs long. Runs once per list (the caller guards with a
      * flag), never on scroll or a later notify. Reduced motion / animations-off: no-op — rows are
      * already at their rest state, so the list simply appears.
+     *
+     * Only the Главная list is left here; [ServersFragment] carries the same routine for its own
+     * list. The copy dies with this one when Главная moves to its own fragment.
      */
     private fun revealListStagger(rv: androidx.recyclerview.widget.RecyclerView) {
         if (rv.reducedMotion()) return
@@ -918,19 +1124,6 @@ class MainActivity : HelperBaseActivity() {
                     .start()
             }
         }
-    }
-
-    private fun updateServersChrome(providerCount: Int) {
-        val serverCount = mainViewModel.serversCache.size
-        val distinctProviders = mainViewModel.serversCache.map { it.profile.subscriptionId }.distinct().size
-        binding.layoutServersHeader.tvServersSubtitle.text =
-            getString(R.string.servers_count, serverCount) + " · " +
-                getString(R.string.providers_count, maxOf(distinctProviders, 0))
-
-        val filtersActive = mainViewModel.keywordFilter.isNotEmpty()
-        val showEmpty = serverCount == 0 && !filtersActive
-        binding.layoutEmpty.root.isVisible = showEmpty
-        binding.rvServers.isVisible = !showEmpty
     }
 
     /**
@@ -1511,9 +1704,9 @@ class MainActivity : HelperBaseActivity() {
 
     private fun removeServerSub(guid: String, position: Int) {
         mainViewModel.removeServer(guid)
-        serversAdapter.removeServerSub(guid, position)
+        serversAdapter?.removeServerSub(guid, position)
         homeAdapter.removeServerSub(guid, position)
-        updateServersChrome(mainViewModel.getProviderGroups().size)
+        serversFragment?.refreshChrome()
     }
 
     /**
@@ -1528,7 +1721,7 @@ class MainActivity : HelperBaseActivity() {
         if (guid == selected) return
 
         MmkvManager.setSelectServer(guid)
-        serversAdapter.setSelectServer(selected, guid)
+        serversAdapter?.setSelectServer(selected, guid)
         homeAdapter.setSelectServer(selected, guid)
         updateSelectedServer()
         // Surface the selected server's subscription card in the carousel.
@@ -2120,7 +2313,7 @@ class MainActivity : HelperBaseActivity() {
         // Other entry points change the selected server without owning these lists — the URL-scheme
         // and shortcut activities, and the quick tile. Re-reading it here keeps the rows honest
         // instead of leaving a stale one painted as selected.
-        serversAdapter.syncSelection()
+        serversAdapter?.syncSelection()
         homeAdapter.syncSelection()
         // The account header is repainted reactively by the AccountSession.state collector
         // (repeatOnLifecycle STARTED); re-evaluate the departament-subscription gate here too, so a
@@ -2711,16 +2904,19 @@ class MainActivity : HelperBaseActivity() {
      * time, reports progress in its own notification and is cancellable, so a long list is slow
      * but never unbounded.
      */
-    private fun startLatencyCheckAll() {
+    override fun startLatencyCheckAll() {
         if (mainViewModel.serversCache.isEmpty()) {
             if (mainViewModel.keywordFilter.isNotEmpty()) {
                 showActionSnackbar(
                     getString(R.string.menu_actions_ping_filtered),
                     getString(R.string.menu_actions_reset_search),
-                ) { binding.layoutServersHeader.etSearch.setText("") }
+                ) { serversFragment?.clearSearch() }
             } else {
                 val onServers = selectedNavId == R.id.nav_servers
-                val anchor = if (onServers) binding.layoutServersHeader.btnAdd else binding.btnHomeAdd
+                // On Серверы the anchor is that header's control; the Home fallback is only ever
+                // reached from Главная, where its own "+" is the one on screen.
+                val anchor = (if (onServers) serversFragment?.addMenuAnchor() else null)
+                    ?: binding.btnHomeAdd
                 showActionSnackbar(
                     getString(R.string.menu_actions_ping_empty),
                     getString(R.string.menu_actions_add),
@@ -2789,12 +2985,10 @@ class MainActivity : HelperBaseActivity() {
     /**
      * «Найти выбранный сервер»: scrolls the Серверы list to the server the next connect would use.
      *
-     * Two states hide that row without it being gone, and the old code reported both as «не
-     * найден»: an active search narrows `serversCache` to the matches, and a collapsed provider
-     * group drops its rows out of the adapter's flat list entirely
-     * ([MainRecyclerAdapter.positionOfGuid] answers -1 in both cases). Telling the user a server
-     * is missing while it sits one tap away reads as a bug rather than as a state, so both are
-     * undone before the action is allowed to fail.
+     * The scrolling itself — and the two states that hide the row without it being gone, an active
+     * search and a collapsed provider group — belong to the list, so they live in
+     * [ServersFragment.locateServer]; this opens the tab it needs and reports the one outcome that
+     * is not a scroll.
      *
      * The two old `toast()` calls also pointed at the wrong strings: `title_file_chooser`
      * («Выберите профиль») and `toast_server_not_found_in_group` both say «профиль», which
@@ -2810,41 +3004,12 @@ class MainActivity : HelperBaseActivity() {
             return
         }
         // Only the Серверы menu offers this today, so this is a no-op there; it keeps the action
-        // correct if a second surface ever calls it.
+        // correct if a second surface ever calls it. Selecting the tab also attaches its fragment,
+        // so the list exists by the line below.
         if (selectedNavId != R.id.nav_servers) selectNav(R.id.nav_servers)
 
-        // Clearing the field runs the existing text watcher, so MainViewModel.filterConfig()
-        // reloads the cache and posts updateListAction synchronously and the adapter is already
-        // rebuilt when this returns.
-        if (mainViewModel.keywordFilter.isNotEmpty() && serversAdapter.positionOfGuid(selectedGuid) < 0) {
-            binding.layoutServersHeader.etSearch.setText("")
-        }
-        // toggleCollapseAll() expands everything only when everything is already collapsed;
-        // otherwise it collapses first, so reaching the fully expanded state can take two calls.
-        // Both land before the next frame, so the list does not flicker through the intermediate
-        // state. It returns early when the list has no group headers at all, and then the two
-        // attempts simply cost nothing.
-        var position = serversAdapter.positionOfGuid(selectedGuid)
-        var attempt = 0
-        while (position < 0 && attempt < 2) {
-            serversAdapter.toggleCollapseAll()
-            position = serversAdapter.positionOfGuid(selectedGuid)
-            attempt++
-        }
-        if (position < 0) {
+        if (serversFragment?.locateServer(selectedGuid) != true) {
             showActionSnackbar(getString(R.string.menu_actions_locate_missing))
-            return
-        }
-        val target = position
-        binding.rvServers.post {
-            val manager = binding.rvServers.layoutManager as? LinearLayoutManager
-            if (manager != null) {
-                // A third of the way down rather than flush to the top: the row lands where the
-                // eye already is, with its neighbours for context.
-                manager.scrollToPositionWithOffset(target, binding.rvServers.height / 3)
-            } else {
-                binding.rvServers.smoothScrollToPosition(target)
-            }
         }
     }
 
@@ -2904,6 +3069,13 @@ class MainActivity : HelperBaseActivity() {
         s.rowTvReceive.setOnClickListener { startActivity(Intent(this, TvReceiveActivity::class.java)) }
 
         // О ПРИЛОЖЕНИИ
+        // Three screens that were built and then left with no way in: SettingsActivity hosts the
+        // whole advanced preference tree, and CheckUpdateActivity and LogcatActivity were declared
+        // in the manifest and referenced from nowhere. A screen with no launch site is not a
+        // feature, so each one gets a row here.
+        s.rowAdvanced.setOnClickListener { requestActivityLauncher.launch(SettingsActivity.newIntent(this)) }
+        s.rowLogs.setOnClickListener { startActivity(Intent(this, LogcatActivity::class.java)) }
+        s.rowCheckUpdate.setOnClickListener { startActivity(Intent(this, CheckUpdateActivity::class.java)) }
         s.rowAbout.setOnClickListener { startActivity(Intent(this, AboutActivity::class.java)) }
         s.rowUrlScheme.setOnClickListener { startActivity(Intent(this, UrlSchemeListActivity::class.java)) }
         s.rowBackup.setOnClickListener { requestActivityLauncher.launch(Intent(this, BackupActivity::class.java)) }

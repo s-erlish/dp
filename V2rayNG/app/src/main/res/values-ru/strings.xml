@@ -2,17 +2,29 @@
 <resources>
     <!-- Servers redesign (S3) -->
     <string name="title_servers">Серверы</string>
-    <string name="servers_count">%d серверов</string>
-    <string name="providers_count">%d провайдеров</string>
+    <!-- Joined with " · " into one subtitle at ServersFragment.updateServersChrome(), so the second
+         half stays lower-case. The "noun: %d" form is deliberate: it is grammatically correct for
+         every count, which "%d серверов" is not (it reads «1 серверов»), and the call site uses
+         getString(), not getQuantityString(), so plurals cannot be applied here. -->
+    <string name="servers_count">Серверов: %d</string>
+    <string name="providers_count">провайдеров: %d</string>
     <string name="search_hint">Поиск серверов…</string>
     <string name="servers_empty_title">Нет серверов</string>
     <string name="servers_add_clipboard">Добавить из буфера</string>
     <string name="servers_section_local">Локальные</string>
     <!-- Home empty state (no servers/subscriptions yet) -->
+    <string name="home_welcome_title">Добро пожаловать</string>
     <string name="home_empty_title">Подписок пока нет</string>
     <string name="home_empty_subtitle">Добавьте подписку, чтобы появились серверы.</string>
     <string name="home_empty_add_qr">Добавить по QR-коду</string>
     <string name="home_empty_add_clipboard">Добавить из буфера обмена</string>
+    <string name="home_or_sign_in">Или войдите в свой аккаунт</string>
+    <!-- Signed-in + no-subscription home state -->
+    <string name="home_buy_subscription">Купить подписку</string>
+    <string name="home_link_telegram">Привязать Telegram</string>
+    <!-- Telegram authorization / account header -->
+    <string name="auth_sign_in_telegram">Войти через Telegram</string>
+    <string name="auth_account">Аккаунт</string>
     <!-- Neutral under-shield label when no server is selected/available -->
     <string name="home_select_server">Выберите сервер</string>
     <!-- Neutral under-shield label when a server is selected but not connected -->
@@ -33,8 +45,8 @@
     <string name="navigation_drawer_close">Закрыть панель навигации</string>
     <string name="migration_success">Данные перенесены</string>
     <string name="action_stop_service">Остановить службу</string>
-    <string name="migration_fail">Перенос данных не выполнен!</string>
-    <string name="pull_down_to_refresh">Потяните вниз для обновления!</string>
+    <string name="migration_fail">Не удалось перенести данные</string>
+    <string name="pull_down_to_refresh">Потяните вниз, чтобы обновить</string>
 
     <!-- Notifications -->
     <string name="notification_action_stop_v2ray">Остановить</string>
@@ -72,7 +84,7 @@
     <string name="menu_item_import_config_manually_wireguard">Добавить WireGuard</string>
     <string name="menu_item_import_config_manually_hysteria2">Добавить Hysteria2</string>
     <string name="del_config_comfirm">Подтверждаете удаление?</string>
-    <string name="del_invalid_config_comfirm">Выполните проверку перед удалением! Подтверждаете удаление?</string>
+    <string name="del_invalid_config_comfirm">Сначала проверьте серверы. Всё равно удалить?</string>
     <string name="server_lab_remarks">Название</string>
     <string name="server_lab_address">Адрес</string>
     <string name="server_lab_port">Порт</string>
@@ -125,7 +137,7 @@
     <string name="server_lab_kcp_tti">mKCP TTI (необязательно, по умолчанию 50)</string>
     <string name="toast_success">Успешно</string>
     <string name="toast_failure">Ошибка</string>
-    <string name="toast_none_data">Ничего нет</string>
+    <string name="toast_none_data">Нет доступных серверов</string>
     <string name="toast_incorrect_protocol">Неправильный протокол</string>
     <string name="toast_decoding_failed">Невозможно декодировать</string>
     <string name="title_file_chooser">Выберите файл</string>
@@ -188,8 +200,8 @@
     <string name="title_vpn_settings">Настройки VPN</string>
     <string name="title_pref_per_app_proxy">Прокси для выбранных приложений</string>
     <string name="summary_pref_per_app_proxy">Обычный режим: отмеченные приложения идут через прокси, остальные напрямую.\nРежим обхода: отмеченные приложения идут напрямую, остальные через прокси.\nАвтоматический выбор приложений доступен в меню.</string>
-    <string name="title_pref_is_booted">Автоподключение при запуске</string>
-    <string name="summary_pref_is_booted">Автоматически подключаться к выбранному серверу при запуске приложения (может оказаться неудачным)</string>
+    <string name="title_pref_is_booted">Автоподключение при включении устройства</string>
+    <string name="summary_pref_is_booted">Подключаться к выбранному серверу после включения устройства. Срабатывает не на всех прошивках.</string>
 
     <string name="title_pref_auto_remove_invalid_after_test">Автоудаление нерабочих серверов</string>
     <string name="summary_pref_auto_remove_invalid_after_test">Автоматическое удаление нерабочих серверов после проверки (результаты проверки могут быть неточными; восстановить удалённые серверы невозможно)</string>
@@ -199,8 +211,8 @@
     <string name="title_mux_settings">Настройки мультиплексирования</string>
     <string name="title_pref_mux_enabled">Использовать мультиплексирование</string>
     <string name="summary_pref_mux_enabled">Быстрее, но подключение может стать нестабильным.\nНиже можно настроить обработку TCP, UDP и QUIC.</string>
-    <string name="title_pref_mux_concurency">TCP-соединения (диапазон от 1 до 1024)</string>
-    <string name="title_pref_mux_xudp_concurency">XUDP-соединения (диапазон от 1 до 1024)</string>
+    <string name="title_pref_mux_concurency">TCP-соединения (диапазон от -1 до 1024)</string>
+    <string name="title_pref_mux_xudp_concurency">XUDP-соединения (диапазон от -1 до 1024)</string>
     <string name="title_pref_mux_xudp_quic">Обработка QUIC в мультиплексном туннеле</string>
     <string-array name="mux_xudp_quic_entries">
         <item>Отклонять</item>
@@ -217,7 +229,7 @@
     <string name="summary_pref_route_only_enabled">Использовать доменное имя только для маршрутизации и сохранять целевой адрес в виде IP.</string>
 
     <string name="title_pref_local_dns_enabled">Использовать локальную DNS</string>
-    <string name="summary_pref_local_dns_enabled">Обслуживание выполняется DNS-модулем ядра (в настройках маршрутизации рекомендуется выбрать режим «Все, кроме LAN и Китая»)</string>
+    <string name="summary_pref_local_dns_enabled">Запросы DNS обрабатывает модуль ядра. Рекомендуется, если маршрутизация должна обходить локальную сеть.</string>
 
     <string name="title_pref_fake_dns_enabled">Использовать поддельную DNS</string>
     <string name="summary_pref_fake_dns_enabled">Локальная DNS возвращает поддельные IP-адреса (быстрее, но может не работать с некоторыми приложениями)</string>
@@ -315,6 +327,29 @@
     <string name="title_language">Язык</string>
     <string name="title_ui_settings">Настройки интерфейса</string>
     <string name="title_pref_ui_mode_night">Тема интерфейса</string>
+    <string name="title_pref_color_theme">Цветовая тема</string>
+    <string name="color_theme_blue">Синяя (departament)</string>
+    <string name="color_theme_mono">Чёрно-белая</string>
+
+    <!-- Ping-method picker: the long labels used by the preference list. The short labels on the
+         settings row live in settings_ping_method_* below. -->
+    <string name="title_pref_ping_method">Способ проверки задержки</string>
+    <string name="ping_method_real">Реальная задержка через туннель</string>
+    <string name="ping_method_http">HTTP-запрос напрямую, минуя туннель</string>
+    <string name="ping_method_tcp">TCP-соединение (tcping)</string>
+    <string name="ping_method_icmp">ICMP-пинг — многие серверы его не пропускают</string>
+
+    <string name="menu_item_fast_connect">Подключиться к самому быстрому серверу</string>
+
+    <!-- Memory panel on the home screen. %1$d is megabytes, %2$s is the level below. -->
+    <string name="title_pref_show_memory">Показывать расход памяти на главной</string>
+    <string name="summary_pref_show_memory">Показывать на главном экране, сколько памяти приложение занимает прямо сейчас</string>
+    <string name="memory_app_usage">Память приложения</string>
+    <string name="memory_value">%1$d МБ · %2$s</string>
+    <string name="memory_normal">Обычный</string>
+    <string name="memory_elevated">Повышенный</string>
+    <string name="memory_high">Высокий</string>
+
     <string name="title_pref_use_hev_tunnel">Использовать Hev TUN</string>
     <string name="summary_pref_use_hev_tunnel">Если включено, TUN будет использовать hev-socks5-tunnel; иначе будет использован xray-core</string>
     <string name="title_pref_hev_tunnel_loglevel">Подробность журнала HevTun</string>
@@ -323,23 +358,23 @@
     <string name="title_logcat">Журнал</string>
     <string name="logcat_copy">Копировать</string>
     <string name="logcat_clear">Очистить</string>
-    <string name="logcat_share">Поделиться логом</string>
+    <string name="logcat_share">Поделиться журналом</string>
     <string name="title_service_restart">Перезапуск службы</string>
     <string name="title_del_all_config">Удалить серверы</string>
     <string name="title_del_duplicate_config">Удалить дубликаты серверов</string>
     <string name="title_del_invalid_config">Удалить нерабочие серверы</string>
     <string name="title_export_all">Экспорт серверов в буфер обмена</string>
-    <string name="title_sub_setting">Группы</string>
+    <string name="title_sub_setting">Подписки</string>
     <string name="sub_setting_remarks">Название</string>
     <string name="sub_setting_url">URL (необязательно)</string>
     <string name="sub_setting_user_agent">User Agent</string>
-    <string name="sub_setting_filter">Название фильтра</string>
+    <string name="sub_setting_filter">Фильтр по названию (регулярное выражение)</string>
     <string name="sub_setting_enable">Использовать обновление</string>
     <string name="sub_auto_update">Использовать автообновление</string>
     <string name="sub_allow_insecure_url">Разрешать незащищённые HTTP-адреса</string>
     <string name="sub_setting_pre_profile">Предыдущий прокси-сервер</string>
     <string name="sub_setting_next_profile">Следующий прокси-сервер</string>
-    <string name="sub_setting_pre_profile_tip">Сервер должен быть уникальным</string>
+    <string name="sub_setting_pre_profile_tip">Точное название существующего сервера</string>
     <string name="toast_invalid_update_interval">Неправильный интервал обновления. Минимум 15 минут.</string>
     <string name="title_sub_update">Обновить подписку</string>
     <string name="sub_support">Поддержка</string>
@@ -347,13 +382,15 @@
     <string name="sub_telegram">Telegram</string>
     <string name="sub_pin">Закрепить подписку</string>
     <string name="sub_unpin">Открепить подписку</string>
-    <string name="sub_expires">до %1$s</string>
+    <string name="sub_expires">До %1$s</string>
     <string name="sub_expired">Истекла</string>
     <string name="sub_meta_updated_never">Никогда</string>
     <string name="sub_auto_update_label">Автообновление: %1$s</string>
     <string name="sub_auto_update_off">Выкл</string>
-    <string name="sub_update_interval_hours">%1$d ч.</string>
-    <string name="sub_update_interval_minutes">%1$d мин.</string>
+    <!-- Unit symbols, no trailing period — same form as settings_sub_auto_update_minutes, and these
+         land at the end of the meta-bar subtitle where a period would read as sentence punctuation. -->
+    <string name="sub_update_interval_hours">%1$d ч</string>
+    <string name="sub_update_interval_minutes">%1$d мин</string>
     <string name="title_ping_all_server">Проверить серверы</string>
     <string name="title_real_ping_all_server">Проверить задержку серверов</string>
     <string name="title_user_asset_setting">Файлы ресурсов</string>
@@ -369,7 +406,7 @@
     <string name="title_update_subscription_no_subscription">Нет подписок</string>
     <string name="msg_updating_subscription">Обновляем «%1$s»</string>
     <string name="toast_server_not_found_in_group">Выбранный сервер не найден в текущей группе</string>
-    <string name="toast_fragment_not_available">Фрагмент недоступен</string>
+    <string name="toast_fragment_not_available">Не удалось открыть текущий экран</string>
     <string name="title_locate_selected_config">Найти выбранный сервер</string>
 
     <string name="tasker_start_service">Запуск службы</string>
@@ -378,7 +415,7 @@
     <!-- RoutingSettingActivity -->
     <string name="routing_settings_domain_strategy">Доменная стратегия</string>
     <string name="routing_settings_title">Маршрутизация</string>
-    <string name="routing_settings_tips">Через запятую (,)\nЧто-то одно: домен, IP или процесс</string>
+    <string name="routing_settings_tips">Перечислите через запятую.\nВ одном поле — только домены, только IP или только процессы.</string>
     <string name="routing_settings_save">Сохранить</string>
     <string name="routing_settings_delete">Очистить</string>
     <string name="routing_settings_rule_title">Настройка правил маршрутизации</string>
@@ -406,7 +443,7 @@
     <string name="connection_test_error">Не удалось проверить подключение: %s</string>
     <string name="connection_test_fail">Интернет недоступен</string>
     <string name="connection_test_error_status_code">Код ошибки: #%d</string>
-    <string name="connection_connected">Соединено, нажмите для проверки</string>
+    <string name="connection_connected">Подключено. Нажмите, чтобы проверить</string>
     <string name="connection_not_connected">Не подключено</string>
     <string name="connection_connecting">Подключение…</string>
     <string name="connection_runing_task_left">Запущено проверок: %s</string>
@@ -428,7 +465,7 @@
 
     <string name="title_policy_group_type">Тип группы политик</string>
     <string name="title_policy_group_subscription_id">Из группы подписки</string>
-    <string name="title_policy_group_subscription_filter">Название фильтра</string>
+    <string name="title_policy_group_subscription_filter">Фильтр по названию (регулярное выражение)</string>
 
     <string name="server_proxy_chain_members">Участники цепочки прокси</string>
     <string name="server_proxy_chain_pick_members">Нажмите здесь, чтобы выбрать участника</string>
@@ -514,7 +551,7 @@
     </string-array>
 
     <string name="bottom_nav_home">Главная</string>
-    <string name="bottom_nav_servers">Сервера</string>
+    <string name="bottom_nav_servers">Серверы</string>
     <string name="bottom_nav_more">Настройки</string>
 
     <!-- Incy settings tab -->
@@ -534,7 +571,7 @@
     <string name="settings_dns">DNS</string>
     <string name="settings_dns_hint">Адрес DNS-сервера</string>
     <string name="settings_ping_method">Пинг</string>
-    <string name="settings_ping_method_real">Реальная задержка (через ядро)</string>
+    <string name="settings_ping_method_real">Реальная задержка (через туннель)</string>
     <string name="settings_ping_method_tcp">TCP-соединение</string>
     <string name="settings_ping_method_http">HTTP-запрос</string>
     <string name="settings_ping_method_icmp">ICMP (системный пинг)</string>
@@ -570,4 +607,7 @@
     <string name="server_selected_reconnect_prompt">Выбран %1$s. Переподключиться к нему?</string>
     <string name="server_selected_reconnect_prompt_generic">Сервер выбран. Переподключиться к нему?</string>
     <string name="server_selected_reconnect_action">Переподключиться</string>
+    <string name="settings_advanced">Расширенные настройки</string>
+    <string name="settings_logs">Журнал</string>
+    <string name="settings_check_update">Проверить обновления</string>
 </resources>

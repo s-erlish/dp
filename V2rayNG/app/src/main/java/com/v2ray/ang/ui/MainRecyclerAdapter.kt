@@ -58,8 +58,9 @@ class MainRecyclerAdapter(
     private var rows: List<Row> = emptyList()
 
     /**
-     * Retained for host-activity API compatibility. The long-press server-actions menu was
-     * removed, so this callback is no longer invoked by the adapter.
+     * Opens the server-actions sheet for a row. Long-press is a hidden affordance for what is
+     * currently the app's only route to edit, delete, share and QR, so the servers redesign is
+     * expected to add a visible trailing control that calls the same thing.
      */
     var onItemLongClick: ((String) -> Unit)? = null
 
@@ -245,7 +246,14 @@ class MainRecyclerAdapter(
         binding.infoContainer.setOnClickListener {
             adapterListener?.onSelectServer(guid)
         }
-        // Long-press server-actions menu removed: long-press is a no-op (no listener set).
+        // Long-press opens the server-actions sheet. Both hosts assign [onItemLongClick] and the
+        // sheet handles the operator-locked case, but this invocation was missing, which left
+        // delete, edit, share and QR — the only routes to any of them — unreachable.
+        binding.infoContainer.setOnLongClickListener {
+            val handler = onItemLongClick ?: return@setOnLongClickListener false
+            handler(guid)
+            true
+        }
     }
 
     private fun primaryProtocol(guid: String, profile: ProfileItem): String {

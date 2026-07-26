@@ -47,6 +47,7 @@ object SettingsManager {
         initRoutingRulesets(context)
         migrateServerListToSubscriptions()
         migrateHysteria2PinSHA256()
+        pruneOrphanServerRawOnce()
     }
 
     /**
@@ -717,6 +718,27 @@ object SettingsManager {
         if (MmkvManager.decodeSettingsString(key).isNullOrEmpty()) {
             MmkvManager.encodeSettings(key, default)
         }
+    }
+
+    /**
+     * Clears the raw-template backlog left by the builds that never deleted from that store.
+     *
+     * Every subscription refresh replaces a провайдер's whole server set, and until now the raw
+     * config of each replaced сервер stayed behind — so the store grew by a full copy of the
+     * server list on every update, for the life of the install, with nothing able to read those
+     * entries again. The delete paths carry the raw entry with its profile now
+     * ([MmkvManager.removeServer] and friends); this clears what accumulated before that, once.
+     */
+    private fun pruneOrphanServerRawOnce() {
+        val migrationKey = "server_raw_orphans_pruned"
+        if (MmkvManager.decodeSettingsBool(migrationKey, false)) {
+            return
+        }
+        val removed = MmkvManager.pruneOrphanServerRaw()
+        if (removed > 0) {
+            LogUtil.i(AppConfig.TAG, "Pruned $removed orphaned raw server configs")
+        }
+        MmkvManager.encodeSettings(migrationKey, true)
     }
 
     private fun migrateHysteria2PinSHA256() {
