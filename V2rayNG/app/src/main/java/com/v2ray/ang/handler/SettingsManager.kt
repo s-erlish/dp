@@ -600,25 +600,35 @@ object SettingsManager {
     }
 
     /**
-     * Get the locale.
+     * Get the locale the app renders in.
+     *
+     * departament ships **one** master locale — Russian, in `res/values/` — so the picker offers
+     * Системный and Русский and nothing else (`R.array.language_select`). The retired options
+     * («English» and the vendored upstream locales, whose `values-*` folders are gone) resolved to
+     * translations that no longer exist, i.e. a Russian app wearing a foreign locale for dates,
+     * numbers and layout direction.
+     *
+     * An install that stored one of those codes before they were retired is **migrated once, here**,
+     * on the first read after the update: it lands on Системный, which is what the settings row
+     * already shows for a value the array no longer contains. Rewriting the stored value rather than
+     * only reinterpreting it keeps the preference and the row in agreement, so the next writer of
+     * this key cannot resurrect a locale the app does not ship.
+     *
      * @return The locale.
      */
     fun getLocale(): Locale {
-        val langCode =
-            MmkvManager.decodeSettingsString(AppConfig.PREF_LANGUAGE) ?: Language.AUTO.code
-        val language = Language.fromCode(langCode)
+        val stored = MmkvManager.decodeSettingsString(AppConfig.PREF_LANGUAGE) ?: Language.AUTO.code
+        val language = when (Language.fromCode(stored)) {
+            Language.RUSSIAN -> Language.RUSSIAN
+            else -> Language.AUTO
+        }
+        if (stored != language.code) {
+            MmkvManager.encodeSettings(AppConfig.PREF_LANGUAGE, language.code)
+        }
 
         return when (language) {
-            Language.AUTO -> Utils.getSysLocale()
-            Language.ENGLISH -> Locale.ENGLISH
-            Language.CHINA -> Locale.CHINA
-            Language.TRADITIONAL_CHINESE -> Locale.TRADITIONAL_CHINESE
-            Language.VIETNAMESE -> Locale.forLanguageTag("vi")
             Language.RUSSIAN -> Locale.forLanguageTag("ru")
-            Language.PERSIAN -> Locale.forLanguageTag("fa")
-            Language.ARABIC -> Locale.forLanguageTag("ar")
-            Language.BANGLA -> Locale.forLanguageTag("bn")
-            Language.BAKHTIARI -> Locale.forLanguageTag("bqi-IR")
+            else -> Utils.getSysLocale()
         }
     }
 

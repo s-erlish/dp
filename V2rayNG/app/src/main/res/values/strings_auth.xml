@@ -4,11 +4,10 @@
   AUTH COPY — 14-auth.md §11.
   ============================================================================
 
-  Russian, because every other module in this tree ships its Russian copy in
-  values/ and the app's default locale is AUTO (SettingsManager.getLocale()):
-  making this ONE file English-by-default would leave a non-ru phone with a
-  Russian app and an English sign-in screen. values-ru/strings_auth.xml carries
-  the identical set so an explicit ru locale resolves here too.
+  Russian, because values/ IS the master locale (M-42): departament ships one
+  language and this folder is where it lives. The picker offers Системный and
+  Русский, and both resolve here — there is no second folder to keep in step and
+  no locale that could leave a Russian app wearing an English sign-in screen.
 
   COPY LAW (00-rules.md 9.2, 9.4): sentence case, no ALL-CAPS, no em/en dash, no
   three-dot sequence, «ёлочки», no final period on a label or a button, full

@@ -13,9 +13,9 @@
       say провайдер says подписка, including the add action.
     * «departament» is lowercase, always, in every string on every screen.
 
-  Mirrored verbatim into res/values-ru/strings_home.xml. values/ is the fallback
-  for every locale, so the two files carry the same Russian on purpose:
-  whichever one a device resolves, Главная reads the same.
+  values/ is the one master locale (M-42) — departament ships its Russian here
+  and nowhere else, so whatever locale a device resolves, Главная reads this
+  file. There is no values-ru to mirror into any more.
 -->
 <resources>
 

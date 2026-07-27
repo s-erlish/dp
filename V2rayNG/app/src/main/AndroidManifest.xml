@@ -23,10 +23,6 @@
         android:name="android.hardware.touchscreen"
         android:required="false" />
 
-    <!-- https://developer.android.com/about/versions/11/privacy/package-visibility -->
-    <uses-permission
-        android:name="android.permission.QUERY_ALL_PACKAGES"
-        tools:ignore="PackageVisibilityPolicy,QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -36,9 +32,34 @@
     <uses-permission
         android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
         android:minSdkVersion="34" />
-    <!-- <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" /> -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!--
+      Package visibility (Android 11+). The only feature that needs to see other apps is the
+      per-app proxy picker: AppManagerUtil.loadNetworkAppList() calls getInstalledPackages() and
+      PerAppProxyActivity / AppPickerActivity list what comes back so the user can route chosen
+      apps through the tunnel.
+
+      This used to be QUERY_ALL_PACKAGES. That permission is granted by Google Play only for a
+      short list of use cases — accessibility, antivirus, device search, file management,
+      banking-fraud prevention, device automation — and "per-app VPN routing" is not one of them,
+      so a VPN client declaring it is refused at review. The tools:ignore that sat on it silenced
+      lint, not the reviewer.
+
+      The supported form below covers exactly what the picker needs: every app the user can launch,
+      which is every app the user can meaningfully choose to route. Apps with no launcher entry
+      (headless services, some system packages) are no longer listed — nothing else in the app
+      reads the installed-package list, and PerAppProxyAdapter's user/system split still works on
+      what is visible.
+      https://developer.android.com/about/versions/11/privacy/package-visibility
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
 
     <application
         android:name=".AngApplication"
