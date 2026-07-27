@@ -45,8 +45,11 @@
     <string name="settings_always_on_sub">Подключаться всегда и блокировать трафик без VPN</string>
     <string name="settings_always_on_hint">Включите постоянный VPN и блокировку без VPN в системных настройках</string>
 
-    <!-- Автообновление подписки: нет подписок -->
+    <!-- Автообновление подписки: нет подписок. Значение строки повторяет ps_no_subs_value
+         на экране «Настройки подписок» — одно состояние называется одинаково на обоих
+         экранах, иначе строка читается как «выключено», хотя включать нечего. -->
     <string name="settings_sub_auto_update_empty">Сначала добавьте подписку</string>
+    <string name="settings_sub_auto_update_none">Нет подписок</string>
 
     <!-- DNS-пресеты -->
     <string name="settings_dns_custom">Свой…</string>

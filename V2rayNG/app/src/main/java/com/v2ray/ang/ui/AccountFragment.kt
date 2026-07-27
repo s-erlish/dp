@@ -364,9 +364,13 @@ class AccountFragment : Fragment() {
             binding.tvUsername.text = ""
             // Null/error state: blank the balance rather than showing a fake "Баланс: 0 ₽". Forget the
             // last figure so a profile arriving later paints instantly instead of counting up from stale.
+            // The whole ROW goes with it: now that the balance is a labelled value, leaving the label
+            // behind would state «Баланс» followed by nothing, which reads as a broken figure rather
+            // than as an absent one.
             balanceAnimator?.cancel()
             lastBalance = null
             binding.tvBalance.text = ""
+            binding.rowBalance.isVisible = false
             binding.rowReferral.visibility = View.GONE
             AvatarManager.setMonogram(binding.tvAvatarInitial, null)
             AvatarManager.applyAvatar(viewLifecycleOwner.lifecycleScope, requireContext(), binding.imgAvatar, binding.tvAvatarInitial, null)
@@ -382,6 +386,7 @@ class AccountFragment : Fragment() {
         binding.tvUsername.text = primary
         AvatarManager.setMonogram(binding.tvAvatarInitial, primary)
         AvatarManager.applyAvatar(viewLifecycleOwner.lifecycleScope, requireContext(), binding.imgAvatar, binding.tvAvatarInitial, profile)
+        binding.rowBalance.isVisible = true
         val previousBalance = lastBalance
         if (previousBalance == null || previousBalance == profile.balance) {
             // First paint (or an unchanged re-render): land the figure instantly, no count-up spin.

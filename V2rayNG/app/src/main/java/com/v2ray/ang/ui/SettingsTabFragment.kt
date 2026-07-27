@@ -84,7 +84,14 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         s.rowIpv6.setOnClickListener { toggleIpv6() }
         s.rowDns.setOnClickListener { editDns() }
         s.rowPingMethod.setOnClickListener { pickPingMethod() }
-        s.rowLocalProxy.setOnClickListener { startActivity(Intent(requireContext(), LocalProxyActivity::class.java)) }
+        // «Локальный прокси» пишет ключи, которые читает конфиг ядра (инбаунды socks/http, их
+        // порт, UDP, системный HTTP-прокси, доступ по сети). Открывать его обычным
+        // startActivity нельзя: флаг SettingsChangeManager.restartService, который экран
+        // выставляет, потребляет только launchSettingsScreen — иначе выключенный локальный
+        // прокси остаётся поднятым до следующего ручного переподключения.
+        s.rowLocalProxy.setOnClickListener {
+            mainHost.launchSettingsScreen(Intent(requireContext(), LocalProxyActivity::class.java))
+        }
         s.rowAlwaysOn.setOnClickListener { openAlwaysOnSettings() }
 
         // ОБХОД БЛОКИРОВОК
@@ -113,7 +120,13 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         s.rowAssets.setOnClickListener {
             mainHost.launchSettingsScreen(Intent(requireContext(), UserAssetActivity::class.java))
         }
-        s.rowProvider.setOnClickListener { startActivity(Intent(requireContext(), ProviderSettingsActivity::class.java)) }
+        // «Настройки подписок» меняет порядок списка серверов и просит оболочку перестроить его
+        // (SettingsChangeManager.setupGroupTab). Этот флаг тоже потребляет только
+        // launchSettingsScreen, поэтому через startActivity новый порядок не доезжал до
+        // Главной до следующего перезапуска.
+        s.rowProvider.setOnClickListener {
+            mainHost.launchSettingsScreen(Intent(requireContext(), ProviderSettingsActivity::class.java))
+        }
 
         // УСТРОЙСТВА
         s.rowTvSend.setOnClickListener { startActivity(Intent(requireContext(), TvSendActivity::class.java)) }
@@ -504,9 +517,18 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         else -> getString(R.string.settings_sub_auto_update_minutes, minutes)
     }
 
-    /** Row value: interval of any auto-updating subscription, or "Выкл" when none is enabled. */
+    /**
+     * Row value: the interval of any auto-updating подписка, «Выкл» when none of them updates, or
+     * «Нет подписок» when there is nothing to update at all.
+     *
+     * The last case matters: with no подписка stored the row used to read «Выкл», which invites a
+     * tap that can only answer with a toast. It now states the reason, in the same words
+     * «Настройки подписок» uses for the same state, so the two screens agree.
+     */
     private fun currentSubAutoUpdateLabel(): String {
-        val active = MmkvManager.decodeSubscriptions().firstOrNull { it.subscription.autoUpdate }
+        val subs = MmkvManager.decodeSubscriptions()
+        if (subs.isEmpty()) return getString(R.string.settings_sub_auto_update_none)
+        val active = subs.firstOrNull { it.subscription.autoUpdate }
             ?: return getString(R.string.settings_value_off)
         return subAutoUpdateLabel(active.subscription.updateInterval)
     }

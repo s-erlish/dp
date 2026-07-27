@@ -108,26 +108,25 @@
                         android:textAppearance="@style/TextAppearance.App.Title"
                         tools:text="Erlish" />
 
+                    <!-- No style attribute on purpose: themes.xml binds materialButtonStyle to
+                         Widget.Departament.Button.Primary, so this control inherits the modelled
+                         fill and the press motion the owner asked for (OWNER-FEEDBACK D1) instead
+                         of a flat slab, plus btn_height 48, radius_button 16, Title type and
+                         glyph_20 — every one of which was previously overridden inline.
+                         android:minHeight="0dp" with 8dp vertical padding made this a ~36dp
+                         target, under the 48dp floor; only the horizontal padding is trimmed now,
+                         which keeps it compact beside the account name without shrinking the hit
+                         box. -->
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_top_up"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_12"
-                        android:insetTop="0dp"
-                        android:insetBottom="0dp"
                         android:minWidth="0dp"
-                        android:minHeight="0dp"
                         android:paddingStart="@dimen/space_16"
-                        android:paddingTop="@dimen/space_8"
                         android:paddingEnd="@dimen/space_16"
-                        android:paddingBottom="@dimen/space_8"
                         android:text="@string/account_top_up"
-                        android:textAllCaps="false"
-                        android:textStyle="bold"
-                        app:cornerRadius="@dimen/radius_button"
-                        app:icon="@drawable/ic_add_24dp"
-                        app:iconGravity="textStart"
-                        app:iconSize="18dp" />
+                        app:icon="@drawable/ic_add_24dp" />
                 </LinearLayout>
 
                 <!-- ============ The hero figure is TIME, not money ============
@@ -195,14 +194,19 @@
 
                 <!-- Balance: demoted from the 34sp hero to a labelled value (1.2, 1.3). It is
                      still the count-up figure it always was — «Пополнить» above it is the action,
-                     so this line states and does not duplicate the CTA. -->
+                     so this line states and does not duplicate the CTA.
+
+                     Starts gone and is revealed by renderProfile: a label with no figure beside it
+                     reads as a broken value, so the row appears with its number or not at all. -->
                 <LinearLayout
                     android:id="@+id/row_balance"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_16"
                     android:baselineAligned="true"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:visibility="gone"
+                    tools:visibility="visible">
 
                     <TextView
                         android:layout_width="0dp"
@@ -341,18 +345,17 @@
                         android:textAppearance="@style/TextAppearance.App.Body"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
+                    <!-- Theme default = Widget.Departament.Button.Primary. The inline overrides it
+                         used to carry (textAllCaps, textStyle, cornerRadius, iconSize, iconGravity)
+                         restated the style's own tokens at a different icon size; dropped so the
+                         empty-state CTA is the same object as every other primary in the app. -->
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_buy_first"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/space_16"
                         android:text="@string/account_hub_buy"
-                        android:textAllCaps="false"
-                        android:textStyle="bold"
-                        app:cornerRadius="@dimen/radius_button"
-                        app:icon="@drawable/ic_acc_upgrade"
-                        app:iconGravity="textStart"
-                        app:iconSize="18dp" />
+                        app:icon="@drawable/ic_acc_upgrade" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -417,16 +420,16 @@
                         android:textAppearance="@style/TextAppearance.App.Body"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
+                    <!-- Secondary, not a raw M3 tonal button: the app's own tier carries the bevel,
+                         the press motion, the focus ring and btn_height 48 that a bare
+                         Widget.Material3.Button.TonalButton has none of (OWNER-FEEDBACK D1). -->
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_retry_load"
-                        style="@style/Widget.Material3.Button.TonalButton"
+                        style="@style/Widget.Departament.Button.Secondary"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/space_16"
-                        android:text="@string/account_retry"
-                        android:textAllCaps="false"
-                        android:textStyle="bold"
-                        app:cornerRadius="@dimen/radius_button" />
+                        android:text="@string/account_retry" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
         </FrameLayout>
@@ -486,7 +489,7 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginStart="@dimen/space_12"
                         android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
                         android:text="@string/account_hub_buy"
@@ -505,7 +508,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
+                    android:layout_marginStart="@dimen/divider_inset_start"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Устройства -->
@@ -540,7 +543,7 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginStart="@dimen/space_12"
                         android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
                         android:text="@string/account_hub_devices"
@@ -568,7 +571,7 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
+                    android:layout_marginStart="@dimen/divider_inset_start"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- История платежей -->
@@ -603,7 +606,7 @@
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginStart="@dimen/space_12"
                         android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
                         android:text="@string/account_hub_history"
@@ -689,7 +692,7 @@
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/space_16"
+                    android:layout_marginStart="@dimen/space_12"
                     android:layout_marginEnd="@dimen/space_8"
                     android:layout_weight="1"
                     android:text="@string/account_row_logout"

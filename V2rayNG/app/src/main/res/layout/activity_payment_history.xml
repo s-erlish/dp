@@ -57,17 +57,18 @@
             tools:text="@string/history_empty"
             tools:visibility="visible" />
 
-        <!-- Wire-ready CTA: activity can reveal + wire this to open Buy. -->
+        <!-- Empty-state CTA, revealed and wired by PaymentHistoryActivity. Secondary tier: an
+             empty state is not this screen's primary action surface (styles.xml), and the app's
+             own tier carries the bevel, press motion, focus ring and btn_height 48 that a raw
+             Widget.Material3.Button.TonalButton has none of (OWNER-FEEDBACK D1). -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_history_buy"
-            style="@style/Widget.Material3.Button.TonalButton"
+            style="@style/Widget.Departament.Button.Secondary"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_16"
             android:text="@string/buy_title"
-            android:textAllCaps="false"
             android:visibility="gone"
-            app:cornerRadius="@dimen/radius_button"
             tools:visibility="visible" />
     </LinearLayout>
 

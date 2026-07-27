@@ -7,7 +7,7 @@
          every count, which "%d серверов" is not (it reads «1 серверов»), and the call site uses
          getString(), not getQuantityString(), so plurals cannot be applied here. -->
     <string name="servers_count">Серверов: %d</string>
-    <string name="providers_count">провайдеров: %d</string>
+    <string name="providers_count">подписок: %d</string>
     <string name="search_hint">Поиск серверов…</string>
     <string name="servers_empty_title">Нет серверов</string>
     <string name="servers_add_clipboard">Добавить из буфера</string>

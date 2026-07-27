@@ -13,6 +13,7 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.util.Utils
 import java.net.Inet4Address
@@ -41,11 +42,20 @@ import kotlin.random.Random
  * значок: он пишет `PREF_ENABLE_LOCAL_PROXY`, а его читает
  * `CoreConfigManager.configureInbounds` — при выключенном значении из конфига ядра убираются
  * инбаунды socks и http. Поэтому строка называется тем, чем она управляет.
+ *
+ * **Каждое значение отсюда попадает в конфиг ядра, поэтому экран сообщает об изменении.**
+ * Строки «Дополнительно» пишутся через `MmkvPreferenceDataStore`, который сам ставит
+ * [SettingsChangeManager.makeRestartService]; здесь запись идёт прямо в MMKV, так что флаг
+ * ставится вручную — [markCoreChanged]. Потребляет его оболочка (`MainActivity`) на возврате,
+ * поэтому вкладка настроек открывает экран через `MainHost.launchSettingsScreen`, а не
+ * `startActivity`: иначе выключенный локальный прокси оставался бы поднятым до следующего
+ * ручного переподключения.
  */
 class LocalProxyActivity : BaseActivity() {
 
     private lateinit var switchSocksAuth: MaterialSwitch
     private lateinit var groupSocksDetails: LinearLayout
+    private lateinit var dividerSocks: View
     private lateinit var etSocksUser: EditText
     private lateinit var etSocksPass: EditText
     private lateinit var etSocksPort: EditText
@@ -73,10 +83,17 @@ class LocalProxyActivity : BaseActivity() {
         bindLocalProxySection()
     }
 
+    /**
+     * Значение ушло в конфиг ядра. Оболочка перезапустит туннель на возврате, но только если
+     * он поднят — проверку делает сам потребитель флага, поэтому здесь условий нет.
+     */
+    private fun markCoreChanged() = SettingsChangeManager.makeRestartService()
+
     // region SOCKS5-АВТОРИЗАЦИЯ
     private fun bindSocksSection() {
         switchSocksAuth = findViewById(R.id.switch_socks_auth)
         groupSocksDetails = findViewById(R.id.group_socks_details)
+        dividerSocks = findViewById(R.id.divider_socks)
         etSocksUser = findViewById(R.id.et_socks_user)
         etSocksPass = findViewById(R.id.et_socks_pass)
         btnTogglePass = findViewById(R.id.btn_toggle_pass)
@@ -88,27 +105,44 @@ class LocalProxyActivity : BaseActivity() {
 
         val authOn = !user.isNullOrEmpty() && !pass.isNullOrEmpty()
         switchSocksAuth.isChecked = authOn
-        groupSocksDetails.visibility = if (authOn) View.VISIBLE else View.GONE
+        setSocksDetailsVisible(authOn)
 
         findViewById<View>(R.id.row_socks_auth).setOnClickListener { switchSocksAuth.toggle() }
         switchSocksAuth.setOnCheckedChangeListener { _, isChecked ->
-            groupSocksDetails.visibility = if (isChecked) View.VISIBLE else View.GONE
+            setSocksDetailsVisible(isChecked)
             if (isChecked) {
                 if (etSocksUser.text.isNullOrBlank() || etSocksPass.text.isNullOrBlank()) {
                     generateAndFillCreds()
+                } else {
+                    // Повторное включение. Выключение чистит ХРАНИЛИЩЕ, но не поля — они
+                    // просто скрываются. Без этой ветки экран показывал бы логин и пароль
+                    // при включённом переключателе, а ядро поднимало бы инбаунд без
+                    // авторизации: ни generateAndFillCreds (поля не пустые), ни
+                    // doAfterTextChanged (текст не менялся) ничего бы не записали.
+                    MmkvManager.encodeSettings(
+                        AppConfig.PREF_SOCKS_USERNAME,
+                        etSocksUser.text.toString().trim()
+                    )
+                    MmkvManager.encodeSettings(
+                        AppConfig.PREF_SOCKS_PASSWORD,
+                        etSocksPass.text.toString()
+                    )
                 }
             } else {
                 // Отключение авторизации: очищаем сохранённые креды (ядро перейдёт на noauth).
                 MmkvManager.encodeSettings(AppConfig.PREF_SOCKS_USERNAME, "")
                 MmkvManager.encodeSettings(AppConfig.PREF_SOCKS_PASSWORD, "")
             }
+            markCoreChanged()
         }
 
         etSocksUser.doAfterTextChanged {
             MmkvManager.encodeSettings(AppConfig.PREF_SOCKS_USERNAME, it?.toString()?.trim() ?: "")
+            markCoreChanged()
         }
         etSocksPass.doAfterTextChanged {
             MmkvManager.encodeSettings(AppConfig.PREF_SOCKS_PASSWORD, it?.toString() ?: "")
+            markCoreChanged()
         }
 
         btnTogglePass.setOnClickListener { togglePasswordVisibility() }
@@ -124,6 +158,17 @@ class LocalProxyActivity : BaseActivity() {
             generateAndFillCreds()
             toastSuccess(R.string.lp_creds_reset)
         }
+    }
+
+    /**
+     * Поля авторизации и волосок над ними живут одной жизнью: разделитель отделяет строку от
+     * полей, и когда полей нет, он висел последней линией у нижнего края карточки, отделяя
+     * строку от пустоты.
+     */
+    private fun setSocksDetailsVisible(visible: Boolean) {
+        val visibility = if (visible) View.VISIBLE else View.GONE
+        groupSocksDetails.visibility = visibility
+        dividerSocks.visibility = visibility
     }
 
     private fun togglePasswordVisibility() {
@@ -160,12 +205,24 @@ class LocalProxyActivity : BaseActivity() {
         // Порт петлевого прокси. Поле жило внутри group_socks_details и показывалось только
         // при включённой SOCKS5-авторизации, то есть при значении по умолчанию порт локального
         // прокси нельзя было ни увидеть, ни поменять. Читает SettingsManager.getSocksPort().
+        //
+        // Проверка на вводе, а не «сохраним что набрали»: getSocksPort() отдаёт число как есть,
+        // и 0 или 70000 уходят в инбаунд ядра, после чего туннель не поднимается вовсе. Пустое
+        // поле и число вне диапазона не сохраняются — в хранилище остаётся последний рабочий
+        // порт, а поле называет причину.
         etSocksPort = findViewById(R.id.et_socks_port)
         etSocksPort.setText(
             MmkvManager.decodeSettingsString(AppConfig.PREF_SOCKS_PORT) ?: AppConfig.PORT_SOCKS
         )
-        etSocksPort.doAfterTextChanged {
-            MmkvManager.encodeSettings(AppConfig.PREF_SOCKS_PORT, it?.toString()?.trim() ?: "")
+        etSocksPort.doAfterTextChanged { text ->
+            val port = text?.toString()?.trim()?.toIntOrNull()
+            if (port == null || port !in PORT_MIN..PORT_MAX) {
+                etSocksPort.error = getString(R.string.lp_socks_port_error, PORT_MIN, PORT_MAX)
+                return@doAfterTextChanged
+            }
+            etSocksPort.error = null
+            MmkvManager.encodeSettings(AppConfig.PREF_SOCKS_PORT, port.toString())
+            markCoreChanged()
         }
 
         // Мастер-строка группы: читает CoreConfigManager.configureInbounds — при выключенном
@@ -201,12 +258,20 @@ class LocalProxyActivity : BaseActivity() {
         bindHotspotSection()
     }
 
+    /**
+     * Состояние выставляется ДО подписки на изменения, иначе первая же отрисовка ушла бы в
+     * onChange и перезаписала бы хранилище своим же значением. Каждый onChange здесь пишет ключ
+     * конфига ядра, поэтому [markCoreChanged] вызывается за всех разом.
+     */
     private fun bindSwitchRow(rowId: Int, switchId: Int, initial: Boolean, onChange: (Boolean) -> Unit) {
         val row = findViewById<View>(rowId)
         val sw = findViewById<MaterialSwitch>(switchId)
         sw.isChecked = initial
         row.setOnClickListener { sw.toggle() }
-        sw.setOnCheckedChangeListener { _, isChecked -> onChange(isChecked) }
+        sw.setOnCheckedChangeListener { _, isChecked ->
+            onChange(isChecked)
+            markCoreChanged()
+        }
     }
     // endregion
 
@@ -238,6 +303,7 @@ class LocalProxyActivity : BaseActivity() {
                 refreshHotspotEndpoint()
                 setHotspotPasswordVisible(true)
             }
+            markCoreChanged()
         }
 
         btnToggleHotspotPass.setOnClickListener { setHotspotPasswordVisible(!hotspotPasswordVisible) }
@@ -308,4 +374,10 @@ class LocalProxyActivity : BaseActivity() {
         }
     }
     // endregion
+
+    private companion object {
+        /** Границы TCP-порта. Ниже и выше ядро инбаунд не поднимет. */
+        const val PORT_MIN = 1
+        const val PORT_MAX = 65535
+    }
 }

@@ -352,39 +352,36 @@ class AccountViewModel : ViewModel() {
     /**
      * Issues a provider checkout for [req].
      *
-     * [onFailure] fires in addition to [error] — and it is why the parameter sits BEFORE the
-     * trailing [onInit] rather than after it. A screen that charges money needs a signal that is
-     * one-per-attempt: [error] is a StateFlow, so two identical failures in a row de-duplicate to a
-     * single emission and a caller clearing its "payment in flight" flag on that emission would
-     * stay stuck busy after the second one. This callback fires once per completed attempt, which
-     * is exactly the lifetime of an in-flight guard (D10).
+     * The in-flight guard is taken with [MutableStateFlow.compareAndSet] BEFORE the first
+     * suspension point, and `viewModelScope` runs on `Dispatchers.Main.immediate`, so a second
+     * call made from the same frame as the first — a double tap — finds the flag already set and
+     * returns without touching the network (D10). It is released in a `finally`, so a throw cannot
+     * strand a screen with a permanently busy CTA.
+     *
+     * Failures surface through [error] alone. There is deliberately no per-attempt failure
+     * callback: nothing needs one, because the guard that a caller would clear from it lives here
+     * rather than on the screen.
      */
     fun buy(
         req: PaymentRequestDto,
-        onFailure: (ApiError) -> Unit = {},
         onInit: (PaymentInitDto) -> Unit,
     ) = viewModelScope.launch {
         if (!_paymentInFlight.compareAndSet(expect = false, update = true)) return@launch
         try {
-            repo.buy(req)
-                .onSuccess { onInit(it) }
-                .onFailure { t -> report(t); onFailure(t as? ApiError ?: ApiError.Network(t)) }
+            repo.buy(req).onSuccess { onInit(it) }.onFailure { report(it) }
         } finally {
             _paymentInFlight.value = false
         }
     }
 
-    /** Settles [req] against the wallet balance. [onFailure] and the in-flight guard as in [buy]. */
+    /** Settles [req] against the wallet balance. Same in-flight guard as [buy]. */
     fun payWithBalance(
         req: PaymentRequestDto,
-        onFailure: (ApiError) -> Unit = {},
         onDone: () -> Unit = {},
     ) = viewModelScope.launch {
         if (!_paymentInFlight.compareAndSet(expect = false, update = true)) return@launch
         try {
-            repo.payWithBalance(req)
-                .onSuccess { onDone() }
-                .onFailure { t -> report(t); onFailure(t as? ApiError ?: ApiError.Network(t)) }
+            repo.payWithBalance(req).onSuccess { onDone() }.onFailure { report(it) }
         } finally {
             _paymentInFlight.value = false
         }

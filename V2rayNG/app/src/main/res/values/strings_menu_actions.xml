@@ -34,7 +34,7 @@
          the live-tunnel check, not a pass over the whole list. 10.7: the accessible name has to be
          the action. Wording matches 32-master-plan-android.md 12.3. -->
     <string name="menu_actions_ping_cd">Проверить задержку</string>
-    <string name="menu_actions_ping_empty">Проверять нечего: серверов пока нет. Добавьте провайдера или сервер.</string>
+    <string name="menu_actions_ping_empty">Проверять нечего: серверов пока нет. Добавьте подписку или сервер.</string>
     <string name="menu_actions_ping_filtered">Поиск ничего не нашёл, проверять нечего. Измените запрос.</string>
     <string name="menu_actions_reset_search">Сбросить</string>
     <string name="menu_actions_add">Добавить</string>
@@ -57,7 +57,7 @@
     <string name="menu_actions_undo">Отменить</string>
     <string name="menu_actions_restored">Серверы восстановлены</string>
 
-    <string name="menu_actions_del_all_body">Список серверов будет очищен. Серверы провайдеров вернутся после обновления подписки, добавленные вручную придётся ввести заново.</string>
+    <string name="menu_actions_del_all_body">Список серверов будет очищен. Серверы подписок вернутся после обновления подписки, добавленные вручную придётся ввести заново.</string>
     <string name="menu_actions_del_all_confirm">Удалить все</string>
     <string name="menu_actions_all_deleted">Серверы удалены: %1$d</string>
     <string name="menu_actions_cancel">Отмена</string>

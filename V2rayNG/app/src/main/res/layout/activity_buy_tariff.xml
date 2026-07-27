@@ -52,17 +52,17 @@
             tools:visibility="visible" />
 
         <!-- Retry affordance for the error state -->
+        <!-- Secondary, not a raw M3 tonal: the app's own tier carries the bevel, the press
+             motion, the focus ring and btn_height 48 (OWNER-FEEDBACK D1). -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_retry"
-            style="@style/Widget.Material3.Button.TonalButton"
+            style="@style/Widget.Departament.Button.Secondary"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="@dimen/space_4"
             android:layout_marginBottom="@dimen/space_8"
             android:text="@string/buy_retry"
-            android:textAllCaps="false"
-            app:cornerRadius="@dimen/radius_button"
             android:visibility="gone"
             tools:visibility="visible" />
 
@@ -203,16 +203,17 @@
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_dev_minus"
                         style="@style/Widget.Material3.Button.IconButton"
-                        android:layout_width="@dimen/tile_size"
-                        android:layout_height="@dimen/tile_size"
+                        android:layout_width="@dimen/view_height_dp48"
+                        android:layout_height="@dimen/view_height_dp48"
                         android:contentDescription="@string/buy_extra_devices_minus"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
                         android:minWidth="0dp"
                         android:minHeight="0dp"
                         android:padding="0dp"
+                        android:stateListAnimator="@anim/press_scale"
                         app:backgroundTint="?attr/iconTileBgBlue"
-                        app:cornerRadius="20dp"
+                        app:cornerRadius="@dimen/radius_pill"
                         app:icon="@drawable/ic_remove_24dp"
                         app:iconGravity="textStart"
                         app:iconPadding="0dp"
@@ -232,16 +233,17 @@
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_dev_plus"
                         style="@style/Widget.Material3.Button.IconButton"
-                        android:layout_width="@dimen/tile_size"
-                        android:layout_height="@dimen/tile_size"
+                        android:layout_width="@dimen/view_height_dp48"
+                        android:layout_height="@dimen/view_height_dp48"
                         android:contentDescription="@string/buy_extra_devices_plus"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
                         android:minWidth="0dp"
                         android:minHeight="0dp"
                         android:padding="0dp"
+                        android:stateListAnimator="@anim/press_scale"
                         app:backgroundTint="?attr/iconTileBgBlue"
-                        app:cornerRadius="20dp"
+                        app:cornerRadius="@dimen/radius_pill"
                         app:icon="@drawable/ic_add_24dp"
                         app:iconGravity="textStart"
                         app:iconPadding="0dp"
@@ -281,8 +283,11 @@
                         tools:text="299 ₽" />
                 </LinearLayout>
 
-                <!-- Pay CTA: filled blue primary, radius_button 16 (00-rules 1.4.5 / C§R1 — the
-                     52dp stadium is the shape the owner rejected by name).
+                <!-- Pay CTA: the screen's ONE full-width primary, at the Tall tier. 52 is a
+                     MINIMUM height and never a fixed one (styles.xml, Primary.Tall) — the
+                     hardcoded android:layout_height="52dp" it used to carry clipped its own label
+                     at large font scales, and the inline textAllCaps/textStyle/cornerRadius
+                     overrides restated the style's own tokens.
 
                      progress_buy lives HERE, on the control that spends money, and not in the
                      states block above where it was declared and then hidden in four places and
@@ -295,14 +300,11 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_pay"
+                        style="@style/Widget.Departament.Button.Primary.Tall"
                         android:layout_width="match_parent"
-                        android:layout_height="52dp"
+                        android:layout_height="wrap_content"
                         android:text="@string/buy_pay"
-                        android:textAllCaps="false"
-                        android:textStyle="bold"
-                        app:cornerRadius="@dimen/radius_button"
-                        app:icon="@drawable/ic_acc_wallet"
-                        app:iconGravity="textStart" />
+                        app:icon="@drawable/ic_acc_wallet" />
 
                     <com.google.android.material.progressindicator.CircularProgressIndicator
                         android:id="@+id/progress_buy"

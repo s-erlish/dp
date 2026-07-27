@@ -74,12 +74,15 @@
                 tools:text="ID: a1b2c3d4e5f6" />
         </LinearLayout>
 
+        <!-- 48dp, not the 44 it shipped with: this is the only target on the row and it destroys
+             a device binding, so it may not sit under the touch minimum. -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_device_delete"
             style="@style/Widget.Material3.Button.IconButton"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:layout_width="@dimen/view_height_dp48"
+            android:layout_height="@dimen/view_height_dp48"
             android:layout_marginStart="@dimen/space_8"
+            android:stateListAnimator="@anim/press_scale"
             android:contentDescription="@string/devices_delete_cd"
             android:insetTop="0dp"
             android:insetBottom="0dp"

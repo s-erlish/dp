@@ -159,7 +159,7 @@
     <string name="subs_ed_interval_hint">Не реже одного раза в сутки достаточно</string>
     <string name="subs_ed_interval_too_small">Слишком короткий интервал. Укажите значение побольше.</string>
     <string name="subs_ed_user_agent" translatable="false">User-Agent</string>
-    <string name="subs_ed_user_agent_hint">Оставьте пустым, чтобы использовать значение из настроек провайдеров</string>
+    <string name="subs_ed_user_agent_hint">Оставьте пустым, чтобы использовать значение из настроек подписок</string>
     <string name="subs_ed_user_agent_error">В заголовке нельзя передать кириллицу и другие не-ASCII символы. Оставьте латиницу, цифры и знаки.</string>
     <string name="subs_ed_filter">Фильтр серверов</string>
     <string name="subs_ed_filter_hint">Показывать только серверы, чьё имя подходит под выражение</string>

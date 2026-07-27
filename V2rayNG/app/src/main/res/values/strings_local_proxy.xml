@@ -17,9 +17,11 @@
 
     <string name="title_local_proxy">Локальный прокси</string>
 
-    <!-- Разделы -->
-    <string name="lp_section_socks">SOCKS5-авторизация</string>
-    <string name="lp_section_local">Локальный прокси</string>
+    <!-- Разделы. Заголовок называет область, строка внутри — сам переключатель: до этого
+         оба раздела повторяли заголовок своей первой строки, а второй повторял ещё и
+         название экрана, так что «Локальный прокси» стояло на экране трижды подряд. -->
+    <string name="lp_section_socks">Учётные данные</string>
+    <string name="lp_section_local">Прокси и доступ</string>
 
     <!-- SOCKS5-авторизация. Логин и пароль спрашивает только инбаунд, открытый
          в локальную сеть: петлевой прокси на 127.0.0.1 всегда без авторизации,
@@ -31,6 +33,8 @@
     <string name="lp_socks_password">Пароль</string>
     <string name="lp_socks_address">Адрес</string>
     <string name="lp_socks_port">Порт</string>
+    <!-- Порт вне диапазона не сохраняется: ядро с ним не поднимет инбаунд. -->
+    <string name="lp_socks_port_error">Порт от %1$d до %2$d</string>
     <string name="lp_socks_reset">Сбросить учётные данные</string>
     <string name="lp_copy">Копировать</string>
     <string name="lp_show_password">Показать пароль</string>
