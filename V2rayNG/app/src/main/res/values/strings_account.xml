@@ -99,12 +99,24 @@
     <!-- «августа 2027» — the year appears only when it is not the current one. -->
     <string name="account_month_year">%1$s %2$d</string>
 
-    <plurals name="account_days">
-        <item quantity="one">день</item>
-        <item quantity="few">дня</item>
-        <item quantity="many">дней</item>
-        <item quantity="other">дня</item>
-    </plurals>
+    <!-- Russian day forms, selected in CODE (AccountFragment.dayWord) and deliberately not a
+         <plurals> set.
+
+         This whole file is the Russian UI and lives in the default folder, but the app follows the
+         SYSTEM locale until the user picks one (SettingsManager.getLocale → Language.AUTO), and
+         getQuantityString chooses its form from the CONFIGURATION locale rather than from the
+         folder the words live in. On an English-locale phone that applies English rules to Russian
+         words: only «one» and «other» exist there, so 5, 6 and 7 all resolved to «дня» — «Осталось
+         5 дня» — across most of the 1-7 day window this hero exists to serve, and 21 read
+         «Осталось 21 дня». 23-account-rework.md 4.4 gives the selector; it is the same rule the
+         desktop's Plural.cs runs, so both clients say the same word for the same number.
+
+         Order is fixed and the code indexes it: ONE, FEW, MANY. -->
+    <string-array name="account_day_forms">
+        <item>день</item>
+        <item>дня</item>
+        <item>дней</item>
+    </string-array>
 
     <!-- Genitive months: they are only ever read after a day figure («3 августа»). -->
     <string-array name="account_months_genitive">

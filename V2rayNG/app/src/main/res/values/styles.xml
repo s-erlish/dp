@@ -393,9 +393,15 @@
         decorative glows behind screens; this is a control, and the ramp is pure
         luminance, not a second hue.
 
-        The 5.51:1 survives ALL FIVE STATES by construction, not by luck: both ramps
-        are spent clear of the label band (see @drawable/btn_gloss_rest), disabled
-        drops the overlay entirely, and loading only removes the label it is hiding.
+        The 5.51:1 survives ALL FIVE STATES by construction, not by luck — and the
+        construction is the whole guarantee, so do not weaken it. Both ramps are spent
+        clear of the label band (see @drawable/btn_gloss_rest: lift gone by 30% of the
+        height, settle starts at 74%, a 16sp label centred in a 48-52dp button sits at
+        ~30%-70%), disabled drops the overlay entirely, and loading only removes the
+        label it is hiding. AT THE BARE EDGES, where no glyph is ever drawn, the fill
+        does move: dark-pressed the top row measures 3.71:1 and light-at-rest the top
+        row measures 4.42:1. Widen either ramp into the label band and the button
+        stops clearing AA — that is the line, not the ramp strengths.
     -->
     <style name="Widget.Departament.Button.Primary" parent="Widget.Departament.Button">
         <item name="backgroundTint">@color/btn_primary_container</item>
@@ -530,10 +536,26 @@
         button is chrome, and 3.6 spends the accent budget on the screen's one
         primary action rather than on its toolbar. The plate draws inside the pill,
         so what appears under the finger is a disc.
+
+        ALL FOUR INSETS ARE ZEROED, and the horizontal pair is not decoration.
+        Widget.Material3.Button.IconButton is the ONE button style in the library
+        that sets android:insetLeft/insetRight (@dimen/m3_btn_inset, 4dp) — the base
+        Widget.MaterialComponents.Button zeroes them and every other variant inherits
+        that. MaterialButton applies the four insets to the drawable it builds, not to
+        the view, so on a 48x48 target the painted background is 40x48. That was
+        invisible while the container was transparent and stops being invisible the
+        moment anything is painted in it: GradientDrawable clamps a corner radius to
+        half the SHORTER side, so radius_pill on 40x48 draws a 20dp vertical stadium
+        instead of the 24dp disc this comment promises, and on .Filled the bevel —
+        which is a FOREGROUND and therefore covers the full 48x48 view — would hang a
+        lit arc 4dp outside the fill on each side. Zeroing them costs no layout: the
+        insets never touched the view's measurement, only where its background drew.
     -->
     <style name="Widget.Departament.Button.Icon" parent="Widget.Material3.Button.IconButton">
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
+        <item name="android:insetLeft">0dp</item>
+        <item name="android:insetRight">0dp</item>
         <item name="android:minWidth">@dimen/view_height_dp48</item>
         <item name="android:minHeight">@dimen/view_height_dp48</item>
         <item name="iconSize">@dimen/tile_glyph</item>

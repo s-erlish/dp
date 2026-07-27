@@ -237,15 +237,22 @@
          is precisely the "просто сплошной цвет" the owner rejected. The rim is
          24%, half again the light value, and the settle is 15%.
 
-         Contrast is unaffected at the label, by construction: the lift is spent by
+         Contrast is unaffected AT THE LABEL, by construction: the lift is spent by
          30% of the height and the settle does not start until 74%, while a 16sp
          label centred in a 48-52dp button occupies ~30%-70%. onPrimary #00183A on
-         #4C8DFF stays 5.51:1 in EVERY state - rest, pressed, focused, loading.
-         Only the bare top and bottom edges, where nothing is drawn, ever see the
-         full strength.
+         #4C8DFF therefore keeps its full 5.51:1 in every state - rest, pressed,
+         focused, loading.
+
+         The BARE EDGES are a different number and it is honest to write it down:
+         nothing is drawn there, so the fill is free to move, and it does. Under the
+         full settle the bottom row measures 4.12:1, and pressed, under the full
+         shade, the top row measures 3.71:1. Those are safe because they are empty
+         pixels. The rule that keeps them empty is the 30%/74% clearance in
+         @drawable/btn_gloss_*, so that clearance - not these five strengths - is the
+         thing that may not be relaxed.
          ===================================================================== -->
     <!-- btn_gloss_clear / btn_gloss_clear_dark are theme-invariant and stay in
-         values/colors.xml. Only the four strengths differ. -->
+         values/colors.xml. Only the five strengths differ. -->
     <color name="btn_gloss_rim">#3DFFFFFF</color>
     <color name="btn_gloss_top">#24FFFFFF</color>
     <color name="btn_gloss_bottom">#26000000</color>

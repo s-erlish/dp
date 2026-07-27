@@ -369,9 +369,18 @@
 
          Light is the quieter of the two: the surfaces are already bright, so a
          hard white lift would blow out and a hard black settle would read as
-         dirt. Measured worst case, at the extreme top edge of the light primary
-         #1E5FC7 under the full rim, white-on-fill still measures 5.08:1 — and no
-         glyph is ever drawn there, because both ramps clear the label band.
+         dirt.
+
+         WHERE THE CONTRAST GUARANTEE ACTUALLY LIVES: at the LABEL, not at the
+         edges. Both ramps are spent clear of the label band, so onPrimary on the
+         light primary #1E5FC7 keeps its full 5.97:1 (dark keeps 5.51:1) in every
+         state. At the bare top and bottom rows, where no glyph is ever drawn, the
+         fill genuinely does move — light-at-rest the top row under the full rim
+         measures 4.42:1, and dark-pressed the top row under the full shade
+         measures 3.71:1. Those numbers are safe ONLY because nothing is drawn
+         there. Raise a strength here and the edge moves; move a stop in
+         @drawable/btn_gloss_* into the 30%-74% band and the LABEL moves, which is
+         the change that would break AA.
          ===================================================================== -->
     <!-- The two zero-alpha stops, and they are NOT interchangeable. Android
          interpolates a gradient in UNPREMULTIPLIED sRGB, so the RGB of a fully

@@ -610,7 +610,7 @@ class AccountFragment : Fragment() {
                 b.tvTimeLabel.setText(R.string.account_time_left)
                 b.tvTimeLabel.setTextColor(amber)
                 b.tvTimeFigure.text = daysLeft.toString()
-                b.tvTimeWord.text = resources.getQuantityString(R.plurals.account_days, daysLeft)
+                b.tvTimeWord.text = dayWord(daysLeft)
                 b.tvTimeDetail.text = getString(R.string.account_time_detail_until, longDate(date))
                 b.tvTimeDetail.isVisible = true
                 tintFigure(amber)
@@ -622,7 +622,7 @@ class AccountFragment : Fragment() {
                 b.tvTimeFigure.text = date.day.toString()
                 b.tvTimeWord.text = dateWord
                 if (daysLeft <= COUNTDOWN_FROM_DAYS) {
-                    val count = resources.getQuantityString(R.plurals.account_days, daysLeft)
+                    val count = dayWord(daysLeft)
                     b.tvTimeDetail.text = getString(R.string.account_time_detail_left, daysLeft, count)
                     b.tvTimeDetail.isVisible = true
                 } else {
@@ -649,6 +649,34 @@ class AccountFragment : Fragment() {
         val b = _binding ?: return
         b.tvTimeFigure.setTextColor(color)
         b.tvTimeWord.setTextColor(color)
+    }
+
+    /**
+     * «день / дня / дней» for [count], chosen by the Russian rule in code rather than by a
+     * `<plurals>` set (23-account-rework.md 4.4).
+     *
+     * The tab's copy is Russian for every user, but the app follows the SYSTEM locale until the
+     * user picks one (`SettingsManager.getLocale` → `Language.AUTO`), and `getQuantityString`
+     * selects its form from the CONFIGURATION locale, not from the folder the words live in. On an
+     * English-locale phone that applied English rules — which have only `one` and `other` — to
+     * Russian words, so 5, 6 and 7 all came out «дня» («Осталось 5 дня») across most of the very
+     * window this hero exists to serve, and 21 came out «Осталось 21 дня». Selecting here is
+     * locale-proof, and it is the same rule the desktop's `Plural.cs` runs, so the two clients say
+     * the same word for the same number.
+     */
+    private fun dayWord(count: Int): String {
+        val forms = resources.getStringArray(R.array.account_day_forms)
+        if (forms.isEmpty()) return ""
+        val n = Math.abs(count)
+        val hundreds = n % 100
+        val units = n % 10
+        val index = when {
+            hundreds in 11..14 -> MANY
+            units == 1 -> ONE
+            units in 2..4 -> FEW
+            else -> MANY
+        }
+        return forms.getOrNull(index) ?: forms.last()
     }
 
     /**
@@ -1075,6 +1103,11 @@ class AccountFragment : Fragment() {
 
         /** Above this a count is machine output — the card states the date and stops. */
         const val COUNTDOWN_FROM_DAYS = 30
+
+        /** Indices into R.array.account_day_forms; the array is ordered ONE, FEW, MANY. */
+        const val ONE = 0
+        const val FEW = 1
+        const val MANY = 2
     }
 }
 

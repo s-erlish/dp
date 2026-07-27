@@ -32,6 +32,22 @@ object MmkvManager {
     private const val KEY_SUB_IDS = "SUB_IDS"
     private const val KEY_WEBDAV_CONFIG = "WEBDAV_CONFIG"
 
+    /**
+     * The retired "measurement in flight" sentinel.
+     *
+     * A shipped build wrote **-2** into every row's stored delay when a latency check started, to
+     * make the list spin. Nothing writes it any more — "in flight" is memory-only state on
+     * `MainViewModel` now — but MMKV kept what that build wrote, so an upgraded install still has
+     * rows carrying it, including rows the check never measured (group/balancer entries,
+     * unparseable CUSTOM profiles) and therefore never overwrote.
+     *
+     * It is negative, and [removeInvalidServer] deletes on "negative". That combination silently
+     * deleted servers the user never asked to delete, unattended, the first time
+     * `PREF_AUTO_REMOVE_INVALID_AFTER_TEST` was on. So the sentinel is named here and excluded by
+     * value: a display state must never be readable as a verdict, whatever wrote it.
+     */
+    private const val TESTING = -2L
+
     private val mainStorage by lazy { MMKV.mmkvWithID(ID_MAIN, MMKV.MULTI_PROCESS_MODE) }
     private val profileFullStorage by lazy { MMKV.mmkvWithID(ID_PROFILE_FULL_CONFIG, MMKV.MULTI_PROCESS_MODE) }
     private val serverRawStorage by lazy { MMKV.mmkvWithID(ID_SERVER_RAW, MMKV.MULTI_PROCESS_MODE) }
@@ -315,6 +331,17 @@ object MmkvManager {
     }
 
     /**
+     * Whether a stored delay is evidence that a check ran against this server and it did not answer.
+     *
+     * Not simply "negative". [TESTING] is negative and is not a verdict about the server at all — it
+     * is a display state a retired build persisted — so it is excluded by value here rather than
+     * trusted to be absent. This is the single place that decides what "invalid" means, and it is
+     * the place that deletes, so the two cannot drift apart.
+     */
+    private fun isFailedMeasurement(delayMillis: Long): Boolean =
+        delayMillis < 0L && delayMillis != TESTING
+
+    /**
      * Removes invalid server configurations.
      *
      * @param guid The server GUID.
@@ -324,7 +351,7 @@ object MmkvManager {
         var count = 0
         if (guid.isNotEmpty()) {
             decodeServerAffiliationInfo(guid)?.let { aff ->
-                if (aff.testDelayMillis < 0L) {
+                if (isFailedMeasurement(aff.testDelayMillis)) {
                     removeServer(guid)
                     count++
                 }
@@ -332,7 +359,7 @@ object MmkvManager {
         } else {
             serverAffStorage.allKeys()?.forEach { key ->
                 decodeServerAffiliationInfo(key)?.let { aff ->
-                    if (aff.testDelayMillis < 0L) {
+                    if (isFailedMeasurement(aff.testDelayMillis)) {
                         removeServer(key)
                         count++
                     }

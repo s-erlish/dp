@@ -21,7 +21,6 @@ import com.v2ray.ang.dto.entities.ServerAffiliationInfo
 import com.v2ray.ang.dto.entities.ServersCache
 import com.v2ray.ang.dto.entities.SubscriptionCache
 import com.v2ray.ang.enums.EConfigType
-import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.extension.isGroupType
 import com.v2ray.ang.template.TemplateManager
 import com.v2ray.ang.util.JsonUtil
@@ -287,24 +286,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Exports all servers.
-     * @return The number of exported servers.
-     */
-    fun exportAllServer(): Int {
-        val serverListCopy =
-            if (subscriptionId.isEmpty() && keywordFilter.isEmpty()) {
-                serverList
-            } else {
-                serversCache.map { it.guid }.toList()
-            }
-
-        val ret = AngConfigManager.shareNonCustomConfigsToClipboard(
-            getApplication<AngApplication>(),
-            serverListCopy
-        )
-        return ret
-    }
+    // «Экспортировать все» (exportAllServer) used to live here and was reachable from the Серверы
+    // tab's overflow. That tab is gone and is not coming back, and the handler outlived every
+    // caller — a function that copies every server link to the clipboard, that nothing can invoke,
+    // reading as though the product still offers it. Sharing one server is a live feature and keeps
+    // its own route (the server row's actions sheet: share link, QR). A whole-list export needs a
+    // deliberate surface and a decision about handing an operator's entire server set to the
+    // clipboard in one tap; until that decision is made the feature is filed (M-51), not implied.
 
     /**
      * Resolves the host:port to ping for a server row.
@@ -611,42 +599,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return -1
     }
 
-    /**
-     * Removes duplicate servers.
-     * Excludes servers with complex types (Custom, PolicyGroup, or ProxyChain) from duplicate comparison.
-     * @return The number of removed servers.
-     */
-    fun removeDuplicateServer(): Int {
-        val serversCacheCopy = serversCache.toList().toMutableList()
-        val deleteServer = mutableListOf<String>()
-
-        serversCacheCopy.forEachIndexed { index, sc ->
-            val profile = sc.profile
-            // Skip if this profile has a complex config type
-            if (profile.configType.isComplexType()) {
-                return@forEachIndexed
-            }
-
-            serversCacheCopy.forEachIndexed { index2, sc2 ->
-                if (index2 > index) {
-                    val profile2 = sc2.profile
-                    // Skip if the second profile has a complex config type
-                    if (profile2.configType.isComplexType()) {
-                        return@forEachIndexed
-                    }
-
-                    if (profile == profile2 && !deleteServer.contains(sc2.guid)) {
-                        deleteServer.add(sc2.guid)
-                    }
-                }
-            }
-        }
-        for (it in deleteServer) {
-            MmkvManager.removeServer(it)
-        }
-
-        return deleteServer.count()
-    }
+    // «Удалить дубликаты» (removeDuplicateServer) used to live here and lost its caller with the
+    // Серверы tab. It is a bulk delete with no prompt, no count shown before the fact and no undo,
+    // and it was left standing with nothing able to call it. That is the shape of defect M-19 —
+    // a delete reachable by accident rather than by intent — so it is not left lying next to the
+    // path that runs unattended. Restoring it means giving it a door the user opens knowingly:
+    // a confirmation that names how many серверы go, and a way back. Filed as M-51.
 
     /**
      * Removes all servers.
@@ -669,11 +627,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Removes the servers whose last check failed.
      *
-     * A server being measured right now is never one of them. `MmkvManager.removeInvalidServer("")`
-     * sweeps the stored delays and deletes everything below zero, which cannot tell a failure from
-     * any other negative value, so the guids are walked here instead and anything still in flight
-     * is skipped. Nothing writes a negative "in progress" value any more (see [measuringGuids]),
-     * and this keeps it that way by construction rather than by convention.
+     * A server being measured right now is never one of them, and it takes two independent guards
+     * to say that honestly, because this runs unattended: [onTestsFinished] calls it whenever
+     * «Автоудаление нерабочих серверов» is on, so a wrong answer here deletes the user's servers
+     * with no prompt and no undo.
+     *
+     * *This* guard is about the run in progress. `MmkvManager.removeInvalidServer("")` sweeps the
+     * whole store and cannot see which rows are in flight, so the guids are walked here and
+     * anything in [measuringGuids] is skipped.
+     *
+     * The other guard is about the store. Nothing in this build writes an "in progress" value into
+     * MMKV — a shipped build did, `-2` on every cached row including the rows its own test then
+     * skipped, and MMKV kept it — so `MmkvManager` excludes that sentinel by value rather than
+     * assuming it is gone. Neither guard is redundant: this one protects a row nobody has finished
+     * measuring, that one protects a row nobody ever started.
      *
      * @return The number of removed servers.
      */
