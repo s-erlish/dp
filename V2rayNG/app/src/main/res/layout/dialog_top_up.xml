@@ -1,7 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Themed input for the "Пополнить баланс" dialog (blue accent via the dialog overlay). -->
+<!--
+  «Пополнить» — the amount field.
+
+  Widget.Departament.TextField, not a raw Material outlined box with a hand-rolled
+  boxStrokeColor/hintTextColor pair: the app's own field carries radius_button 16,
+  the 56dp minimum, the 3:1 component boundary and the focus/error strokes, so this
+  dialog stops being the one field in the product drawn differently from every other.
+
+  hintEnabled is false in that style because a label lives ABOVE its field and a
+  placeholder is only ever an example of the value (00-rules.md 7.4). Here the label
+  is the dialog's own title, «Сумма пополнения», which is always visible, so
+  «Введите сумму» moves onto the input as the placeholder it always was.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
@@ -10,17 +21,16 @@
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/til_top_up"
-        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        style="@style/Widget.Departament.TextField"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="@string/account_top_up_hint"
-        app:boxStrokeColor="?attr/colorPrimary"
-        app:hintTextColor="?attr/colorPrimary">
+        android:layout_height="wrap_content">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/et_top_up"
+            style="@style/Widget.Departament.TextField.EditText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:hint="@string/account_top_up_hint"
             android:imeOptions="actionDone"
             android:inputType="numberDecimal"
             android:maxLines="1" />

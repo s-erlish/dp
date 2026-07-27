@@ -1,20 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  ============================================================================
+  A-20  settings/routing - Маршрутизация.  H3 · R1.
+  24-tab-conformance.md A-20, 00-rules.md 4.2 / 4.8.
+  ============================================================================
 
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+  What changed, beyond the tokens: FIVE ACTIONS CAME OUT OF A TOOLBAR OVERFLOW that
+  nothing else in the app has - «Готовые наборы», «Импорт из буфера», «Импорт из
+  QR-кода», «Экспорт», and «Добавить правило» - and became visible rows in their own
+  group. A-38 removes the ActionBar these lived on, so leaving them there would have
+  deleted five features outright.
+
+  The screen is one ledger, top to bottom (R1):
+
+      H3 toolbar «Маршрутизация» + «Добавить правило»
+      24 · Row.Value «Стратегия доменов», cycles AsIs / IPIfNonMatch / IPOnDemand
+      24 · «Правила» · rule rows at 0, or the empty state
+      24 · «Наборы и обмен» · four action rows
+      32
+
+  Deleted with the old file: the 12dp card inset, the 60dp row height, the 14dp inner
+  padding, the 16sp/13sp inline sizes, the 18dp chevron and the purple icon tile - a
+  fourth tile colour that encoded no category (D-5).
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:attr/colorBackground"
     android:fitsSystemWindows="true"
+    android:orientation="vertical"
     tools:context=".ui.RoutingSettingActivity">
+
+    <include
+        android:id="@+id/toolbar"
+        layout="@layout/view_toolbar" />
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/main_content"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:clipToPadding="false"
-        android:paddingBottom="16dp"
+        android:paddingBottom="@dimen/space_32"
         android:scrollbars="none">
 
         <LinearLayout
@@ -22,97 +50,53 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <include
+                android:id="@+id/row_domain_strategy"
+                layout="@layout/view_row" />
+
             <TextView
+                android:id="@+id/label_rules"
                 style="@style/SettingsSectionLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/routing_settings_domain_strategy" />
-
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="12dp"
-                app:cardBackgroundColor="?attr/colorSurface"
-                app:cardCornerRadius="20dp"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp">
-
-                <LinearLayout
-                    android:id="@+id/layout_domain_strategy"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="60dp"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="10dp">
-
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_icon_purple">
-
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_globe_24dp"
-                            app:tint="?attr/iconTintPurple" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/routing_settings_domain_strategy"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp" />
-
-                        <TextView
-                            android:id="@+id/tv_domain_strategy_summary"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:maxLines="1"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-
-                </LinearLayout>
-
-            </com.google.android.material.card.MaterialCardView>
-
-            <TextView
-                style="@style/SettingsSectionLabel"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/routing_settings_rule_title" />
+                android:text="@string/routing_section_rules" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/recycler_view"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:nestedScrollingEnabled="false"
-                tools:listitem="@layout/item_recycler_routing_setting" />
+                tools:listitem="@layout/view_row" />
+
+            <include
+                android:id="@+id/empty_state"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_24"
+                android:layout_marginBottom="@dimen/space_24"
+                layout="@layout/view_empty_state" />
+
+            <TextView
+                style="@style/SettingsSectionLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/routing_section_actions" />
+
+            <include
+                android:id="@+id/row_presets"
+                layout="@layout/view_row" />
+
+            <include
+                android:id="@+id/row_import_clipboard"
+                layout="@layout/view_row" />
+
+            <include
+                android:id="@+id/row_import_qrcode"
+                layout="@layout/view_row" />
+
+            <include
+                android:id="@+id/row_export"
+                layout="@layout/view_row" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
-</RelativeLayout>
+</LinearLayout>

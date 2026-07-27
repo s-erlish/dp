@@ -1,13 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Universal press feedback for large tappable targets (rows, cards, buttons):
-     NO ripple/glow change. The target scales down slightly under the finger
-     (state_pressed) and eases back to 1.0 on release. Generalizes the bottom-nav
-     nav_press pattern, but 0.96 (subtler) since these targets are large, and uses
-     the shared motion tokens: press-in is quick (motion_press_in), release is a
-     softer settle (motion_press_out), both ease-out only. Reduced motion: when
-     ANIMATOR_DURATION_SCALE == 0 the system runs these at 0ms, so the view snaps
-     to the end scale with no visible animation.
-     Apply via android:stateListAnimator on the primary tappable view. -->
+<!-- THE press recipe, D-11 / R4, and the only one in the product: scale 0.97,
+     in over @integer/motion_press_in 90ms on ease_out_quart, out over
+     @integer/motion_press_out 160ms on ease_out_quint. The asymmetry is the
+     point - the finger-down must read as instant, the release as a relax.
+     Was 0.97's predecessor 0.96 with ease_out_quart in both directions; three
+     different press scales existed across the two clients and that is why the
+     number is now a single token (@fraction/press_scale).
+
+     R5, before you attach this: OBJECTS scale, ROWS DO NOT. A row is a slice of a
+     surface and scaling it tears the hairlines above and below it, which reads as
+     a rendering bug; a row inside a card or group steps its background to
+     ?attr/colorSurfaceContainerHigh instead. Free-standing pressable objects
+     (server row, subscription card, tariff card, device card, empty-state CTA)
+     scale.
+
+     NO ripple/glow change here; a ripple, where one is wanted, comes from
+     ?attr/selectableItemBackground on the same view - except the bottom
+     navigation, where 00-rules.md 0.4.8 forbids it outright.
+
+     Reduced motion: at ANIMATOR_DURATION_SCALE == 0 the system runs these at 0ms
+     and the view snaps to the end scale, so there is nothing to check at the
+     call site. Apply via android:stateListAnimator on the pressable view. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_pressed="true">
         <set>
@@ -15,13 +28,13 @@
                 android:duration="@integer/motion_press_in"
                 android:interpolator="@interpolator/ease_out_quart"
                 android:propertyName="scaleX"
-                android:valueTo="0.96"
+                android:valueTo="0.97"
                 android:valueType="floatType" />
             <objectAnimator
                 android:duration="@integer/motion_press_in"
                 android:interpolator="@interpolator/ease_out_quart"
                 android:propertyName="scaleY"
-                android:valueTo="0.96"
+                android:valueTo="0.97"
                 android:valueType="floatType" />
         </set>
     </item>
@@ -29,13 +42,13 @@
         <set>
             <objectAnimator
                 android:duration="@integer/motion_press_out"
-                android:interpolator="@interpolator/ease_out_quart"
+                android:interpolator="@interpolator/ease_out_quint"
                 android:propertyName="scaleX"
                 android:valueTo="1.0"
                 android:valueType="floatType" />
             <objectAnimator
                 android:duration="@integer/motion_press_out"
-                android:interpolator="@interpolator/ease_out_quart"
+                android:interpolator="@interpolator/ease_out_quint"
                 android:propertyName="scaleY"
                 android:valueTo="1.0"
                 android:valueType="floatType" />

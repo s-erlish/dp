@@ -1,6 +1,7 @@
 package com.v2ray.ang.auth
 
 import com.v2ray.ang.BuildConfig
+import com.v2ray.ang.util.HttpUtil
 
 /**
  * Central configuration for the Departament VPN backend + Telegram bot.
@@ -13,15 +14,67 @@ import com.v2ray.ang.BuildConfig
  */
 object BackendConfig {
 
+    /**
+     * The `SUB_USER_AGENT` value earlier builds shipped — our branding, not a client string any
+     * VPN panel knows. Those builds also STAMPED it onto every managed subscription, so it is
+     * still sitting in the highest precedence tier on upgraded installs; [isAppStampedUserAgent]
+     * exists to recognise and drop it. The build no longer ships it (see `build.gradle.kts`).
+     */
+    private const val LEGACY_BRANDING_USER_AGENT = "DepartamentVPN/1.0"
+
+    /**
+     * `v2rayNG/<version>` for ANY version — the shape of
+     * [HttpUtil.DEFAULT_SUBSCRIPTION_USER_AGENT] in every build this app ever had, so a stamp left
+     * by a build with a different `versionName` is recognised too.
+     */
+    private val APP_DEFAULT_USER_AGENT_SHAPE = Regex("""v2rayNG/\d+(\.\d+)*""", RegexOption.IGNORE_CASE)
+
     /** Backend base URL, e.g. https://web.departament.site/api (no trailing slash). */
     val baseUrl: String get() = BuildConfig.BACKEND_BASE_URL.trimEnd('/')
 
     /** Telegram bot username without the leading '@', e.g. departament_vpn_bot. */
     val botUsername: String get() = BuildConfig.BOT_USERNAME
 
-    /** User-Agent used for API + subscription requests (negotiates the response format). */
+    /**
+     * User-Agent used for API + subscription requests (negotiates the response format).
+     *
+     * Panels pick the subscription format — XRAY_JSON template vs base64 link list — from this
+     * header and map it themselves, so which string yields the template is a property of the
+     * OPERATOR'S panel, not of this app: `SUB_USER_AGENT` is that operator's knob and whatever it
+     * holds is sent verbatim. Blank means "not configured" and falls back to
+     * [HttpUtil.DEFAULT_SUBSCRIPTION_USER_AGENT], the client string every panel recognises as this
+     * client (answered with the base64 link list — see `build.gradle.kts` for why that is the
+     * shipped default).
+     *
+     * The one value that is refused is one that cannot travel in a header, and that is a hard
+     * limit rather than a preference: this property is not only a subscription fallback —
+     * [DepartamentApiClientImpl] sends it verbatim as the API `User-Agent` — and OkHttp throws
+     * while BUILDING the request on a non-ASCII value, so a Cyrillic string here would take down
+     * every backend call, not just format negotiation.
+     */
     val subscriptionUserAgent: String
-        get() = BuildConfig.SUB_USER_AGENT.ifBlank { "DepartamentVPN/1.0" }
+        get() = BuildConfig.SUB_USER_AGENT.trim()
+            .takeIf { it.isNotBlank() && HttpUtil.isHeaderSafe(it) }
+            ?: HttpUtil.DEFAULT_SUBSCRIPTION_USER_AGENT
+
+    /**
+     * True when [value] is a User-Agent THIS APP put on a subscription rather than one a person
+     * typed — i.e. it carries no user intent and a caller may drop it.
+     *
+     * Covers every string the app itself has ever stamped or defaulted to: the legacy branding
+     * value, the current operator value, and `v2rayNG/<version>` of any build. Matching by shape
+     * matters because the stamp on an upgraded install was written by an OLDER build, so comparing
+     * against today's resolved value alone silently matches nothing — which is exactly how the
+     * stamp survived into the highest precedence tier and defeated the whole User-Agent chain.
+     */
+    fun isAppStampedUserAgent(value: String): Boolean {
+        val v = value.trim()
+        return v.isEmpty()
+            || v.equals(LEGACY_BRANDING_USER_AGENT, ignoreCase = true)
+            || v.equals(subscriptionUserAgent, ignoreCase = true)
+            || v.equals(HttpUtil.DEFAULT_SUBSCRIPTION_USER_AGENT, ignoreCase = true)
+            || APP_DEFAULT_USER_AGENT_SHAPE.matches(v)
+    }
 
     /** True only when a backend base URL has been provided at build time. */
     fun isConfigured(): Boolean = BuildConfig.BACKEND_BASE_URL.isNotBlank()

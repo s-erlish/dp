@@ -47,6 +47,7 @@ object SettingsManager {
         initRoutingRulesets(context)
         migrateServerListToSubscriptions()
         migrateHysteria2PinSHA256()
+        pruneOrphanServerRawOnce()
     }
 
     /**
@@ -381,6 +382,98 @@ object SettingsManager {
     }
 
     /**
+     * Whether a notification is posted while a subscription is being refreshed. Default TRUE.
+     */
+    fun isNotifyOnSubscriptionUpdate(): Boolean {
+        return MmkvManager.decodeSettingsBool(AppConfig.PREF_SUB_NOTIFY_ON_UPDATE, true)
+    }
+
+    /**
+     * Whether every subscription is refreshed once when the app starts. Default FALSE.
+     */
+    fun isUpdateSubscriptionOnLaunch(): Boolean {
+        return MmkvManager.decodeSettingsBool(AppConfig.PREF_SUB_UPDATE_ON_LAUNCH, false)
+    }
+
+    /**
+     * Whether the latency test runs once when the app starts. Default FALSE.
+     */
+    fun isPingOnLaunch(): Boolean {
+        return MmkvManager.decodeSettingsBool(AppConfig.PREF_PING_ON_LAUNCH, false)
+    }
+
+    /**
+     * Whether the latency test runs after a subscription refresh. Default TRUE.
+     */
+    fun isPingOnSubscriptionUpdate(): Boolean {
+        return MmkvManager.decodeSettingsBool(AppConfig.PREF_PING_ON_UPDATE, true)
+    }
+
+    /**
+     * Global fallback User-Agent for subscription fetches, or null when the user has not set one —
+     * a subscription's own User-Agent and then the operator default still apply, in that order.
+     */
+    fun getSubscriptionUserAgent(): String? {
+        return MmkvManager.decodeSettingsString(AppConfig.PREF_SUB_USER_AGENT)?.trim()?.takeIf { it.isNotEmpty() }
+    }
+
+    /**
+     * Server list order chosen on the provider screen, one of `AppConfig.SERVER_SORT_*`.
+     */
+    fun getServerSortOrder(): String {
+        return MmkvManager.decodeSettingsString(AppConfig.PREF_SERVER_SORT_ORDER)
+            ?.takeIf { it.isNotEmpty() } ?: AppConfig.SERVER_SORT_DEFAULT
+    }
+
+    /**
+     * Reorders every stored server list to match [getServerSortOrder].
+     *
+     * Order is a property of the stored guid list — every screen renders servers as stored, and a
+     * subscription refresh rewrites the list in the provider's order — so the choice is applied to
+     * storage instead of at render time. That is also why
+     * [AppConfig.SERVER_SORT_DEFAULT] does nothing here: the provider's own order is what the next
+     * refresh restores.
+     */
+    fun applyServerSortOrder() {
+        val order = getServerSortOrder()
+        if (order == AppConfig.SERVER_SORT_DEFAULT) return
+
+        val subIds = decodeSubsList()
+        // Ungrouped servers live under the default subscription, which is not always in the list.
+        if (!subIds.contains(DEFAULT_SUBSCRIPTION_ID)) {
+            subIds.add(DEFAULT_SUBSCRIPTION_ID)
+        }
+
+        subIds.forEach { subId ->
+            val guids = MmkvManager.decodeServerList(subId)
+            if (guids.size < 2) return@forEach
+
+            // Each key is read once and then sorted, never re-read per comparison: this runs on the
+            // main thread during startup and one key costs an MMKV read plus a JSON parse.
+            val sorted = when (order) {
+                AppConfig.SERVER_SORT_PING -> guids
+                    .map { guid ->
+                        // Untested and unreachable servers sink to the bottom instead of leading it.
+                        val delay = MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: -1L
+                        guid to if (delay <= 0L) Long.MAX_VALUE else delay
+                    }
+                    .sortedBy { it.second }
+                    .map { it.first }
+
+                AppConfig.SERVER_SORT_NAME -> guids
+                    .map { guid ->
+                        guid to decodeServerConfig(guid)?.remarks?.lowercase(Locale.getDefault()).orEmpty()
+                    }
+                    .sortedBy { it.second }
+                    .map { it.first }
+
+                else -> return@forEach
+            }
+            MmkvManager.encodeServerList(sorted.toMutableList(), subId)
+        }
+    }
+
+    /**
      * Soft memory cap (in megabytes) requested for the core runtime. Default 100.
      * Only meaningful when [isMemoryLimitEnabled] is true.
      */
@@ -507,25 +600,35 @@ object SettingsManager {
     }
 
     /**
-     * Get the locale.
+     * Get the locale the app renders in.
+     *
+     * departament ships **one** master locale — Russian, in `res/values/` — so the picker offers
+     * Системный and Русский and nothing else (`R.array.language_select`). The retired options
+     * («English» and the vendored upstream locales, whose `values-*` folders are gone) resolved to
+     * translations that no longer exist, i.e. a Russian app wearing a foreign locale for dates,
+     * numbers and layout direction.
+     *
+     * An install that stored one of those codes before they were retired is **migrated once, here**,
+     * on the first read after the update: it lands on Системный, which is what the settings row
+     * already shows for a value the array no longer contains. Rewriting the stored value rather than
+     * only reinterpreting it keeps the preference and the row in agreement, so the next writer of
+     * this key cannot resurrect a locale the app does not ship.
+     *
      * @return The locale.
      */
     fun getLocale(): Locale {
-        val langCode =
-            MmkvManager.decodeSettingsString(AppConfig.PREF_LANGUAGE) ?: Language.AUTO.code
-        val language = Language.fromCode(langCode)
+        val stored = MmkvManager.decodeSettingsString(AppConfig.PREF_LANGUAGE) ?: Language.AUTO.code
+        val language = when (Language.fromCode(stored)) {
+            Language.RUSSIAN -> Language.RUSSIAN
+            else -> Language.AUTO
+        }
+        if (stored != language.code) {
+            MmkvManager.encodeSettings(AppConfig.PREF_LANGUAGE, language.code)
+        }
 
         return when (language) {
-            Language.AUTO -> Utils.getSysLocale()
-            Language.ENGLISH -> Locale.ENGLISH
-            Language.CHINA -> Locale.CHINA
-            Language.TRADITIONAL_CHINESE -> Locale.TRADITIONAL_CHINESE
-            Language.VIETNAMESE -> Locale.forLanguageTag("vi")
             Language.RUSSIAN -> Locale.forLanguageTag("ru")
-            Language.PERSIAN -> Locale.forLanguageTag("fa")
-            Language.ARABIC -> Locale.forLanguageTag("ar")
-            Language.BANGLA -> Locale.forLanguageTag("bn")
-            Language.BAKHTIARI -> Locale.forLanguageTag("bqi-IR")
+            else -> Utils.getSysLocale()
         }
     }
 
@@ -625,6 +728,27 @@ object SettingsManager {
         if (MmkvManager.decodeSettingsString(key).isNullOrEmpty()) {
             MmkvManager.encodeSettings(key, default)
         }
+    }
+
+    /**
+     * Clears the raw-template backlog left by the builds that never deleted from that store.
+     *
+     * Every subscription refresh replaces a провайдер's whole server set, and until now the raw
+     * config of each replaced сервер stayed behind — so the store grew by a full copy of the
+     * server list on every update, for the life of the install, with nothing able to read those
+     * entries again. The delete paths carry the raw entry with its profile now
+     * ([MmkvManager.removeServer] and friends); this clears what accumulated before that, once.
+     */
+    private fun pruneOrphanServerRawOnce() {
+        val migrationKey = "server_raw_orphans_pruned"
+        if (MmkvManager.decodeSettingsBool(migrationKey, false)) {
+            return
+        }
+        val removed = MmkvManager.pruneOrphanServerRaw()
+        if (removed > 0) {
+            LogUtil.i(AppConfig.TAG, "Pruned $removed orphaned raw server configs")
+        }
+        MmkvManager.encodeSettings(migrationKey, true)
     }
 
     private fun migrateHysteria2PinSHA256() {

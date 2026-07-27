@@ -2,22 +2,32 @@ package com.v2ray.ang.ui
 
 import android.os.Bundle
 import android.text.InputType
-import android.widget.EditText
+import android.view.View
+import android.widget.FrameLayout
 import androidx.appcompat.app.AlertDialog
+import androidx.core.widget.doAfterTextChanged
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
+import com.v2ray.ang.auth.BackendConfig
 import com.v2ray.ang.databinding.ActivityProviderSettingsBinding
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
+import com.v2ray.ang.util.HttpUtil
 
 /**
- * "Настройки провайдеров" — provider/subscription settings screen (departament design).
+ * «Настройки подписок» — the settings that belong to the subscription feeds, not to one подписка.
  *
- * Groups four cards that mirror the Incy provider screen:
+ * The word is the owner's: what this app used to call a «провайдер» is a **подписка** on every
+ * surface, so the screen, its title and its copy say подписка.
+ *
+ * Groups four cards:
  *  1. ОБНОВЛЕНИЕ    — auto-update toggle + interval picker + update notification toggle.
  *  2. ПРИ ЗАПУСКЕ    — update-on-launch / ping-on-launch / ping-on-update toggles.
- *  3. СЕТЬ           — HWID toggle (real behavior) + subscription User-Agent editor.
+ *  3. СЕТЬ           — HWID toggle + subscription User-Agent editor.
  *  4. СПИСОК СЕРВЕРОВ — server list sort order (single choice).
  *
  * Wiring notes:
@@ -26,34 +36,42 @@ import com.v2ray.ang.handler.SubscriptionUpdater
  *    [com.v2ray.ang.dto.entities.SubscriptionItem.updateInterval]) across every stored
  *    subscription, then rescheduled via [SubscriptionUpdater.sync]. This mirrors the global
  *    picker in MainActivity's settings tab — it changes real update behavior.
- *  - HWID writes [AppConfig.PREF_SEND_HWID] via MMKV; the subscription updater reads it.
- *  - The remaining toggles/values have no existing global pref, so they are persisted under
- *    local keys (defined below) via MMKV. They are stored but not yet consumed by app logic.
+ *  - Every other row writes an [AppConfig] preference that the rest of the app reads: HWID and
+ *    the User-Agent are consumed by the subscription fetch, the notification and the
+ *    launch/update actions by [SubscriptionUpdater], the sort order by
+ *    [SettingsManager.applyServerSortOrder]. Defaults live in [SettingsManager], not here, so
+ *    the switch state and the behaviour can never drift apart.
  */
 class ProviderSettingsActivity : BaseActivity() {
 
     private val binding by lazy { ActivityProviderSettingsBinding.inflate(layoutInflater) }
 
     companion object {
-        // Local (this-screen-only) pref keys. Not added to AppConfig (owned by Agent 1).
-        private const val PREF_NOTIFY_ON_UPDATE = "pref_provider_notify_on_update"
-        private const val PREF_UPDATE_ON_LAUNCH = "pref_provider_update_on_launch"
-        private const val PREF_PING_ON_LAUNCH = "pref_provider_ping_on_launch"
-        private const val PREF_PING_ON_UPDATE = "pref_provider_ping_on_update"
-        private const val PREF_SUB_USER_AGENT = "pref_provider_sub_user_agent"
-        private const val PREF_SERVER_SORT_ORDER = "pref_provider_server_sort_order"
-        // Remembers the chosen interval even when no subscription is present yet.
-        private const val PREF_UPDATE_INTERVAL = "pref_provider_update_interval"
-
-        private const val DEFAULT_USER_AGENT = "DepartamentVPN/1.0"
+        /**
+         * Fallback shown when nothing has an interval yet - the same default a fresh
+         * [com.v2ray.ang.dto.entities.SubscriptionItem] carries.
+         *
+         * There is no screen-local key any more. This screen used to keep the chosen interval in a
+         * private `pref_provider_update_interval`, which nothing else in the app read: the value
+         * that actually schedules work is `SubscriptionItem.updateInterval`, and a second copy of it
+         * could disagree with the scheduler the moment the interval was changed anywhere else. The
+         * row reads the real one now.
+         */
         private const val DEFAULT_INTERVAL_MINUTES = 60L
+
+        /** 0.38 - the disabled alpha of the row grammar. */
+        private const val ALPHA_DISABLED = 0.38f
     }
 
     /** Interval options (minutes) offered by the interval picker: 1/2/6/12/24 hours. */
     private val intervalValues = longArrayOf(60L, 120L, 360L, 720L, 1440L)
 
     /** Sort-order values persisted for the server list. */
-    private val sortValues = arrayOf("default", "ping", "name")
+    private val sortValues = arrayOf(
+        AppConfig.SERVER_SORT_DEFAULT,
+        AppConfig.SERVER_SORT_PING,
+        AppConfig.SERVER_SORT_NAME
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,12 +80,20 @@ class ProviderSettingsActivity : BaseActivity() {
         // ОБНОВЛЕНИЕ
         binding.rowAutoUpdate.setOnClickListener { toggleAutoUpdate() }
         binding.rowInterval.setOnClickListener { pickInterval() }
-        binding.rowNotify.setOnClickListener { toggleLocalBool(PREF_NOTIFY_ON_UPDATE, binding.switchNotify) }
+        binding.rowNotify.setOnClickListener {
+            toggleBool(AppConfig.PREF_SUB_NOTIFY_ON_UPDATE, binding.switchNotify, SettingsManager.isNotifyOnSubscriptionUpdate())
+        }
 
         // ПРИ ЗАПУСКЕ
-        binding.rowUpdateOnLaunch.setOnClickListener { toggleLocalBool(PREF_UPDATE_ON_LAUNCH, binding.switchUpdateOnLaunch) }
-        binding.rowPingOnLaunch.setOnClickListener { toggleLocalBool(PREF_PING_ON_LAUNCH, binding.switchPingOnLaunch) }
-        binding.rowPingOnUpdate.setOnClickListener { toggleLocalBool(PREF_PING_ON_UPDATE, binding.switchPingOnUpdate) }
+        binding.rowUpdateOnLaunch.setOnClickListener {
+            toggleBool(AppConfig.PREF_SUB_UPDATE_ON_LAUNCH, binding.switchUpdateOnLaunch, SettingsManager.isUpdateSubscriptionOnLaunch())
+        }
+        binding.rowPingOnLaunch.setOnClickListener {
+            toggleBool(AppConfig.PREF_PING_ON_LAUNCH, binding.switchPingOnLaunch, SettingsManager.isPingOnLaunch())
+        }
+        binding.rowPingOnUpdate.setOnClickListener {
+            toggleBool(AppConfig.PREF_PING_ON_UPDATE, binding.switchPingOnUpdate, SettingsManager.isPingOnSubscriptionUpdate())
+        }
 
         // СЕТЬ
         binding.rowSendHwid.setOnClickListener { toggleSendHwid() }
@@ -79,15 +105,34 @@ class ProviderSettingsActivity : BaseActivity() {
         bindState()
     }
 
+    /**
+     * A подписка can be added or deleted while this screen sits in the back stack (the list is two
+     * taps away), and that changes whether the update rows can do anything at all. Re-read on the
+     * way back rather than showing what was true when the screen opened.
+     */
+    override fun onResume() {
+        super.onResume()
+        bindState()
+    }
+
     /** Reflect all persisted values/toggle states into the rows. */
     private fun bindState() {
-        binding.switchAutoUpdate.isChecked = isAutoUpdateOn()
-        binding.valueInterval.text = intervalLabel(storedIntervalMinutes())
-        binding.switchNotify.isChecked = MmkvManager.decodeSettingsBool(PREF_NOTIFY_ON_UPDATE, true)
+        // With no подписка stored there is nothing for a schedule to apply to: toggling the switch
+        // wrote to an empty list and looked like it had worked. The two rows say so instead.
+        val hasSubscriptions = MmkvManager.decodeSubscriptions().isNotEmpty()
+        setRowEnabled(binding.rowAutoUpdate, hasSubscriptions)
+        setRowEnabled(binding.rowInterval, hasSubscriptions)
+        binding.switchAutoUpdate.isChecked = hasSubscriptions && isAutoUpdateOn()
+        binding.valueInterval.text = if (hasSubscriptions) {
+            intervalLabel(storedIntervalMinutes())
+        } else {
+            getString(R.string.ps_no_subs_value)
+        }
+        binding.switchNotify.isChecked = SettingsManager.isNotifyOnSubscriptionUpdate()
 
-        binding.switchUpdateOnLaunch.isChecked = MmkvManager.decodeSettingsBool(PREF_UPDATE_ON_LAUNCH, false)
-        binding.switchPingOnLaunch.isChecked = MmkvManager.decodeSettingsBool(PREF_PING_ON_LAUNCH, false)
-        binding.switchPingOnUpdate.isChecked = MmkvManager.decodeSettingsBool(PREF_PING_ON_UPDATE, true)
+        binding.switchUpdateOnLaunch.isChecked = SettingsManager.isUpdateSubscriptionOnLaunch()
+        binding.switchPingOnLaunch.isChecked = SettingsManager.isPingOnLaunch()
+        binding.switchPingOnUpdate.isChecked = SettingsManager.isPingOnSubscriptionUpdate()
 
         binding.switchSendHwid.isChecked = SettingsManager.isSendHwid()
         binding.valueUserAgent.text = currentUserAgent()
@@ -101,17 +146,30 @@ class ProviderSettingsActivity : BaseActivity() {
     private fun isAutoUpdateOn(): Boolean =
         MmkvManager.decodeSubscriptions().any { it.subscription.autoUpdate }
 
-    private fun storedIntervalMinutes(): Long =
-        MmkvManager.decodeSettingsString(PREF_UPDATE_INTERVAL, DEFAULT_INTERVAL_MINUTES.toString())
-            ?.toLongOrNull() ?: DEFAULT_INTERVAL_MINUTES
+    /**
+     * The interval that is actually scheduled: the one on the first auto-updating подписка, or the
+     * one the first подписка carries, or the shipped default when there is nothing to read.
+     */
+    private fun storedIntervalMinutes(): Long {
+        val subs = MmkvManager.decodeSubscriptions()
+        val item = subs.firstOrNull { it.subscription.autoUpdate }?.subscription
+            ?: subs.firstOrNull()?.subscription
+            ?: return DEFAULT_INTERVAL_MINUTES
+        return item.updateInterval.takeIf { it > 0L } ?: DEFAULT_INTERVAL_MINUTES
+    }
 
+    /**
+     * A подписка can carry an interval that is not one of the five offered here - the form in
+     * `SubEditActivity` takes any number of minutes. Such a value is shown as it is; the old `else`
+     * branch fell back to «1 ч» and so reported an interval the scheduler was not using.
+     */
     private fun intervalLabel(minutes: Long): String = when (minutes) {
         60L -> getString(R.string.ps_interval_1h)
         120L -> getString(R.string.ps_interval_2h)
         360L -> getString(R.string.ps_interval_6h)
         720L -> getString(R.string.ps_interval_12h)
         1440L -> getString(R.string.ps_interval_24h)
-        else -> getString(R.string.ps_interval_1h)
+        else -> getString(R.string.settings_sub_auto_update_minutes, minutes)
     }
 
     /**
@@ -142,7 +200,6 @@ class ProviderSettingsActivity : BaseActivity() {
             .setTitle(R.string.ps_interval)
             .setSingleChoiceItems(entries, idx) { dialog, which ->
                 val minutes = intervalValues[which]
-                MmkvManager.encodeSettings(PREF_UPDATE_INTERVAL, minutes.toString())
                 MmkvManager.decodeSubscriptions().forEach { cache ->
                     val item = cache.subscription
                     item.autoUpdate = true
@@ -166,37 +223,85 @@ class ProviderSettingsActivity : BaseActivity() {
         binding.switchSendHwid.isChecked = enabled
     }
 
-    private fun currentUserAgent(): String =
-        MmkvManager.decodeSettingsString(PREF_SUB_USER_AGENT, DEFAULT_USER_AGENT)
-            ?.ifBlank { DEFAULT_USER_AGENT } ?: DEFAULT_USER_AGENT
+    /**
+     * The User-Agent subscription fetches will actually send: the global override when set,
+     * otherwise the operator default the build ships with — put through the same resolution the
+     * fetch uses, so a value the fetch would replace (one an older build stored before this screen
+     * validated its input) is not advertised here as if it were sent.
+     */
+    private fun currentUserAgent(): String = HttpUtil.resolveSubscriptionUserAgent(
+        SettingsManager.getSubscriptionUserAgent() ?: BackendConfig.subscriptionUserAgent
+    )
 
+    /**
+     * Edits the global User-Agent override.
+     *
+     * The value is validated HERE, on entry, and a rejected one is never stored: a User-Agent that
+     * cannot travel in an HTTP header is silently replaced at fetch time, so storing it would put
+     * a string in this row that the app will never send — and the row exists to say what is sent.
+     */
     private fun editUserAgent() {
-        val input = EditText(this).apply {
-            setText(currentUserAgent())
+        val field = TextInputLayout(this).apply {
+            hint = getString(R.string.ps_user_agent_hint)
+            isErrorEnabled = true
+        }
+        val input = TextInputEditText(field.context).apply {
+            // Only the override is prefilled: confirming an untouched dialog must not freeze the
+            // operator default into a permanent override that a later build could no longer change.
+            // The row itself already shows the User-Agent that is actually sent.
+            setText(SettingsManager.getSubscriptionUserAgent().orEmpty())
             setSingleLine()
             inputType = InputType.TYPE_CLASS_TEXT
-            hint = getString(R.string.ps_user_agent_hint)
         }
-        AlertDialog.Builder(this)
+        field.addView(input)
+        val pad = resources.getDimensionPixelSize(R.dimen.space_16)
+        val container = FrameLayout(this).apply {
+            setPadding(pad, pad, pad, 0)
+            addView(field)
+        }
+
+        // Validate on blur, and again on confirm; clear the error as soon as the user edits.
+        input.doAfterTextChanged { field.error = null }
+        input.setOnFocusChangeListener { _, hasFocus -> if (!hasFocus) showUserAgentError(field, input) }
+
+        val dialog = AlertDialog.Builder(this)
             .setTitle(R.string.ps_user_agent)
-            .setView(input)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                val value = input.text.toString().trim().ifEmpty { DEFAULT_USER_AGENT }
-                MmkvManager.encodeSettings(PREF_SUB_USER_AGENT, value)
-                bindState()
-            }
+            .setView(container)
+            .setPositiveButton(android.R.string.ok, null)
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .create()
+        dialog.setOnShowListener {
+            // Own the click so an invalid value keeps the dialog open with the error visible,
+            // instead of dismissing and quietly discarding what was typed.
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                if (showUserAgentError(field, input)) {
+                    input.requestFocus()
+                    return@setOnClickListener
+                }
+                // An empty field clears the override rather than storing a blank User-Agent.
+                MmkvManager.encodeSettings(AppConfig.PREF_SUB_USER_AGENT, input.text.toString().trim())
+                bindState()
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
+    }
+
+    /** Shows/clears the inline error. @return true when the value is rejected. */
+    private fun showUserAgentError(field: TextInputLayout, input: TextInputEditText): Boolean {
+        val value = input.text.toString().trim()
+        val invalid = value.isNotEmpty() && !HttpUtil.isHeaderSafe(value)
+        field.error = if (invalid) getString(R.string.ps_user_agent_error) else null
+        return invalid
     }
 
     // ---------------- СПИСОК СЕРВЕРОВ ----------------
 
-    private fun currentSortOrder(): String =
-        MmkvManager.decodeSettingsString(PREF_SERVER_SORT_ORDER, sortValues.first()).orEmpty()
+    private fun currentSortOrder(): String = SettingsManager.getServerSortOrder()
 
     private fun sortLabelRes(value: String): Int = when (value) {
-        "ping" -> R.string.ps_sort_ping
-        "name" -> R.string.ps_sort_name
+        AppConfig.SERVER_SORT_PING -> R.string.ps_sort_ping
+        AppConfig.SERVER_SORT_NAME -> R.string.ps_sort_name
         else -> R.string.ps_sort_default
     }
 
@@ -206,7 +311,12 @@ class ProviderSettingsActivity : BaseActivity() {
         AlertDialog.Builder(this)
             .setTitle(R.string.ps_sort_order)
             .setSingleChoiceItems(entries, idx) { dialog, which ->
-                MmkvManager.encodeSettings(PREF_SERVER_SORT_ORDER, sortValues[which])
+                MmkvManager.encodeSettings(AppConfig.PREF_SERVER_SORT_ORDER, sortValues[which])
+                // Order lives in storage, so reorder now — the servers list renders what is stored
+                // and never re-sorts on its own. It also holds its rows from before this screen was
+                // opened, so ask it to rebuild; otherwise the new order only shows after a restart.
+                SettingsManager.applyServerSortOrder()
+                SettingsChangeManager.makeSetupGroupTab()
                 bindState()
                 dialog.dismiss()
             }
@@ -216,9 +326,24 @@ class ProviderSettingsActivity : BaseActivity() {
 
     // ---------------- helpers ----------------
 
-    /** Flip a locally-persisted boolean pref and reflect it on its switch. */
-    private fun toggleLocalBool(key: String, switch: com.google.android.material.materialswitch.MaterialSwitch) {
-        val enabled = !MmkvManager.decodeSettingsBool(key, key == PREF_NOTIFY_ON_UPDATE || key == PREF_PING_ON_UPDATE)
+    /**
+     * A row that cannot do anything is not presented as if it could: it stops taking taps and
+     * drops to the disabled alpha of the row grammar, and its value states the reason.
+     */
+    private fun setRowEnabled(row: View, enabled: Boolean) {
+        row.isEnabled = enabled
+        row.isClickable = enabled
+        row.isFocusable = enabled
+        row.alpha = if (enabled) 1f else ALPHA_DISABLED
+    }
+
+    /** Flip a boolean pref and reflect it on its switch. [current] carries the default. */
+    private fun toggleBool(
+        key: String,
+        switch: com.google.android.material.materialswitch.MaterialSwitch,
+        current: Boolean
+    ) {
+        val enabled = !current
         MmkvManager.encodeSettings(key, enabled)
         switch.isChecked = enabled
     }

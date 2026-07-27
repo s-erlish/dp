@@ -1,126 +1,123 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  ============================================================================
+  A-18  settings/perapp - Прокси по приложениям.  H3 · R1.
+  24-tab-conformance.md A-18, 00-rules.md 4.5 / 4.8 / 15.
+  ============================================================================
+
+  What this replaces: two switches inside a card - one of them with a second,
+  independent info target that fired a Toasty - above a GridLayoutManager of bordered
+  cards, each with a bare MaterialCheckBox, a `** ` prefix glued onto system app names
+  in Kotlin, an 18dp radius, 15sp and 12sp inline sizes, and no empty state, no
+  loading state and no search anywhere on screen.
+
+  The screen now reads top to bottom as one ledger (R1):
+
+      H3 toolbar                       «Прокси по приложениям» + one overflow
+      Row.Value «Режим»                cycles Все / Только выбранные / Кроме выбранных
+                                       in place; its subtitle says what the mode DOES
+      search 56                        filters in place, never navigates
+      meta line                        «Отмечено 4 из 128», Caption, Numeric figures
+      grouped list                     «Ваши приложения» then «Системные приложения»,
+                                       one Row.Toggle per app, the row owns the switch
+
+  Three states share the frame below the meta line and exactly one is visible at a
+  time: the list, the skeleton (the package manager is slow on a cold start and the
+  screen used to show nothing at all while it worked), and the empty state, which
+  carries either «Ничего не найдено» for a search that matched nothing or the load
+  failure with «Повторить».
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:attr/colorBackground"
+    android:fitsSystemWindows="true"
     android:orientation="vertical"
     tools:context=".ui.PerAppProxyActivity">
 
-    <LinearLayout
-        android:id="@+id/header_view"
+    <include
+        android:id="@+id/toolbar"
+        layout="@layout/view_toolbar" />
+
+    <include
+        android:id="@+id/row_mode"
+        layout="@layout/view_row" />
+
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:paddingStart="@dimen/screen_gutter"
+        android:paddingTop="@dimen/space_8"
+        android:paddingEnd="@dimen/screen_gutter">
 
-        <com.google.android.material.card.MaterialCardView
+        <include
+            android:id="@+id/search"
+            layout="@layout/view_search_field" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/tv_meta"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_12"
+        android:layout_marginBottom="@dimen/space_8"
+        android:paddingStart="@dimen/screen_gutter"
+        android:paddingEnd="@dimen/screen_gutter"
+        android:textAppearance="@style/TextAppearance.App.Caption"
+        tools:text="Отмечено 4 из 128" />
+
+    <!-- ONE of the three children below is visible at a time (00-rules.md 15). -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingBottom="@dimen/space_32"
+            android:scrollbars="vertical"
+            tools:listitem="@layout/view_row" />
+
+        <!-- The silhouette of the list, not a spinner over a blank screen: same tile,
+             same 68 text origin, same 56 minimum. Shown only after 300ms. -->
+        <LinearLayout
+            android:id="@+id/skeleton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="12dp"
-            android:layout_marginTop="8dp"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            android:importantForAccessibility="noHideDescendants"
+            android:orientation="vertical"
+            android:visibility="gone">
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
+            <include
+                android:id="@+id/skeleton_1"
+                layout="@layout/view_skeleton_row" />
 
-                <LinearLayout
-                    android:id="@+id/container_per_app_proxy"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:minHeight="56dp"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="8dp">
+            <include
+                android:id="@+id/skeleton_2"
+                layout="@layout/view_skeleton_row" />
 
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/pa_enable"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+            <include
+                android:id="@+id/skeleton_3"
+                layout="@layout/view_skeleton_row" />
 
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switch_per_app_proxy"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
+            <include
+                android:id="@+id/skeleton_4"
+                layout="@layout/view_skeleton_row" />
 
-                </LinearLayout>
+            <include
+                android:id="@+id/skeleton_5"
+                layout="@layout/view_skeleton_row" />
+        </LinearLayout>
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginHorizontal="16dp"
-                    android:background="?attr/colorOutlineVariant" />
-
-                <LinearLayout
-                    android:id="@+id/container_bypass_apps"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:minHeight="56dp"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="8dp">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/pa_bypass_mode"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
-
-                    <LinearLayout
-                        android:id="@+id/layout_switch_bypass_apps_tips"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:clickable="true"
-                        android:contentDescription="@string/pa_bypass_tips"
-                        android:focusable="true"
-                        android:gravity="center"
-                        android:padding="@dimen/padding_spacing_dp8">
-
-                        <ImageView
-                            android:layout_width="@dimen/image_size_dp24"
-                            android:layout_height="@dimen/image_size_dp24"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_about_24dp"
-                            app:tint="?attr/colorOnSurfaceVariant" />
-
-                    </LinearLayout>
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switch_bypass_apps"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp" />
-
-                </LinearLayout>
-
-            </LinearLayout>
-
-        </com.google.android.material.card.MaterialCardView>
-
-    </LinearLayout>
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recycler_view"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:clipToPadding="false"
-        android:paddingTop="4dp"
-        android:paddingBottom="16dp"
-        android:scrollbars="vertical"
-        app:layoutManager="androidx.recyclerview.widget.GridLayoutManager" />
-
+        <include
+            android:id="@+id/empty_state"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            layout="@layout/view_empty_state" />
+    </FrameLayout>
 </LinearLayout>

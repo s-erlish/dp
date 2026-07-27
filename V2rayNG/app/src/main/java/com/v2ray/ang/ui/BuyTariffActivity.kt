@@ -37,26 +37,41 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 
 /**
- * "Купить подписку" — the buy-subscription flow. The user picks a tariff, a duration/price
- * option and (optionally) extra devices, then taps «Оплатить» to choose a payment method.
+ * «Купить подписку» — the buy-subscription flow. The user picks a tariff, a duration/price
+ * option and (optionally) extra devices, then taps the CTA to choose a payment method.
  *
  * Data comes from [AccountViewModel]: [AccountViewModel.tariffs] + [AccountViewModel.loadTariffs]
  * for the catalog and [AccountViewModel.publicConfig] + [AccountViewModel.loadPublicConfig] for
  * the payment methods; [AccountViewModel.profile] provides the wallet balance shown in the sheet.
+ *
+ * **The selection is held as KEYS, not as objects** (D09/D11). Every re-render of the catalog
+ * rebuilds the card views, and a rotation rebuilds the whole activity; an object reference kept
+ * across either is a reference to a card nobody can see. Holding `selectedTariffKey` /
+ * `selectedOptionKey` and re-deriving the highlighted views from them in [applySelection] means a
+ * catalog re-emission (which a payment error causes, because the error is combined into the same
+ * render) repaints the same selection instead of quietly dropping it while the checkout card kept
+ * offering to charge for it.
  */
 class BuyTariffActivity : BaseActivity() {
 
     private val viewModel: AccountViewModel by viewModels()
 
-    // Selection state.
-    private var selectedTariff: TariffDto? = null
-    private var selectedOption: PriceOptionDto? = null
+    // Selection state — keys, resolved against the live catalog on demand (see the class comment).
+    private var selectedTariffKey: String? = null
+    private var selectedOptionKey: String? = null
     private var extraDevices: Int = 0
 
+    // The rendered catalog, indexed the same way the selection is keyed.
+    private val tariffsByKey = LinkedHashMap<String, TariffDto>()
+    private val cardViews = LinkedHashMap<String, MaterialCardView>()
+    private val optionContainers = LinkedHashMap<String, LinearLayout>()
     // Per-tariff check marks so the whole list needn't be rebuilt on re-select.
     private val checkMarks = mutableMapOf<String, ImageView>()
     // Per-tariff option rows, so the selected row can be highlighted without a rebuild.
     private val optionRows = mutableMapOf<String, MutableList<Pair<PriceOptionDto, View>>>()
+
+    // Shape of the catalog currently on screen. An identical re-emission is repainted, not rebuilt.
+    private var renderedSignature: String? = null
 
     // A purchase/balance payment was just fired: the NEXT error must surface as the
     // "Ошибка оплаты" diagnostic dialog (with the real backend detail), not be swallowed.
@@ -108,13 +123,38 @@ class BuyTariffActivity : BaseActivity() {
         tvTotal = findViewById(R.id.tv_total)
         btnPay = findViewById(R.id.btn_pay)
 
+        savedInstanceState?.let {
+            selectedTariffKey = it.getString(STATE_TARIFF_KEY)
+            selectedOptionKey = it.getString(STATE_OPTION_KEY)
+            extraDevices = it.getInt(STATE_EXTRA_DEVICES, 0)
+            pendingPayment = it.getBoolean(STATE_PENDING_PAYMENT, false)
+            awaitingPaymentError = it.getBoolean(STATE_AWAITING_ERROR, false)
+        }
+
         btnDevMinus.setOnClickListener { changeExtraDevices(-1) }
         btnDevPlus.setOnClickListener { changeExtraDevices(+1) }
         btnPay.setOnClickListener { onPayClicked() }
         btnRetry.setOnClickListener { reload() }
 
+        // The method pick comes back as DATA, on this activity's own FragmentManager, and the
+        // listener is registered by whichever instance is alive (D11). The sheet used to hand its
+        // answer to a lambda that had captured the activity which opened it — after a rotation that
+        // activity is destroyed, and picking a method crashed the app.
+        supportFragmentManager.setFragmentResultListener(REQUEST_PAY_METHOD, this) { _, bundle ->
+            onMethodPicked(bundle)
+        }
+
         observe()
         reload()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_TARIFF_KEY, selectedTariffKey)
+        outState.putString(STATE_OPTION_KEY, selectedOptionKey)
+        outState.putInt(STATE_EXTRA_DEVICES, extraDevices)
+        outState.putBoolean(STATE_PENDING_PAYMENT, pendingPayment)
+        outState.putBoolean(STATE_AWAITING_ERROR, awaitingPaymentError)
     }
 
     /** (Re)fetch the catalog + payment config, showing the loading state until the first result. */
@@ -147,6 +187,11 @@ class BuyTariffActivity : BaseActivity() {
                 }
             }
         }
+        // The in-flight flag lives on the ViewModel, which is retained across a rotation, so the
+        // busy CTA comes back busy on the other side of one (D10).
+        lifecycleScope.launch {
+            viewModel.paymentInFlight.collect { renderPayBusy(it) }
+        }
     }
 
     // region rendering
@@ -173,7 +218,6 @@ class BuyTariffActivity : BaseActivity() {
         // circular spinner and the "Загрузка" label are NOT stacked on top of it — that redundancy
         // (spinner + label + skeleton, then a hard pop to real cards) is what read as janky. The
         // glyph + label are reserved for the skeleton-less states (error/empty) below.
-        progressBuy.visibility = View.GONE
         stateIcon.visibility = View.GONE
         btnRetry.visibility = View.GONE
         stateView.visibility = View.GONE
@@ -184,7 +228,6 @@ class BuyTariffActivity : BaseActivity() {
     }
 
     private fun showError() {
-        progressBuy.visibility = View.GONE
         skeleton.visibility = View.GONE
         stateIcon.visibility = View.VISIBLE
         btnRetry.visibility = View.VISIBLE
@@ -194,7 +237,6 @@ class BuyTariffActivity : BaseActivity() {
     }
 
     private fun showEmpty() {
-        progressBuy.visibility = View.GONE
         skeleton.visibility = View.GONE
         stateIcon.visibility = View.VISIBLE
         btnRetry.visibility = View.GONE
@@ -203,6 +245,18 @@ class BuyTariffActivity : BaseActivity() {
         tariffsHeader.visibility = View.GONE
     }
 
+    /**
+     * Shape of the catalog: which tariffs, in which order, each with which options. Two renders
+     * with the same signature would build byte-identical cards, so the second one repaints the
+     * selection instead of tearing the list down and putting it back (D09).
+     */
+    private fun signatureOf(groups: List<TariffGroupDto>): String =
+        groups.joinToString("|") { group ->
+            group.tariffs.joinToString(",") { tariff ->
+                tariffKey(tariff) + "#" + optionsOf(tariff).joinToString("+") { optionKey(it) }
+            }
+        }
+
     private fun renderTariffs(groups: List<TariffGroupDto>) {
         val hasAny = groups.any { it.tariffs.isNotEmpty() }
         if (!hasAny) {
@@ -210,20 +264,33 @@ class BuyTariffActivity : BaseActivity() {
             return
         }
 
-        // Was the skeleton what the user is currently looking at? Only then do we cross-fade;
-        // a plain re-render (the catalog flow re-emits after content is already up) swaps in place.
-        val fromSkeleton = skeleton.visibility == View.VISIBLE
-
-        // The spinner/glyph/label never coexist with real content — retire them immediately.
-        progressBuy.visibility = View.GONE
+        // The state glyph/label never coexist with real content — retire them immediately.
         stateIcon.visibility = View.GONE
         btnRetry.visibility = View.GONE
         stateView.visibility = View.GONE
+
+        val signature = signatureOf(groups)
+        if (signature == renderedSignature && tariffsContainer.childCount > 0) {
+            // Same catalog, re-emitted. This is the path a payment error takes: the error is
+            // combined into this render, and rebuilding here is exactly what used to reset every
+            // card to neutral while the checkout card went on offering the invisible selection.
+            tariffsHeader.visibility = View.VISIBLE
+            skeleton.visibility = View.GONE
+            applySelection()
+            return
+        }
+
+        // Was the skeleton what the user is currently looking at? Only then do we cross-fade;
+        // a plain re-render (the catalog flow re-emits after content is already up) swaps in place.
+        val fromSkeleton = skeleton.visibility == View.VISIBLE
 
         // Build the real cards FIRST so the fade reveals a fully-rendered list, not a blank frame.
         // Rebuild once; selection is then mutated in place.
         tariffsHeader.visibility = View.VISIBLE
         tariffsContainer.removeAllViews()
+        tariffsByKey.clear()
+        cardViews.clear()
+        optionContainers.clear()
         checkMarks.clear()
         optionRows.clear()
         val inflater = LayoutInflater.from(this)
@@ -233,6 +300,12 @@ class BuyTariffActivity : BaseActivity() {
                 addTariffCard(inflater, tariffsContainer, group.emoji, tariff)
             }
         }
+        renderedSignature = signature
+
+        // Re-apply whatever was selected before the rebuild (a rotation, or the first render after
+        // a restore). A key that no longer exists in the catalog resolves to nothing and the
+        // checkout card closes, which is the honest outcome.
+        applySelection()
 
         if (fromSkeleton) {
             crossFadeSkeletonToContent()
@@ -312,6 +385,9 @@ class BuyTariffActivity : BaseActivity() {
             " · " + getString(R.string.buy_tariff_traffic, trafficStr)
 
         val key = tariffKey(tariff)
+        tariffsByKey[key] = tariff
+        cardViews[key] = card
+        optionContainers[key] = llOptions
         checkMarks[key] = ivCheck
 
         // Build the duration/price option rows (hidden until the tariff is selected).
@@ -329,8 +405,8 @@ class BuyTariffActivity : BaseActivity() {
         }
         optionRows[key] = rows
 
-        card.setOnClickListener { selectTariff(tariff, card, llOptions) }
-        header.setOnClickListener { selectTariff(tariff, card, llOptions) }
+        card.setOnClickListener { selectTariff(tariff) }
+        header.setOnClickListener { selectTariff(tariff) }
 
         parent.addView(card)
     }
@@ -339,46 +415,79 @@ class BuyTariffActivity : BaseActivity() {
 
     // region selection
 
-    private fun selectTariff(tariff: TariffDto, card: MaterialCardView, llOptions: LinearLayout) {
-        val alreadySelected = selectedTariff?.let { tariffKey(it) == tariffKey(tariff) } == true
-        if (alreadySelected) return
+    private fun selectedTariff(): TariffDto? = selectedTariffKey?.let { tariffsByKey[it] }
 
-        selectedTariff = tariff
-        selectedOption = null
-        extraDevices = 0
+    private fun selectedOption(): PriceOptionDto? {
+        val tariff = selectedTariff() ?: return null
+        val key = selectedOptionKey ?: return null
+        return optionsOf(tariff).firstOrNull { optionKey(it) == key }
+    }
 
-        // Reset every card to the neutral look, then highlight/expand this one.
-        for (i in 0 until tariffsContainer.childCount) {
-            val c = tariffsContainer.getChildAt(i) as? MaterialCardView ?: continue
-            c.strokeColor = resolveAttrColor(com.google.android.material.R.attr.colorOutlineVariant)
-            c.strokeWidth = dp(1)
-            c.findViewById<View>(R.id.ll_price_options)?.visibility = View.GONE
+    /**
+     * Selecting a tariff is IDEMPOTENT. Tapping the tariff that is already selected used to return
+     * early, which was fine while the cards it had highlighted were still on screen — and useless
+     * once a re-render had replaced them, because the state said "selected" and nothing was
+     * painted. Now a repeat tap keeps the chosen option and simply re-applies the selection (D09).
+     */
+    private fun selectTariff(tariff: TariffDto) {
+        val key = tariffKey(tariff)
+        if (selectedTariffKey != key) {
+            selectedTariffKey = key
+            selectedOptionKey = null
+            extraDevices = 0
+            // A tariff with a single option → preselect it for a shorter flow.
+            val options = optionsOf(tariff)
+            if (options.size == 1) selectedOptionKey = optionKey(options.first())
         }
-        checkMarks.forEach { (_, iv) -> iv.visibility = View.INVISIBLE }
-
-        card.strokeColor = resolveAttrColor(androidx.appcompat.R.attr.colorPrimary)
-        card.strokeWidth = dp(2)
-        llOptions.visibility = View.VISIBLE
-        checkMarks[tariffKey(tariff)]?.visibility = View.VISIBLE
-
-        clearOptionHighlights(tariffKey(tariff))
-
-        // A tariff with a single option → preselect it for a shorter flow.
-        val options = optionsOf(tariff)
-        if (options.size == 1) {
-            selectOption(tariff, options.first())
-        } else {
-            checkoutCard.visibility = View.GONE
-        }
+        applySelection()
     }
 
     private fun selectOption(tariff: TariffDto, option: PriceOptionDto) {
-        selectedTariff = tariff
-        selectedOption = option
-        highlightOption(tariffKey(tariff), option)
-        setupExtraDevices(tariff)
-        checkoutCard.visibility = View.VISIBLE
-        updateTotal()
+        selectedTariffKey = tariffKey(tariff)
+        selectedOptionKey = optionKey(option)
+        applySelection()
+    }
+
+    /**
+     * Paints the current selection onto the cards that exist right now: exactly one card carries
+     * the accent stroke, its check mark and its open option list; every other card is neutral and
+     * closed. The checkout card is shown if and only if a tariff AND an option resolve — so it can
+     * never offer to charge for something the user cannot see.
+     */
+    private fun applySelection() {
+        // Drop keys the current catalog no longer contains.
+        if (selectedTariff() == null) {
+            selectedTariffKey = null
+            selectedOptionKey = null
+        } else if (selectedOption() == null) {
+            selectedOptionKey = null
+        }
+
+        val neutral = resolveAttrColor(com.google.android.material.R.attr.colorOutlineVariant)
+        val accent = resolveAttrColor(androidx.appcompat.R.attr.colorPrimary)
+        val selected = selectedTariffKey
+
+        for ((key, card) in cardViews) {
+            val isSelected = key == selected
+            card.strokeColor = if (isSelected) accent else neutral
+            card.strokeWidth = if (isSelected) dp(2) else dp(1)
+            optionContainers[key]?.visibility = if (isSelected) View.VISIBLE else View.GONE
+            checkMarks[key]?.visibility = if (isSelected) View.VISIBLE else View.INVISIBLE
+        }
+
+        val tariff = selectedTariff()
+        val option = selectedOption()
+        if (selected != null) {
+            if (option != null) highlightOption(selected, option) else clearOptionHighlights(selected)
+        }
+
+        if (tariff != null && option != null) {
+            setupExtraDevices(tariff)
+            checkoutCard.visibility = View.VISIBLE
+            updateTotal(tariff, option)
+        } else {
+            checkoutCard.visibility = View.GONE
+        }
     }
 
     private fun highlightOption(key: String, option: PriceOptionDto) {
@@ -408,20 +517,23 @@ class BuyTariffActivity : BaseActivity() {
     }
 
     private fun changeExtraDevices(delta: Int) {
-        val tariff = selectedTariff ?: return
+        val tariff = selectedTariff() ?: return
         val max = tariff.maxExtraDevices
         extraDevices = (extraDevices + delta).coerceIn(0, maxOf(0, max))
         renderExtraDevices(tariff)
-        updateTotal()
+        selectedOption()?.let { updateTotal(tariff, it) }
     }
 
     private fun renderExtraDevices(tariff: TariffDto) {
         tvExtraCount.text = getString(R.string.buy_extra_devices_count, extraDevices)
 
         // Make the stepper bounds visible: dim + disable the button that can't move further.
+        // A payment in flight freezes the stepper too — the amount being charged is already fixed,
+        // so a control that appears to change it would be lying.
+        val busy = viewModel.paymentInFlight.value
         val max = maxOf(0, tariff.maxExtraDevices)
-        setStepperEnabled(btnDevMinus, extraDevices > 0)
-        setStepperEnabled(btnDevPlus, extraDevices < max)
+        setStepperEnabled(btnDevMinus, !busy && extraDevices > 0)
+        setStepperEnabled(btnDevPlus, !busy && extraDevices < max)
 
         val cost = extraDevices * tariff.pricePerExtraDevice
         if (extraDevices > 0 && cost > 0.0) {
@@ -444,9 +556,7 @@ class BuyTariffActivity : BaseActivity() {
     private fun currentTotal(tariff: TariffDto, option: PriceOptionDto): Double =
         option.price + extraDevices * tariff.pricePerExtraDevice
 
-    private fun updateTotal() {
-        val tariff = selectedTariff ?: return
-        val option = selectedOption ?: return
+    private fun updateTotal(tariff: TariffDto, option: PriceOptionDto) {
         tvTotal.text = formatMoney(currentTotal(tariff, option), tariff.currency)
     }
 
@@ -454,9 +564,27 @@ class BuyTariffActivity : BaseActivity() {
 
     // region checkout
 
+    /**
+     * The CTA's in-flight state (D10). The screen used to change in NO way between the tap and the
+     * provider's answer — on a slow connection that is a button which appears not to have worked,
+     * and the second tap is a second charge. Now the button says what it is doing, stops taking
+     * taps, and the declared indicator beside it finally does the job it was declared for.
+     */
+    private fun renderPayBusy(busy: Boolean) {
+        btnPay.isEnabled = !busy
+        btnPay.text = getString(if (busy) R.string.account_pay_in_progress else R.string.buy_pay)
+        btnPay.contentDescription = btnPay.text
+        progressBuy.visibility = if (busy) View.VISIBLE else View.GONE
+        selectedTariff()?.let { renderExtraDevices(it) }
+    }
+
     private fun onPayClicked() {
-        val tariff = selectedTariff
-        val option = selectedOption
+        // Belt to the ViewModel's braces: the request itself refuses to start twice, and the CTA
+        // refuses to ask.
+        if (viewModel.paymentInFlight.value) return
+
+        val tariff = selectedTariff()
+        val option = selectedOption()
         if (tariff == null || option == null) {
             toast(getString(R.string.buy_select_option_first))
             return
@@ -471,44 +599,60 @@ class BuyTariffActivity : BaseActivity() {
         val profile = viewModel.profile.value
         val balanceLabel = profile?.let { formatMoney(it.balance, it.currency) }
 
+        // Everything the charge needs travels WITH the pick, so the request is never rebuilt from
+        // selection state that a rotation reset while the sheet was open (D11).
+        val payload = Bundle().apply {
+            putString(EXTRA_TARIFF_ID, tariff.id)
+            putString(EXTRA_OPTION_ID, option.id)
+            putInt(EXTRA_EXTRA_DEVICES, extraDevices)
+            putDouble(EXTRA_AMOUNT, currentTotal(tariff, option))
+            putString(EXTRA_CURRENCY, tariff.currency.ifBlank { "RUB" })
+        }
+
         PaymentMethodSheet.show(
             supportFragmentManager,
+            REQUEST_PAY_METHOD,
             getString(R.string.buy_pick_method_title),
             balanceLabel,
             methods,
-        ) { methodId -> onMethodPicked(tariff, option, methodId) }
+            payload,
+        )
     }
 
-    private fun onMethodPicked(tariff: TariffDto, option: PriceOptionDto, methodId: String) {
-        // Arm the diagnostic: whichever request we fire, a failure now becomes a visible dialog.
-        awaitingPaymentError = true
-        val deviceCount = extraDevices.takeIf { it > 0 }
-        val currency = tariff.currency.ifBlank { "RUB" }
+    private fun onMethodPicked(result: Bundle) {
+        val methodId = result.getString(PaymentMethodSheet.RESULT_METHOD_ID) ?: return
+        if (viewModel.paymentInFlight.value) return
+
+        val tariffId = result.getString(EXTRA_TARIFF_ID).orEmpty()
+        val optionId = result.getString(EXTRA_OPTION_ID).orEmpty()
+        val deviceCount = result.getInt(EXTRA_EXTRA_DEVICES, 0).takeIf { it > 0 }
         // Charge exactly the displayed «Итого» (option price + extra devices), never just the
         // bare option price — otherwise the extra-device cost is silently dropped from checkout.
-        val amount = currentTotal(tariff, option)
+        val amount = result.getDouble(EXTRA_AMOUNT, 0.0)
+        val currency = result.getString(EXTRA_CURRENCY)?.ifBlank { null } ?: "RUB"
+        if (tariffId.isBlank() || amount <= 0.0) {
+            toastError(getString(R.string.buy_select_option_first))
+            return
+        }
+
+        // Arm the diagnostic: whichever request we fire, a failure now becomes a visible dialog.
+        awaitingPaymentError = true
+        val req = PaymentRequestDto(
+            tariffId = tariffId,
+            tariffPriceOptionId = optionId.ifBlank { null },
+            deviceCount = deviceCount,
+            amount = amount,
+            currency = currency,
+            paymentMethod = if (methodId == PaymentMethodSheet.ID_BALANCE) null else methodId.toIntOrNull(),
+        )
+
         if (methodId == PaymentMethodSheet.ID_BALANCE) {
-            val req = PaymentRequestDto(
-                tariffId = tariff.id,
-                tariffPriceOptionId = option.id,
-                deviceCount = deviceCount,
-                amount = amount,
-                currency = currency,
-            )
             viewModel.payWithBalance(req) {
                 awaitingPaymentError = false
                 toastSuccess(getString(R.string.buy_success))
                 finish()
             }
         } else {
-            val req = PaymentRequestDto(
-                tariffId = tariff.id,
-                tariffPriceOptionId = option.id,
-                deviceCount = deviceCount,
-                amount = amount,
-                currency = currency,
-                paymentMethod = methodId.toIntOrNull(),
-            )
             viewModel.buy(req) { init ->
                 awaitingPaymentError = false
                 openCheckout(init)
@@ -516,7 +660,7 @@ class BuyTariffActivity : BaseActivity() {
         }
     }
 
-    /** Dialog with the raw HTTP code + sanitized backend detail for a failed payment. */
+    /** Dialog with a designed, code-free reason for a failed payment. */
     private fun showPaymentErrorDialog(error: ApiError) {
         val code = when (error) {
             is ApiError.Unauthorized -> "401/403"
@@ -629,6 +773,20 @@ class BuyTariffActivity : BaseActivity() {
     // endregion
 
     companion object {
+        private const val REQUEST_PAY_METHOD = "buy_pay_method"
+
+        private const val EXTRA_TARIFF_ID = "extra_tariff_id"
+        private const val EXTRA_OPTION_ID = "extra_option_id"
+        private const val EXTRA_EXTRA_DEVICES = "extra_extra_devices"
+        private const val EXTRA_AMOUNT = "extra_amount"
+        private const val EXTRA_CURRENCY = "extra_currency"
+
+        private const val STATE_TARIFF_KEY = "state_tariff_key"
+        private const val STATE_OPTION_KEY = "state_option_key"
+        private const val STATE_EXTRA_DEVICES = "state_extra_devices"
+        private const val STATE_PENDING_PAYMENT = "state_pending_payment"
+        private const val STATE_AWAITING_ERROR = "state_awaiting_error"
+
         private fun formatMoney(amount: Double, currency: String): String {
             val n = if (amount % 1.0 == 0.0) amount.toLong().toString()
             else String.format(Locale.US, "%.2f", amount)

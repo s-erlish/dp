@@ -32,6 +32,22 @@ object MmkvManager {
     private const val KEY_SUB_IDS = "SUB_IDS"
     private const val KEY_WEBDAV_CONFIG = "WEBDAV_CONFIG"
 
+    /**
+     * The retired "measurement in flight" sentinel.
+     *
+     * A shipped build wrote **-2** into every row's stored delay when a latency check started, to
+     * make the list spin. Nothing writes it any more — "in flight" is memory-only state on
+     * `MainViewModel` now — but MMKV kept what that build wrote, so an upgraded install still has
+     * rows carrying it, including rows the check never measured (group/balancer entries,
+     * unparseable CUSTOM profiles) and therefore never overwrote.
+     *
+     * It is negative, and [removeInvalidServer] deletes on "negative". That combination silently
+     * deleted servers the user never asked to delete, unattended, the first time
+     * `PREF_AUTO_REMOVE_INVALID_AFTER_TEST` was on. So the sentinel is named here and excluded by
+     * value: a display state must never be readable as a verdict, whatever wrote it.
+     */
+    private const val TESTING = -2L
+
     private val mainStorage by lazy { MMKV.mmkvWithID(ID_MAIN, MMKV.MULTI_PROCESS_MODE) }
     private val profileFullStorage by lazy { MMKV.mmkvWithID(ID_PROFILE_FULL_CONFIG, MMKV.MULTI_PROCESS_MODE) }
     private val serverRawStorage by lazy { MMKV.mmkvWithID(ID_SERVER_RAW, MMKV.MULTI_PROCESS_MODE) }
@@ -209,10 +225,19 @@ object MmkvManager {
         }
         profileFullStorage.remove(guid)
         serverAffStorage.remove(guid)
+        // The raw template goes with the profile, and after it, never before: a locked operator
+        // profile reads its config out of this store, so dropping the raw first would leave a live
+        // profile pointing at nothing.
+        serverRawStorage.remove(guid)
     }
 
     /**
      * Removes the server configurations via subscription ID.
+     *
+     * This is the hot path for the raw-template store: a subscription refresh replaces a
+     * провайдер's whole server set through here, so before the raw entries were removed with their
+     * profiles the store grew by a full copy of every сервер on every update, for the life of the
+     * install, with nothing able to read a single one of those entries again.
      *
      * @param subscriptionId The subscription ID.
      */
@@ -227,6 +252,7 @@ object MmkvManager {
             }
             profileFullStorage.remove(guid)
             serverAffStorage.remove(guid)
+            serverRawStorage.remove(guid)
         }
 
         serverList.clear()
@@ -282,15 +308,38 @@ object MmkvManager {
     /**
      * Removes all server configurations.
      *
+     * `mainStorage` is NOT cleared wholesale, and must not be: it is a shared store, not a server
+     * store. Alongside the per-subscription server lists it holds [KEY_SUB_IDS] — the провайдер
+     * order the user arranged — and [KEY_WEBDAV_CONFIG]. Clearing it took both down with the
+     * серверы, and [initSubsList] then rebuilt the провайдер list from `subStorage.allKeys()` in
+     * whatever order the store happened to enumerate. Only the keys that describe серверы go.
+     *
      * @return The number of server configurations removed.
      */
     fun removeAllServer(): Int {
         val count = profileFullStorage.allKeys()?.count() ?: 0
-        mainStorage.clearAll()
+        mainStorage.allKeys()
+            ?.filter { it.startsWith(KEY_SUB_SERVER_PREFIX) }
+            ?.forEach { mainStorage.remove(it) }
+        mainStorage.remove(KEY_SELECTED_SERVER)
         profileFullStorage.clearAll()
         serverAffStorage.clearAll()
+        // The raw templates are keyed by the same guids as the profiles just dropped, so every one
+        // of them is now unreachable (D23: nothing else deletes from this store).
+        serverRawStorage.clearAll()
         return count
     }
+
+    /**
+     * Whether a stored delay is evidence that a check ran against this server and it did not answer.
+     *
+     * Not simply "negative". [TESTING] is negative and is not a verdict about the server at all — it
+     * is a display state a retired build persisted — so it is excluded by value here rather than
+     * trusted to be absent. This is the single place that decides what "invalid" means, and it is
+     * the place that deletes, so the two cannot drift apart.
+     */
+    private fun isFailedMeasurement(delayMillis: Long): Boolean =
+        delayMillis < 0L && delayMillis != TESTING
 
     /**
      * Removes invalid server configurations.
@@ -302,7 +351,7 @@ object MmkvManager {
         var count = 0
         if (guid.isNotEmpty()) {
             decodeServerAffiliationInfo(guid)?.let { aff ->
-                if (aff.testDelayMillis < 0L) {
+                if (isFailedMeasurement(aff.testDelayMillis)) {
                     removeServer(guid)
                     count++
                 }
@@ -310,7 +359,7 @@ object MmkvManager {
         } else {
             serverAffStorage.allKeys()?.forEach { key ->
                 decodeServerAffiliationInfo(key)?.let { aff ->
-                    if (aff.testDelayMillis < 0L) {
+                    if (isFailedMeasurement(aff.testDelayMillis)) {
                         removeServer(key)
                         count++
                     }
@@ -338,6 +387,27 @@ object MmkvManager {
      */
     fun decodeServerRaw(guid: String): String? {
         return serverRawStorage.decodeString(guid)
+    }
+
+    /**
+     * Deletes every raw template whose profile no longer exists.
+     *
+     * A one-time repair, not a routine sweep: the delete paths above now carry the raw entry with
+     * its profile, so nothing new is orphaned. What this clears is the backlog left by the builds
+     * that had no delete path at all — one copy of every сервер per subscription refresh, kept for
+     * the life of the install and read by nothing.
+     *
+     * @return The number of orphaned raw entries removed.
+     */
+    fun pruneOrphanServerRaw(): Int {
+        val keys = serverRawStorage.allKeys() ?: return 0
+        var count = 0
+        for (key in keys) {
+            if (profileFullStorage.containsKey(key)) continue
+            serverRawStorage.remove(key)
+            count++
+        }
+        return count
     }
 
     //endregion

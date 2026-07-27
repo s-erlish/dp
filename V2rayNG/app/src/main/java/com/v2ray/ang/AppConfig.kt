@@ -88,6 +88,22 @@ object AppConfig {
     const val PREF_MEMORY_LIMIT = "pref_memory_limit"
     const val PREF_MEMORY_LIMIT_ENABLED = "pref_memory_limit_enabled"
 
+    /**
+     * Provider-screen preferences. The key strings keep the `pref_provider_` prefix they were first
+     * written with, so values stored while they lived inside the screen stay readable.
+     */
+    const val PREF_SUB_NOTIFY_ON_UPDATE = "pref_provider_notify_on_update"
+    const val PREF_SUB_UPDATE_ON_LAUNCH = "pref_provider_update_on_launch"
+    const val PREF_PING_ON_LAUNCH = "pref_provider_ping_on_launch"
+    const val PREF_PING_ON_UPDATE = "pref_provider_ping_on_update"
+    const val PREF_SUB_USER_AGENT = "pref_provider_sub_user_agent"
+    const val PREF_SERVER_SORT_ORDER = "pref_provider_server_sort_order"
+
+    /** Values of [PREF_SERVER_SORT_ORDER]. */
+    const val SERVER_SORT_DEFAULT = "default"
+    const val SERVER_SORT_PING = "ping"
+    const val SERVER_SORT_NAME = "name"
+
     /** Cache keys. */
     const val CACHE_SUBSCRIPTION_ID = "cache_subscription_id"
 
@@ -125,13 +141,45 @@ object AppConfig {
     const val GITHUB_RAW_URL = "https://raw.githubusercontent.com"
     const val GITHUB_DOWNLOAD_URL = "$GITHUB_URL/%s/releases/latest/download"
     const val ANDROID_PACKAGE_NAME_LIST_URL = "$GITHUB_RAW_URL/2dust/androidpackagenamelist/master/proxy.txt"
+    /**
+     * Where this app's own source lives. departament is a GPL-3 derivative of 2dust/v2rayNG and
+     * has no public fork repository yet, so «Исходный код» points at the upstream project the code
+     * comes from — the nearest true answer that actually opens. Replace it with departament's own
+     * public mirror the day one exists; a private repository URL would 404 for every customer.
+     */
     const val APP_URL = "$GITHUB_URL/2dust/v2rayNG"
-    const val APP_API_URL = "https://api.github.com/repos/2dust/v2rayNG/releases"
-    const val APP_ISSUES_URL = "$APP_URL/issues"
+
+    /**
+     * The self-update feed. **Blank on purpose: departament publishes no release feed.**
+     *
+     * This used to read `https://api.github.com/repos/2dust/v2rayNG/releases`, so «Проверить
+     * обновления» compared departament's version against *upstream v2rayNG's* tags and, on a hit,
+     * handed the customer upstream's APK — a different application, under a different
+     * applicationId, signed with a different key. It could never upgrade anything; it side-installs
+     * a stranger's VPN client next to this one. That is worse than having no updater.
+     *
+     * Blank means the updater has nothing to reach and can no longer offer anyone else's build.
+     * Consumers must treat blank as «this build has no update channel» and not present the control
+     * at all — see `UpdateCheckerManager` and the «Проверить обновления» rows in `AboutActivity`
+     * and `SettingsTabFragment`. Fill this in with departament's own releases endpoint (and keep
+     * asset names matching `departament_<version>[-fdroid]_<abi>.apk`, which
+     * `UpdateCheckerManager.getDownloadUrl` already filters on) to turn the feature back on.
+     */
+    const val APP_API_URL = ""
+
+    /** Customer support. Was upstream's GitHub issue tracker — a stranger's inbox for our users. */
+    const val APP_ISSUES_URL = "https://t.me/departamentvpnbot"
     const val APP_WIKI_MODE = "$APP_URL/wiki/Mode"
-    const val APP_PRIVACY_POLICY = "$GITHUB_RAW_URL/2dust/v2rayNG/master/CR.md"
+
+    /**
+     * departament's own privacy policy. Was `2dust/v2rayNG/master/CR.md` — a different operator's
+     * Chinese-language policy, served to this product's customers as if it governed them.
+     */
+    const val APP_PRIVACY_POLICY = "https://departament.site/privacy"
     const val APP_PROMOTION_URL = "aHR0cHM6Ly85LjIzNDQ1Ni54eXovYWJjLmh0bWw="
-    const val TG_CHANNEL_URL = "https://t.me/github_2dust"
+
+    /** departament's Telegram channel. Was `t.me/github_2dust` — upstream's channel. */
+    const val TG_CHANNEL_URL = "https://t.me/departamentvpn"
     const val DELAY_TEST_URL = "https://www.gstatic.com/generate_204"
     const val DELAY_TEST_URL2 = "https://www.google.com/generate_204"
 

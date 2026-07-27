@@ -17,6 +17,7 @@ import com.v2ray.ang.databinding.ItemRecyclerMainBinding
 import com.v2ray.ang.databinding.ItemSectionHeaderBinding
 import com.v2ray.ang.dto.V2rayConfig
 import com.v2ray.ang.dto.entities.ProfileItem
+import com.v2ray.ang.dto.entities.ServerAffiliationInfo
 import com.v2ray.ang.dto.entities.ServersCache
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.isComplexType
@@ -35,6 +36,13 @@ class MainRecyclerAdapter(
         private const val VIEW_TYPE_HEADER = 0
         private const val VIEW_TYPE_ITEM = 1
         private const val VIEW_TYPE_FOOTER = 2
+
+        /**
+         * What a failed check puts in the latency cell: a hyphen, in the failure colour, where a
+         * number would be. Not a word yet because this file does not own the copy — the copy pass
+         * is asked for `ping_result_failed` («нет») and should swap this for it.
+         */
+        private const val PING_FAILED = "-"
     }
 
     /** A flat row: either a provider section header or a server. */
@@ -50,8 +58,12 @@ class MainRecyclerAdapter(
     private var rows: List<Row> = emptyList()
 
     /**
-     * Retained for host-activity API compatibility. The long-press server-actions menu was
-     * removed, so this callback is no longer invoked by the adapter.
+     * Opens the server-actions sheet for a row — edit, delete, share, QR, duplicate, make default.
+     *
+     * Two affordances reach it and both are wired from here: a long press anywhere on the row, and
+     * the row's trailing `btn_row_actions` control, which exists because long press alone is a
+     * hidden route to actions that have no other one (M-52). A host that leaves this null gets
+     * neither — the trailing control is hidden rather than shown answering nothing.
      */
     var onItemLongClick: ((String) -> Unit)? = null
 
@@ -74,8 +86,16 @@ class MainRecyclerAdapter(
         this.showHeaders = showHeaders
         val targetGuid = if (index in this.servers.indices) this.servers[index].guid else null
         rebuildRows()
+
+        // Selection can have been changed by something that owns no list — a subscription import,
+        // fast-connect, or the service starting with an explicit guid. Re-read it on every rebuild
+        // so a single-row refresh can never leave a stale row painted as selected.
+        val latestSelection = MmkvManager.getSelectServer()
+        val selectionChanged = latestSelection != selectedGuid
+        selectedGuid = latestSelection
+
         val flat = targetGuid?.let { flatPositionOf(it) } ?: -1
-        if (flat >= 0) notifyItemChanged(flat) else notifyDataSetChanged()
+        if (flat >= 0 && !selectionChanged) notifyItemChanged(flat) else notifyDataSetChanged()
     }
 
     /** Backward-compatible shim: flat list, no section headers. */
@@ -123,6 +143,15 @@ class MainRecyclerAdapter(
 
     private fun flatPositionOf(guid: String): Int =
         rows.indexOfFirst { it is Row.Server && it.cache.guid == guid }
+
+    /**
+     * The guid this adapter currently paints as selected. Selection lives in MMKV, but MMKV cannot
+     * notify, and it is written from several places that do not own a list (subscription import,
+     * fast-connect, service start). Mirroring it here lets [syncSelection] repaint exactly the rows
+     * that changed — and, crucially, detect the case where the previously selected row is no longer
+     * findable, which used to leave two rows painted as selected at once.
+     */
+    private var selectedGuid: String? = MmkvManager.getSelectServer()
 
     /** Toggles collapse state across all provider sections. */
     @SuppressLint("NotifyDataSetChanged")
@@ -188,22 +217,29 @@ class MainRecyclerAdapter(
         binding.tvType.text = primaryProtocol(guid, profile)
         binding.tvStatistics.text = transportSecurity(guid, profile)
 
-        // Latency text only (colored by result). testDelayMillis == -2L is the "testing" sentinel
-        // set by MainActivity at ping start: show a spinner in place of the ms value until the real
-        // per-server result overwrites it.
+        // Latency: three states, three different cells (00-rules.md 15). Measuring is the spinner
+        // and no number. A failed check is PING_FAILED in the failure colour — never the raw
+        // negative marker, which is not a duration and would read as one. A server nobody has
+        // measured yet is simply blank, and that blank is what tells it apart from a failure.
         val aff = MmkvManager.decodeServerAffiliationInfo(guid)
-        val delay = aff?.testDelayMillis ?: 0L
-        val testing = delay == -2L
-        binding.progressPing.visibility = if (testing) View.VISIBLE else View.GONE
-        binding.tvTestResult.visibility = if (testing) View.GONE else View.VISIBLE
-        binding.tvTestResult.text = if (testing) "" else aff?.getTestDelayString().orEmpty()
+        val measuring = mainViewModel.isMeasuring(guid)
+        val failed = aff?.pingResult == ServerAffiliationInfo.PingResult.FAILED
+        binding.progressPing.visibility = if (measuring) View.VISIBLE else View.GONE
+        binding.tvTestResult.visibility = if (measuring) View.GONE else View.VISIBLE
+        binding.tvTestResult.text = when {
+            measuring -> ""
+            failed -> PING_FAILED
+            else -> aff?.getTestDelayString().orEmpty()
+        }
         // Ping colours resolved from theme attrs so ThemeOverlay.Mono greys them out.
-        val pingAttr = if (delay < 0L) R.attr.pingBad else R.attr.pingGood
+        val pingAttr = if (failed) R.attr.pingBad else R.attr.pingGood
         binding.tvTestResult.setTextColor(MaterialColors.getColor(binding.tvTestResult, pingAttr))
 
         // Selection: blue rounded outline via bg_server_row selected state.
         // Indicator bar tint via theme attr (mono-safe).
-        val selected = guid == MmkvManager.getSelectServer()
+        // Painted from the mirrored [selectedGuid], not straight from MMKV, so that a row can never
+        // render a selection state the adapter has not been told about.
+        val selected = guid == selectedGuid
         binding.infoContainer.isSelected = selected
         binding.layoutIndicator.setBackgroundColor(
             if (selected) MaterialColors.getColor(binding.layoutIndicator, R.attr.indicatorColor)
@@ -213,7 +249,22 @@ class MainRecyclerAdapter(
         binding.infoContainer.setOnClickListener {
             adapterListener?.onSelectServer(guid)
         }
-        // Long-press server-actions menu removed: long-press is a no-op (no listener set).
+        // Long-press opens the server-actions sheet. Both hosts assign [onItemLongClick] and the
+        // sheet handles the operator-locked case, but this invocation was missing, which left
+        // delete, edit, share and QR — the only routes to any of them — unreachable.
+        binding.infoContainer.setOnLongClickListener {
+            val handler = onItemLongClick ?: return@setOnLongClickListener false
+            handler(guid)
+            true
+        }
+        // The visible door to the same sheet (M-52). Long-press survives above it: a hidden
+        // affordance is a bad ONLY route, not a bad shortcut. The trailing button is a clickable
+        // child, so it consumes its own touch and the row's select-server click never fires from
+        // it. When no host wired the sheet there is nothing behind the control, so it is not
+        // offered at all rather than drawn as a button that answers nothing.
+        val actions = onItemLongClick
+        binding.btnRowActions.visibility = if (actions != null) View.VISIBLE else View.GONE
+        binding.btnRowActions.setOnClickListener { actions?.invoke(guid) }
     }
 
     private fun primaryProtocol(guid: String, profile: ProfileItem): String {
@@ -288,8 +339,35 @@ class MainRecyclerAdapter(
 
     /** Refreshes the two rows involved in a selection change (guids). */
     fun setSelectServer(fromGuid: String?, toGuid: String?) {
-        fromGuid?.let { flatPositionOf(it).takeIf { p -> p >= 0 }?.let { p -> notifyItemChanged(p) } }
-        toGuid?.let { flatPositionOf(it).takeIf { p -> p >= 0 }?.let { p -> notifyItemChanged(p) } }
+        syncSelection(toGuid, previous = fromGuid)
+    }
+
+    /**
+     * Repaints selection to match [guid] (defaults to whatever MMKV holds).
+     *
+     * Refreshing only the two affected rows is the cheap path, but it is only correct when BOTH
+     * rows are currently in [rows]. The old row can be missing — it may sit inside a collapsed
+     * section, or the list may have been rebuilt by a subscription update since it was selected —
+     * and a missed refresh leaves it painted as selected next to the new one, which is the
+     * "two servers selected at once" defect. So: fall back to a full refresh whenever either row
+     * cannot be located.
+     */
+    @SuppressLint("NotifyDataSetChanged")
+    fun syncSelection(guid: String? = MmkvManager.getSelectServer(), previous: String? = selectedGuid) {
+        if (guid == selectedGuid && previous == selectedGuid) return
+        selectedGuid = guid
+
+        val fromPos = previous?.let { flatPositionOf(it) } ?: -1
+        val toPos = guid?.let { flatPositionOf(it) } ?: -1
+
+        val fromResolved = previous == null || fromPos >= 0
+        val toResolved = guid == null || toPos >= 0
+        if (!fromResolved || !toResolved) {
+            notifyDataSetChanged()
+            return
+        }
+        if (fromPos >= 0) notifyItemChanged(fromPos)
+        if (toPos >= 0 && toPos != fromPos) notifyItemChanged(toPos)
     }
 
     /** Flat adapter position of a server guid, or -1. */

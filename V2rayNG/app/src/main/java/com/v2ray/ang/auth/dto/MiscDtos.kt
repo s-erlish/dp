@@ -35,8 +35,7 @@ data class DevicesDto(
     /** The device list regardless of whether the backend returns it flat or nested. */
     fun devices(): List<DeviceDto> = when {
         items.isNotEmpty() -> items
-        !response?.devices.isNullOrEmpty() -> response!!.devices
-        else -> emptyList()
+        else -> response?.devices.orEmpty()
     }
 }
 

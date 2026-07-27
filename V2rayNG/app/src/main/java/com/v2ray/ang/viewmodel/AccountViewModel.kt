@@ -2,6 +2,7 @@ package com.v2ray.ang.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.v2ray.ang.AngApplication
 import com.v2ray.ang.auth.AccountCache
 import com.v2ray.ang.auth.AccountRepository
 import com.v2ray.ang.auth.AccountSession
@@ -16,11 +17,17 @@ import com.v2ray.ang.auth.dto.ServerStatusDto
 import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.auth.dto.TariffGroupDto
 import com.v2ray.ang.auth.dto.UserProfileDto
+import com.v2ray.ang.core.CoreServiceManager
+import com.v2ray.ang.util.AvatarManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Backs the account/subscriptions/store/payments screens. Holds the observable data as
@@ -79,6 +86,18 @@ class AccountViewModel : ViewModel() {
 
     private val _error = MutableStateFlow<ApiError?>(null)
     val error: StateFlow<ApiError?> = _error.asStateFlow()
+
+    /**
+     * True from the moment a charge is issued until the provider answers — the guard behind D10.
+     *
+     * It lives HERE, not on the screen, for two reasons. A ViewModel survives a rotation, so a
+     * purchase fired before one is still visibly in flight after it, instead of handing the user a
+     * fresh, enabled «Оплатить» over a request that is still running. And [buy] / [payWithBalance]
+     * consult it themselves, so even a caller that forgets to disable its own button cannot issue
+     * a second charge: the second call returns without touching the network.
+     */
+    private val _paymentInFlight = MutableStateFlow(false)
+    val paymentInFlight: StateFlow<Boolean> = _paymentInFlight.asStateFlow()
 
     fun clearError() {
         _error.value = null
@@ -330,12 +349,42 @@ class AccountViewModel : ViewModel() {
 
     // region actions
 
-    fun buy(req: PaymentRequestDto, onInit: (PaymentInitDto) -> Unit) = viewModelScope.launch {
-        repo.buy(req).onSuccess { onInit(it) }.onFailure { report(it) }
+    /**
+     * Issues a provider checkout for [req].
+     *
+     * The in-flight guard is taken with [MutableStateFlow.compareAndSet] BEFORE the first
+     * suspension point, and `viewModelScope` runs on `Dispatchers.Main.immediate`, so a second
+     * call made from the same frame as the first — a double tap — finds the flag already set and
+     * returns without touching the network (D10). It is released in a `finally`, so a throw cannot
+     * strand a screen with a permanently busy CTA.
+     *
+     * Failures surface through [error] alone. There is deliberately no per-attempt failure
+     * callback: nothing needs one, because the guard that a caller would clear from it lives here
+     * rather than on the screen.
+     */
+    fun buy(
+        req: PaymentRequestDto,
+        onInit: (PaymentInitDto) -> Unit,
+    ) = viewModelScope.launch {
+        if (!_paymentInFlight.compareAndSet(expect = false, update = true)) return@launch
+        try {
+            repo.buy(req).onSuccess { onInit(it) }.onFailure { report(it) }
+        } finally {
+            _paymentInFlight.value = false
+        }
     }
 
-    fun payWithBalance(req: PaymentRequestDto, onDone: () -> Unit = {}) = viewModelScope.launch {
-        repo.payWithBalance(req).onSuccess { onDone() }.onFailure { report(it) }
+    /** Settles [req] against the wallet balance. Same in-flight guard as [buy]. */
+    fun payWithBalance(
+        req: PaymentRequestDto,
+        onDone: () -> Unit = {},
+    ) = viewModelScope.launch {
+        if (!_paymentInFlight.compareAndSet(expect = false, update = true)) return@launch
+        try {
+            repo.payWithBalance(req).onSuccess { onDone() }.onFailure { report(it) }
+        } finally {
+            _paymentInFlight.value = false
+        }
     }
 
     fun upgrade(
@@ -397,11 +446,90 @@ class AccountViewModel : ViewModel() {
         repo.renameSubscription(scope, id, name).onSuccess { onDone() }.onFailure { report(it) }
     }
 
-    fun logout() {
-        AccountSession.wipe()
-        // Hard reset: clear the in-memory cache eagerly rather than relying only on the lazy
-        // logged-out clear on next read, and stop any in-flight subscription load.
-        AccountCache.invalidateAll()
+    /** True while the core is up, so the sign-out dialog can tell the truth about the tunnel. */
+    fun isTunnelRunning(): Boolean = runCatching { CoreServiceManager.isRunning() }.getOrDefault(false)
+
+    /**
+     * Signs the user out.
+     *
+     * **There is no network call here, and there cannot be one.** This backend issues a 7-day,
+     * non-refreshable JWT and exposes no logout endpoint (see [com.v2ray.ang.auth.AuthManager]'s
+     * class comment: "There is NO refresh/logout here"). Sign-out is entirely local: nothing here
+     * waits on a server, so there is no request to time out and no late reply to arrive after the
+     * screen is gone. Local is not the same as instant, though - see the watchdog note below.
+     *
+     * The failure that matters is a HALF-cleared session, so the order is load-bearing:
+     *
+     * 1. **[AccountSession.wipe] runs first and alone.** It removes every subscription this
+     *    session imported, cancels their auto-update workers, drops the token / cached profile /
+     *    managed-guid map, and only then flips the state to LoggedOut. If it throws part-way, the
+     *    token is still there, the user is still signed in and still connected, and the whole
+     *    action is safely retryable (every step in it is idempotent).
+     * 2. **Then the tunnel is stopped**, because the servers it was built from no longer exist.
+     *    Left running, the core would keep routing the whole device through a subscription the
+     *    user just detached from their account, under a notification naming a profile that is
+     *    gone from storage, and the next launch would start with a live service and no selected
+     *    server. That is the undefined state; stopping is not optional.
+     *    (Removing the servers already cleared the selected-server key, see
+     *    `MmkvManager.removeServerViaSubid`.)
+     * 3. **Then the account-scoped local leftovers**: the in-memory [AccountCache], and the
+     *    locally-picked avatar, which would otherwise show the previous person's photo to
+     *    whoever signs in next on this device. The cost is that a returning user re-picks their
+     *    photo; the alternative is wearing a stranger's face, which is worse.
+     *
+     * What deliberately survives: `AuthTokenStore.deviceId()` (so signing back in reuses the same
+     * HWID slot instead of burning a device on the panel), and every server or subscription the
+     * user added by hand. Those are the user's, not the account's.
+     *
+     * [onFailure] is invoked when step 1 threw, i.e. the user is still signed in and the caller
+     * should offer a retry. It is also invoked when the wipe stops making progress: none of these
+     * calls is a network call, but two of them cross a process boundary (`RemoteWorkManager` binds
+     * a service to cancel the auto-update work, `stopVService` messages the core service), and a
+     * binder that never comes back would otherwise leave the caller's spinner turning for ever
+     * with no way out. [LOGOUT_WATCHDOG_MS] bounds the wait; the wipe itself is deliberately NOT
+     * cancelled when the watchdog fires, because a half-run wipe is the one outcome this method
+     * exists to prevent. It keeps running, and if it does finish it flips the session to
+     * LoggedOut, which the Account tab already observes and treats exactly like a normal
+     * sign-out. So the worst case is a retry offered for work that then succeeds on its own —
+     * never a stuck screen, and never a torn session.
+     *
+     * [onFailure] is deliberately NOT invoked on success: the state flip tears the tab down and
+     * the UI change is the confirmation, so there is nothing to say.
+     */
+    fun logout(onFailure: () -> Unit = {}) {
+        viewModelScope.launch {
+            // Passing NonCancellable as the context's Job detaches this coroutine from
+            // viewModelScope, which is the point: the wipe must survive both the ViewModel being
+            // cleared mid-flight and the watchdog below giving up on it. Nothing inside can throw
+            // (every step is wrapped), so the detached job cannot fail unobserved either.
+            val work = viewModelScope.async(Dispatchers.IO + NonCancellable) {
+                val ok = runCatching { AccountSession.wipe() }.isSuccess
+                if (ok) {
+                    val app = AngApplication.application
+                    runCatching { if (CoreServiceManager.isRunning()) CoreServiceManager.stopVService(app) }
+                    runCatching { AccountCache.invalidateAll() }
+                    runCatching { AvatarManager.clearCustomAvatar(app) }
+                }
+                ok
+            }
+            // true = signed out, false = the wipe threw, null = it is still running and the
+            // watchdog gave up waiting. The last two are the same thing to the user: still signed
+            // in, safe to try again.
+            val wiped = withTimeoutOrNull(LOGOUT_WATCHDOG_MS) { work.await() }
+            if (wiped == true) clearAccountData() else onFailure()
+        }
+    }
+
+    /**
+     * Drops every piece of account data this ViewModel publishes, and stops the loads that would
+     * refill it, so nothing can paint a signed-out screen with the previous session's values.
+     *
+     * Public, and separate from [logout], because the session can also drop without the user
+     * asking: [AccountRepository.refreshProfile] wipes it when the identity endpoint returns 401.
+     * The Account tab calls this on that transition too, so an expired token leaves no more
+     * behind than an explicit sign-out does.
+     */
+    fun clearAccountData() {
         subsJob?.cancel()
         subsJob = null
         devicesJob?.cancel()
@@ -414,6 +542,19 @@ class AccountViewModel : ViewModel() {
         _payments.value = emptyList()
         _deviceCount.value = null
         _importedGuids.value = emptyList()
+        _tariffs.value = emptyList()
+        _error.value = null
+        _loading.value = false
+    }
+
+    private companion object {
+        /**
+         * How long [logout] waits for a wipe that is entirely local before it stops promising the
+         * user that something is happening. Generous on purpose: everything here normally lands in
+         * single-digit milliseconds, so this only ever fires when a binder call is genuinely wedged,
+         * and firing it early would report a failure for work that was about to succeed.
+         */
+        const val LOGOUT_WATCHDOG_MS = 8_000L
     }
 
     // endregion

@@ -4,166 +4,194 @@ import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.Intent
 import android.os.Bundle
-import android.view.Menu
-import android.view.MenuItem
 import androidx.activity.viewModels
-import androidx.appcompat.widget.SearchView
+import androidx.core.content.FileProvider
+import androidx.core.view.isVisible
+import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.v2ray.ang.BuildConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityLogcatBinding
-import com.v2ray.ang.extension.toast
+import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
+import com.v2ray.ang.ui.component.EmptyStateBinder
+import com.v2ray.ang.ui.component.SkeletonBinder
+import com.v2ray.ang.ui.component.SubPage
+import com.v2ray.ang.ui.component.ToolbarBinder
 import com.v2ray.ang.util.Utils
 import com.v2ray.ang.viewmodel.LogcatViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.core.content.FileProvider
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * A-35 `settings/about/log` - «Журнал». H3 header, R3 rhythm.
+ *
+ * The screen shipped with a toast on entry - «Please pull down to refresh!», in English, on a
+ * Russian-only product - and an empty list behind it. It loads its own content now, shows a skeleton
+ * while it does, and has the empty state it never had. Search, copy, share and clear all lived in an
+ * ActionBar overflow that A-38 removes; search is a field on the screen and the three actions are
+ * rows in the editors' shared sheet.
+ */
 class LogcatActivity : BaseActivity(), SwipeRefreshLayout.OnRefreshListener {
+
     private val binding by lazy { ActivityLogcatBinding.inflate(layoutInflater) }
     private val viewModel: LogcatViewModel by viewModels()
     private lateinit var adapter: LogcatRecyclerAdapter
+    private var query: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
-        setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = getString(R.string.title_logcat))
+        setContentView(binding.root)
+
+        ToolbarBinder.bind(
+            root = binding.toolbar.root,
+            title = getString(R.string.log_title),
+            activity = this,
+            actionIcon = R.drawable.ic_more_vert_24dp,
+            actionDescription = getString(R.string.editor_more_actions),
+            onAction = { showLogActions() },
+        )
+        ToolbarBinder.attachTo(binding.toolbar.root, binding.recyclerView)
 
         adapter = LogcatRecyclerAdapter(viewModel, ::onLogLongClick)
-
         binding.recyclerView.setHasFixedSize(true)
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
-        addCustomDividerToRecyclerView(binding.recyclerView, this, R.drawable.custom_divider)
         binding.recyclerView.adapter = adapter
 
-        binding.refreshLayout.setOnRefreshListener(this)
+        binding.search.searchInput.setHint(R.string.log_search_hint)
+        binding.search.searchInput.doAfterTextChanged {
+            query = it?.toString().orEmpty()
+            viewModel.filter(query)
+            refreshData()
+        }
 
-        toast(getString(R.string.pull_down_to_refresh))
+        binding.refreshLayout.setOnRefreshListener(this)
+        loadLogs()
     }
 
     private fun onLogLongClick(log: String): Boolean {
         Utils.setClipboard(this, log)
+        toastSuccess(R.string.editor_copied)
         return true
     }
 
-    private fun shareLogcat() {
-        lifecycleScope.launch(Dispatchers.IO) {
-            val logText = viewModel.getAll().joinToString("\n")
+    private fun loadLogs() {
+        SkeletonBinder.showAfterDelay(binding.skeleton)
+        binding.recyclerView.isVisible = false
+        EmptyStateBinder.hide(binding.emptyState.root)
 
-            val result = try {
-                val shareDir = File(cacheDir, "shared_logs").apply {
-                    mkdirs()
-                }
-
-                shareDir.listFiles()?.forEach { it.delete() }
-
-                val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
-                val logFile = File(shareDir, "departament_logcat_$timestamp.txt")
-                logFile.writeText(logText, Charsets.UTF_8)
-
-                val uri = FileProvider.getUriForFile(
-                    this@LogcatActivity,
-                    "${packageName}.cache",
-                    logFile
-                )
-
-                uri to logFile.name
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    toast(e.localizedMessage ?: e.toString())
-                }
-                return@launch
-            }
-
-            withContext(Dispatchers.Main) {
-                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_STREAM, result.first)
-                    putExtra(Intent.EXTRA_SUBJECT, result.second)
-                    putExtra(Intent.EXTRA_TITLE, result.second)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    clipData = ClipData.newUri(contentResolver, result.second, result.first)
-                }
-
-                startActivity(
-                    Intent.createChooser(
-                        shareIntent,
-                        getString(R.string.logcat_share)
-                    )
-                )
-            }
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) { viewModel.loadLogcat() }
+            binding.refreshLayout.isRefreshing = false
+            refreshData()
         }
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.menu_logcat, menu)
-
-        val searchItem = menu.findItem(R.id.search_view)
-        if (searchItem != null) {
-            val searchView = searchItem.actionView as SearchView
-            searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-                override fun onQueryTextSubmit(query: String?): Boolean = false
-
-                override fun onQueryTextChange(newText: String?): Boolean {
-                    viewModel.filter(newText)
-                    refreshData()
-                    return false
-                }
-            })
-            searchView.setOnCloseListener {
-                viewModel.filter("")
-                refreshData()
-                false
-            }
-        }
-
-        return super.onCreateOptionsMenu(menu)
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
-        R.id.copy_all -> {
-            val all = viewModel.getAll().joinToString("\n")
-            Utils.setClipboard(this, all)
-            toastSuccess(R.string.toast_success)
-            true
-        }
-
-        R.id.share_all -> {
-            shareLogcat()
-            true
-        }
-
-        R.id.clear_all -> {
-            lifecycleScope.launch(Dispatchers.IO) {
-                viewModel.clearLogcat()
-                withContext(Dispatchers.Main) {
-                    refreshData()
-                }
-            }
-            true
-        }
-
-        else -> super.onOptionsItemSelected(item)
     }
 
     override fun onRefresh() {
-        lifecycleScope.launch(Dispatchers.IO) {
-            viewModel.loadLogcat()
-            withContext(Dispatchers.Main) {
-                binding.refreshLayout.isRefreshing = false
-                refreshData()
-            }
-        }
+        loadLogs()
     }
 
     @SuppressLint("NotifyDataSetChanged")
-    fun refreshData() {
+    private fun refreshData() {
+        SkeletonBinder.cancel(binding.skeleton)
         adapter.notifyDataSetChanged()
+
+        val isEmpty = viewModel.getAll().isEmpty()
+        binding.recyclerView.isVisible = !isEmpty
+        if (!isEmpty) {
+            EmptyStateBinder.hide(binding.emptyState.root)
+            return
+        }
+        if (query.isNotBlank()) {
+            EmptyStateBinder.bind(
+                root = binding.emptyState.root,
+                glyph = R.drawable.ic_logcat_24dp,
+                title = getString(R.string.editor_search_empty_title),
+                line = getString(R.string.editor_search_empty_line),
+                actionLabel = getString(R.string.editor_search_reset),
+                onAction = { binding.search.searchInput.setText("") },
+            )
+        } else {
+            EmptyStateBinder.bind(
+                root = binding.emptyState.root,
+                glyph = R.drawable.ic_logcat_24dp,
+                title = getString(R.string.log_empty_title),
+                line = getString(R.string.log_empty_line),
+            )
+        }
+    }
+
+    private fun showLogActions() {
+        val hasLines = viewModel.getAll().isNotEmpty()
+        EditorActionsSheet(this, getString(R.string.editor_actions_title))
+            .action(R.string.log_action_copy, R.drawable.ic_copy, enabled = hasLines) {
+                Utils.setClipboard(this, viewModel.getAll().joinToString("\n"))
+                toastSuccess(R.string.editor_copied)
+            }
+            .action(R.string.log_action_share, R.drawable.ic_share_24dp, enabled = hasLines) {
+                shareLogcat()
+            }
+            .destructive(R.string.log_action_clear) {
+                lifecycleScope.launch {
+                    withContext(Dispatchers.IO) { viewModel.clearLogcat() }
+                    refreshData()
+                    toastSuccess(R.string.log_cleared)
+                }
+            }
+            .show()
+    }
+
+    private fun shareLogcat() {
+        lifecycleScope.launch {
+            val logText = viewModel.getAll().joinToString("\n")
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val shareDir = File(cacheDir, "shared_logs").apply { mkdirs() }
+                    shareDir.listFiles()?.forEach { it.delete() }
+
+                    val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
+                    val logFile = File(shareDir, "departament_logcat_$timestamp.txt")
+                    logFile.writeText(logText, Charsets.UTF_8)
+
+                    // One spelling of the FileProvider authority across the app: BackupActivity
+                    // already uses BuildConfig.APPLICATION_ID, and "${packageName}.cache" drifts
+                    // from it the moment a flavour changes the package.
+                    val uri = FileProvider.getUriForFile(
+                        this@LogcatActivity,
+                        "${BuildConfig.APPLICATION_ID}.cache",
+                        logFile,
+                    )
+                    uri to logFile.name
+                }
+            }
+
+            val (uri, name) = result.getOrElse {
+                toastError(R.string.log_share_failed)
+                return@launch
+            }
+
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, name)
+                putExtra(Intent.EXTRA_TITLE, name)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                clipData = ClipData.newUri(contentResolver, name, uri)
+            }
+            startActivity(Intent.createChooser(shareIntent, getString(R.string.log_action_share)))
+        }
+    }
+
+    override fun onDestroy() {
+        SkeletonBinder.cancel(binding.skeleton)
+        super.onDestroy()
     }
 }

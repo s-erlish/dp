@@ -1,277 +1,367 @@
 package com.v2ray.ang.ui
 
-import android.annotation.SuppressLint
 import android.os.Bundle
 import android.text.TextUtils
-import android.view.Menu
-import android.view.MenuItem
-import android.widget.Toast
+import android.view.View
 import androidx.activity.viewModels
-import androidx.appcompat.widget.SearchView
+import androidx.core.view.isVisible
+import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.ANG_PACKAGE
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityBypassListBinding
 import com.v2ray.ang.dto.AppInfo
 import com.v2ray.ang.dto.UrlContentRequest
-import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.extension.v2RayApplication
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
+import com.v2ray.ang.ui.component.EmptyStateBinder
+import com.v2ray.ang.ui.component.RowBinder
+import com.v2ray.ang.ui.component.SkeletonBinder
+import com.v2ray.ang.ui.component.SubPage
+import com.v2ray.ang.ui.component.ToolbarBinder
 import com.v2ray.ang.util.AppManagerUtil
 import com.v2ray.ang.util.HttpUtil
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.Utils
 import com.v2ray.ang.viewmodel.PerAppProxyViewModel
-import es.dmoral.toasty.Toasty
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.Collator
 
+/**
+ * A-18 `settings/perapp` - «Прокси по приложениям». H3 header, R1 rhythm.
+ *
+ * The two audit findings this screen was called out for:
+ *
+ * - **The boolean was a bare checkbox in a card grid.** Every app is now a `Row.Toggle` in one
+ *   grouped list, so the whole row toggles and the switch matches every other boolean in the app.
+ * - **There was no grouping and no search on screen.** Search lived in an ActionBar `SearchView`
+ *   that A-38 deletes along with the ActionBar; it is now a real 56dp field that filters in place.
+ *   The list is grouped «Ваши приложения» / «Системные приложения» instead of prefixing system apps
+ *   with `** ` in Kotlin.
+ *
+ * And the states the screen simply did not have: a skeleton while the package manager resolves the
+ * list (slow on a cold start, and the screen used to be blank for all of it), «Ничего не найдено»
+ * for a search that matched nothing, and a load failure that offers «Повторить» instead of logging
+ * and showing an empty screen.
+ *
+ * **The mode is one row, not two switches.** `PREF_PER_APP_PROXY` and `PREF_BYPASS_APPS` are two
+ * booleans encoding three states, and the old screen showed them as two independent switches - one
+ * of which was meaningless while the other was off, with the explanation hidden behind a second
+ * tappable target that fired a toast. They are one `Row.Value` here, cycling «Все приложения» ->
+ * «Только выбранные» -> «Кроме выбранных» in place, with the subtitle stating what the current mode
+ * actually does. Both preferences keep their existing meaning and their existing keys.
+ */
 class PerAppProxyActivity : BaseActivity() {
+
     private val binding by lazy { ActivityBypassListBinding.inflate(layoutInflater) }
 
-    private var adapter: PerAppProxyAdapter? = null
-    private var appsAll: List<AppInfo>? = null
     private val viewModel: PerAppProxyViewModel by viewModels()
+    private val adapter by lazy {
+        PerAppProxyAdapter(
+            isSelected = viewModel::contains,
+            onToggle = { packageName ->
+                viewModel.toggle(packageName)
+                updateMeta()
+            },
+        )
+    }
+
+    private var appsAll: List<AppInfo> = emptyList()
+    private var query: String = ""
+    private var loadFailed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
-        //setContentView(binding.root)
-        setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = getString(R.string.pa_title))
+        setContentView(binding.root)
 
-        addCustomDividerToRecyclerView(binding.recyclerView, this, R.drawable.custom_divider)
+        ToolbarBinder.bind(
+            root = binding.toolbar.root,
+            title = getString(R.string.pa_title),
+            activity = this,
+            actionIcon = R.drawable.ic_more_vert_24dp,
+            actionDescription = getString(R.string.editor_more_actions),
+            onAction = { showListActions() },
+        )
+        ToolbarBinder.attachTo(binding.toolbar.root, binding.recyclerView)
 
-        initList()
+        binding.recyclerView.setHasFixedSize(true)
+        binding.recyclerView.layoutManager = LinearLayoutManager(this)
+        binding.recyclerView.adapter = adapter
 
-        binding.switchPerAppProxy.setOnCheckedChangeListener { _, isChecked ->
-            MmkvManager.encodeSettings(AppConfig.PREF_PER_APP_PROXY, isChecked)
+        binding.search.searchInput.setHint(R.string.perapp_search_hint)
+        binding.search.searchInput.doAfterTextChanged { text ->
+            query = text?.toString().orEmpty()
+            applyFilter()
         }
-        binding.switchPerAppProxy.isChecked = MmkvManager.decodeSettingsBool(AppConfig.PREF_PER_APP_PROXY, false)
 
-        binding.switchBypassApps.setOnCheckedChangeListener { _, isChecked ->
-            MmkvManager.encodeSettings(AppConfig.PREF_BYPASS_APPS, isChecked)
-        }
-        binding.switchBypassApps.isChecked = MmkvManager.decodeSettingsBool(AppConfig.PREF_BYPASS_APPS, false)
-
-        binding.layoutSwitchBypassAppsTips.setOnClickListener {
-            Toasty.info(this, R.string.pa_summary, Toast.LENGTH_LONG, true).show()
-        }
+        bindModeRow()
+        loadApps()
     }
 
-    private fun initList() {
-        showLoading()
+    // ---------------------------------------------------------------- mode
+
+    /**
+     * The three modes, in cycle order. The pair of booleans behind them is unchanged - this is a
+     * presentation of the existing preferences, not a new setting.
+     */
+    private enum class Mode(val labelRes: Int, val hintRes: Int) {
+        ALL(R.string.perapp_mode_all, R.string.perapp_mode_all_hint),
+        SELECTED(R.string.perapp_mode_selected, R.string.perapp_mode_selected_hint),
+        EXCEPT(R.string.perapp_mode_except, R.string.perapp_mode_except_hint),
+    }
+
+    private fun currentMode(): Mode = when {
+        !MmkvManager.decodeSettingsBool(AppConfig.PREF_PER_APP_PROXY, false) -> Mode.ALL
+        MmkvManager.decodeSettingsBool(AppConfig.PREF_BYPASS_APPS, false) -> Mode.EXCEPT
+        else -> Mode.SELECTED
+    }
+
+    private fun applyMode(mode: Mode) {
+        MmkvManager.encodeSettings(AppConfig.PREF_PER_APP_PROXY, mode != Mode.ALL)
+        MmkvManager.encodeSettings(AppConfig.PREF_BYPASS_APPS, mode == Mode.EXCEPT)
+        SettingsChangeManager.makeRestartService()
+        bindModeRow()
+    }
+
+    private fun bindModeRow() {
+        val mode = currentMode()
+        RowBinder.bind(
+            root = binding.rowMode.root,
+            title = getString(R.string.perapp_mode_row),
+            subtitle = getString(mode.hintRes),
+            glyph = R.drawable.ic_per_apps_24dp,
+            value = getString(mode.labelRes),
+            // The unfold glyph is the promise that the value changes HERE - no screen, no dialog
+            // (22-components 8.1). Three options is exactly the count that grammar is for.
+            trailing = RowBinder.Trailing.Glyph(
+                icon = R.drawable.ic_arrow_drop_down,
+                contentDescription = null,
+            ),
+            onClick = {
+                val next = Mode.entries[(mode.ordinal + 1) % Mode.entries.size]
+                applyMode(next)
+            },
+        )
+    }
+
+    // ---------------------------------------------------------------- list
+
+    private fun loadApps() {
+        loadFailed = false
+        showLoadingState()
 
         lifecycleScope.launch {
-            try {
-                val apps = withContext(Dispatchers.IO) {
-                    val appsList = AppManagerUtil.loadNetworkAppList(this@PerAppProxyActivity)
-
-                    val blacklistSet = viewModel.getAll()
-                    if (blacklistSet.isNotEmpty()) {
-                        appsList.forEach { app ->
-                            app.isSelected = if (blacklistSet.contains(app.packageName)) 1 else 0
-                        }
-                        appsList.sortedWith { p1, p2 ->
-                            when {
-                                p1.isSelected > p2.isSelected -> -1
-                                p1.isSelected < p2.isSelected -> 1
-                                p1.isSystemApp > p2.isSystemApp -> 1
-                                p1.isSystemApp < p2.isSystemApp -> -1
-                                p1.appName.lowercase() > p2.appName.lowercase() -> 1
-                                p1.appName.lowercase() < p2.appName.lowercase() -> -1
-                                p1.packageName > p2.packageName -> 1
-                                p1.packageName < p2.packageName -> -1
-                                else -> 0
-                            }
-                        }
-                    } else {
-                        val collator = Collator.getInstance()
-                        appsList.sortedWith(compareBy(collator) { it.appName })
-                    }
+            val apps = withContext(Dispatchers.IO) {
+                runCatching {
+                    val collator = Collator.getInstance()
+                    AppManagerUtil.loadNetworkAppList(this@PerAppProxyActivity)
+                        .sortedWith(compareBy(collator) { it.appName })
                 }
+            }
+            apps.onSuccess {
+                appsAll = it
+                loadFailed = false
+            }.onFailure {
+                appsAll = emptyList()
+                loadFailed = true
+                LogUtil.e(ANG_PACKAGE, "Error loading apps", it)
+            }
+            applyFilter()
+        }
+    }
 
-                appsAll = apps
-                adapter = PerAppProxyAdapter(apps, viewModel)
-                binding.recyclerView.adapter = adapter
+    private fun applyFilter() {
+        val key = query.trim().uppercase()
+        val visible = if (key.isEmpty()) {
+            appsAll
+        } else {
+            appsAll.filter {
+                it.appName.uppercase().contains(key) || it.packageName.uppercase().contains(key)
+            }
+        }
+        adapter.submit(
+            apps = visible,
+            userLabel = getString(R.string.perapp_section_user),
+            systemLabel = getString(R.string.perapp_section_system),
+        )
+        updateMeta()
+        showContentState(visible.isEmpty())
+    }
 
-            } catch (e: Exception) {
-                LogUtil.e(ANG_PACKAGE, "Error loading apps", e)
-            } finally {
-                hideLoading()
+    private fun updateMeta() {
+        binding.tvMeta.text = getString(
+            R.string.perapp_selected_count,
+            viewModel.getAll().size,
+            appsAll.size,
+        )
+    }
+
+    // -------------------------------------------------------------- states
+
+    private fun showLoadingState() {
+        EmptyStateBinder.hide(binding.emptyState.root)
+        binding.recyclerView.isVisible = false
+        binding.tvMeta.isVisible = false
+        SkeletonBinder.showAfterDelay(binding.skeleton)
+    }
+
+    /** Exactly one of list / empty / error is on screen once the load settles (00-rules.md 15). */
+    private fun showContentState(isEmpty: Boolean) {
+        SkeletonBinder.cancel(binding.skeleton)
+        binding.tvMeta.isVisible = !loadFailed
+        binding.search.root.isVisible = !loadFailed
+
+        when {
+            loadFailed -> {
+                binding.recyclerView.isVisible = false
+                EmptyStateBinder.bind(
+                    root = binding.emptyState.root,
+                    glyph = R.drawable.ic_dl_info,
+                    title = getString(R.string.perapp_error_title),
+                    line = getString(R.string.perapp_error_line),
+                    actionLabel = getString(R.string.editor_retry),
+                    emphasis = EmptyStateBinder.Emphasis.TERTIARY,
+                    onAction = { loadApps() },
+                )
+            }
+
+            isEmpty && query.isNotBlank() -> {
+                binding.recyclerView.isVisible = false
+                EmptyStateBinder.bind(
+                    root = binding.emptyState.root,
+                    glyph = R.drawable.ic_per_apps_24dp,
+                    title = getString(R.string.editor_search_empty_title),
+                    line = getString(R.string.editor_search_empty_line),
+                    actionLabel = getString(R.string.editor_search_reset),
+                    onAction = { binding.search.searchInput.setText("") },
+                )
+            }
+
+            isEmpty -> {
+                binding.recyclerView.isVisible = false
+                EmptyStateBinder.bind(
+                    root = binding.emptyState.root,
+                    glyph = R.drawable.ic_per_apps_24dp,
+                    title = getString(R.string.perapp_empty_title),
+                    line = getString(R.string.perapp_empty_line),
+                )
+            }
+
+            else -> {
+                EmptyStateBinder.hide(binding.emptyState.root)
+                binding.recyclerView.isVisible = true
             }
         }
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.menu_bypass_list, menu)
+    // ------------------------------------------------------------- actions
 
-        val searchItem = menu.findItem(R.id.search_view)
-        if (searchItem != null) {
-            val searchView = searchItem.actionView as SearchView
-            searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-                override fun onQueryTextSubmit(query: String?): Boolean = false
+    /**
+     * The six list actions. They used to live in a toolbar overflow menu; the seamless sub-page
+     * header of §4.8 keeps at most one trailing action, so they live in the one sheet the editors
+     * share. Nothing was dropped: select-all now states which way it will go, and its inverse
+     * («Снять отметки») is a separate row rather than a second meaning of the same one.
+     */
+    private fun showListActions() {
+        val visible = adapter.apps.map { it.packageName }
+        val allSelected = visible.isNotEmpty() && visible.all { viewModel.contains(it) }
 
-                override fun onQueryTextChange(newText: String?): Boolean {
-                    filterProxyApp(newText.orEmpty())
-                    return false
-                }
-            })
-        }
-
-        return super.onCreateOptionsMenu(menu)
-    }
-
-
-    @SuppressLint("NotifyDataSetChanged")
-    override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
-        R.id.select_all -> {
-            selectAllApp()
-            allowPerAppProxy()
-            true
-        }
-
-        R.id.invert_selection -> {
-            invertSelection()
-            allowPerAppProxy()
-            true
-        }
-
-        R.id.select_proxy_app -> {
-            selectProxyAppAuto()
-            allowPerAppProxy()
-            true
-        }
-
-        R.id.import_proxy_app -> {
-            importProxyApp()
-            allowPerAppProxy()
-            true
-        }
-
-        R.id.export_proxy_app -> {
-            exportProxyApp()
-            true
-        }
-
-        else -> super.onOptionsItemSelected(item)
-    }
-
-    private fun selectAllApp() {
-        adapter?.let { adapter ->
-            val pkgNames = adapter.apps.map { it.packageName }
-            val allSelected = pkgNames.all { viewModel.contains(it) }
-
-            if (allSelected) {
-                viewModel.removeAll(pkgNames)
-            } else {
-                viewModel.addAll(pkgNames)
+        EditorActionsSheet(this, getString(R.string.editor_actions_title))
+            .action(
+                labelRes = if (allSelected) R.string.perapp_action_clear_all else R.string.perapp_action_select_all,
+                enabled = visible.isNotEmpty(),
+            ) {
+                if (allSelected) viewModel.removeAll(visible) else viewModel.addAll(visible)
+                afterBulkChange()
             }
-            refreshData()
-        }
+            .action(R.string.perapp_action_invert, enabled = visible.isNotEmpty()) {
+                visible.forEach { viewModel.toggle(it) }
+                afterBulkChange()
+            }
+            .action(
+                labelRes = R.string.perapp_action_auto,
+                subtitle = getString(R.string.perapp_action_auto_hint),
+            ) { selectProxyAppAuto() }
+            .action(R.string.perapp_action_import) { importProxyApp() }
+            .action(R.string.perapp_action_export) { exportProxyApp() }
+            .show()
     }
 
-    private fun invertSelection() {
-        adapter?.let { adapter ->
-            adapter.apps.forEach { app ->
-                viewModel.toggle(app.packageName)
-            }
-            refreshData()
+    /**
+     * A bulk change implies the feature is wanted: the old screen called `allowPerAppProxy()` after
+     * every one of these, and that behaviour is kept - but only when the mode is «Все приложения»,
+     * where the list would otherwise have no effect at all.
+     */
+    private fun afterBulkChange() {
+        if (currentMode() == Mode.ALL) {
+            applyMode(Mode.SELECTED)
         }
+        adapter.refreshSelection()
+        updateMeta()
     }
 
     private fun selectProxyAppAuto() {
-        toast(R.string.msg_downloading_content)
-        showLoading()
+        showLoadingState()
+        binding.recyclerView.isVisible = false
 
         val url = AppConfig.ANDROID_PACKAGE_NAME_LIST_URL
-        lifecycleScope.launch(Dispatchers.IO) {
-            var content = HttpUtil.getUrlContent(
-                UrlContentRequest(
-                    url = url,
-                    timeout = 5000
-                )
-            )
-            if (content.isNullOrEmpty()) {
-                val proxyUsername = SettingsManager.getSocksUsername()
-                val proxyPassword = SettingsManager.getSocksPassword()
-                val httpPort = SettingsManager.getHttpPort()
-                content = HttpUtil.getUrlContent(
-                    UrlContentRequest(
-                        url = url,
-                        timeout = 5000,
-                        httpPort = httpPort,
-                        proxyUsername = proxyUsername,
-                        proxyPassword = proxyPassword
-                    )
-                ) ?: ""
+        lifecycleScope.launch {
+            val content = withContext(Dispatchers.IO) {
+                HttpUtil.getUrlContent(UrlContentRequest(url = url, timeout = 5000))
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: HttpUtil.getUrlContent(
+                        UrlContentRequest(
+                            url = url,
+                            timeout = 5000,
+                            httpPort = SettingsManager.getHttpPort(),
+                            proxyUsername = SettingsManager.getSocksUsername(),
+                            proxyPassword = SettingsManager.getSocksPassword(),
+                        )
+                    ).orEmpty()
             }
-            launch(Dispatchers.Main) {
-                //LogUtil.i(AppConfig.TAG, content)
-                selectProxyApp(content, true)
-                toastSuccess(R.string.toast_success)
-                hideLoading()
-            }
+            selectProxyApp(content, force = true)
+            afterBulkChange()
+            applyFilter()
+            toastSuccess(R.string.editor_done)
         }
     }
 
     private fun importProxyApp() {
         val content = Utils.getClipboard(applicationContext)
         if (TextUtils.isEmpty(content)) return
-        selectProxyApp(content, false)
-        toastSuccess(R.string.toast_success)
+        selectProxyApp(content, force = false)
+        afterBulkChange()
+        toastSuccess(R.string.editor_done)
     }
 
     private fun exportProxyApp() {
-        var lst = binding.switchBypassApps.isChecked.toString()
-
-        viewModel.getAll().forEach { pkg ->
-            lst = lst + System.lineSeparator() + pkg
-        }
-        Utils.setClipboard(applicationContext, lst)
-        toastSuccess(R.string.toast_success)
+        val header = (currentMode() == Mode.EXCEPT).toString()
+        val payload = viewModel.getAll().fold(header) { acc, pkg -> acc + System.lineSeparator() + pkg }
+        Utils.setClipboard(applicationContext, payload)
+        toastSuccess(R.string.editor_done)
     }
 
-    private fun allowPerAppProxy() {
-        binding.switchPerAppProxy.isChecked = true
-        SettingsChangeManager.makeRestartService()
-    }
-
-    @SuppressLint("NotifyDataSetChanged")
     private fun selectProxyApp(content: String, force: Boolean): Boolean {
         try {
-            val proxyApps = if (TextUtils.isEmpty(content)) {
+            val proxyApps = content.ifEmpty {
                 Utils.readTextFromAssets(v2RayApplication, "proxy_package_name")
-            } else {
-                content
             }
-            if (TextUtils.isEmpty(proxyApps)) return false
+            if (proxyApps.isEmpty()) return false
 
             viewModel.clear()
-
-            if (binding.switchBypassApps.isChecked) {
-                adapter?.let { adapter ->
-                    adapter.apps.forEach { app ->
-                        val packageName = app.packageName
-                        if (!inProxyApps(proxyApps, packageName, force)) {
-                            viewModel.add(packageName)
-                        }
-                    }
-                    refreshData()
-                }
-            } else {
-                adapter?.let { adapter ->
-                    adapter.apps.forEach { app ->
-                        val packageName = app.packageName
-                        if (inProxyApps(proxyApps, packageName, force)) {
-                            viewModel.add(packageName)
-                        }
-                    }
-                    refreshData()
+            val bypassing = currentMode() == Mode.EXCEPT
+            appsAll.forEach { app ->
+                val listed = inProxyApps(proxyApps, app.packageName, force)
+                if (listed != bypassing) {
+                    viewModel.add(app.packageName)
                 }
             }
         } catch (e: Exception) {
@@ -282,41 +372,20 @@ class PerAppProxyActivity : BaseActivity() {
     }
 
     private fun inProxyApps(proxyApps: String, packageName: String, force: Boolean): Boolean {
-        println(packageName)
         if (force) {
-            if (packageName == "com.google.android.webview") return false
-            if (packageName.startsWith("com.google")) return true
+            if (packageName == WEBVIEW_PACKAGE) return false
+            if (packageName.startsWith(GOOGLE_PACKAGE_PREFIX)) return true
         }
-
-        return proxyApps.indexOf(packageName) >= 0
+        return proxyApps.contains(packageName)
     }
 
-    private fun filterProxyApp(content: String): Boolean {
-        val apps = ArrayList<AppInfo>()
-
-        val key = content.uppercase()
-        if (key.isNotEmpty()) {
-            appsAll?.forEach {
-                if (it.appName.uppercase().indexOf(key) >= 0
-                    || it.packageName.uppercase().indexOf(key) >= 0
-                ) {
-                    apps.add(it)
-                }
-            }
-        } else {
-            appsAll?.forEach {
-                apps.add(it)
-            }
-        }
-
-        adapter = PerAppProxyAdapter(apps, adapter?.viewModel ?: viewModel)
-        binding.recyclerView.adapter = adapter
-        refreshData()
-        return true
+    override fun onDestroy() {
+        SkeletonBinder.cancel(binding.skeleton)
+        super.onDestroy()
     }
 
-    @SuppressLint("NotifyDataSetChanged")
-    fun refreshData() {
-        adapter?.notifyDataSetChanged()
+    private companion object {
+        const val WEBVIEW_PACKAGE = "com.google.android.webview"
+        const val GOOGLE_PACKAGE_PREFIX = "com.google"
     }
 }

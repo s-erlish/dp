@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The row background for all five row archetypes (22-components.md 8.7).
+
+  R5, and it is the reason this file is a background and not a stateListAnimator:
+  ROWS DO NOT SCALE. A row is a slice of a surface, and scaling it tears the
+  hairlines above and below it, which reads as a rendering bug. So the press
+  feedback is a background STEP to colorSurfaceContainerHigh #1A1D21, over
+  motion_press_in 90 and released over motion_press_out 160 by the ripple itself.
+  Free-standing pressable objects (server row, subscription card, tariff card)
+  scale instead, via @anim/press_scale.
+
+  Focus (R7) is an inset 2dp accent ring, because a row has no MaterialButton
+  stroke to borrow. Selected is the 12% accent fill of 22-components.md 18.1.
+-->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/ripple_neutral">
+    <item>
+        <selector>
+            <!-- Pressed: the surface step, never a scale. -->
+            <item android:state_pressed="true">
+                <shape android:shape="rectangle">
+                    <solid android:color="?attr/colorSurfaceContainerHigh" />
+                </shape>
+            </item>
+            <!-- Focused: the ring every focusable control owes the user. -->
+            <item android:state_focused="true">
+                <shape android:shape="rectangle">
+                    <solid android:color="@android:color/transparent" />
+                    <stroke
+                        android:width="@dimen/stroke_focus"
+                        android:color="?attr/colorPrimary" />
+                    <corners android:radius="@dimen/radius_chip" />
+                </shape>
+            </item>
+            <!-- Selected: 12% accent fill. onSurface over it measures 15.68:1. -->
+            <item android:state_activated="true">
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/accent_fill_12" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="@android:color/transparent" />
+                </shape>
+            </item>
+        </selector>
+    </item>
+</ripple>

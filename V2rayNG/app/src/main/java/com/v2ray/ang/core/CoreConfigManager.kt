@@ -205,9 +205,23 @@ object CoreConfigManager {
             return ConfigResult(status = false, guid = guid, errorMessage = "Custom config has no outbounds")
         }
 
-        // Promote the first real proxy outbound (skip freedom/blackhole/dns/loopback) to index 0
-        // so the delay request is routed through it once routing/balancer are removed.
-        val proxyIndex = outboundsJson.indexOfFirst { elem ->
+        // Promote the outbound that actually carries this template's traffic to index 0, so the delay
+        // request goes through it once routing/balancer are removed.
+        //
+        // Which one that is has to come from the template's own routing: operator templates commonly
+        // carry several proxy outbounds and select one with a rule, so a template whose FIRST proxy
+        // outbound is a decoy would otherwise have its latency measured against a host that is not
+        // its server — which never answers, so the profile appears unpingable. Fall back to the first
+        // proxy outbound only when routing names nothing.
+        val routedTag = effectiveOutboundTag(raw)
+        val taggedIndex = routedTag?.let { tag ->
+            outboundsJson.indexOfFirst { elem ->
+                elem.takeIf { it.isJsonObject }?.asJsonObject
+                    ?.get("tag")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
+                    ?.asString.equals(tag, ignoreCase = true)
+            }
+        } ?: -1
+        val proxyIndex = if (taggedIndex >= 0) taggedIndex else outboundsJson.indexOfFirst { elem ->
             val protocol = elem.takeIf { it.isJsonObject }?.asJsonObject
                 ?.get("protocol")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
                 ?.asString ?: return@indexOfFirst false
@@ -235,6 +249,21 @@ object CoreConfigManager {
         val content = JsonUtil.toJsonPretty(json)
             ?: return ConfigResult(status = false, guid = guid, errorMessage = "Failed to serialize speedtest config")
         return ConfigResult(status = true, guid = guid, content = content)
+    }
+
+    /**
+     * Tag of the outbound this raw config's routing actually sends ordinary traffic to, or null when
+     * routing names none (or the payload cannot be modelled). Delegates to the same resolution the
+     * rest of the app uses for a custom profile's server, so the delay probe and the displayed server
+     * can never disagree about which outbound the profile is.
+     */
+    private fun effectiveOutboundTag(raw: String): String? {
+        return try {
+            JsonUtil.fromJsonSafe(raw, V2rayConfig::class.java)?.getProxyOutbound()?.tag
+        } catch (e: Exception) {
+            LogUtil.w(AppConfig.TAG, "effectiveOutboundTag: could not model custom config: ${e.message}")
+            null
+        }
     }
 
     /**

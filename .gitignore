@@ -65,3 +65,9 @@ V2rayNG/app/google-services.json
 Thumbs.db
 .DS_Store
 .claude/worktrees/
+
+# Local type-check stub for the native libv2ray AAR (CI downloads the real one)
+V2rayNG/app/libs/libv2ray-stub.jar
+
+# Kotlin build session dir
+V2rayNG/.kotlin/

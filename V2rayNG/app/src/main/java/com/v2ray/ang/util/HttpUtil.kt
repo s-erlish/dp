@@ -23,6 +23,68 @@ import java.util.concurrent.TimeUnit
 object HttpUtil {
 
     /**
+     * User-Agent sent for a subscription fetch when neither the subscription nor the operator
+     * configured one.
+     *
+     * Panels (Remnawave/3x-ui) pick the response format — XRAY_JSON template vs base64 link list —
+     * from this header, using their own client->template mapping, so no value the app can pick on
+     * its own guarantees the template: an unknown client string gets the base64 link list, and so
+     * does a v2rayNG one unless the operator mapped it. The fallback is therefore the upstream
+     * client string — honest about which client this is, understood by every panel, and answered
+     * with the link list this app parses. Negotiating the template is the operator's job, via
+     * `SUB_USER_AGENT` (see [com.v2ray.ang.auth.BackendConfig.subscriptionUserAgent]).
+     */
+    val DEFAULT_SUBSCRIPTION_USER_AGENT: String get() = "v2rayNG/${BuildConfig.VERSION_NAME}"
+
+    /**
+     * Ask for the XRAY_JSON template first, but keep accepting the base64 link list: a panel that
+     * honours Accept must not answer 406 for a plain-text subscription.
+     */
+    private const val SUBSCRIPTION_ACCEPT = "application/json, text/plain;q=0.9, */*;q=0.8"
+
+    /**
+     * Resolves the User-Agent of a subscription request. The caller-supplied value — the
+     * per-subscription override, else the operator-configured UA — always wins and is never
+     * rewritten, because the panel keys the response format off it; the default only fills a blank.
+     *
+     * A value that cannot travel in a header also falls back: the override is free text the user
+     * types, and OkHttp throws while building the request on a control or non-ASCII character, so
+     * one stray character (a Cyrillic client string, say) would otherwise fail every future update
+     * of that subscription with nothing but a log line to explain it.
+     *
+     * Public so a screen that DISPLAYS the User-Agent can display the one that will actually be
+     * sent, instead of the stored text: showing a value this function would replace is the exact
+     * dishonesty the fallback would otherwise introduce. The editors validate on entry, so the
+     * fallback should now only ever fire on a value stored by an older build.
+     */
+    fun resolveSubscriptionUserAgent(userAgent: String?): String =
+        userAgent?.trim()?.takeIf { it.isNotEmpty() && isHeaderSafe(it) }
+            ?: DEFAULT_SUBSCRIPTION_USER_AGENT
+
+    /**
+     * Mirrors OkHttp's own header-value check: printable ASCII, plus tab.
+     *
+     * Public because every value this app puts in a header has to pass it before OkHttp sees it:
+     * OkHttp throws while BUILDING the request, so an unchecked non-ASCII value does not degrade
+     * the request, it kills it. Callers outside this file need the same test to stay consistent
+     * with what the request builders below accept.
+     */
+    fun isHeaderSafe(value: String): Boolean = value.all { it == '\t' || it in ' '..'~' }
+
+    /**
+     * [value] when it can travel in a header (see [isHeaderSafe]), else [fallback].
+     *
+     * Public for the same reason [isHeaderSafe] is: every caller that builds a request — the
+     * subscription fetch below and the backend API client — has to apply the same guard to the
+     * same OEM-supplied values, or the half that skips it throws for the same devices.
+     */
+    fun headerSafeOr(value: String?, fallback: String): String =
+        value?.takeIf { isHeaderSafe(it) } ?: fallback
+
+    /** Mirrors [Utils.getDeviceName]'s own blank fallback, for a model name no header can carry. */
+    const val FALLBACK_DEVICE_MODEL = "Android Device"
+
+    /**
      * Converts the domain part of a URL string to its IDN (Punycode, ASCII Compatible Encoding) format.
      *
      * For example, a URL like "https://例子.中国/path" will be converted to "https://xn--fsqu00a.xn--fiqs8s/path".
@@ -152,15 +214,11 @@ object HttpUtil {
         while (redirects++ < maxRedirects) {
             if (currentUrl == null) continue
             val client = buildOkHttpClient(request.timeout, request.httpPort, request.proxyUsername, request.proxyPassword, followRedirects = false)
-            val finalUserAgent = if (request.userAgent.isNullOrBlank()) {
-                "departament/${BuildConfig.VERSION_NAME}"
-            } else {
-                request.userAgent
-            }
             val requestBuilder = Request.Builder()
                 .url(currentUrl)
                 .get()
-                .header("User-agent", finalUserAgent)
+                .header("User-agent", resolveSubscriptionUserAgent(request.userAgent))
+                .header("Accept", SUBSCRIPTION_ACCEPT)
                 .header("Connection", "close")
 
             attachDeviceHeaders(request, requestBuilder)
@@ -225,26 +283,11 @@ object HttpUtil {
         while (redirects++ < maxRedirects) {
             if (currentUrl == null) continue
             val client = buildOkHttpClient(request.timeout, request.httpPort, request.proxyUsername, request.proxyPassword, followRedirects = false)
-            // Subscription fetch: panels (Remnawave/3x-ui) key the response format
-            // (XRAY_JSON template vs base64 link list) off a recognised client User-Agent.
-            // The caller-supplied value can be a branding string (BackendConfig fallback
-            // "DepartamentVPN/1.0") or the provider-screen display field, neither of which
-            // the panel recognises -> it returns the wrong format. Force a v2rayNG-family
-            // UA whenever the supplied value is missing or not v2rayNG-family, so the panel
-            // always returns the managed JSON servers, independent of the display field.
-            val defaultSubUserAgent = "v2rayNG/${BuildConfig.VERSION_NAME}"
-            val requestedUserAgent = request.userAgent?.trim()
-            val finalUserAgent = if (!requestedUserAgent.isNullOrBlank()
-                && requestedUserAgent.contains("v2rayng", ignoreCase = true)
-            ) {
-                requestedUserAgent
-            } else {
-                defaultSubUserAgent
-            }
             val requestBuilder = Request.Builder()
                 .url(currentUrl)
                 .get()
-                .header("User-agent", finalUserAgent)
+                .header("User-agent", resolveSubscriptionUserAgent(request.userAgent))
+                .header("Accept", SUBSCRIPTION_ACCEPT)
                 .header("Connection", "close")
 
             attachDeviceHeaders(request, requestBuilder)
@@ -296,13 +339,21 @@ object HttpUtil {
      * [AppConfig.HEADER_HWID] (stable -> one entry per device, no slot pollution) and labels it
      * from [AppConfig.HEADER_DEVICE_MODEL] (the real model, not a User-Agent guess). All values
      * are stable across calls, so they never register new device entries.
+     *
+     * Every value goes through [isHeaderSafe] first. The model comes from `Build.MODEL`, which is
+     * whatever the OEM wrote there and is not guaranteed ASCII; unchecked, one such device would
+     * throw here and fail every subscription update forever. Degrading the panel's device label is
+     * the acceptable half of that trade, losing the subscription is not.
      */
     private fun attachDeviceHeaders(request: UrlContentRequest, requestBuilder: Request.Builder) {
-        val hwid = request.hwid?.takeIf { it.isNotBlank() } ?: return
+        val hwid = request.hwid?.takeIf { it.isNotBlank() && isHeaderSafe(it) } ?: return
         requestBuilder.addHeader(AppConfig.HEADER_HWID, hwid)
         requestBuilder.addHeader(AppConfig.HEADER_DEVICE_OS, "android")
-        requestBuilder.addHeader(AppConfig.HEADER_VER_OS, Build.VERSION.RELEASE ?: "")
-        requestBuilder.addHeader(AppConfig.HEADER_DEVICE_MODEL, Utils.getDeviceName())
+        requestBuilder.addHeader(AppConfig.HEADER_VER_OS, headerSafeOr(Build.VERSION.RELEASE, ""))
+        requestBuilder.addHeader(
+            AppConfig.HEADER_DEVICE_MODEL,
+            headerSafeOr(Utils.getDeviceName(), FALLBACK_DEVICE_MODEL)
+        )
     }
 
     private fun applyEmbeddedBasicAuthHeader(rawUrl: String, requestBuilder: Request.Builder) {

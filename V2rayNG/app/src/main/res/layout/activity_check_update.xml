@@ -1,83 +1,102 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  ============================================================================
+  A-36  Проверка обновлений.  H3 · R1.
+  ============================================================================
+
+  24-tab-conformance.md A-36 marks this screen DELETE - it was unreachable, so it
+  cost nothing to cut. It is reachable now (a row on «О приложении»), and «нет
+  способа проверить обновление» is a product gap the peripherals audit called out, so
+  it is restyled instead of removed. The GitHub-release caveat stands: what this
+  screen does is TELL the user a newer build exists and open the download page.
+
+  The screen used to be two hand-rolled 16dp rows and a centred grey version label,
+  and it reported its outcome in toasts - three of them, one of which was an
+  exception message shown raw to a customer. It now has states: checking, up to date,
+  update available, and a failure that names the cause and offers «Повторить».
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true">
+    android:background="?android:attr/colorBackground"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical"
+    tools:context=".ui.CheckUpdateActivity">
 
-    <LinearLayout xmlns:app="http://schemas.android.com/apk/res-auto"
+    <include
+        android:id="@+id/toolbar"
+        layout="@layout/view_toolbar" />
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/main_content"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/space_32"
+        android:scrollbars="none">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center|start"
-            android:orientation="horizontal"
-            android:padding="@dimen/padding_spacing_dp16">
+            android:orientation="vertical">
 
-            <ImageView
-                android:layout_width="@dimen/image_size_dp24"
-                android:layout_height="@dimen/image_size_dp24"
-                android:importantForAccessibility="no"
-                app:srcCompat="@drawable/ic_source_code_24dp" />
+            <include
+                android:id="@+id/row_version"
+                layout="@layout/view_row" />
 
-            <androidx.appcompat.widget.SwitchCompat
-                android:id="@+id/check_pre_release"
-                android:layout_width="wrap_content"
+            <include
+                android:id="@+id/row_pre_release"
+                layout="@layout/view_row" />
+
+            <!-- The result block: one state at a time, never two. Both layout_width and
+                 layout_height are declared because an <include> ignores every layout_*
+                 attribute unless those two are present - which is how the margin above
+                 would have silently done nothing. -->
+            <include
+                android:id="@+id/empty_state"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:maxLines="1"
-                android:paddingStart="@dimen/padding_spacing_dp16"
-                android:text="@string/update_check_pre_release"
-                android:textAppearance="@style/TextAppearance.AppCompat.Small"
-                app:theme="@style/BrandedSwitch" />
-        </LinearLayout>
+                android:layout_marginTop="@dimen/space_32"
+                layout="@layout/view_empty_state" />
 
-        <LinearLayout
-            android:id="@+id/layout_check_update"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center|start"
-            android:orientation="horizontal"
-            android:padding="@dimen/padding_spacing_dp16">
+            <LinearLayout
+                android:id="@+id/checking"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_32"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:visibility="gone">
 
-            <ImageView
-                android:layout_width="@dimen/image_size_dp24"
-                android:layout_height="@dimen/image_size_dp24"
-                android:importantForAccessibility="no"
-                app:srcCompat="@drawable/ic_check_update_24dp" />
+                <com.google.android.material.progressindicator.CircularProgressIndicator
+                    android:id="@+id/progress"
+                    style="@style/Widget.Departament.Progress.Circular.Inline"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:indeterminate="true" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_12"
+                    android:accessibilityLiveRegion="polite"
+                    android:text="@string/upd_checking"
+                    android:textAppearance="@style/TextAppearance.App.Subtitle" />
+            </LinearLayout>
 
             <TextView
-                android:layout_width="wrap_content"
+                android:id="@+id/tv_release_notes"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingStart="@dimen/padding_spacing_dp16"
-                android:text="@string/update_check_for_update"
-                android:textAppearance="@style/TextAppearance.AppCompat.Subhead" />
-
+                android:layout_marginTop="@dimen/space_16"
+                android:paddingStart="@dimen/screen_gutter"
+                android:paddingEnd="@dimen/screen_gutter"
+                android:textAppearance="@style/TextAppearance.App.Body"
+                android:visibility="gone"
+                tools:text="Исправлено переподключение после смены сети."
+                tools:visibility="visible" />
         </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:orientation="horizontal"
-            android:padding="@dimen/padding_spacing_dp16">
-
-            <TextView
-                android:id="@+id/tv_version"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/title_about"
-                android:textAppearance="@style/TextAppearance.AppCompat.Small" />
-        </LinearLayout>
-
-    </LinearLayout>
-
-</ScrollView>
-
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

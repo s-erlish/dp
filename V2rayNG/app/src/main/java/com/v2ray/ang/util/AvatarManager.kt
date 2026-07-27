@@ -185,7 +185,7 @@ object AvatarManager {
             val req = Request.Builder().url(url).get().build()
             http.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return null
-                val bytes = resp.body?.bytes() ?: return null
+                val bytes = resp.body.bytes()
                 val bmp = decodeSampledBytes(bytes) ?: return null
                 runCatching {
                     cacheFile.outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }

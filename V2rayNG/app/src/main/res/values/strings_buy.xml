@@ -27,19 +27,19 @@
 
     <!-- Total + CTA -->
     <string name="buy_total">Итого</string>
-    <string name="buy_pay">Оплатить</string>
+    <string name="buy_pay">Купить</string>
     <string name="buy_pick_method_title">Способ оплаты</string>
     <string name="buy_balance_label">Баланс: %1$s</string>
 
     <!-- States -->
     <string name="buy_loading">Загрузка тарифов…</string>
-    <string name="buy_empty">Тарифы недоступны</string>
-    <string name="buy_error">Не удалось загрузить тарифы. Проверьте соединение и повторите.</string>
+    <string name="buy_empty">Тарифов пока нет. Загляните позже, список обновляется автоматически.</string>
+    <string name="buy_error">Не удалось загрузить тарифы. Проверьте подключение и повторите.</string>
     <string name="buy_retry">Повторить</string>
-    <string name="buy_select_option_first">Выберите срок подписки</string>
+    <string name="buy_select_option_first">Сначала выберите срок подписки</string>
     <string name="buy_success">Подписка оплачена</string>
-    <string name="buy_no_browser">Не удалось открыть страницу оплаты</string>
-    <string name="buy_no_methods">Способы оплаты недоступны</string>
+    <string name="buy_no_browser">Не удалось открыть страницу оплаты. Попробуйте другой способ оплаты.</string>
+    <string name="buy_no_methods">Способы оплаты недоступны. Повторите попытку позже.</string>
 
     <!-- Post-checkout feedback -->
     <string name="buy_checkout_return">Завершите оплату в браузере</string>

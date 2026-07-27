@@ -53,7 +53,7 @@ class UrlSchemeActivity : BaseActivity() {
                             }
 
                             else -> {
-                                toastError(R.string.toast_failure)
+                                toastError(R.string.editor_failed)
                             }
                         }
                     }
@@ -81,7 +81,7 @@ class UrlSchemeActivity : BaseActivity() {
      */
     private fun handleDepvScheme(uri: Uri?) {
         if (uri == null) {
-            toastError(R.string.toast_failure)
+            toastError(R.string.editor_failed)
             return
         }
         when (uri.host) {
@@ -102,7 +102,7 @@ class UrlSchemeActivity : BaseActivity() {
                 if (decoded.isNotEmpty()) {
                     importDecodedConfig(decoded)
                 } else {
-                    toastError(R.string.toast_failure)
+                    toastError(R.string.editor_failed)
                 }
             }
 
@@ -111,7 +111,7 @@ class UrlSchemeActivity : BaseActivity() {
                 if (raw.isNotEmpty()) {
                     parseUri(raw, null)
                 } else {
-                    toastError(R.string.toast_failure)
+                    toastError(R.string.editor_failed)
                 }
             }
 
@@ -123,14 +123,14 @@ class UrlSchemeActivity : BaseActivity() {
                     if ((op == "add" || op == "onadd") && json.isNotEmpty()) {
                         importRoutingRules(json, apply = op == "onadd")
                     } else {
-                        toastError(R.string.toast_failure)
+                        toastError(R.string.editor_failed)
                     }
                 } else {
-                    toastError(R.string.toast_failure)
+                    toastError(R.string.editor_failed)
                 }
             }
 
-            else -> toastError(R.string.toast_failure)
+            else -> toastError(R.string.editor_failed)
         }
     }
 
@@ -142,9 +142,9 @@ class UrlSchemeActivity : BaseActivity() {
             val (count, countSub) = AngConfigManager.importBatchConfig(content, "", false)
             withContext(Dispatchers.Main) {
                 if (count + countSub > 0) {
-                    toast(R.string.import_subscription_success)
+                    toast(R.string.scheme_import_done)
                 } else {
-                    toast(R.string.import_subscription_failure)
+                    toastError(R.string.scheme_import_failed)
                 }
             }
         }
@@ -161,9 +161,9 @@ class UrlSchemeActivity : BaseActivity() {
             }
             withContext(Dispatchers.Main) {
                 if (result) {
-                    toastSuccess(R.string.toast_success)
+                    toastSuccess(R.string.editor_done)
                 } else {
-                    toastError(R.string.toast_failure)
+                    toastError(R.string.editor_failed)
                 }
             }
         }
@@ -186,9 +186,9 @@ class UrlSchemeActivity : BaseActivity() {
                 val (count, countSub) = AngConfigManager.importBatchConfig(decodedUrl, "", false)
                 withContext(Dispatchers.Main) {
                     if (count + countSub > 0) {
-                        toast(R.string.import_subscription_success)
+                        toast(R.string.scheme_import_done)
                     } else {
-                        toast(R.string.import_subscription_failure)
+                        toastError(R.string.scheme_import_failed)
                     }
                 }
             }

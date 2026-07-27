@@ -2,4 +2,12 @@
 <resources>
     <!-- Custom gray status toast shown when a subscription refresh/update completes. -->
     <string name="toast_updated">Обновлено</string>
+
+    <!-- Spoken label of the back affordance in the seamless sub-page toolbar
+         (res/layout/view_toolbar.xml, ~15 screens). It lived there as the tree's ONE
+         hardcoded android:contentDescription (M-44), so it was the single user-facing
+         string a locale change could never reach. It sits in this cross-cutting file
+         rather than in a screen's own strings because the toolbar belongs to no screen.
+         values/ is the Russian master (docs/agents/state/DECISION-localisation.md). -->
+    <string name="cd_back">Назад</string>
 </resources>

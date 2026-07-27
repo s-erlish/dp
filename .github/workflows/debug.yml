@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - claude/vpn-client-happ-design-mq51pv
+      - claude/app-audit-agents-hyyftk
     paths:
       - 'V2rayNG/**'
       - '.github/workflows/debug.yml'

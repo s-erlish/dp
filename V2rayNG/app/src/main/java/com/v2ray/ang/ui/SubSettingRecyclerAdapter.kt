@@ -1,85 +1,93 @@
 package com.v2ray.ang.ui
 
-import android.graphics.Color
-import android.text.TextUtils
+import android.content.Context
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import com.v2ray.ang.R
 import com.v2ray.ang.contracts.BaseAdapterListener
-import com.v2ray.ang.databinding.ItemRecyclerSubSettingBinding
+import com.v2ray.ang.databinding.ViewRowBinding
+import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.helper.ItemTouchHelperAdapter
 import com.v2ray.ang.helper.ItemTouchHelperViewHolder
+import com.v2ray.ang.ui.component.RowBinder
 import com.v2ray.ang.util.Utils
 import com.v2ray.ang.viewmodel.SubscriptionsViewModel
 
+/**
+ * One subscription group per row (A-17).
+ *
+ * The old row carried FOUR targets - the row, an edit glyph, a share glyph, a delete glyph, plus a
+ * switch - in a card, and hid three of them with `INVISIBLE` when the group had no URL, which left
+ * the geometry holding space for controls that were not there. §4.5 allows one trailing element, so
+ * everything the group can do lives behind one overflow: enable, edit, QR, copy, and delete under a
+ * hairline in the destructive tone.
+ *
+ * The state a user needs at a glance is in the subtitle instead: whether the group is off, when it
+ * last updated, and its URL - or «Локальная группа» when it has none, which is the case the old row
+ * expressed by hiding half of itself.
+ */
 class SubSettingRecyclerAdapter(
     private val viewModel: SubscriptionsViewModel,
     private val adapterListener: BaseAdapterListener?
-) : RecyclerView.Adapter<SubSettingRecyclerAdapter.MainViewHolder>(), ItemTouchHelperAdapter {
+) : RecyclerView.Adapter<SubSettingRecyclerAdapter.SubViewHolder>(), ItemTouchHelperAdapter {
+
+    /** Set by the activity: the overflow needs the activity's dialogs and sheets, not the adapter's. */
+    var onOverflow: ((subId: String, position: Int) -> Unit)? = null
 
     override fun getItemCount() = viewModel.getAll().size
 
-    override fun onBindViewHolder(holder: MainViewHolder, position: Int) {
-        val subscriptions = viewModel.getAll()
-        val subId = subscriptions[position].guid
-        val subItem = subscriptions[position].subscription
-        holder.itemSubSettingBinding.tvName.text = subItem.remarks
-        holder.itemSubSettingBinding.tvUrl.text = subItem.url
-        holder.itemSubSettingBinding.chkEnable.isChecked = subItem.enabled
-        holder.itemSubSettingBinding.tvLastUpdated.text = Utils.formatTimestamp(subItem.lastUpdated)
-        holder.itemView.setBackgroundColor(Color.TRANSPARENT)
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SubViewHolder =
+        SubViewHolder(ViewRowBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
-        holder.itemSubSettingBinding.layoutEdit.setOnClickListener {
-            adapterListener?.onEdit(subId, position)
-        }
+    override fun onBindViewHolder(holder: SubViewHolder, position: Int) {
+        val entry = viewModel.getAll()[position]
+        val subItem = entry.subscription
+        val context = holder.itemView.context
 
-        holder.itemSubSettingBinding.layoutRemove.setOnClickListener {
-            adapterListener?.onRemove(subId, position)
-        }
+        val unnamedLocalGroup = isUnnamedLocalGroup(subItem)
+        val title = displayName(context, subItem)
 
-        holder.itemSubSettingBinding.chkEnable.setOnCheckedChangeListener { it, isChecked ->
-            if (!it.isPressed) return@setOnCheckedChangeListener
-            subItem.enabled = isChecked
-            viewModel.update(subId, subItem)
-        }
-
-        if (TextUtils.isEmpty(subItem.url)) {
-            holder.itemSubSettingBinding.layoutUrl.visibility = View.GONE
-            holder.itemSubSettingBinding.layoutShare.visibility = View.INVISIBLE
-            holder.itemSubSettingBinding.chkEnable.visibility = View.INVISIBLE
-            holder.itemSubSettingBinding.layoutLastUpdated.visibility = View.INVISIBLE
-        } else {
-            holder.itemSubSettingBinding.layoutUrl.visibility = View.VISIBLE
-            holder.itemSubSettingBinding.layoutShare.visibility = View.VISIBLE
-            holder.itemSubSettingBinding.chkEnable.visibility = View.VISIBLE
-            holder.itemSubSettingBinding.layoutLastUpdated.visibility = View.VISIBLE
-            holder.itemSubSettingBinding.layoutShare.setOnClickListener {
-                adapterListener?.onShare(subItem.url)
+        val subtitle = when {
+            // Title already says it; repeating it under itself is noise.
+            unnamedLocalGroup -> null
+            subItem.url.isBlank() -> context.getString(R.string.subs_local)
+            else -> {
+                val updated = subItem.lastUpdated.takeIf { it > 0 }
+                    ?.let { context.getString(R.string.subs_updated, Utils.formatTimestamp(it)) }
+                    ?: context.getString(R.string.subs_never_updated)
+                listOfNotNull(
+                    context.getString(R.string.subs_disabled).takeIf { !subItem.enabled },
+                    updated,
+                ).joinToString(" · ")
             }
         }
-    }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MainViewHolder {
-        return MainViewHolder(
-            ItemRecyclerSubSettingBinding.inflate(
-                LayoutInflater.from(parent.context),
-                parent,
-                false
-            )
+        RowBinder.bind(
+            root = holder.binding.root,
+            title = title,
+            subtitle = subtitle,
+            glyph = R.drawable.ic_subscriptions_24dp,
+            trailing = RowBinder.Trailing.IconAction(
+                icon = R.drawable.ic_more_vert_24dp,
+                contentDescription = context.getString(R.string.editor_more_actions),
+                onClick = {
+                    val index = holder.bindingAdapterPosition
+                    if (index != RecyclerView.NO_POSITION) onOverflow?.invoke(entry.guid, index)
+                },
+            ),
         )
     }
 
-    class MainViewHolder(val itemSubSettingBinding: ItemRecyclerSubSettingBinding) :
-        BaseViewHolder(itemSubSettingBinding.root), ItemTouchHelperViewHolder
+    inner class SubViewHolder(val binding: ViewRowBinding) :
+        RecyclerView.ViewHolder(binding.root), ItemTouchHelperViewHolder {
 
-    open class BaseViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        fun onItemSelected() {
-            itemView.setBackgroundColor(Color.LTGRAY)
+        override fun onItemSelected() {
+            itemView.isActivated = true
         }
 
-        fun onItemClear() {
-            itemView.setBackgroundColor(0)
+        override fun onItemClear() {
+            itemView.isActivated = false
         }
     }
 
@@ -94,5 +102,35 @@ class SubSettingRecyclerAdapter(
     }
 
     override fun onItemDismiss(position: Int) {
+    }
+
+    companion object {
+        /** The remark `SettingsManager` gives the linkless container it recreates. Not a name. */
+        private const val PLACEHOLDER_REMARK = "Default"
+
+        /**
+         * The store keeps ONE linkless container for hand-added servers, and recreates it under the
+         * remark «Default» the moment the last real подписка is deleted
+         * (`SettingsManager.removeSubscriptionWithDefault`).
+         */
+        private fun isUnnamedLocalGroup(item: SubscriptionItem): Boolean =
+            item.url.isBlank() &&
+                (item.remarks.isBlank() || item.remarks.equals(PLACEHOLDER_REMARK, ignoreCase = true))
+
+        /**
+         * What to call this подписка on screen.
+         *
+         * Left as it was, the recreated container drew the raw remark «Default», so a user who had
+         * just deleted his only подписка saw a row appear where it had been and concluded nothing
+         * was deleted - which is how «удалять почему-то я тоже не могу подписки» looks from the
+         * outside. The container is named for what it is instead, and the same name is used by the
+         * row, by the actions sheet and by the delete confirmation, so all three agree.
+         */
+        fun displayName(context: Context, item: SubscriptionItem): String =
+            if (isUnnamedLocalGroup(item)) {
+                context.getString(R.string.subs_local)
+            } else {
+                item.remarks
+            }
     }
 }

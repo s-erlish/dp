@@ -23,7 +23,7 @@
         android:orientation="horizontal"
         android:paddingStart="@dimen/space_12"
         android:paddingTop="@dimen/space_8"
-        android:paddingEnd="@dimen/space_12"
+        android:paddingEnd="@dimen/space_4"
         android:paddingBottom="@dimen/space_8"
         android:stateListAnimator="@anim/press_scale">
 
@@ -124,6 +124,33 @@
             </LinearLayout>
 
         </LinearLayout>
+
+        <!-- THE VISIBLE DOOR to edit / share / QR / duplicate / delete (M-52).
+             Those five were reachable only by a long press on the row, which is a
+             hidden affordance and was the app's ONLY route to any of them — the
+             owner's «удалять почему-то я тоже не могу подписки на телефоне» was a
+             discoverability report as much as a functional one.
+
+             THE LONG PRESS STAYS. This is a second door, not a replacement.
+
+             48x48 from Widget.Departament.Button.Icon (minWidth/minHeight
+             view_height_dp48) holding the 22dp tile_glyph, transparent at rest with a
+             neutral press disc, so it reads as chrome and spends none of the screen's
+             one accent. It is clickable in its own right, so it consumes its own
+             touch and never fires the row's select-server click.
+
+             GUTTER: the row's paddingEnd dropped 12 -> 4 to pay for it. The button is
+             52 wide with the glyph centred, so the GLYPH's far edge lands ~17 from the
+             card edge — the same optical inset the 12dp text edge reads at, which is
+             the arithmetic view_toolbar.xml documents for its trailing action. -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_row_actions"
+            style="@style/Widget.Departament.Button.Icon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:contentDescription="@string/server_actions_title"
+            app:icon="@drawable/ic_more_vert_24dp" />
 
     </LinearLayout>
 

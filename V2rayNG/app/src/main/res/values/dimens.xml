@@ -1,41 +1,170 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Dimension tokens. Single source of truth for every dp value in the product
+  (00-rules.md 3.1/3.2/3.3, 10-design-system.md 1.3/2.5/2.6/2.7/2.8).
+
+  The closed number set: space 0/4/8/12/16/24/32/40/48/56/64, radius
+  12/16/20/24/100, stroke 1/2/3, component sizes from the measured list in
+  10-design-system.md 1.3. Anything not declared here is a defect; anything
+  declared here is not "off-scale" even when its number is odd for a gap
+  (00-rules.md 1.4.5 names meter_height 6, btn_min_width 96 and radius_button 16
+  explicitly as legal sizes rather than off-scale spacing).
+
+  ADDITIVE: the upstream padding_spacing_*/view_height_* block below is retired
+  by 10-design-system.md 4.3 but still referenced by unmigrated layouts, so it
+  stays until the migration wave clears the references. Do not use it in new work.
+-->
 <resources>
+    <!-- ============================================================= -->
+    <!-- LEGACY (upstream). Retired by 10-design-system.md 4.3.         -->
+    <!-- Kept alive only because layouts still reference them.          -->
+    <!-- New work uses space_* / btn_height / view_height_dp48.          -->
+    <!-- ============================================================= -->
     <dimen name="padding_spacing_dp4">4dp</dimen>
     <dimen name="padding_spacing_dp8">8dp</dimen>
     <dimen name="padding_spacing_dp16">16dp</dimen>
+    <!-- Kept by 4.3, renamed in spirit to size_glyph_nav (24dp nav/toolbar glyph). -->
     <dimen name="image_size_dp24">24dp</dimen>
+    <!-- Retired as a button height by 22-components.md 20.3 -> btn_height 48. -->
     <dimen name="view_height_dp36">36dp</dimen>
+    <!-- size_touch_min: the Android 48x48dp minimum touch target (00-rules 7.2). -->
     <dimen name="view_height_dp48">48dp</dimen>
     <dimen name="view_height_dp64">64dp</dimen>
     <dimen name="view_height_dp120">120dp</dimen>
     <dimen name="view_height_dp160">160dp</dimen>
 
-    <!-- Incy spacing scale (app-wide) -->
+    <!-- ============================================================= -->
+    <!-- SPACING. The ONLY spacing values in the product (3.1).         -->
+    <!-- Rhythm: parts of one object 4-12, objects 16, sections 24,     -->
+    <!-- the two major breaks 32. Never one gap value everywhere.       -->
+    <!-- ============================================================= -->
     <dimen name="space_4">4dp</dimen>
     <dimen name="space_8">8dp</dimen>
     <dimen name="space_12">12dp</dimen>
     <dimen name="space_16">16dp</dimen>
     <dimen name="space_24">24dp</dimen>
     <dimen name="space_32">32dp</dimen>
-
-    <!-- Incy radius tokens -->
-    <dimen name="radius_chip">12dp</dimen>
-    <dimen name="radius_card">20dp</dimen>
-    <dimen name="radius_tile">12dp</dimen>
-    <!-- Effective pill: large enough to fully round any control height. -->
-    <dimen name="radius_pill">100dp</dimen>
-    <!-- Bottom-sheet / modal top corners. -->
-    <dimen name="radius_sheet">24dp</dimen>
-
-    <!-- Incy component tokens -->
-    <dimen name="tile_size">40dp</dimen>
-    <dimen name="tile_glyph">22dp</dimen>
-    <dimen name="row_min_height">56dp</dimen>
+    <!-- The one horizontal screen inset. values-sw600dp/ must override to 24dp. -->
     <dimen name="screen_gutter">16dp</dimen>
+    <!-- Content column cap on tablet / wide window; centred past this (4.1). -->
+    <dimen name="content_max_width">720dp</dimen>
+    <!-- Derived text origin: gutter 16 + tile 40 + gap 12. Every row title and
+         every in-group hairline starts here (2.5). -->
+    <dimen name="divider_inset_start">68dp</dimen>
 
-    <!-- Account hero: subscription carousel + page dots -->
+    <!-- ============================================================= -->
+    <!-- RADIUS. Shape lock (D-6, D-7):                                 -->
+    <!--   12  fittings      chips, badges, tiles, flags, segment thumb  -->
+    <!--   16  controls      every labelled button, input, search field, -->
+    <!--                     price option, segmented track               -->
+    <!--   20  objects       cards, dialogs, sheet/flyout bodies, toast  -->
+    <!--   24  sheet lip     top corners only                           -->
+    <!--   100 round         ONLY where width == height or the shape is  -->
+    <!--                     a track: icon-only buttons, avatars, dots,  -->
+    <!--                     sheet handle, connect disc, meter, switch   -->
+    <!--                     track, M3 nav active indicator              -->
+    <!-- Concentricity: inner radius = outer radius - the padding        -->
+    <!-- between them. Never a 20 inside a 16.                           -->
+    <!-- ============================================================= -->
+    <dimen name="radius_chip">12dp</dimen>
+    <dimen name="radius_tile">12dp</dimen>
+    <!-- D-6: buttons are a 16dp rounded RECTANGLE, not a pill. This supersedes
+         00-rules.md 3.2's "buttons are pill" on the owner's recorded rejection of
+         capsule CTAs (v2rayN Assets/GlobalStyles.axaml:3-14). D-7 puts inputs,
+         the search field, the price option and the segmented track on the same
+         16. 16 completes the Incy scale chip 12 / button 16 / card 20 / sheet 24. -->
+    <dimen name="radius_button">16dp</dimen>
+    <!-- Alias of radius_button. 10-design-system.md 2.6/4.3 calls this token
+         radius_control while D-6 and 22-components.md 20.1 call it radius_button;
+         both names resolve to the same 16dp so neither spelling can break a build. -->
+    <dimen name="radius_control">@dimen/radius_button</dimen>
+    <dimen name="radius_card">20dp</dimen>
+    <!-- Bottom-sheet / drawer top corners only (24,24,0,0). -->
+    <dimen name="radius_sheet">24dp</dimen>
+    <!-- Effective full-round: larger than half of any control height we ship. -->
+    <dimen name="radius_pill">100dp</dimen>
+
+    <!-- ============================================================= -->
+    <!-- STROKE (2.8). Which of the two lines a border is decides        -->
+    <!-- whether WCAG 1.4.11 applies to it.                             -->
+    <!-- ============================================================= -->
+    <!-- Row separators and card borders, in colorOutlineVariant. Structural
+         decoration at 1.16:1 dark / 1.29:1 light: deliberately below 3:1, and
+         1.4.11 does not apply to it. -->
+    <dimen name="stroke_hairline">1dp</dimen>
+    <!-- Input / outlined button / segmented track boundary, in
+         colorOutlineControl. This IS a control boundary, so 1.4.11 applies and
+         the colour clears 3:1 (3.43:1 dark, 3.45:1 light). -->
+    <dimen name="stroke_control">1dp</dimen>
+    <!-- The focus ring (R7). Drawn on every focusable control. -->
+    <dimen name="stroke_focus">2dp</dimen>
+    <!-- Selected indicator; connect ring when connected. -->
+    <dimen name="stroke_emphasis">2dp</dimen>
+    <!-- Connect disc ring. -->
+    <dimen name="stroke_ring">3dp</dimen>
+    <!-- Focus ring offset for the outer case; the ring's radius is the
+         control's radius + this (R7). -->
+    <dimen name="focus_offset">2dp</dimen>
+
+    <!-- ============================================================= -->
+    <!-- SIZES (2.7). Measured object sizes, not a scale to interpolate. -->
+    <!-- Every control height is a MINIMUM: layout_height="wrap_content" -->
+    <!-- + minHeight, never a fixed height (R2). A fixed height clips a  -->
+    <!-- two-line Russian label at font scale 200%, which is a P1 a11y   -->
+    <!-- defect by 00-rules.md 14.5.                                     -->
+    <!-- ============================================================= -->
+    <dimen name="glyph_16">16dp</dimen>
+    <dimen name="glyph_20">20dp</dimen>
+    <!-- The glyph inside the 40dp tile. 22 is a size here and never a gap. -->
+    <dimen name="tile_glyph">22dp</dimen>
+    <dimen name="flag_size">28dp</dimen>
+    <dimen name="avatar_chip">36dp</dimen>
+    <!-- The leading icon tile on every settings / account row. -->
+    <dimen name="tile_size">40dp</dimen>
+    <!-- Icon-only button hit box. Round (radius_pill) because width == height. -->
+    <dimen name="icon_button">40dp</dimen>
+    <!-- R2: default button height. Everything in flow. Declared as minHeight,
+         and every Departament button style must also set insetTop/insetBottom
+         to 0dp, because Widget.Material3.Button's 6dp insets are why declared
+         52dp CTAs currently draw at 40dp. -->
+    <dimen name="btn_height">48dp</dimen>
+    <!-- R2: the screen's ONE full-width primary CTA (the .Tall modifier). -->
+    <dimen name="btn_height_tall">52dp</dimen>
+    <!-- Alias of btn_height_tall. 10-design-system.md 2.7 spells this cta_height
+         / Size.CtaTall; R2 spells it btn_height_tall. Same 52dp either way. -->
+    <dimen name="cta_height">@dimen/btn_height_tall</dimen>
+    <!-- R2: minimum button width, so a two-word Russian label never draws a
+         stub. 00-rules.md 1.4.5 names 96 as a legal size, not off-scale spacing. -->
+    <dimen name="btn_min_width">96dp</dimen>
+    <!-- R10: input field height. Deliberately the same number as row_min_height
+         so a form and a list share one rhythm, and so Material's
+         TextInputLayout.OutlinedBox 56dp minimum is not fought. -->
+    <dimen name="field_min_height">56dp</dimen>
+    <!-- Alias of field_min_height. 10-design-system.md 2.7/4.3 spells this
+         field_height and gives it 52; R10 ratifies 56 with the OutlinedBox
+         reason, so this alias carries 56 and both spellings agree. -->
+    <dimen name="field_height">@dimen/field_min_height</dimen>
+    <!-- Minimum height of any list row. With a two-line subtitle the row grows;
+         it never clips. -->
+    <dimen name="row_min_height">56dp</dimen>
+    <!-- Seamless sub-page toolbar (00-rules.md 4.8). Replaces ?attr/actionBarSize:
+         page background, no elevation, no divider, no shadow. -->
+    <dimen name="toolbar_height">56dp</dimen>
+    <dimen name="nav_bar_height">64dp</dimen>
+    <dimen name="empty_icon">64dp</dimen>
+    <dimen name="shield_glyph">80dp</dimen>
+    <!-- Account hero: subscription carousel card. -->
     <dimen name="sub_card_height">152dp</dimen>
+    <dimen name="connect_disc">176dp</dimen>
+    <!-- Determinate progress / traffic meter bar. Uses radius_pill, which clamps
+         to half its own height and gives true round ends without a bespoke
+         token. 00-rules.md 1.4.5 names 6 as a legal size. -->
+    <dimen name="meter_height">6dp</dimen>
+    <!-- Carousel page dots. -->
     <dimen name="dot_size">6dp</dimen>
     <dimen name="dot_size_active">8dp</dimen>
     <dimen name="dot_gap">8dp</dimen>
+    <!-- Bottom-sheet drag handle: 36x4, radius_pill. -->
+    <dimen name="sheet_handle_w">36dp</dimen>
+    <dimen name="sheet_handle_h">4dp</dimen>
 </resources>

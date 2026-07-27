@@ -6,6 +6,7 @@ import android.text.TextUtils
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.AuthTokenStore
+import com.v2ray.ang.auth.BackendConfig
 import com.v2ray.ang.core.CoreConfigManager
 import com.v2ray.ang.dto.SubscriptionUpdateResult
 import com.v2ray.ang.dto.UrlContentRequest
@@ -31,6 +32,7 @@ import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.QRCodeDecoder
 import com.v2ray.ang.util.SubscriptionGuard
 import com.v2ray.ang.util.Utils
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.net.URI
 
 object AngConfigManager {
@@ -551,6 +553,33 @@ object AngConfigManager {
         return left.trim().equals(right.trim(), ignoreCase = true)
     }
 
+    /** Remnawave's own directive block (`injectHosts`, tag prefixes) — not an Xray root field. */
+    private const val VENDOR_ROOT_KEY = "remnawave"
+
+    /**
+     * Drops the vendor [VENDOR_ROOT_KEY] object from a raw Xray JSON template.
+     *
+     * Remnawave resolves and removes it server-side when it generates a subscription, but a
+     * template imported from a file or served by a panel that skipped that step still carries it,
+     * and the core refuses to start on an unknown root field. What is stored must be exactly what
+     * the core will run, so strip it before storage rather than at connect time.
+     *
+     * @param rawConfig The raw config JSON.
+     * @return The config without the vendor object, or [rawConfig] unchanged when there is nothing
+     *         to strip or it is not a JSON object.
+     */
+    private fun stripVendorRootKey(rawConfig: String): String {
+        if (!rawConfig.contains(VENDOR_ROOT_KEY)) return rawConfig
+        return try {
+            val root = JsonUtil.parseString(rawConfig) ?: return rawConfig
+            if (root.remove(VENDOR_ROOT_KEY) == null) return rawConfig
+            JsonUtil.toJsonPretty(root) ?: rawConfig
+        } catch (e: Exception) {
+            LogUtil.e(AppConfig.TAG, "Failed to strip vendor key from custom config", e)
+            rawConfig
+        }
+    }
+
     /**
      * Parses a custom configuration server.
      *
@@ -580,27 +609,41 @@ object AngConfigManager {
                     JsonUtil.fromJson(server, Array<Any>::class.java) ?: arrayOf()
 
                 if (serverList.isNotEmpty()) {
-                    val removedSelected = getRemovedSelectedProfile(subid, append)
-                    if (!append) {
-                        MmkvManager.removeServerViaSubid(subid)
-                    }
-                    var count = 0
-                    val keyToProfile = mutableMapOf<String, ProfileItem>()
+                    // Parse into a staging list FIRST, delete second — the same order the link-list
+                    // branch uses (`parseBatchConfig`, "if (configs.isNotEmpty())"). Deleting on
+                    // `serverList.isNotEmpty()` meant a провайдер answering with a non-empty but
+                    // unparseable XRAY_JSON body wiped every сервер it had, cleared the selected
+                    // one, and then discovered it had nothing to put back — the user was left with
+                    // an empty провайдер and no way to recover it from the device.
+                    val staged = ArrayList<Pair<String, ProfileItem>>(serverList.size)
                     for (srv in serverList.reversed()) {
-                        val config = CustomFmt.parse(JsonUtil.toJson(srv)) ?: continue
-                        config.subscriptionId = subid
-                        config.locked = locked
-                        config.description = generateDescription(config)
-                        val key = MmkvManager.encodeServerConfig("", config)
-                        MmkvManager.encodeServerRaw(key, TemplateManager.wrapRawForStorage(JsonUtil.toJsonPretty(srv) ?: "", locked))
-                        keyToProfile[key] = config
-                        count += 1
+                        // Pretty-printing also normalises Gson's doubles back to ints, which the core needs.
+                        val rawConfig = stripVendorRootKey(JsonUtil.toJsonPretty(srv) ?: "")
+                        val config = CustomFmt.parse(rawConfig) ?: continue
+                        staged.add(rawConfig to config)
                     }
-                    if (count > 0) {
+                    if (staged.isNotEmpty()) {
+                        val removedSelected = getRemovedSelectedProfile(subid, append)
+                        if (!append) {
+                            MmkvManager.removeServerViaSubid(subid)
+                        }
+                        val keyToProfile = mutableMapOf<String, ProfileItem>()
+                        for ((rawConfig, config) in staged) {
+                            config.subscriptionId = subid
+                            config.locked = locked
+                            config.description = generateDescription(config)
+                            val key = MmkvManager.encodeServerConfig("", config)
+                            MmkvManager.encodeServerRaw(key, TemplateManager.wrapRawForStorage(rawConfig, locked))
+                            keyToProfile[key] = config
+                        }
                         val matchKey = resolveSelectedKey(keyToProfile, removedSelected, subid, append)
                         matchKey?.let { MmkvManager.setSelectServer(it) }
+                        return staged.size
                     }
-                    return count
+                    // Nothing in the array parsed. Fall through to the single-config path below
+                    // rather than returning 0: that path guards its own delete on a successful
+                    // parse, so the worst case is an honest "imported nothing" with the
+                    // already-stored серверы untouched.
                 }
             } catch (e: Exception) {
                 LogUtil.e(AppConfig.TAG, "Failed to parse custom config server JSON array", e)
@@ -608,7 +651,8 @@ object AngConfigManager {
 
             try {
                 // For compatibility
-                val config = CustomFmt.parse(server) ?: return 0
+                val rawConfig = stripVendorRootKey(server)
+                val config = CustomFmt.parse(rawConfig) ?: return 0
                 config.subscriptionId = subid
                 config.locked = locked
                 config.description = generateDescription(config)
@@ -616,7 +660,7 @@ object AngConfigManager {
                     MmkvManager.removeServerViaSubid(subid)
                 }
                 val key = MmkvManager.encodeServerConfig("", config)
-                MmkvManager.encodeServerRaw(key, TemplateManager.wrapRawForStorage(server, locked))
+                MmkvManager.encodeServerRaw(key, TemplateManager.wrapRawForStorage(rawConfig, locked))
                 return 1
             } catch (e: Exception) {
                 LogUtil.e(AppConfig.TAG, "Failed to parse custom config server as single config", e)
@@ -726,6 +770,99 @@ object AngConfigManager {
     }
 
     /**
+     * Decides which URL a subscription fetch may actually use, or null when it must not run.
+     *
+     * [Utils.isValidSubUrl] is the transport-safety test: https anywhere, or http to loopback or a
+     * private range (that traffic never leaves the device or the LAN, which is why self-hosted
+     * panels keep working below). `allowInsecureUrl` is the user's opt-out from it — and for an
+     * operator-managed (locked) subscription it is deliberately NOT honoured: that URL carries the
+     * account token and the response is the template we then store encrypted precisely because it
+     * is sensitive, so cleartext would undo both at once.
+     *
+     * A locked subscription that IS on cleartext http is not just dropped. `locked` only becomes
+     * known after the first successful fetch ([TemplateManager.applyLockState]), so a plain refusal
+     * would turn a subscription that worked once into one that fails forever, with only a generic
+     * "update failed" to show for it. Instead the same URL is retried over https — a scheme swap,
+     * dropping a redundant `:80`, since asking for TLS on the cleartext port only fails the
+     * handshake — which is what a real panel behind nginx/Caddy answers on anyway. If https does
+     * not answer, the update fails with the reason in the log; it never falls back to http.
+     *
+     * @param url The subscription URL, already IDN-normalised.
+     * @param sub The subscription being fetched.
+     * @return The URL to fetch, or null to fail the update.
+     */
+    private fun resolveSecureSubUrl(url: String, sub: SubscriptionItem): String? {
+        if (Utils.isValidSubUrl(url)) return url
+
+        // Every refusal below ends the update with the same generic failure count, so the log line
+        // is the only place the reason exists: each one names the subscription, what was refused
+        // and what would fix it. (Surfacing it in the UI needs a reason on SubscriptionUpdateResult,
+        // which this change does not own.)
+        val name = sub.remarks.ifBlank { "(unnamed)" }
+
+        if (!sub.locked) {
+            // Ordinary subscription: the user's explicit opt-in still governs.
+            if (sub.allowInsecureUrl) return url
+            LogUtil.w(
+                AppConfig.TAG,
+                "Subscription \"$name\" not updated: its address is cleartext http and "
+                    + "\"allow insecure HTTP address\" is off for it. Turn that switch on in the "
+                    + "subscription editor, or change the address to https."
+            )
+            return null
+        }
+
+        val upgraded = toHttpsUrl(url)
+        if (upgraded == null) {
+            LogUtil.w(
+                AppConfig.TAG,
+                "Managed subscription \"$name\" not updated: its address is neither https nor a "
+                    + "cleartext http address this app can parse, so there is no https address to "
+                    + "try. Re-add the subscription from the account. (\"Allow insecure HTTP "
+                    + "address\" does not apply here: an operator address carries the account "
+                    + "token and is never fetched in cleartext.)"
+            )
+            return null
+        }
+        if (!Utils.isValidSubUrl(upgraded)) {
+            LogUtil.w(
+                AppConfig.TAG,
+                "Managed subscription \"$name\" not updated: its address stays unsafe after the "
+                    + "https upgrade. Re-add the subscription from the account."
+            )
+            return null
+        }
+        LogUtil.w(
+            AppConfig.TAG,
+            "Managed subscription \"$name\" is on cleartext http; fetching over https instead. "
+                + "\"Allow insecure HTTP address\" does not apply to operator-managed "
+                + "subscriptions — that address carries the account token."
+        )
+        return upgraded
+    }
+
+    /**
+     * Rewrites an `http://` URL as `https://`, keeping userinfo, path, query and fragment, and any
+     * explicit port other than the http default. Returns null when [url] is not cleartext http.
+     *
+     * Parsed with OkHttp's [okhttp3.HttpUrl] rather than [java.net.URI] on purpose: URI applies
+     * RFC 2396 host rules and returns a null host for addresses OkHttp accepts and would happily
+     * fetch (an underscore in the hostname is the everyday case), so a URI-based upgrade refused
+     * the retry on addresses that were never the problem. The parser here is the one that performs
+     * the fetch, so what it accepts and what can be fetched cannot drift apart.
+     */
+    private fun toHttpsUrl(url: String): String? {
+        val parsed = Utils.fixIllegalUrl(url.trim()).toHttpUrlOrNull() ?: return null
+        if (!parsed.scheme.equals("http", ignoreCase = true)) return null
+        val builder = parsed.newBuilder().scheme("https")
+        // Port 80 — implicit or written out — belongs to cleartext: asking for TLS on it only
+        // fails the handshake, so move to the https default. Any other explicit port is the
+        // operator's choice and is kept.
+        if (parsed.port == 80) builder.port(443)
+        return builder.build().toString()
+    }
+
+    /**
      * Updates the configuration via a subscription.
      *
      * @param it The subscription item.
@@ -750,13 +887,22 @@ object AngConfigManager {
             if (!Utils.isValidUrl(url)) {
                 return SubscriptionUpdateResult(failureCount = 1)
             }
-            if (!it.subscription.allowInsecureUrl) {
-                if (!Utils.isValidSubUrl(url)) {
-                    return SubscriptionUpdateResult(failureCount = 1)
-                }
-            }
-            LogUtil.i(AppConfig.TAG, url)
-            val userAgent = it.subscription.userAgent
+            val fetchUrl = resolveSecureSubUrl(url, it.subscription)
+                ?: return SubscriptionUpdateResult(failureCount = 1)
+            LogUtil.i(AppConfig.TAG, fetchUrl)
+            // The panel picks the response format (XRAY_JSON template vs base64 link list) from
+            // the User-Agent, so a per-subscription override wins over everything, then the
+            // global override from the provider screen, then the operator-configured UA. All
+            // three tiers are resolved HERE because this is the only fetch point, and both the
+            // scheduled worker and a manual refresh come through it — resolving the global tier
+            // anywhere else would let the automatic and the manual refresh of one subscription
+            // ask for different response formats. The worker deliberately does not pre-stamp the
+            // item (see SubscriptionUpdater.UpdateTask) and neither does the account import (see
+            // SubscriptionSyncManager): this function persists the item, so a UA set on it there
+            // would silently become that subscription's own override and outlive the global one.
+            val userAgent = it.subscription.userAgent?.trim()?.ifBlank { null }
+                ?: SettingsManager.getSubscriptionUserAgent()
+                ?: BackendConfig.subscriptionUserAgent
             val proxyUsername = SettingsManager.getSocksUsername()
             val proxyPassword = SettingsManager.getSocksPassword()
             // Stable per-install device id (HWID) header, opt-out via settings.
@@ -766,7 +912,7 @@ object AngConfigManager {
                 val httpPort = SettingsManager.getHttpPort()
                 HttpUtil.getUrlContentWithUserAgentEx(
                     UrlContentRequest(
-                        url = url,
+                        url = fetchUrl,
                         userAgent = userAgent,
                         timeout = 15000,
                         httpPort = httpPort,
@@ -783,7 +929,7 @@ object AngConfigManager {
                 result = try {
                     HttpUtil.getUrlContentWithUserAgentEx(
                         UrlContentRequest(
-                            url = url,
+                            url = fetchUrl,
                             userAgent = userAgent,
                             hwid = hwid
                         )

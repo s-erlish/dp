@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- Экран «Настройки провайдеров» (ProviderSettingsActivity) -->
-    <string name="ps_title">Настройки провайдеров</string>
+    <!-- Экран «Настройки подписок» (ProviderSettingsActivity).
+
+         Владелец называет эту сущность подпиской, а не провайдером: слово
+         заменено во всех строках экрана. Ключи (ps_*) оставлены прежними, чтобы
+         не трогать разметку чужой волны. -->
+    <string name="ps_title">Настройки подписок</string>
 
     <!-- Разделы -->
     <string name="ps_section_update">Обновление</string>
@@ -17,6 +21,11 @@
     <string name="ps_notify_updates">Уведомлять об обновлениях</string>
     <string name="ps_notify_updates_sub">Показывать уведомление после обновления подписки</string>
 
+    <!-- Нет ни одной подписки: применять расписание не к чему, поэтому строки
+         «Автообновление» и «Интервал обновления» выключены, а значение интервала
+         само называет причину (12-settings.md 4.4). -->
+    <string name="ps_no_subs_value">Нет подписок</string>
+
     <!-- Интервалы -->
     <string name="ps_interval_1h">1 ч</string>
     <string name="ps_interval_2h">2 ч</string>
@@ -30,10 +39,11 @@
     <string name="ps_ping_on_update">Пинг при обновлении</string>
 
     <!-- Сеть -->
-    <string name="ps_send_hwid">Отправлять HWID</string>
-    <string name="ps_send_hwid_sub">Отправлять идентификатор устройства при обновлении подписки</string>
+    <string name="ps_send_hwid">Отправлять идентификатор устройства</string>
+    <string name="ps_send_hwid_sub">Передавать идентификатор при обновлении подписки</string>
     <string name="ps_user_agent">User-Agent</string>
     <string name="ps_user_agent_hint">User-Agent для запросов подписки</string>
+    <string name="ps_user_agent_error">В заголовке нельзя передать кириллицу и другие не-ASCII символы. Оставьте латиницу, цифры и знаки.</string>
 
     <!-- Список серверов -->
     <string name="ps_sort_order">Сортировка серверов</string>

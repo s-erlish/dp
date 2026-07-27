@@ -4,14 +4,18 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.view.Menu
-import android.view.MenuItem
-import androidx.appcompat.widget.SearchView
+import androidx.core.view.isVisible
+import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityAppPickerBinding
 import com.v2ray.ang.dto.AppInfo
+import com.v2ray.ang.ui.component.EmptyStateBinder
+import com.v2ray.ang.ui.component.SkeletonBinder
+import com.v2ray.ang.ui.component.SubPage
+import com.v2ray.ang.ui.component.ToolbarBinder
 import com.v2ray.ang.util.AppManagerUtil
 import com.v2ray.ang.util.LogUtil
 import kotlinx.coroutines.Dispatchers
@@ -19,7 +23,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.Collator
 
+/**
+ * A-19 - the app picker a routing rule opens for its «Приложения» field.
+ *
+ * It is the same list as A-18 and now says so: the same grouped `Row.Toggle` list through
+ * [PerAppProxyAdapter], the same on-screen search, the same skeleton and the same empty states. What
+ * differs is who owns the selection (an in-memory set returned as an activity result, not the
+ * per-app preference) and the unnamed-traffic pseudo-entry pinned at the top, which is a real
+ * routing target and not an app.
+ *
+ * The screen used to be a bare `RecyclerView` with its search and its two bulk actions in an
+ * ActionBar menu; A-38 takes the ActionBar away, so the search is a field and the bulk actions are
+ * rows in the shared sheet.
+ */
 class AppPickerActivity : BaseActivity() {
+
     companion object {
         private const val EXTRA_SELECTED_PACKAGES = "selected_packages"
         private const val EXTRA_PICKER_TITLE = "picker_title"
@@ -43,64 +61,65 @@ class AppPickerActivity : BaseActivity() {
         intent.getStringArrayListExtra(EXTRA_SELECTED_PACKAGES).orEmpty()
     }
     private val selectedPackages = LinkedHashSet<String>()
+    private val adapter by lazy {
+        PerAppProxyAdapter(
+            isSelected = selectedPackages::contains,
+            onToggle = { packageName ->
+                if (!selectedPackages.remove(packageName)) selectedPackages.add(packageName)
+                updateMeta()
+            },
+        )
+    }
+
     private var appsAll: List<AppInfo> = emptyList()
-    private val adapter = AppSelectorAdapter(selectedPackages)
+    private var query: String = ""
+    private var loadFailed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
-        setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = resolveScreenTitle())
+        setContentView(binding.root)
 
         selectedPackages.addAll(initialSelectedPackages)
-        setupRecyclerView()
+
+        ToolbarBinder.bind(
+            root = binding.toolbar.root,
+            title = resolveScreenTitle(),
+            activity = this,
+            actionIcon = R.drawable.ic_more_vert_24dp,
+            actionDescription = getString(R.string.editor_more_actions),
+            onAction = { showListActions() },
+        )
+        ToolbarBinder.attachTo(binding.toolbar.root, binding.recyclerView)
+
+        // Without this the RecyclerView never lays out - it logs «No layout manager attached;
+        // skipping layout» and draws an empty screen, which is what this list did after the
+        // rebuild. The layout declares no app:layoutManager, so it has to be set here.
+        binding.recyclerView.setHasFixedSize(true)
+        binding.recyclerView.layoutManager = LinearLayoutManager(this)
+        binding.recyclerView.adapter = adapter
+        binding.search.searchInput.setHint(R.string.perapp_search_hint)
+        binding.search.searchInput.doAfterTextChanged {
+            query = it?.toString().orEmpty()
+            applyFilter()
+        }
+
         loadApps()
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.menu_app_picker, menu)
-
-        val searchItem = menu.findItem(R.id.search_view)
-        if (searchItem != null) {
-            val searchView = searchItem.actionView as SearchView
-            searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-                override fun onQueryTextSubmit(query: String?): Boolean = false
-
-                override fun onQueryTextChange(newText: String?): Boolean {
-                    filterApps(newText.orEmpty())
-                    return false
-                }
-            })
-        }
-
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
-        R.id.select_all -> {
-            selectAllVisible()
-            true
-        }
-
-        R.id.invert_selection -> {
-            invertVisibleSelection()
-            true
-        }
-
-        else -> super.onOptionsItemSelected(item)
-    }
-
+    /**
+     * The picker has no «Готово» button on purpose: leaving the screen IS confirming, and the
+     * result is written here so the toolbar back arrow, the system Back gesture and the predictive
+     * Back animation all commit the same selection.
+     */
     override fun finish() {
         setResult(
             RESULT_OK,
             Intent().apply {
-                putStringArrayListExtra(EXTRA_SELECTED_PACKAGES, getSelectedPackages())
+                putStringArrayListExtra(EXTRA_SELECTED_PACKAGES, ArrayList(selectedPackages.sorted()))
             }
         )
         super.finish()
-    }
-
-    private fun setupRecyclerView() {
-        binding.recyclerView.adapter = adapter
-        addCustomDividerToRecyclerView(binding.recyclerView, this, R.drawable.custom_divider)
     }
 
     @SuppressLint("UseCompatLoadingForDrawables")
@@ -110,7 +129,7 @@ class AppPickerActivity : BaseActivity() {
                 ?: getDrawable(android.R.drawable.sym_def_app_icon)
         ) { "No fallback drawable available" }
         return AppInfo(
-            appName = getString(R.string.app_picker_unknown_app),
+            appName = getString(R.string.perapp_unknown_app),
             packageName = AppConfig.UNIDENTIFIED_PACKAGE,
             appIcon = icon,
             isSystemApp = false,
@@ -119,79 +138,121 @@ class AppPickerActivity : BaseActivity() {
     }
 
     private fun loadApps() {
-        showLoading()
+        loadFailed = false
+        EmptyStateBinder.hide(binding.emptyState.root)
+        binding.recyclerView.isVisible = false
+        binding.tvMeta.isVisible = false
+        SkeletonBinder.showAfterDelay(binding.skeleton)
 
         lifecycleScope.launch {
-            try {
-                val apps = withContext(Dispatchers.IO) {
-                    val appsList = AppManagerUtil.loadNetworkAppList(this@AppPickerActivity)
-                    val sortedApps = sortApps(appsList)
-                    listOf(createSpecialItemUnidentified()) + sortedApps
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val collator = Collator.getInstance()
+                    val sorted = AppManagerUtil.loadNetworkAppList(this@AppPickerActivity)
+                        .sortedWith(compareBy(collator) { it.appName })
+                    listOf(createSpecialItemUnidentified()) + sorted
                 }
+            }
+            result.onSuccess { appsAll = it }.onFailure {
+                appsAll = emptyList()
+                loadFailed = true
+                LogUtil.e(AppConfig.TAG, "Failed to load app list", it)
+            }
+            applyFilter()
+        }
+    }
 
-                appsAll = apps
-                updateDisplayedApps(apps)
-            } catch (e: Exception) {
-                LogUtil.e("AppPickerActivity", "Failed to load app list", e)
-            } finally {
-                hideLoading()
+    private fun applyFilter() {
+        val key = query.trim().uppercase()
+        val visible = if (key.isEmpty()) {
+            appsAll
+        } else {
+            appsAll.filter {
+                it.appName.uppercase().contains(key) || it.packageName.uppercase().contains(key)
+            }
+        }
+        adapter.submit(
+            apps = visible,
+            // The pseudo-entry is not «ваше приложение», so the first group stays unheaded here and
+            // only the system block earns a header.
+            userLabel = null,
+            systemLabel = getString(R.string.perapp_section_system),
+        )
+        updateMeta()
+        showContentState(visible.isEmpty())
+    }
+
+    private fun updateMeta() {
+        binding.tvMeta.text = getString(R.string.perapp_picker_selected, selectedPackages.size)
+    }
+
+    private fun showContentState(isEmpty: Boolean) {
+        SkeletonBinder.cancel(binding.skeleton)
+        binding.tvMeta.isVisible = !loadFailed
+        binding.search.root.isVisible = !loadFailed
+
+        when {
+            loadFailed -> {
+                binding.recyclerView.isVisible = false
+                EmptyStateBinder.bind(
+                    root = binding.emptyState.root,
+                    glyph = R.drawable.ic_dl_info,
+                    title = getString(R.string.perapp_error_title),
+                    line = getString(R.string.perapp_error_line),
+                    actionLabel = getString(R.string.editor_retry),
+                    emphasis = EmptyStateBinder.Emphasis.TERTIARY,
+                    onAction = { loadApps() },
+                )
+            }
+
+            isEmpty -> {
+                binding.recyclerView.isVisible = false
+                EmptyStateBinder.bind(
+                    root = binding.emptyState.root,
+                    glyph = R.drawable.ic_per_apps_24dp,
+                    title = getString(R.string.editor_search_empty_title),
+                    line = getString(R.string.editor_search_empty_line),
+                    actionLabel = getString(R.string.editor_search_reset),
+                    onAction = { binding.search.searchInput.setText("") },
+                )
+            }
+
+            else -> {
+                EmptyStateBinder.hide(binding.emptyState.root)
+                binding.recyclerView.isVisible = true
             }
         }
     }
 
-    private fun filterApps(content: String) {
-        val key = content.uppercase()
-        val filteredApps = appsAll.filter { app ->
-            key.isEmpty() || matchesSearch(app, key)
-        }
-        updateDisplayedApps(filteredApps)
-    }
+    private fun showListActions() {
+        val visible = adapter.apps.map { it.packageName }
+        val allSelected = visible.isNotEmpty() && visible.all { selectedPackages.contains(it) }
 
-    private fun sortApps(apps: List<AppInfo>): List<AppInfo> {
-        val collator = Collator.getInstance()
-        return apps.sortedWith { p1, p2 ->
-            val p1Selected = selectedPackages.contains(p1.packageName)
-            val p2Selected = selectedPackages.contains(p2.packageName)
-            when {
-                p1Selected && !p2Selected -> -1
-                !p1Selected && p2Selected -> 1
-                p1.isSystemApp && !p2.isSystemApp -> 1
-                !p1.isSystemApp && p2.isSystemApp -> -1
-                else -> collator.compare(p1.appName, p2.appName)
+        EditorActionsSheet(this, getString(R.string.editor_actions_title))
+            .action(
+                labelRes = if (allSelected) R.string.perapp_action_clear_all else R.string.perapp_action_select_all,
+                enabled = visible.isNotEmpty(),
+            ) {
+                if (allSelected) selectedPackages.removeAll(visible.toSet()) else selectedPackages.addAll(visible)
+                adapter.refreshSelection()
+                updateMeta()
             }
-        }
-    }
-
-    private fun matchesSearch(app: AppInfo, keyword: String): Boolean {
-        return app.appName.uppercase().contains(keyword) || app.packageName.uppercase().contains(keyword)
-    }
-
-    private fun updateDisplayedApps(apps: List<AppInfo>) {
-        adapter.submitList(apps)
-    }
-
-    private fun selectAllVisible() {
-        adapter.apps.forEach { app -> selectedPackages.add(app.packageName) }
-        adapter.refreshSelection()
-    }
-
-    private fun invertVisibleSelection() {
-        adapter.apps.forEach { app ->
-            if (selectedPackages.contains(app.packageName)) {
-                selectedPackages.remove(app.packageName)
-            } else {
-                selectedPackages.add(app.packageName)
+            .action(R.string.perapp_action_invert, enabled = visible.isNotEmpty()) {
+                visible.forEach {
+                    if (!selectedPackages.remove(it)) selectedPackages.add(it)
+                }
+                adapter.refreshSelection()
+                updateMeta()
             }
-        }
-        adapter.refreshSelection()
+            .show()
     }
 
-    private fun getSelectedPackages(): ArrayList<String> {
-        return ArrayList(selectedPackages.sorted())
+    override fun onDestroy() {
+        SkeletonBinder.cancel(binding.skeleton)
+        super.onDestroy()
     }
 
     private fun resolveScreenTitle(): String {
-        return intent.getStringExtra(EXTRA_PICKER_TITLE) ?: getString(R.string.per_app_proxy_settings)
+        return intent.getStringExtra(EXTRA_PICKER_TITLE) ?: getString(R.string.perapp_picker_title)
     }
 }
-

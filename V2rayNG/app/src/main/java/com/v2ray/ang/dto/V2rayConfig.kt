@@ -504,15 +504,91 @@ data class V2rayConfig(
         var poolSize: Int = 10000
     ) // roughly 10 times smaller than total ip pool
 
+    /**
+     * The outbound that actually carries this config's traffic.
+     *
+     * Taking the first proxy-protocol outbound is wrong for operator templates, which routinely ship
+     * several proxy outbounds and pick one with a routing rule. A template can, for instance, place a
+     * decoy outbound tagged "proxy" first and send all tcp/udp traffic to a differently-tagged one:
+     * reading the first entry then reports the wrong host, so the row shows the wrong protocol, the
+     * TCP ping probes a host that is not the server and never answers, and the delay test measures the
+     * wrong outbound entirely.
+     *
+     * So follow the routing the way the core does — the first rule that matches ordinary outbound
+     * traffic wins — and fall back to the old first-match behaviour only when routing says nothing.
+     */
     fun getProxyOutbound(): OutboundBean? {
-        outbounds.forEach { outbound ->
-            EConfigType.entries.forEach {
-                if (outbound.protocol.equals(it.name, true)) {
-                    return outbound
-                }
+        return resolveRoutedOutbound() ?: firstProxyOutbound()
+    }
+
+    /** First outbound whose protocol names a real proxy, ignoring routing. */
+    private fun firstProxyOutbound(): OutboundBean? = outbounds.firstOrNull { outbound ->
+        EConfigType.entries.any { it.name.equals(outbound.protocol, true) }
+    }
+
+    private fun outboundByTag(tag: String?): OutboundBean? =
+        tag?.let { t -> outbounds.firstOrNull { it.tag.equals(t, true) } }
+
+    /**
+     * Walks [routing] in core order and returns the proxy outbound that ordinary traffic reaches, or
+     * null when no rule applies to it.
+     *
+     * Only rules that can match *generic* traffic are considered: a rule constrained by ip, domain,
+     * port, source, user, inbound tag, process or application protocol describes a special case
+     * (private ranges, bittorrent, a bypass list), not the default path. Of the rest, the first one
+     * wins, mirroring the core's top-down evaluation.
+     */
+    private fun resolveRoutedOutbound(): OutboundBean? {
+        // `routing` is declared non-null, but these configs come from Gson, which happily leaves it
+        // null when the template has no routing section at all.
+        val routingOrNull: RoutingBean? = routing
+        val rules = routingOrNull?.rules ?: return null
+        for (rule in rules) {
+            if (!rule.matchesGenericTraffic()) continue
+
+            val direct = outboundByTag(rule.outboundTag)
+            if (direct != null) {
+                // A rule sending everything to freedom/blackhole is a kill-switch or a bypass, not
+                // this profile's server — keep looking rather than reporting "the server is freedom".
+                if (!direct.isProxyProtocol()) continue
+                return direct
             }
+
+            // A balancer names its members by tag prefix; any member is representative enough for
+            // the display name, the ping target and the delay probe.
+            val balancer = rule.balancerTag?.let { tag ->
+                routingOrNull.balancers?.firstOrNull { it.tag.equals(tag, true) }
+            } ?: continue
+            val member = balancer.selector
+                .firstNotNullOfOrNull { prefix ->
+                    outbounds.firstOrNull { it.tag.startsWith(prefix, true) && it.isProxyProtocol() }
+                }
+                ?: outboundByTag(balancer.fallbackTag)?.takeIf { it.isProxyProtocol() }
+            if (member != null) return member
         }
         return null
+    }
+
+    private fun OutboundBean.isProxyProtocol(): Boolean =
+        EConfigType.entries.any { it.name.equals(protocol, true) }
+
+    /**
+     * True when this rule is not narrowed to a particular destination, source or protocol, so it
+     * applies to ordinary outbound traffic. A bare `network: "tcp,udp"` still counts — that is how
+     * templates spell "everything else".
+     */
+    private fun RoutingBean.RulesBean.matchesGenericTraffic(): Boolean {
+        if (outboundTag == null && balancerTag == null) return false
+        return ip.isNullOrEmpty() &&
+            domain.isNullOrEmpty() &&
+            process.isNullOrEmpty() &&
+            protocol.isNullOrEmpty() &&
+            source.isNullOrEmpty() &&
+            user.isNullOrEmpty() &&
+            inboundTag.isNullOrEmpty() &&
+            port.isNullOrEmpty() &&
+            sourcePort.isNullOrEmpty() &&
+            attrs.isNullOrEmpty()
     }
 
     fun getAllProxyOutbound(): List<OutboundBean> {

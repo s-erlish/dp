@@ -1,0 +1,8 @@
+ConnectHeroView.axaml.cs(L,C): warning CS0067: The event 'ConnectHeroView.AddRequested' is never used
+HotKeyManager.cs(L,C): warning CS8625: Cannot convert null literal to non-nullable reference type.
+LoginView.axaml.cs(L,C): warning CS0618: 'TextBox.Watermark' is obsolete: 'Use PlaceholderText instead.'
+UrlSchemesPage.axaml.cs(L,C): warning CA1416: This call site is reachable on all platforms. 'Registry.CurrentUser' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416)
+UrlSchemesPage.axaml.cs(L,C): warning CA1416: This call site is reachable on all platforms. 'RegistryKey.CreateSubKey(string)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416)
+UrlSchemesPage.axaml.cs(L,C): warning CA1416: This call site is reachable on all platforms. 'RegistryKey.GetValue(string?)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416)
+UrlSchemesPage.axaml.cs(L,C): warning CA1416: This call site is reachable on all platforms. 'RegistryKey.OpenSubKey(string)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416)
+UrlSchemesPage.axaml.cs(L,C): warning CA1416: This call site is reachable on all platforms. 'RegistryKey.SetValue(string?, object)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416)

@@ -1,7 +1,65 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     id("com.jaredsburrows.license")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Release signing.
+//
+// A release must never carry the debug key. AGP generates that key per machine and per CI run, so
+// two "releases" are signed by two different identities: Android refuses to install one over the
+// other (INSTALL_FAILED_UPDATE_INCOMPATIBLE — which costs the user every server, subscription and
+// their session), the debug key's private half is public knowledge, and Play rejects a debug-signed
+// upload outright.
+//
+// The real key is read from the environment (CI secrets) or from an untracked keystore.properties
+// next to the build. When neither is present the release is left UNSIGNED and says so in its
+// filename, because an artefact that cannot be shipped must not look shippable. Passing
+// `-PdebugSignedRelease=true` is the one deliberate way back to a debug-signed release for local
+// testing, and it labels the output too.
+// ─────────────────────────────────────────────────────────────────────────────
+val keystoreProperties = Properties().apply {
+    val propsFile = rootProject.file("keystore.properties")
+    if (propsFile.exists()) propsFile.inputStream().use { load(it) }
+}
+
+fun signingSecret(envName: String, propertyName: String): String? =
+    System.getenv(envName)?.takeIf { it.isNotBlank() }
+        ?: keystoreProperties.getProperty(propertyName)?.takeIf { it.isNotBlank() }
+
+val releaseStorePath: String =
+    signingSecret("DEPARTAMENT_KEYSTORE", "storeFile") ?: "$rootDir/keystore/release.jks"
+val releaseStorePassword: String? = signingSecret("DEPARTAMENT_KEYSTORE_PASSWORD", "storePassword")
+val releaseKeyAlias: String? = signingSecret("DEPARTAMENT_KEY_ALIAS", "keyAlias")
+val releaseKeyPassword: String? = signingSecret("DEPARTAMENT_KEY_PASSWORD", "keyPassword")
+
+val hasReleaseKey: Boolean = file(releaseStorePath).exists() &&
+    releaseStorePassword != null && releaseKeyAlias != null && releaseKeyPassword != null
+
+val debugSignedRelease: Boolean =
+    (project.findProperty("debugSignedRelease") as String?)?.toBoolean() ?: false
+
+// Said once, at configuration time, only when a release task was actually asked for — a build that
+// produces an uninstallable artefact should not be quiet about it.
+if (!hasReleaseKey && gradle.startParameter.taskNames.any { it.contains("elease") }) {
+    if (debugSignedRelease) {
+        logger.lifecycle(
+            "departament: release will be DEBUG-SIGNED (-PdebugSignedRelease). Test builds only — " +
+                "the debug key differs per machine and per CI run, so this APK cannot be upgraded " +
+                "by, or upgrade to, any other build. Outputs are tagged -debugsigned."
+        )
+    } else {
+        logger.lifecycle(
+            "departament: no release keystore, so the release will be UNSIGNED and tagged " +
+                "-unsigned. Supply DEPARTAMENT_KEYSTORE / DEPARTAMENT_KEYSTORE_PASSWORD / " +
+                "DEPARTAMENT_KEY_ALIAS / DEPARTAMENT_KEY_PASSWORD (or keystore.properties with " +
+                "storeFile / storePassword / keyAlias / keyPassword), or pass " +
+                "-PdebugSignedRelease=true for a throwaway installable test build."
+        )
+    }
 }
 
 android {
@@ -43,19 +101,57 @@ android {
         // Fill these in (or override per build type/flavor) when the real bot backend lands.
         buildConfigField("String", "BACKEND_BASE_URL", "\"https://web.departament.site/api\"")
         buildConfigField("String", "BOT_USERNAME", "\"departamentvpnbot\"")
-        buildConfigField("String", "SUB_USER_AGENT", "\"DepartamentVPN/1.0\"")
+        // User-Agent for subscription fetches and backend calls. The panel picks the subscription
+        // format (XRAY_JSON template vs base64 link list) from this header using ITS OWN
+        // client->template mapping, so the string that yields the template is operator-specific:
+        // this field is that operator's knob and is sent verbatim (BackendConfig only refuses a
+        // value that cannot travel in an HTTP header).
+        // Blank = the app's own default, "v2rayNG/<versionName>" — the client string every panel
+        // recognises as this client, answered with the base64 link list, which the app parses and
+        // which is what ships today. Fill this in with the client string this deployment's
+        // Remnawave maps to xray-json to negotiate the operator's routing/DNS template.
+        // Do NOT put branding here: "DepartamentVPN/1.0" (what earlier builds shipped) is an
+        // unknown client to every panel, so it gets the base64 list anyway AND names the
+        // deployment on every request.
+        buildConfigField("String", "SUB_USER_AGENT", "\"\"")
+    }
+
+    signingConfigs {
+        // Declared only when the material to fill it actually exists; see the block above the
+        // `plugins` declaration for where the values come from.
+        if (hasReleaseKey) {
+            create("release") {
+                storeFile = file(releaseStorePath)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
+            }
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Safe only because proguard-rules.pro exists: the Xray config's Gson field names are
+            // the wire format, and the libv2ray/hev-socks5-tunnel JNI surfaces are resolved by
+            // literal name. Read that file before changing this flag.
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Sign release builds with the debug key so the produced APK is directly installable
-            // for full-app testing (no separate keystore/secrets required in CI).
-            signingConfig = signingConfigs.getByName("debug")
+            // Never the debug key by default. No key at all beats a key that makes an
+            // unshippable build look shippable.
+            signingConfig = if (hasReleaseKey) {
+                signingConfigs.getByName("release")
+            } else if (debugSignedRelease) {
+                signingConfigs.getByName("debug")
+            } else {
+                null
+            }
         }
     }
 
@@ -93,6 +189,14 @@ android {
     applicationVariants.all {
         val variant = this
         val isFdroid = variant.productFlavors.any { it.name == "fdroid" }
+        // What the file is, in the file's own name. A debug artefact and a release artefact used to
+        // be called exactly the same thing, and a release with no key looked identical to one with.
+        val artefactMarker = when {
+            variant.buildType.name != "release" -> "-${variant.buildType.name}"
+            hasReleaseKey -> ""
+            debugSignedRelease -> "-debugsigned"
+            else -> "-unsigned"
+        }
         if (isFdroid) {
             val versionCodes =
                 mapOf(
@@ -103,7 +207,8 @@ android {
                 .map { it as com.android.build.gradle.internal.api.ApkVariantOutputImpl }
                 .forEach { output ->
                     val abi = output.getFilter("ABI") ?: "universal"
-                    output.outputFileName = "departament_${variant.versionName}-fdroid_${abi}.apk"
+                    output.outputFileName =
+                        "departament_${variant.versionName}-fdroid_${abi}${artefactMarker}.apk"
                     if (versionCodes.containsKey(abi)) {
                         output.versionCodeOverride =
                             (100 * variant.versionCode + versionCodes[abi]!!).plus(5000000)
@@ -112,8 +217,12 @@ android {
                     }
                 }
         } else {
+            // One rank per ABI, distinct. Every entry used to be 4, so all five splits resolved to
+            // 4000731 and Play refuses the second APK of a multi-APK release ("Version code
+            // 4000731 has already been used"). `universal` stays lowest so a device-specific split
+            // always outranks the fat one on the same device.
             val versionCodes =
-                mapOf("armeabi-v7a" to 4, "arm64-v8a" to 4, "x86" to 4, "x86_64" to 4, "universal" to 4)
+                mapOf("universal" to 0, "arm64-v8a" to 1, "armeabi-v7a" to 2, "x86_64" to 3, "x86" to 4)
 
             variant.outputs
                 .map { it as com.android.build.gradle.internal.api.ApkVariantOutputImpl }
@@ -123,7 +232,8 @@ android {
                     else
                         "universal"
 
-                    output.outputFileName = "departament_${variant.versionName}_${abi}.apk"
+                    output.outputFileName =
+                        "departament_${variant.versionName}_${abi}${artefactMarker}.apk"
                     if (versionCodes.containsKey(abi)) {
                         output.versionCodeOverride =
                             (1000000 * versionCodes[abi]!!).plus(variant.versionCode)

@@ -1,26 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Motion duration tokens (ms). One tempo for the whole app so every surface
-  presses, reveals, and settles on the same clock. Ease-out only, no bounce.
-  Exit is always faster than enter (press_out is the release, but reveals/state
-  exits should reuse the smaller token). Honor reduced motion at the call site:
-  when Settings.Global.ANIMATOR_DURATION_SCALE == 0 the system collapses these
-  to 0 and views jump straight to the end state (see MotionUtils).
+  presses, reveals, and settles on the same clock (00-rules.md 3.7 and 8,
+  10-design-system.md 1.5 / 2.11). Ease-out only: no bounce, no elastic, no
+  spring, and no linear on a state transition - the single linear exemption is
+  motion_spin, a continuous rotation with no end state to settle into.
+
+  Exit is 75% of enter: state 220 -> 165, reveal 300 -> 225.
+
+  Honor reduced motion at the call site: when
+  Settings.Global.ANIMATOR_DURATION_SCALE == 0 the system collapses these to 0
+  and views jump straight to the end state (see MotionUtils). A declarative
+  stateListAnimator collapses automatically.
+
+  Curves live in res/interpolator/: ease_out_quart (0.25,1,0.5,1) for press,
+  ease_out_quint (0.22,1,0.36,1) for reveal and settle, ease_standard (0.2,0,0,1)
+  for two-way tint and crossfade, ease_out_expo (0.16,1,0.3,1) reserved for the
+  single auth -> home hand-off.
 -->
 <resources>
-    <!-- Finger-down press: quick acknowledgement (< 100ms feels instant). -->
+    <!-- Finger-down press: quick acknowledgement (< 100ms feels instant).
+         Curve: ease_out_quart. -->
     <integer name="motion_press_in">90</integer>
     <!-- Release/settle back to rest. Slightly longer than press-in so the
-         rebound reads as a relax, not a snap. -->
+         rebound reads as a relax, not a snap. Curve: ease_out_quint. -->
     <integer name="motion_press_out">160</integer>
-    <!-- State changes: selection, enable/disable, color/elevation shifts. -->
+    <!-- Parity token with the desktop hover fade. Android has no hover state and
+         must not design for one; this exists only so the two scales stay 1:1. -->
+    <integer name="motion_hover">150</integer>
+    <!-- State changes: selection, enable/disable, tint crossfade.
+         Curve: ease_standard. -->
     <integer name="motion_state">220</integer>
-    <!-- Reveal: show/hide, expand, sheet/section entrances. -->
+    <!-- Reverse of motion_state (75% of enter). -->
+    <integer name="motion_state_exit">165</integer>
+    <!-- Reveal: show/hide, expand, sheet and sub-page entrance.
+         Curve: ease_out_quint. -->
     <integer name="motion_reveal">300</integer>
+    <!-- Reverse of motion_reveal (75% of enter). Screen / sub-page exit. -->
+    <integer name="motion_reveal_exit">225</integer>
+    <!-- The single auth -> home hand-off, and nothing else.
+         Curve: ease_out_expo. -->
+    <integer name="motion_slow">450</integer>
     <!-- Per-item delay for list/grid stagger. Cap the staggered count so the
-         total never exceeds ~400ms. -->
+         total never exceeds 400ms: 10 items, then the rest appear together. -->
     <integer name="motion_stagger">40</integer>
-    <!-- Emphasis: the one hero moment (connect sonar / assemble). Longest token
-         in the system; reserve for the single primary action, never chrome. -->
+    <!-- Emphasis: the one hero moment in the whole product (connect sonar /
+         assemble). Longest transition token; reserve for the single primary
+         action, never chrome. Curve: ease_out_quint. -->
     <integer name="motion_emphasis">600</integer>
+    <!-- Skeleton pulse, opacity 0.45 <-> 1.0, infinite reverse. Loading feedback
+         is state, which 8.1 permits, and at 1000ms it is slower than the hero
+         moment rather than competing with it. Replaces the off-scale 900ms
+         AccelerateDecelerate pulse in AccountFragment. Reduced motion holds the
+         skeleton static at opacity 0.7. Curve: ease_standard. -->
+    <integer name="motion_pulse">1000</integer>
+    <!-- One revolution of the 20dp inline indeterminate spinner arc. LINEAR, and
+         the only linear animation in the product: a spinner is a continuous
+         rotation, not a transition between two states, and an eased revolution
+         visibly stutters once per turn (00-rules.md 3.7). -->
+    <integer name="motion_spin">1100</integer>
+    <!-- Not an animation: the re-entry window that makes a double-press
+         impossible by construction on a tap that is not command-gated (R9).
+         It lives here because it is a duration, and durations live here. -->
+    <integer name="input_debounce">500</integer>
+
+    <!-- The one press value (D-11): scale 0.97 everywhere, in over
+         motion_press_in 90 (ease_out_quart), out over motion_press_out 160
+         (ease_out_quint). Held as a fraction so an imperative animator and
+         res/anim/press_scale.xml cannot drift apart. R5: rows do not scale (they
+         step their background to colorSurfaceContainerHigh instead), objects do. -->
+    <item name="press_scale" type="fraction">97%</item>
 </resources>

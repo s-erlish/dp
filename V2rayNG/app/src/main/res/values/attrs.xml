@@ -1,4 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Theme attributes.
+
+  An attribute belongs here — rather than a layout naming @color/… directly —
+  when its value must differ between the three shipping themes (blue light, blue
+  dark, mono). Android resolves @color/… by resource qualifier, which covers
+  light vs night but NOT the mono overlay: ThemeOverlay.Mono is applied at
+  runtime in BaseActivity and can only redirect ATTRIBUTES. So the rule is:
+
+      differs light vs night only        -> @color/… with a values-night twin
+      must also change under mono        -> ?attr/… declared here
+
+  Every attr below is bound in all three themes (values/themes.xml,
+  values-night inherits it, ThemeOverlay.Mono overrides it). 00-rules.md 11.1.
+-->
 <resources>
 
     <style name="TabLayoutTextStyle" parent="TextAppearance.Design.Tab">
@@ -38,4 +53,51 @@
     <attr name="iconTileBgPurple" format="color" />
     <attr name="iconTileBgRed" format="color" />
     <attr name="iconTileBgYellow" format="color" />
+
+    <!-- =================================================================== -->
+    <!-- 2026-07 token wave (10-design-system.md 4.7, 2.2). Six semantic      -->
+    <!-- roles that had colour tokens in values/colors.xml + values-night/    -->
+    <!-- but no way to reach them from a layout, and no mono mapping at all.  -->
+    <!-- =================================================================== -->
+
+    <!-- D-9. THE boundary of a control: input field, outlined button, segmented
+         track, switch track decoration. Exists because colorOutline measures
+         1.45:1 on the dark ground and 1.62:1 on white — invisible as a control
+         edge and a WCAG 1.4.11 failure. Resolves:
+           blue dark  #646C7C  3.43:1 on surface, 3.73:1 on background
+           blue light #7D8BA3  3.45:1 on surface, 3.21:1 on background
+           mono dark  #6A6A6E  3.47:1 on mono surface
+           mono light #767679  4.53:1 on mono surface
+         colorOutlineVariant keeps the 1dp hairline role (row separators, card
+         borders); that is structural decoration and 1.4.11 does not apply. -->
+    <attr name="colorOutlineControl" format="color" />
+
+    <!-- The dimmed GLYPH tone, one step below colorOnSurfaceVariant: a chevron
+         or a decorative glyph that must recede without reading as disabled.
+         Dark #6E7480 is 3.86:1 on surface — above the 3:1 icon floor, below the
+         4.5:1 body floor. Never use it for text; text is onSurfaceVariant. -->
+    <attr name="colorOnSurfaceDim" format="color" />
+
+    <!-- The «истекает» / «ждёт оплаты» hue and nothing else. Never a button,
+         never a link, never a selection colour (00-rules.md 1.4.1). It replaces
+         the misnamed iconTintYellow, which is aliased to the accent and cannot
+         carry a warning. Dark #EAB308 9.45:1 on surface; light #8A6300 5.43:1;
+         mono degrades to the secondary text tone and leans on word + glyph. -->
+    <attr name="warning" format="color" />
+
+    <!-- D-10. On LIGHT a status chip's text is not the status hue: amber on its
+         own fill measures 4.24:1 and fails AA, so light uses a darkened #6B5000
+         (6.72:1 on warning_container). On DARK the fill is dark enough that the
+         hue itself clears AA (7.51:1), which is why the two columns differ.
+         Do not "unify" them. -->
+    <attr name="warningText" format="color" />
+
+    <!-- The amber status-chip FILL. A fill delta against the surface, not a
+         boundary, so WCAG 1.4.11 does not apply to its own contrast. -->
+    <attr name="warningContainer" format="color" />
+
+    <!-- Loading placeholder bar, pulsing 0.45 <-> 1.0 over motion_pulse 1000ms.
+         Equals the inset plane in every theme: a skeleton is a shape, not text.
+         Replaces the centred spinner over a blank screen. -->
+    <attr name="colorSkeleton" format="color" />
 </resources>

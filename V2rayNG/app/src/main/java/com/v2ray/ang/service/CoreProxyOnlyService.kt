@@ -31,7 +31,16 @@ class CoreProxyOnlyService : Service(), ServiceControl {
      */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         LogUtil.i(AppConfig.TAG, "StartCore-Proxy: Service command received")
-        CoreServiceManager.startCoreLoop(null)
+        // Honour the result. startCoreLoop() returns false when a core is already running, and
+        // ignoring that meant a failed start left the PREVIOUS server's core alive while the UI
+        // reported the newly selected one — a silent lie about where the traffic is going.
+        // CoreVpnService already stops itself in that case; this service must do the same.
+        if (!CoreServiceManager.startCoreLoop(null)) {
+            LogUtil.e(AppConfig.TAG, "StartCore-Proxy: Failed to start core loop")
+            // stopSelf() alone — onDestroy() performs the single stopCoreLoop() teardown.
+            stopSelf()
+            return START_NOT_STICKY
+        }
         return START_STICKY
     }
 

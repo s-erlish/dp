@@ -1,82 +1,110 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  ============================================================================
+  servers/server/{guid} - Своя конфигурация.  H3 · R4.
+  ============================================================================
+
+  The JSON editor stays - it is the right control for the job - but the frame around
+  it comes onto the scale: the 12dp page padding, the 4dp label margins, the 14dp
+  inner padding, the inline 12sp hint and the 16dp card radius are gone, and the
+  remark field is the library field rather than a background-less EditText inside a
+  card pretending to be one.
+
+  The editor sits in a real card at radius_card 20 and FILLS the screen: the old file
+  put `match_parent` on it inside a ScrollView, which measures as wrap_content, so a
+  long config grew the page instead of scrolling inside the editor.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:attr/colorBackground"
-    android:clipToPadding="false"
     android:fitsSystemWindows="true"
-    android:scrollbars="none"
+    android:orientation="vertical"
     tools:context=".ui.ServerCustomConfigActivity">
 
-    <LinearLayout
+    <include
+        android:id="@+id/toolbar"
+        layout="@layout/view_toolbar" />
+
+    <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="12dp">
+        android:layout_marginTop="@dimen/space_8"
+        android:paddingStart="@dimen/screen_gutter"
+        android:paddingEnd="@dimen/screen_gutter"
+        android:text="@string/srv_config_note"
+        android:textAppearance="@style/TextAppearance.App.Caption" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="4dp"
-            android:layout_marginTop="4dp"
-            android:text="@string/server_lab_need_inbound"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="12sp" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_16"
+        android:paddingStart="@dimen/screen_gutter"
+        android:paddingEnd="@dimen/screen_gutter"
+        android:text="@string/srv_name_label"
+        android:textAppearance="@style/TextAppearance.App.Title.Medium" />
 
-        <TextView
-            style="@style/SettingsSectionLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/server_lab_remarks" />
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/til_remarks"
+        style="@style/Widget.Departament.TextField"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/screen_gutter"
+        android:layout_marginTop="@dimen/space_8"
+        android:layout_marginEnd="@dimen/screen_gutter">
 
-        <com.google.android.material.card.MaterialCardView
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/et_remarks"
+            style="@style/Widget.Departament.TextField.EditText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            android:imeOptions="actionNext"
+            android:inputType="text"
+            android:maxLines="1" />
+    </com.google.android.material.textfield.TextInputLayout>
 
-            <EditText
-                android:id="@+id/et_remarks"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@null"
-                android:inputType="text"
-                android:paddingHorizontal="14dp"
-                android:paddingVertical="14dp"
-                android:textColor="?attr/colorOnSurface"
-                android:textColorHint="?attr/colorOnSurfaceVariant" />
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_16"
+        android:paddingStart="@dimen/screen_gutter"
+        android:paddingEnd="@dimen/screen_gutter"
+        android:text="@string/srv_config_label"
+        android:textAppearance="@style/TextAppearance.App.Title.Medium" />
 
-        </com.google.android.material.card.MaterialCardView>
+    <!-- weight 1: the editor owns the leftover height and scrolls its own content,
+         instead of growing the page the way `match_parent` inside a ScrollView did. -->
+    <com.google.android.material.card.MaterialCardView
+        style="@style/Widget.Departament.Card.Group"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginStart="@dimen/screen_gutter"
+        android:layout_marginTop="@dimen/space_8"
+        android:layout_marginEnd="@dimen/screen_gutter"
+        android:layout_weight="1">
 
-        <TextView
-            style="@style/SettingsSectionLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/server_lab_content" />
-
-        <com.google.android.material.card.MaterialCardView
+        <com.blacksquircle.ui.editorkit.widget.TextProcessor
+            android:id="@+id/editor"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginBottom="4dp"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            android:background="@null"
+            android:gravity="top|start"
+            android:padding="@dimen/space_12" />
+    </com.google.android.material.card.MaterialCardView>
 
-            <com.blacksquircle.ui.editorkit.widget.TextProcessor
-                android:id="@+id/editor"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@null"
-                android:gravity="top|start"
-                android:padding="12dp" />
-        </com.google.android.material.card.MaterialCardView>
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_save"
+        style="@style/Widget.Departament.Button.Primary.Tall"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/screen_gutter"
+        android:layout_marginTop="@dimen/space_16"
+        android:layout_marginEnd="@dimen/screen_gutter"
+        android:text="@string/editor_save" />
 
-    </LinearLayout>
-</ScrollView>
+    <include
+        android:id="@+id/row_delete"
+        layout="@layout/view_row" />
+</LinearLayout>

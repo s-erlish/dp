@@ -1,0 +1,504 @@
+package com.v2ray.ang.ui.component
+
+import android.content.res.ColorStateList
+import android.view.View
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.annotation.DrawableRes
+import androidx.core.content.ContextCompat
+import androidx.core.view.AccessibilityDelegateCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
+import androidx.core.widget.ImageViewCompat
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.materialswitch.MaterialSwitch
+import com.v2ray.ang.R
+
+/**
+ * The universal row - `res/layout/view_row.xml` bound in one call (22-components.md 8,
+ * 32-master-plan-android.md 8.1).
+ *
+ * This is the single most repeated object in the product, and the reason this package exists: the
+ * same structure is hand-inlined over a hundred times in the shipped app and the copies have
+ * drifted 2 to 4dp apart. Geometry belongs to the layout and to
+ * `@style/Widget.Departament.Row`:
+ *
+ * ```
+ * [ 16 gutter ][ 40 tile r12, 22 glyph ][ 12 ][ text column, weight 1 ][ 12 ][ ONE trailing ][ 16 ]
+ * ```
+ *
+ * This binder owns the row's CONTENT and its STATE, and it enforces the three things geometry
+ * cannot:
+ *
+ * 1. **Exactly one trailing element.** [Trailing] is a closed set and the binder hides every
+ *    affordance it was not asked for, on every bind. Two trailing elements are not "discouraged"
+ *    here, they are unreachable. The same reset is what makes recycling safe: a row that was a
+ *    switch last frame cannot keep its switch when it is rebound as a chevron.
+ * 2. **The row's job is never split in two.** When the trailing element is itself the action
+ *    ([Trailing.IconAction], [Trailing.ActionButton]) the row is not a target, per 22-components
+ *    8.4 - two targets doing different things is the `layout_subscription_meta_bar` mistake.
+ *    Passing `onClick` alongside one of those throws rather than shipping the defect.
+ * 3. **State is announced, not only drawn.** A toggle row reports itself to TalkBack as checkable
+ *    and checked, a selected row as selected (00-rules.md 14.9).
+ *
+ * The rest follows the spec: the whole row is the touch target, it GROWS with a two-line subtitle
+ * rather than clipping, press feedback is the background step in `@drawable/bg_row` and never a
+ * scale (R5), text is styled by applying a ramp role and never by an inline size or face, and every
+ * icon-only control carries a name.
+ */
+object RowBinder {
+
+    /**
+     * The closed tile system (D-5): three colours and no fourth. Purple / orange / yellow / green
+     * encode a category system this product does not have.
+     *
+     * At most three coloured tiles on one screen, and in practice a screen has one or none - 56 of
+     * 65 tiles in the shipped app are blue, which is the defect this closes.
+     *
+     * [DESTRUCTIVE] is for a genuinely destructive CATEGORY, not for a destructive row: a
+     * destructive row keeps a [NEUTRAL] tile and carries its red in the title
+     * ([RowTone.DESTRUCTIVE]), because a red tile plus red text is the same signal twice and turns
+     * the row into an alarm (22-components 8.6).
+     */
+    enum class TileRole { NEUTRAL, ACCENT, DESTRUCTIVE }
+
+    /** The title's ramp role. [DESTRUCTIVE] is `TextAppearance.App.Title.Destructive`. */
+    enum class RowTone { DEFAULT, DESTRUCTIVE }
+
+    /**
+     * The trailing affordance and the promise it makes to the user (32-master-plan-android.md 8.1).
+     * Exactly one per row; the type is what enforces that.
+     */
+    sealed interface Trailing {
+
+        /**
+         * No trailing affordance at all, which is two archetypes depending on `onClick`:
+         *
+         * - with no listener it is **Row.Fact** - a read-only row, not clickable, no ripple, no
+         *   press feedback, not focusable;
+         * - with one it is **Row.Destructive** («Удалить сервер», «Выйти»), where the red title in
+         *   [RowTone.DESTRUCTIVE] is itself the affordance and a chevron would be noise. Per
+         *   00-rules.md 7.5 the default is act plus an undo snackbar, not a confirm dialog; when
+         *   the action really is irreversible, use [Chevron] instead, because it opens a screen.
+         */
+        data object None : Trailing
+
+        /** Tapping pushes a screen. The 20dp `ic_chevron_right` in `?attr/colorOnSurfaceVariant`. */
+        data object Chevron : Trailing
+
+        /**
+         * Tapping expands content inline, right here: the same chevron rotated 0 to 90.
+         * [bind] sets the resting angle, [animateExpand] performs the transition.
+         */
+        data class Expand(val expanded: Boolean) : Trailing
+
+        /**
+         * Tapping changes the value in place - no screen, no dialog. This is the cycle affordance;
+         * pass `ic_unfold_more` once the icon owner lands it, which is why the layout ships this
+         * slot with no `src` to be wrong.
+         *
+         * The glyph is normally decorative - the row's name and its value carry the meaning - so
+         * [contentDescription] is normally null and the glyph is then hidden from TalkBack.
+         */
+        data class Glyph(
+            @param:DrawableRes val icon: Int,
+            val contentDescription: CharSequence? = null,
+        ) : Trailing
+
+        /**
+         * A boolean applied immediately. The ROW owns the switch: tapping anywhere on the row
+         * toggles it, the switch is not separately focusable, and the state is announced as a
+         * checkable node rather than only drawn. Fires `tickHaptic()` per 00-rules.md 8.10.
+         */
+        data class Toggle(
+            val checked: Boolean,
+            val onCheckedChange: (Boolean) -> Unit,
+        ) : Trailing
+
+        /**
+         * This item is the current selection (22-components 18). The check slot is ALWAYS reserved
+         * and only its alpha changes, so selecting an item never reflows the list. This is the one
+         * sanctioned pairing: a marker row may also carry a `value` - the server row's ping figure
+         * beside its check.
+         */
+        data class Marker(val selected: Boolean) : Trailing
+
+        /**
+         * A 40dp icon button performing the action in place; the row itself is inert.
+         * [contentDescription] is not optional, and it names the ACTION rather than the object -
+         * «Скопировать код», not «Код».
+         */
+        data class IconAction(
+            @param:DrawableRes val icon: Int,
+            val contentDescription: CharSequence,
+            val onClick: (View) -> Unit,
+        ) : Trailing
+
+        /**
+         * A Tertiary button inside the row - the only place in the product a Tertiary lives in a
+         * row (22-components 8.4): «Привязать Telegram» -> «Привязать». The row itself is inert.
+         */
+        data class ActionButton(
+            val label: CharSequence,
+            val onClick: (View) -> Unit,
+        ) : Trailing
+    }
+
+    /**
+     * Binds one `view_row.xml`.
+     *
+     * ```kotlin
+     * RowBinder.bind(
+     *     root = binding.rowDns.row,
+     *     title = getString(R.string.settings_dns),
+     *     glyph = R.drawable.ic_dns,
+     *     value = "Cloudflare",
+     *     trailing = RowBinder.Trailing.Chevron,
+     *     onClick = { SubPage.open(this, dnsIntent) },
+     * )
+     * ```
+     *
+     * @param root the inflated row, i.e. `@id/row`.
+     * @param title the row's name. Ramp role Title 16/700, max 2 lines, sentence case, never caps.
+     * @param subtitle six words on what the row DOES, or null. A subtitle that restates its title is
+     *   deleted, not written; it says what is on when it is on, never a negation.
+     * @param glyph the 22dp tile glyph. `0` hides the tile, which is what a PLAIN (untiled) group
+     *   is - the row then starts at the 16dp gutter and the tile's 12dp margin goes with it. A
+     *   group is tiled only when its rows carry glyphs that DIFFER; identical tiles down the left
+     *   edge is the generated-settings tell.
+     * @param tileRole one of the three tile colours. Neutral unless the row is genuinely categorical.
+     * @param tone the title's ramp role; [RowTone.DESTRUCTIVE] for «Удалить сервер», «Выйти».
+     * @param value the row's current value - «DNS · Cloudflare». A settings list the user can audit
+     *   by scrolling once, without opening anything, is the single best idea in the reference app.
+     * @param valueIsNumeric true for a quantity, which puts the value on the Numeric role: tabular
+     *   figures, so a live number does not reflow on every tick.
+     * @param trailing the one affordance. Everything else is hidden.
+     * @param enabled false draws the whole row at 0.38 and takes it out of the touch order (R6).
+     * @param haptic normally [Haptic.NONE] - a row tap does not vibrate. A switch does, and the
+     *   binder supplies that itself.
+     * @param onClick what tapping the row does, routed through [onSingleClick] so a double tap
+     *   cannot fire it twice. MUST be null when the trailing element is itself the action
+     *   ([Trailing.IconAction], [Trailing.ActionButton]); null with [Trailing.None] is what makes a
+     *   row a read-only fact.
+     */
+    fun bind(
+        root: View,
+        title: CharSequence,
+        subtitle: CharSequence? = null,
+        @DrawableRes glyph: Int = 0,
+        tileRole: TileRole = TileRole.NEUTRAL,
+        tone: RowTone = RowTone.DEFAULT,
+        value: CharSequence? = null,
+        valueIsNumeric: Boolean = false,
+        trailing: Trailing = Trailing.Chevron,
+        enabled: Boolean = true,
+        haptic: Haptic = Haptic.NONE,
+        onClick: ((View) -> Unit)? = null,
+    ) {
+        require(onClick == null || !trailing.trailingOwnsAction()) {
+            "Departament row: this trailing element owns the action, so the row itself must not " +
+                "be a target (22-components 8.4). Pass onClick = null."
+        }
+        require(trailing !is Trailing.Toggle || value == null) {
+            "Departament row: a toggle row is a title, an optional subtitle and the switch " +
+                "(22-components 8.5). A value beside a switch is two trailing elements."
+        }
+
+        val slots = RowSlots.of(root)
+        bindTile(slots, glyph, tileRole)
+        bindText(slots, title, subtitle, tone)
+        bindValue(slots, value, valueIsNumeric)
+        resetTrailing(slots)
+        bindTrailing(slots, trailing)
+        bindInteraction(slots, trailing, enabled, haptic, onClick)
+    }
+
+    /**
+     * The expand transition for a [Trailing.Expand] row: the chevron rotates 0 to 90 over
+     * `motion_state` 220ms on `ease_standard`. A rotation between two resting angles is a state
+     * change, not a reveal, which is why it is 220 and not 300. Reduced motion snaps.
+     *
+     * Call it from the row's own click listener after flipping your expanded flag; [bind] only sets
+     * the resting angle, so scrolling a list never replays the animation.
+     */
+    fun animateExpand(root: View, expanded: Boolean) {
+        val chevron = RowSlots.of(root).chevron
+        val target = if (expanded) EXPANDED_DEGREES else 0f
+        chevron.motion(snap = { chevron.rotation = target }) {
+            chevron.animate()
+                .rotation(target)
+                .setDuration(chevron.durationOf(R.integer.motion_state))
+                .setInterpolator(chevron.curve(R.interpolator.ease_standard))
+                .start()
+        }
+    }
+
+    /**
+     * True when the trailing control is the action, which is the case 22-components 8.4 settles:
+     * the row then stops being a target, because two targets doing different things is a defect and
+     * not a convenience. [Trailing.None] is deliberately absent - a row with no trailing is inert
+     * only when it is also given no listener.
+     */
+    private fun Trailing.trailingOwnsAction(): Boolean =
+        this is Trailing.IconAction || this is Trailing.ActionButton
+
+    private fun bindTile(slots: RowSlots, @DrawableRes glyph: Int, role: TileRole) {
+        val tile = slots.tile
+        if (glyph == 0) {
+            tile.visibility = View.GONE
+            return
+        }
+        tile.visibility = View.VISIBLE
+
+        val background = when (role) {
+            TileRole.NEUTRAL -> R.drawable.bg_tile_neutral
+            TileRole.ACCENT -> R.drawable.bg_tile_accent
+            TileRole.DESTRUCTIVE -> R.drawable.bg_tile_destructive
+        }
+        // setBackgroundResource re-derives padding from the drawable, which would drop the padding
+        // that centres the 22dp glyph in the 40dp tile. Keep exactly what the style declared.
+        val left = tile.paddingLeft
+        val top = tile.paddingTop
+        val right = tile.paddingRight
+        val bottom = tile.paddingBottom
+        tile.setBackgroundResource(background)
+        tile.setPadding(left, top, right, bottom)
+
+        tile.setImageResource(glyph)
+        ImageViewCompat.setImageTintList(tile, ColorStateList.valueOf(tile.tintFor(role)))
+    }
+
+    private fun View.tintFor(role: TileRole): Int = when (role) {
+        TileRole.NEUTRAL -> ContextCompat.getColor(context, R.color.icon_glyph_neutral)
+        TileRole.ACCENT -> themeColor(androidx.appcompat.R.attr.colorPrimary)
+        TileRole.DESTRUCTIVE -> themeColor(androidx.appcompat.R.attr.colorError)
+    }
+
+    private fun bindText(
+        slots: RowSlots,
+        title: CharSequence,
+        subtitle: CharSequence?,
+        tone: RowTone,
+    ) {
+        slots.title.text = title
+        slots.title.setTextAppearance(
+            when (tone) {
+                RowTone.DEFAULT -> R.style.TextAppearance_App_Title
+                RowTone.DESTRUCTIVE -> R.style.TextAppearance_App_Title_Destructive
+            }
+        )
+        slots.subtitle.text = subtitle ?: ""
+        slots.subtitle.visibility = if (subtitle.isNullOrEmpty()) View.GONE else View.VISIBLE
+    }
+
+    private fun bindValue(slots: RowSlots, value: CharSequence?, numeric: Boolean) {
+        if (value.isNullOrEmpty()) {
+            slots.value.text = ""
+            slots.value.visibility = View.GONE
+            return
+        }
+        slots.value.text = value
+        slots.value.visibility = View.VISIBLE
+        slots.value.setTextAppearance(
+            if (numeric) R.style.TextAppearance_App_Numeric else R.style.TextAppearance_App_Subtitle
+        )
+    }
+
+    /** Every affordance off, every listener detached. This is what makes "exactly one" true. */
+    private fun resetTrailing(slots: RowSlots) {
+        slots.chevron.visibility = View.GONE
+        slots.trailingGlyph.visibility = View.GONE
+        slots.marker.visibility = View.GONE
+        slots.toggle.setOnCheckedChangeListener(null)
+        slots.toggle.visibility = View.GONE
+        slots.iconAction.clearClick()
+        slots.iconAction.visibility = View.GONE
+        slots.actionButton.clearClick()
+        slots.actionButton.visibility = View.GONE
+    }
+
+    private fun bindTrailing(slots: RowSlots, trailing: Trailing) {
+        when (trailing) {
+            is Trailing.None -> Unit
+
+            is Trailing.Chevron -> {
+                slots.chevron.rotation = 0f
+                slots.chevron.visibility = View.VISIBLE
+            }
+
+            is Trailing.Expand -> {
+                slots.chevron.rotation = if (trailing.expanded) EXPANDED_DEGREES else 0f
+                slots.chevron.visibility = View.VISIBLE
+            }
+
+            is Trailing.Glyph -> with(slots.trailingGlyph) {
+                setImageResource(trailing.icon)
+                contentDescription = trailing.contentDescription
+                importantForAccessibility = if (trailing.contentDescription == null) {
+                    View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                } else {
+                    View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                }
+                visibility = View.VISIBLE
+            }
+
+            is Trailing.Toggle -> with(slots.toggle) {
+                visibility = View.VISIBLE
+                isChecked = trailing.checked
+                setOnCheckedChangeListener { _, checked -> trailing.onCheckedChange(checked) }
+            }
+
+            is Trailing.Marker -> {
+                // The slot stays VISIBLE and moves its alpha, so selection changes nothing about
+                // the layout - no reflow, no geometry shift (22-components 18.1).
+                slots.marker.visibility = View.VISIBLE
+                slots.marker.alpha = if (trailing.selected) 1f else 0f
+                // The fourth selection axis: title weight 700 selected, 500 not. Both are ramp
+                // roles, so the weight is never set inline.
+                slots.title.setTextAppearance(
+                    if (trailing.selected) {
+                        R.style.TextAppearance_App_Title
+                    } else {
+                        R.style.TextAppearance_App_Title_Medium
+                    }
+                )
+            }
+
+            is Trailing.IconAction -> with(slots.iconAction) {
+                visibility = View.VISIBLE
+                setIconResource(trailing.icon)
+                contentDescription = trailing.contentDescription
+                onSingleClick(action = trailing.onClick)
+            }
+
+            is Trailing.ActionButton -> with(slots.actionButton) {
+                visibility = View.VISIBLE
+                text = trailing.label
+                onSingleClick(action = trailing.onClick)
+            }
+        }
+    }
+
+    private fun bindInteraction(
+        slots: RowSlots,
+        trailing: Trailing,
+        enabled: Boolean,
+        haptic: Haptic,
+        onClick: ((View) -> Unit)?,
+    ) {
+        val root = slots.root
+        root.isEnabled = enabled
+        // isEnabled does NOT cascade to a ViewGroup's children, so a disabled row whose action
+        // lives in the trailing slot would stay tappable. Disable the three interactive slots by
+        // hand; the other trailing elements are glyphs and have nothing to disable.
+        slots.toggle.isEnabled = enabled
+        slots.iconAction.isEnabled = enabled
+        slots.actionButton.isEnabled = enabled
+        // R6: disabled is 0.38 on the WHOLE control, on both platforms.
+        root.alpha = if (enabled) 1f else DISABLED_ALPHA
+        root.isActivated = trailing is Trailing.Marker && trailing.selected
+
+        when {
+            // An inert row keeps its background: `bg_row` only draws a pressed or focused state,
+            // and neither is reachable once the row stops being clickable. Clearing the background
+            // instead would leave a recycled row permanently flat when it is next bound clickable.
+            !enabled || trailing.trailingOwnsAction() -> root.clearClick()
+
+            trailing is Trailing.Toggle -> root.onSingleClick(Haptic.TICK) {
+                slots.toggle.isChecked = !slots.toggle.isChecked
+            }
+
+            onClick != null -> {
+                root.onSingleClick(haptic, onClick)
+                root.isFocusable = true
+            }
+
+            else -> root.clearClick()
+        }
+
+        applySemantics(
+            root = root,
+            checkable = trailing is Trailing.Toggle,
+            checked = trailing is Trailing.Toggle && trailing.checked,
+            selected = trailing is Trailing.Marker && trailing.selected,
+        )
+    }
+
+    /**
+     * 00-rules.md 14.9: selected, disabled, expanded, loading and error are EXPOSED to TalkBack,
+     * not only drawn. A delegate is installed on every bind, including the neutral case, so a
+     * recycled row cannot keep the previous item's announcement.
+     */
+    private fun applySemantics(
+        root: View,
+        checkable: Boolean,
+        checked: Boolean,
+        selected: Boolean,
+    ) {
+        ViewCompat.setAccessibilityDelegate(root, object : AccessibilityDelegateCompat() {
+            override fun onInitializeAccessibilityNodeInfo(
+                host: View,
+                info: AccessibilityNodeInfoCompat,
+            ) {
+                super.onInitializeAccessibilityNodeInfo(host, info)
+                info.isCheckable = checkable
+                // setChecked(Boolean) is deprecated in favour of an int-based tri-state
+                // (unchecked / checked / partially checked), but that overload is NOT in the
+                // androidx.core resolved by this build - the class in the resolved artifact
+                // exposes setChecked and no CHECKED_STATE_* constants, so there is nothing to
+                // migrate to yet. A toggle row genuinely has to announce its checked state or
+                // TalkBack reads it as a plain button, so this is suppressed rather than dropped.
+                // Revisit when androidx.core ships the overload.
+                @Suppress("DEPRECATION")
+                info.isChecked = checked
+                info.isSelected = selected
+                if (checkable) info.className = SWITCH_CLASS
+            }
+        })
+    }
+
+    private const val DISABLED_ALPHA = 0.38f
+    private const val EXPANDED_DEGREES = 90f
+    private const val SWITCH_CLASS = "android.widget.Switch"
+}
+
+/**
+ * The row's child views, resolved once from `view_row.xml`.
+ *
+ * Nothing here is nullable: every slot is declared by that one layout, so a null would mean the
+ * caller passed the wrong root, and [slot] says so instead of drawing a row with a hole in it.
+ */
+class RowSlots private constructor(
+    val root: View,
+    val tile: ImageView,
+    val title: TextView,
+    val subtitle: TextView,
+    val value: TextView,
+    val chevron: ImageView,
+    val marker: ImageView,
+    val trailingGlyph: ImageView,
+    val toggle: MaterialSwitch,
+    val iconAction: MaterialButton,
+    val actionButton: MaterialButton,
+) {
+
+    companion object {
+
+        private const val LAYOUT = "res/layout/view_row.xml"
+
+        /** Resolves every slot of an inflated `view_row.xml`. */
+        fun of(root: View): RowSlots = RowSlots(
+            root = root,
+            tile = root.slot(R.id.row_tile, LAYOUT, "row_tile"),
+            title = root.slot(R.id.row_title, LAYOUT, "row_title"),
+            subtitle = root.slot(R.id.row_subtitle, LAYOUT, "row_subtitle"),
+            value = root.slot(R.id.row_value, LAYOUT, "row_value"),
+            chevron = root.slot(R.id.row_chevron, LAYOUT, "row_chevron"),
+            marker = root.slot(R.id.row_marker, LAYOUT, "row_marker"),
+            trailingGlyph = root.slot(R.id.row_trailing_glyph, LAYOUT, "row_trailing_glyph"),
+            toggle = root.slot(R.id.row_switch, LAYOUT, "row_switch"),
+            iconAction = root.slot(R.id.row_icon_action, LAYOUT, "row_icon_action"),
+            actionButton = root.slot(R.id.row_action, LAYOUT, "row_action"),
+        )
+    }
+}
