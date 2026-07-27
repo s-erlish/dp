@@ -113,6 +113,13 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         s.rowSubsList.setOnClickListener {
             mainHost.launchSettingsScreen(Intent(requireContext(), SubSettingActivity::class.java))
         }
+        // «Другие способы добавления» — ссылка, сервер вручную, файл конфигурации.
+        // Владелец сократил меню «Добавить подписку» до QR и буфера обмена (OWNER C1), и
+        // эти три способа переехали в MainHost.showAdvancedAddMethods() — но вызывать их
+        // стало нечему: код жил, компилировался и был недостижим. Это их вход. Идёт через
+        // хост, а не через собственный диалог, потому что «Импортировать из файла»
+        // открывает системный выбор файла на лаунчере оболочки.
+        s.rowAddOther.setOnClickListener { mainHost.showAdvancedAddMethods() }
         s.rowSubAutoUpdate.setOnClickListener { pickSubAutoUpdate() }
         s.rowRouting.setOnClickListener {
             mainHost.launchSettingsScreen(Intent(requireContext(), RoutingSettingActivity::class.java))

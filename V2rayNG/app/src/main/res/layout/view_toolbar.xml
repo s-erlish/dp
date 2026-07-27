@@ -59,15 +59,17 @@
              24dp ic_arrow_back; until the icon owner lands it, the 24dp chevron is
              mirrored, which draws the correct left-pointing affordance. When
              ic_arrow_back exists, set it on app:icon and DELETE the scaleX line.
-             STRING GAP: there is no «Назад» in res/values/strings*.xml and this wave
-             may not add one; the literal below wants to become @string/cd_back. -->
+             STRING GAP CLOSED (M-44): this was the tree's one hardcoded
+             android:contentDescription. It is now @string/cd_back, defined in
+             res/values/strings_ui_polish.xml — the toolbar belongs to no single screen,
+             so its one string lives in the cross-cutting file rather than a screen's. -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/toolbar_back"
             style="@style/Widget.Departament.Button.Icon.Toolbar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/space_4"
-            android:contentDescription="Назад"
+            android:contentDescription="@string/cd_back"
             android:scaleX="-1"
             app:icon="@drawable/ic_chevron_right" />
 

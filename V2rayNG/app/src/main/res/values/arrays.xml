@@ -137,17 +137,18 @@
         <item>xtls-rprx-vision-udp443</item>
     </string-array>
 
+    <!-- Two options, and they are the whole set. departament ships one master locale — Russian, in
+         values/ — so «English» selected a locale nothing translates and produced a Russian app with an
+         English shell. Its stored value is migrated to "auto" by SettingsManager.getLocale(); this
+         array and language_select_value must stay index-parallel. -->
     <string-array name="language_select" translatable="false">
         <item>@string/settings_language_system</item>
         <item>Русский</item>
-        <item>English</item>
     </string-array>
-
 
     <string-array name="language_select_value" translatable="false">
         <item>auto</item>
         <item>ru</item>
-        <item>en</item>
     </string-array>
 
     <string-array name="mux_xudp_quic_value" translatable="false">
