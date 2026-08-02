@@ -73,6 +73,9 @@
     <string name="routing_section_actions">Наборы и обмен</string>
     <string name="routing_rule_on">Включено</string>
     <string name="routing_rule_off">Выключено</string>
+    <!-- The accessible name of the rule row's own switch, restored from 5e8cd54's chk_enable.
+         It names the ACTION on the object, because the row already says which rule it is. -->
+    <string name="routing_rule_enabled_cd">Включить правило</string>
     <string name="routing_rule_locked">Защищено</string>
     <string name="routing_action_add">Добавить правило</string>
     <string name="routing_action_presets">Готовые наборы</string>

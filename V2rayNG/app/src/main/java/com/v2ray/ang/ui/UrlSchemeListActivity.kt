@@ -10,6 +10,7 @@ import androidx.core.view.isVisible
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityUrlSchemeListBinding
 import com.v2ray.ang.databinding.ItemEditorSectionBinding
+import com.v2ray.ang.databinding.ViewCardSectionBinding
 import com.v2ray.ang.databinding.ViewRowBinding
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.ui.component.EmptyStateBinder
@@ -68,8 +69,15 @@ class UrlSchemeListActivity : BaseActivity() {
             header.sectionTitle.setText(section.titleRes)
             binding.schemeList.addView(header.root)
 
+            // The section's rows live inside ONE bordered card, which is the composition this
+            // screen had at 5e8cd54 (five section cards, each holding its schemes) and the one the
+            // owner asked for back on 2026-08-02. The card is inflated rather than hand-built so it
+            // is the same @style/Widget.Departament.CardSection every other screen uses.
+            val card = ViewCardSectionBinding.inflate(inflater, binding.schemeList, false)
+            binding.schemeList.addView(card.root)
+
             section.schemes.forEach { scheme ->
-                val row = ViewRowBinding.inflate(inflater, binding.schemeList, false)
+                val row = ViewRowBinding.inflate(inflater, card.cardBody, false)
                 RowBinder.bind(
                     root = row.root,
                     title = getString(scheme.labelRes),
@@ -84,7 +92,7 @@ class UrlSchemeListActivity : BaseActivity() {
                         },
                     ),
                 )
-                binding.schemeList.addView(row.root)
+                card.cardBody.addView(row.root)
             }
         }
     }

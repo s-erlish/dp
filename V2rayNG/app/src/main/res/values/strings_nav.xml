@@ -5,19 +5,32 @@
 
   Russian, sentence case, «подписка» never «провайдер», departament always lowercase.
 
-  Two rounds of orphans have been cleared out of this file, both for the same reason: a string with
-  no consumer is copy nobody can review against the register and nobody can see on screen.
+  One round of orphans was cleared out of this file: «Войти через сайт» / «Управление аккаунтом»,
+  the old home account card's labels. That card now draws from `strings_home.xml`
+  (`home_account_title` / `home_account_subtitle`) and the sign-in screen from `strings_auth.xml`
+  (`auth_btn_email`, `auth_btn_telegram`), so these two named nothing. No affordance went with them:
+  only the duplicate wording did.
 
-    · the «Привязать Telegram» banner's pair — the banner is gone, linking Telegram belongs to
-      Аккаунт and the onboarding gate already offers it;
-    · «Войти через сайт» / «Управление аккаунтом» — the old home account card's labels. That card
-      now draws from `strings_home.xml` (`home_account_title` / `home_account_subtitle`) and the
-      sign-in screen from `strings_auth.xml` (`auth_btn_email`, `auth_btn_telegram`), so these two
-      named nothing. No affordance went with them: only the duplicate wording did.
+  The «Привязать Telegram» banner's pair was cleared in the SAME pass and that was wrong — the
+  banner had been removed, and a dismissible offer a pasted-подписка user could act on went with it.
+  Owner rule, 2026-08-02: an element that was on screen and is now gone is a regression. Both
+  strings are back below, and so is the banner (`fragment_home.xml`, `HomeFragment.paintLinkCta`).
 -->
 <resources>
     <!-- Bottom-nav tab, visible only when signed in. -->
     <string name="bottom_nav_account">Аккаунт</string>
+
+    <!--
+      THE «ПРИВЯЗАТЬ TELEGRAM» BANNER, restored from 5e8cd54.
+
+      It speaks to the one state nothing else on Главная covers: a user who pasted a departament
+      подписка and has never signed in. He has servers, so there is no gate; he is signed out, so
+      the gate's «Привязать Telegram» secondary — which only appears in the signed-in-with-no-
+      подписка shape — never reaches him. Dismissible, because it is an offer and not an error, and
+      the dismissal is remembered so it is offered once and not on every launch.
+    -->
+    <string name="auth_link_telegram_cta">Привяжите Telegram, чтобы управлять подпиской</string>
+    <string name="auth_link_telegram_cta_dismiss">Скрыть</string>
 
     <!-- Gray status toast shown after subscriptions are auto-imported post-login. -->
     <string name="toast_subscription_linked">Подписка привязана</string>

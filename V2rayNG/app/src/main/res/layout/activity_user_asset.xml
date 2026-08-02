@@ -41,13 +41,23 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <include
-                android:id="@+id/row_source"
-                layout="@layout/view_row" />
+            <com.google.android.material.card.MaterialCardView style="@style/Widget.Departament.CardSection">
 
-            <include
-                android:id="@+id/row_download"
-                layout="@layout/view_row" />
+                <LinearLayout style="@style/Widget.Departament.CardSection.Body">
+
+                    <include
+                        android:id="@+id/row_source"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+
+                    <include
+                        android:id="@+id/row_download"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
             <TextView
                 android:id="@+id/label_files"

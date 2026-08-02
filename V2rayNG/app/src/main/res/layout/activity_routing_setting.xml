@@ -50,9 +50,17 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <include
-                android:id="@+id/row_domain_strategy"
-                layout="@layout/view_row" />
+            <com.google.android.material.card.MaterialCardView style="@style/Widget.Departament.CardSection">
+
+                <LinearLayout style="@style/Widget.Departament.CardSection.Body">
+
+                    <include
+                        android:id="@+id/row_domain_strategy"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
             <TextView
                 android:id="@+id/label_rules"
@@ -82,21 +90,35 @@
                 android:layout_height="wrap_content"
                 android:text="@string/routing_section_actions" />
 
-            <include
-                android:id="@+id/row_presets"
-                layout="@layout/view_row" />
+            <com.google.android.material.card.MaterialCardView style="@style/Widget.Departament.CardSection">
 
-            <include
-                android:id="@+id/row_import_clipboard"
-                layout="@layout/view_row" />
+                <LinearLayout style="@style/Widget.Departament.CardSection.Body">
 
-            <include
-                android:id="@+id/row_import_qrcode"
-                layout="@layout/view_row" />
+                    <include
+                        android:id="@+id/row_presets"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
 
-            <include
-                android:id="@+id/row_export"
-                layout="@layout/view_row" />
+                    <include
+                        android:id="@+id/row_import_clipboard"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+
+                    <include
+                        android:id="@+id/row_import_qrcode"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+
+                    <include
+                        android:id="@+id/row_export"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </LinearLayout>

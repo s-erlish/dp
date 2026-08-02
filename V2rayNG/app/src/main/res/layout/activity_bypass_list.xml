@@ -40,9 +40,23 @@
         android:id="@+id/toolbar"
         layout="@layout/view_toolbar" />
 
-    <include
-        android:id="@+id/row_mode"
-        layout="@layout/view_row" />
+    <!-- The mode sits in a card, as the two switches it replaced did at 5e8cd54
+         (container_per_app_proxy / container_bypass_apps lived inside one bordered
+         card). Owner decision, 2026-08-02: sub-screen content goes back to the
+         grouped-card composition; the shared toolbar above stays. -->
+    <com.google.android.material.card.MaterialCardView
+        style="@style/Widget.Departament.CardSection"
+        android:layout_marginTop="@dimen/space_8">
+
+        <LinearLayout style="@style/Widget.Departament.CardSection.Body">
+
+            <include
+                android:id="@+id/row_mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                layout="@layout/view_row" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 
     <FrameLayout
         android:layout_width="match_parent"

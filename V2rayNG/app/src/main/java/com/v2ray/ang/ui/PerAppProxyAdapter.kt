@@ -7,7 +7,7 @@ import androidx.core.widget.ImageViewCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ItemEditorSectionBinding
-import com.v2ray.ang.databinding.ViewRowBinding
+import com.v2ray.ang.databinding.ViewRowCardBinding
 import com.v2ray.ang.dto.AppInfo
 import com.v2ray.ang.ui.component.RowBinder
 
@@ -86,7 +86,7 @@ class PerAppProxyAdapter(
         return if (viewType == VIEW_TYPE_SECTION) {
             SectionViewHolder(ItemEditorSectionBinding.inflate(inflater, parent, false))
         } else {
-            AppViewHolder(ViewRowBinding.inflate(inflater, parent, false))
+            AppViewHolder(ViewRowCardBinding.inflate(inflater, parent, false))
         }
     }
 
@@ -100,12 +100,12 @@ class PerAppProxyAdapter(
     private class SectionViewHolder(val binding: ItemEditorSectionBinding) :
         RecyclerView.ViewHolder(binding.root)
 
-    private inner class AppViewHolder(val binding: ViewRowBinding) :
+    private inner class AppViewHolder(val binding: ViewRowCardBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
         fun bind(app: AppInfo) {
             RowBinder.bind(
-                root = binding.root,
+                root = binding.row.root,
                 title = app.appName,
                 subtitle = app.packageName,
                 // A placeholder the binder can tint and size; the real launcher icon replaces it
@@ -122,8 +122,8 @@ class PerAppProxyAdapter(
             // that showed the placeholder must not keep that tint. The slot comes from the view
             // binding rather than a second findViewById sweep: this list is 200 rows on a real
             // device and it is scrolled fast.
-            binding.rowTile.setImageDrawable(app.appIcon)
-            ImageViewCompat.setImageTintList(binding.rowTile, null)
+            binding.row.rowTile.setImageDrawable(app.appIcon)
+            ImageViewCompat.setImageTintList(binding.row.rowTile, null)
         }
     }
 

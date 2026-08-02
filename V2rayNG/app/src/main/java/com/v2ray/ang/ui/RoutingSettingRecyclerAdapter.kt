@@ -4,12 +4,13 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import com.v2ray.ang.R
 import com.v2ray.ang.contracts.BaseAdapterListener
-import com.v2ray.ang.databinding.ViewRowBinding
+import com.v2ray.ang.databinding.ViewRowCardBinding
 import com.v2ray.ang.dto.entities.RulesetItem
 import com.v2ray.ang.helper.ItemTouchHelperAdapter
 import com.v2ray.ang.helper.ItemTouchHelperViewHolder
 import com.v2ray.ang.ui.component.RowBinder
 import com.v2ray.ang.viewmodel.RoutingSettingsViewModel
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
 
 /**
@@ -17,10 +18,16 @@ import androidx.recyclerview.widget.RecyclerView
  *
  * The old row carried three targets in a space 56dp tall: the row itself, a 24dp edit glyph in a
  * 40dp box, and a switch stacked underneath it - all inside a bordered card, inside a 12dp-inset
- * wrapper, with a green tile that encoded nothing. §4.5 allows a row exactly one trailing element,
- * so the row is a `Row.Navigation` and every per-rule action - «Включено», «Защищено», delete -
- * lives on the rule form the chevron opens, which is where A-21 puts them anyway. Nothing became
- * unreachable; the rule form gained the two toggles it was missing.
+ * wrapper, with a green tile that encoded nothing. §4.5 allows a ROW exactly one trailing
+ * element, so the row is a `Row.Navigation` whose chevron opens the rule form, and «Защищено» and
+ * delete live there.
+ *
+ * «Включено» does NOT: the inline switch is back on the card, beside the row
+ * (`view_row_card.xml`'s `row_card_switch`), because `chk_enable` was on this row at 5e8cd54 and
+ * moving it into the editor turned a one-tap change into three. Owner rule, 2026-08-02: an element
+ * that was on screen and is now gone is a regression. The editor keeps its copy — two homes for one
+ * toggle beat a capability that got harder to reach. The switch sits on the CARD rather than in the
+ * row's trailing slot precisely so §4.5 still holds for the row itself.
  *
  * The subtitle is what makes the list auditable without opening anything: state first when it is not
  * the default, then what the rule matches, then where it sends the traffic.
@@ -38,20 +45,40 @@ class RoutingSettingRecyclerAdapter(
     override fun getItemCount() = viewModel.getAll().size
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RuleViewHolder =
-        RuleViewHolder(ViewRowBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+        RuleViewHolder(ViewRowCardBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
     override fun onBindViewHolder(holder: RuleViewHolder, position: Int) {
         val ruleset = viewModel.getAll()[position]
         val context = holder.itemView.context
 
         RowBinder.bind(
-            root = holder.binding.root,
+            root = holder.binding.row.root,
             title = ruleset.remarks.orEmpty().ifBlank { ruleset.outboundTag.orEmpty() },
             subtitle = summarise(ruleset, context.resources),
             glyph = R.drawable.ic_routing_24dp,
             trailing = RowBinder.Trailing.Chevron,
             onClick = { adapterListener?.onEdit("", holder.bindingAdapterPosition) },
         )
+
+        // THE INLINE ENABLE SWITCH, RESTORED. `item_recycler_routing_setting.xml` carried
+        // `chk_enable` on the row at 5e8cd54; the rebuild moved it inside the rule editor, so
+        // turning one rule off went from one tap to three. The editor's copy stays — two homes for
+        // one toggle beat a capability that got harder to reach — and this is the near one.
+        //
+        // The listener is cleared before the state is set: this is a recycled view, and assigning
+        // `isChecked` while the previous row's listener is still attached would write THAT rule's
+        // guid with THIS rule's value.
+        val toggle = holder.binding.rowCardSwitch
+        toggle.setOnCheckedChangeListener(null)
+        toggle.isVisible = true
+        toggle.isChecked = ruleset.enabled
+        toggle.contentDescription = context.getString(R.string.routing_rule_enabled_cd)
+        toggle.setOnCheckedChangeListener { _, checked ->
+            val index = holder.bindingAdapterPosition
+            if (index == RecyclerView.NO_POSITION) return@setOnCheckedChangeListener
+            viewModel.setEnabled(index, checked)
+            notifyItemChanged(index)
+        }
     }
 
     /**
@@ -73,7 +100,7 @@ class RoutingSettingRecyclerAdapter(
         ).joinToString(" · ")
     }
 
-    inner class RuleViewHolder(val binding: ViewRowBinding) :
+    inner class RuleViewHolder(val binding: ViewRowCardBinding) :
         RecyclerView.ViewHolder(binding.root), ItemTouchHelperViewHolder {
 
         override fun onItemSelected() {

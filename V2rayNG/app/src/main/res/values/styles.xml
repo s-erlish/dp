@@ -29,16 +29,24 @@
   family-plus-textFontWeight ramp would silently render Title.Medium at 400 and — on
   the roles that matter most — Title at 400 too. Binding the master makes the
   declared weight the drawn weight on every supported API, with no synthetic bold
-  anywhere and no reliance on a fallback path. android:textFontWeight is declared
-  alongside it so the intent is legible and API 28+ matching is exact.
+  anywhere and no reliance on a fallback path.
   @font/golos_text (the family) still ships and is what any runtime weight change
   must use. Space Grotesk is a single VARIABLE file, so its roles necessarily go
   through @font/space_grotesk, whose entries pin 'wght' via fontVariationSettings.
 
-  LINE HEIGHT IS DECLARED, NEVER INHERITED (D-12): android:lineHeight for API 28+,
-  AppCompat's lineHeight for everything below, both on every size-bearing role.
-  Before this, neither platform declared leading at all and the same screen had
-  different rhythm on Android and on Windows.
+  LINE HEIGHT IS DECLARED, NEVER INHERITED (D-12): AppCompat's `lineHeight` here,
+  which every supported API honours, and `android:lineHeight` from 28 up. Before
+  this, neither platform declared leading at all and the same screen had different
+  rhythm on Android and on Windows.
+
+  THE API-28 HALF LIVES IN values-v28/styles.xml, NOT HERE. `android:textFontWeight`
+  and `android:lineHeight` are API 28 against minSdk 24, so declaring them in this
+  file made lint right (NewApi ×22) and the file misleading: on 24-27 they were
+  parsed and dropped. Each role's parent is now an API-qualified style of the same
+  name + `.Api28`, empty at the foot of this file and carrying the two items in
+  values-v28. One definition per role, in one file; only the two gated items vary by
+  configuration, and nothing about the drawn result changes at 28 because the master
+  font and AppCompat's lineHeight above already carry 24-27.
 
   ADDITIVE ONLY. Every style name that existed before still exists — SettingsSectionLabel,
   BottomNavLabel, BottomNavIndicator, ToolbarBrandTitle, ThemeOverlay.Departament.Dialog
@@ -62,12 +70,10 @@
         tnum + lnum on, because a Display is always a number and a hero figure that
         reflows every tick is the jitter this ramp exists to stop.
     -->
-    <style name="TextAppearance.App.Display" parent="TextAppearance.Material3.HeadlineMedium">
+    <style name="TextAppearance.App.Display" parent="TextAppearance.App.Display.Api28">
         <item name="android:fontFamily">@font/space_grotesk</item>
         <item name="fontFamily">@font/space_grotesk</item>
-        <item name="android:textFontWeight">700</item>
         <item name="android:textSize">34sp</item>
-        <item name="android:lineHeight">40sp</item>
         <item name="lineHeight">40sp</item>
         <item name="android:letterSpacing">-0.02</item>
         <item name="android:fontFeatureSettings">"tnum" on, "lnum" on</item>
@@ -81,12 +87,10 @@
         therefore Golos: this role carried @font/space_grotesk before, which is the
         no-op D-1 describes.
     -->
-    <style name="TextAppearance.App.Headline" parent="TextAppearance.Material3.HeadlineSmall">
+    <style name="TextAppearance.App.Headline" parent="TextAppearance.App.Headline.Api28">
         <item name="android:fontFamily">@font/golos_text_bold</item>
         <item name="fontFamily">@font/golos_text_bold</item>
-        <item name="android:textFontWeight">700</item>
         <item name="android:textSize">24sp</item>
-        <item name="android:lineHeight">28sp</item>
         <item name="lineHeight">28sp</item>
         <item name="android:letterSpacing">-0.01</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
@@ -98,12 +102,10 @@
         Row titles, card titles, toolbar titles, dialog titles, and the Primary and
         Destructive button labels. The most-used role in the product.
     -->
-    <style name="TextAppearance.App.Title" parent="TextAppearance.Material3.TitleMedium">
+    <style name="TextAppearance.App.Title" parent="TextAppearance.App.Title.Api28">
         <item name="android:fontFamily">@font/golos_text_bold</item>
         <item name="fontFamily">@font/golos_text_bold</item>
-        <item name="android:textFontWeight">700</item>
         <item name="android:textSize">16sp</item>
-        <item name="android:lineHeight">20sp</item>
         <item name="lineHeight">20sp</item>
         <item name="android:letterSpacing">0.0</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
@@ -116,10 +118,9 @@
         an unselected segment. Same size as Title, one weight down — that is the
         whole difference and it is enough.
     -->
-    <style name="TextAppearance.App.Title.Medium" parent="TextAppearance.App.Title">
+    <style name="TextAppearance.App.Title.Medium" parent="TextAppearance.App.Title.Medium.Api28">
         <item name="android:fontFamily">@font/golos_text_medium</item>
         <item name="fontFamily">@font/golos_text_medium</item>
-        <item name="android:textFontWeight">500</item>
     </style>
 
     <!-- Destructive row title. #FF6069 on dark (6.15:1), not #F04452 (4.88:1) —
@@ -133,12 +134,10 @@
         Primary reading copy, dialog body, snackbar text. Cap a paragraph at roughly
         60 characters; that is a layout job, not a style one.
     -->
-    <style name="TextAppearance.App.Body" parent="TextAppearance.Material3.BodyMedium">
+    <style name="TextAppearance.App.Body" parent="TextAppearance.App.Body.Api28">
         <item name="android:fontFamily">@font/golos_text_regular</item>
         <item name="fontFamily">@font/golos_text_regular</item>
-        <item name="android:textFontWeight">400</item>
         <item name="android:textSize">14sp</item>
-        <item name="android:lineHeight">20sp</item>
         <item name="lineHeight">20sp</item>
         <item name="android:letterSpacing">0.01</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
@@ -150,12 +149,10 @@
         Row subtitles, the supporting line, field labels, a row's trailing value.
         onSurfaceVariant #9BA1AD = 6.99:1 on surface.
     -->
-    <style name="TextAppearance.App.Subtitle" parent="TextAppearance.Material3.BodyMedium">
+    <style name="TextAppearance.App.Subtitle" parent="TextAppearance.App.Subtitle.Api28">
         <item name="android:fontFamily">@font/golos_text_regular</item>
         <item name="fontFamily">@font/golos_text_regular</item>
-        <item name="android:textFontWeight">400</item>
         <item name="android:textSize">13sp</item>
-        <item name="android:lineHeight">18sp</item>
         <item name="lineHeight">18sp</item>
         <item name="android:letterSpacing">0.01</item>
         <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
@@ -167,12 +164,10 @@
         Metadata, timestamps, helper text. The tracking floor for a heading is
         +0.02em; anything above it at heading size is the eyebrow tell and is banned.
     -->
-    <style name="TextAppearance.App.Caption" parent="TextAppearance.Material3.BodySmall">
+    <style name="TextAppearance.App.Caption" parent="TextAppearance.App.Caption.Api28">
         <item name="android:fontFamily">@font/golos_text_regular</item>
         <item name="fontFamily">@font/golos_text_regular</item>
-        <item name="android:textFontWeight">400</item>
         <item name="android:textSize">12sp</item>
-        <item name="android:lineHeight">16sp</item>
         <item name="lineHeight">16sp</item>
         <item name="android:letterSpacing">0.02</item>
         <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
@@ -191,12 +186,10 @@
         string like any other: it takes TextAppearance.App.Chip.Ui below. This is the
         single easiest place in the product to reintroduce the D-2 defect.
     -->
-    <style name="TextAppearance.App.Chip" parent="TextAppearance.Material3.LabelSmall">
+    <style name="TextAppearance.App.Chip" parent="TextAppearance.App.Chip.Api28">
         <item name="android:fontFamily">@font/space_grotesk</item>
         <item name="fontFamily">@font/space_grotesk</item>
-        <item name="android:textFontWeight">500</item>
         <item name="android:textSize">11sp</item>
-        <item name="android:lineHeight">14sp</item>
         <item name="lineHeight">14sp</item>
         <item name="android:letterSpacing">0.04</item>
         <item name="android:textAllCaps">false</item>
@@ -229,10 +222,9 @@
         sentence never ripples between two faces. If the figure deserves the brand
         face it is not a sentence, it is a value, and it gets its own slot.
     -->
-    <style name="TextAppearance.App.Numeric" parent="TextAppearance.Material3.BodyMedium">
+    <style name="TextAppearance.App.Numeric" parent="TextAppearance.App.Numeric.Api28">
         <item name="android:fontFamily">@font/space_grotesk</item>
         <item name="fontFamily">@font/space_grotesk</item>
-        <item name="android:textFontWeight">500</item>
         <item name="android:fontFeatureSettings">"tnum" on, "lnum" on, "zero" on</item>
         <item name="android:letterSpacing">0.0</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
@@ -251,6 +243,50 @@
     <!-- Numeric at the Display size, for the one hero figure per screen. -->
     <style name="TextAppearance.App.Numeric.Display" parent="TextAppearance.App.Display">
         <item name="android:fontFeatureSettings">"tnum" on, "lnum" on, "zero" on</item>
+    </style>
+
+    <!-- ========================================================================= -->
+    <!-- 1b. THE GROUPED CARD SECTION — the shape of a settings screen's content   -->
+    <!-- ========================================================================= -->
+
+    <!--
+        THE SECTION CARD, AND WHY IT IS A STYLE.
+
+        Owner decision, 2026-08-02: the CHROME of a sub-screen stays shared and modern
+        (view_toolbar — that include is what stopped twelve screens drawing their Russian
+        titles in a face with no Cyrillic, 6b9914c), and the CONTENT goes back to the
+        grouped-card composition it had at 5e8cd54: a sentence-case section header, then
+        the section's rows inside ONE bordered surface. «дизайн не старый, а новый».
+
+        The recipe is not invented here. It is byte-for-byte the one the Настройки tab
+        already uses (fragment_settings_tab.xml) — the one screen of this shape the owner
+        has never asked to have changed — and it is 5e8cd54's own card with its two
+        off-scale numbers moved onto the scale: 12dp margin -> @dimen/screen_gutter,
+        20dp radius -> @dimen/radius_card. One definition, so a fourteenth screen cannot
+        drift from the other thirteen.
+
+        NO NESTED CARDS (00-rules.md): a row inside this card is a row, never a card of
+        its own. A LIST whose items are cards is the other shape and uses
+        @layout/view_row_card instead — see that file.
+    -->
+    <style name="Widget.Departament.CardSection" parent="Widget.Material3.CardView.Outlined">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginStart">@dimen/screen_gutter</item>
+        <item name="android:layout_marginEnd">@dimen/screen_gutter</item>
+        <item name="cardBackgroundColor">?attr/colorSurface</item>
+        <item name="cardCornerRadius">@dimen/radius_card</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">?attr/colorOutlineVariant</item>
+        <item name="strokeWidth">@dimen/stroke_hairline</item>
+    </style>
+
+    <!-- The card's own body: the vertical stack its rows sit in. Separate style so the
+         two halves of the recipe cannot be written differently on two screens. -->
+    <style name="Widget.Departament.CardSection.Body" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">vertical</item>
     </style>
 
     <!--
@@ -277,12 +313,10 @@
         this style because both toolbars set it as titleTextAppearance; that is the
         D-11 defect and @style/Widget.Departament.Toolbar below is the fix.
     -->
-    <style name="ToolbarBrandTitle" parent="TextAppearance.Material3.TitleLarge">
+    <style name="ToolbarBrandTitle" parent="ToolbarBrandTitle.Api28">
         <item name="android:fontFamily">@font/space_grotesk</item>
         <item name="fontFamily">@font/space_grotesk</item>
-        <item name="android:textFontWeight">700</item>
         <item name="android:textSize">20sp</item>
-        <item name="android:lineHeight">24sp</item>
         <item name="lineHeight">24sp</item>
         <item name="android:letterSpacing">-0.01</item>
         <item name="android:textColor">?attr/colorOnBackground</item>
@@ -882,9 +916,8 @@
 
     <!-- A card used as a ROW GROUP: no padding of its own, clipped so the rows'
          pressed backgrounds respect the 20dp corners. -->
-    <style name="Widget.Departament.Card.Group" parent="Widget.Departament.Card">
+    <style name="Widget.Departament.Card.Group" parent="Widget.Departament.Card.Group.Api31">
         <item name="contentPadding">0dp</item>
-        <item name="android:clipToOutline">true</item>
     </style>
 
     <!-- A card the user presses as one object: this is where scale 0.97 is correct,
@@ -1065,15 +1098,13 @@
         So the nav label borrows the Chip's METRICS and keeps the UI FACE. It is not a
         twelfth ramp step: same size, same weight, same leading, different script.
     -->
-    <style name="BottomNavLabel" parent="TextAppearance.App.Chip.Ui">
-        <item name="android:textFontWeight">500</item>
+    <style name="BottomNavLabel" parent="BottomNavLabel.Api28">
     </style>
 
     <!-- The active destination: weight 700, the second of the three axes. -->
-    <style name="BottomNavLabel.Active" parent="BottomNavLabel">
+    <style name="BottomNavLabel.Active" parent="BottomNavLabel.Active.Api28">
         <item name="android:fontFamily">@font/golos_text_bold</item>
         <item name="fontFamily">@font/golos_text_bold</item>
-        <item name="android:textFontWeight">700</item>
     </style>
 
     <!-- ========================================================================= -->
@@ -1145,9 +1176,8 @@
         The confirm says what it does («Удалить подписку», «Выйти»), never «OK» and
         never «Да»/«Нет».
     -->
-    <style name="ThemeOverlay.Departament.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+    <style name="ThemeOverlay.Departament.Dialog" parent="ThemeOverlay.Departament.Dialog.Api28">
         <item name="android:windowBackground">@drawable/bg_dialog</item>
-        <item name="android:dialogCornerRadius">@dimen/radius_card</item>
         <item name="dialogCornerRadius">@dimen/radius_card</item>
 
         <item name="colorControlNormal">?attr/colorOnSurfaceVariant</item>
@@ -1436,5 +1466,37 @@
     <style name="ShapeAppearance.App.Fitting" parent="ShapeAppearance.Departament.Fitting" />
     <style name="ShapeAppearance.App.Object" parent="ShapeAppearance.Departament.Object" />
     <style name="ShapeAppearance.App.Sheet" parent="ShapeAppearance.Departament.Sheet" />
+
+
+    <!-- =========================================================================
+         THE API-GATED HALF OF THE RAMP, AS SEEN BY API 24-27.
+         =========================================================================
+
+         Every style below is EMPTY here and carries its two platform-gated items in
+         values-v28/styles.xml (and values-v31 for the one card). Each is the PARENT of
+         the role of the same name above, so a role has ONE definition in ONE file and
+         only `android:textFontWeight` / `android:lineHeight` — API 28 — vary by
+         configuration. They must exist here or the reference in the default
+         configuration would not resolve, which is why an empty style is not dead code:
+         it is the fallback branch, stated.
+
+         Below 28 the ramp is carried by the OTHER half, which is not gated: the explicit
+         static master font per role (@font/golos_text_bold / _medium / _regular) and
+         AppCompat`s own `lineHeight`. Nothing about the drawn result changes at 28.
+    -->
+    <style name="TextAppearance.App.Display.Api28" parent="TextAppearance.Material3.HeadlineMedium" />
+    <style name="TextAppearance.App.Headline.Api28" parent="TextAppearance.Material3.HeadlineSmall" />
+    <style name="TextAppearance.App.Title.Api28" parent="TextAppearance.Material3.TitleMedium" />
+    <style name="TextAppearance.App.Title.Medium.Api28" parent="TextAppearance.App.Title" />
+    <style name="TextAppearance.App.Body.Api28" parent="TextAppearance.Material3.BodyMedium" />
+    <style name="TextAppearance.App.Subtitle.Api28" parent="TextAppearance.Material3.BodyMedium" />
+    <style name="TextAppearance.App.Caption.Api28" parent="TextAppearance.Material3.BodySmall" />
+    <style name="TextAppearance.App.Chip.Api28" parent="TextAppearance.Material3.LabelSmall" />
+    <style name="TextAppearance.App.Numeric.Api28" parent="TextAppearance.Material3.BodyMedium" />
+    <style name="ToolbarBrandTitle.Api28" parent="TextAppearance.Material3.TitleLarge" />
+    <style name="BottomNavLabel.Api28" parent="TextAppearance.App.Chip.Ui" />
+    <style name="BottomNavLabel.Active.Api28" parent="BottomNavLabel" />
+    <style name="ThemeOverlay.Departament.Dialog.Api28" parent="ThemeOverlay.Material3.MaterialAlertDialog" />
+    <style name="Widget.Departament.Card.Group.Api31" parent="Widget.Departament.Card" />
 
 </resources>

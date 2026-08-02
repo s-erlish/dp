@@ -73,6 +73,7 @@ import com.v2ray.ang.ui.component.SkeletonBinder
 import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.util.AvatarManager
 import com.v2ray.ang.util.FlagUtil
+import com.v2ray.ang.util.SubscriptionOrigin
 import com.v2ray.ang.util.reducedMotion
 import com.v2ray.ang.util.tickHaptic
 import com.v2ray.ang.viewmodel.AccountViewModel
@@ -692,6 +693,33 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private fun wireHeaderRow() {
         binding.layoutHomeAccount.rowAccount.onSingleClick { openAccount() }
         binding.btnHomeAdd.onSingleClick { mainHost.showAddMenu(it) }
+        // The restored «Привязать Telegram» banner: the banner itself is the action, the ✕ is the
+        // dismissal, and the dismissal is written to MMKV so the offer is made once.
+        binding.ctaLinkTelegram.onSingleClick { openTelegramLink() }
+        binding.btnCtaDismiss.onSingleClick {
+            MmkvManager.encodeSettings(AppConfig.PREF_LINK_TG_CTA_DISMISSED, true)
+            binding.ctaLinkTelegram.isVisible = false
+        }
+    }
+
+    /**
+     * Главная's «Привязать Telegram» banner, restored from 5e8cd54.
+     *
+     * ONE state, and nothing else on this screen covers it: a departament подписка was PASTED and
+     * the user has never signed in. He has servers, so [resolveGate] returns null and there is no
+     * gate block; the gate's own «Привязать Telegram» secondary belongs to the
+     * signed-in-with-no-подписка shape and never reaches him.
+     *
+     * The подписка must be a departament one — a pasted foreign link must not surface an account
+     * affordance for an account it has nothing to do with, which is the same gate
+     * [MainActivity.accountAccessAllowed] applies to the Аккаунт tab.
+     */
+    private fun paintLinkCta() {
+        val show = BackendConfig.isConfigured() &&
+            !AccountSession.isLoggedIn() &&
+            !MmkvManager.decodeSettingsBool(AppConfig.PREF_LINK_TG_CTA_DISMISSED) &&
+            SubscriptionOrigin.hasDepartamentSubscription()
+        binding.ctaLinkTelegram.isVisible = show
     }
 
     /**
@@ -1586,6 +1614,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         if (!isBindingInitialized) return
         val state = resolveState()
         paintHeader(state)
+        paintLinkCta()
         paintCondition(state.condition)
         paintConnect(state, animate)
         paintFigures()

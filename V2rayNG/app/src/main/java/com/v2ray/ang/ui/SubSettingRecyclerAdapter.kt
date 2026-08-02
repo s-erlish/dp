@@ -6,7 +6,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.v2ray.ang.R
 import com.v2ray.ang.contracts.BaseAdapterListener
-import com.v2ray.ang.databinding.ViewRowBinding
+import com.v2ray.ang.databinding.ViewRowCardBinding
 import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.helper.ItemTouchHelperAdapter
 import com.v2ray.ang.helper.ItemTouchHelperViewHolder
@@ -38,7 +38,7 @@ class SubSettingRecyclerAdapter(
     override fun getItemCount() = viewModel.getAll().size
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SubViewHolder =
-        SubViewHolder(ViewRowBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+        SubViewHolder(ViewRowCardBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
     override fun onBindViewHolder(holder: SubViewHolder, position: Int) {
         val entry = viewModel.getAll()[position]
@@ -64,7 +64,7 @@ class SubSettingRecyclerAdapter(
         }
 
         RowBinder.bind(
-            root = holder.binding.root,
+            root = holder.binding.row.root,
             title = title,
             subtitle = subtitle,
             glyph = R.drawable.ic_subscriptions_24dp,
@@ -79,7 +79,7 @@ class SubSettingRecyclerAdapter(
         )
     }
 
-    inner class SubViewHolder(val binding: ViewRowBinding) :
+    inner class SubViewHolder(val binding: ViewRowCardBinding) :
         RecyclerView.ViewHolder(binding.root), ItemTouchHelperViewHolder {
 
         override fun onItemSelected() {

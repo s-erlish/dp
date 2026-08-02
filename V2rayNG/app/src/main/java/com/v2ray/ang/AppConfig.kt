@@ -46,6 +46,17 @@ object AppConfig {
     const val SUBSCRIPTION_UPDATE_TASK_NAME = "subscription_updater"
     const val SUBSCRIPTION_MIN_INTERVAL_MINUTES = 15L
     const val PREF_SPEED_ENABLED = "pref_speed_enabled"
+
+    /**
+     * The user has dismissed Главная's «Привязать Telegram» banner.
+     *
+     * PERSISTED, not a field. The banner is an offer to a pasted-подписка user, and at 5e8cd54 the
+     * dismissal lived in an Activity field — so it came back on the next cold start, which is what
+     * makes an offer read as nagging. Restoring the control is the owner's rule; remembering the
+     * answer is the refinement that goes with it.
+     */
+    const val PREF_LINK_TG_CTA_DISMISSED = "pref_link_tg_cta_dismissed"
+
     const val PREF_CONFIRM_REMOVE = "pref_confirm_remove"
     const val PREF_START_SCAN_IMMEDIATE = "pref_start_scan_immediate"
     const val PREF_DOUBLE_COLUMN_DISPLAY = "pref_double_column_display"

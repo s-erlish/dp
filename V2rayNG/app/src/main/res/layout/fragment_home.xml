@@ -217,6 +217,72 @@
             android:id="@+id/layout_home_account"
             layout="@layout/layout_home_account" />
 
+        <!--
+          THE «ПРИВЯЗАТЬ TELEGRAM» BANNER, restored from 5e8cd54 (owner rule,
+          2026-08-02: an element that was on screen and is now gone is a
+          regression).
+
+          It exists for exactly one state, and nothing else on this screen covers
+          it: a user who PASTED a departament подписка and has never signed in. He
+          has servers, so there is no gate block at all; and the gate's own
+          «Привязать Telegram» secondary belongs to the signed-in-with-no-подписка
+          shape, so it never reaches him.
+
+          DISMISSIBLE, and the dismissal is remembered: this is an offer, not an
+          error, and an offer that returns on every launch is nagging. The ✕ is a
+          40dp target beside a row that is itself the primary action, which is the
+          one place two targets on one line are sanctioned (a banner is not a row).
+        -->
+        <LinearLayout
+            android:id="@+id/cta_link_telegram"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/screen_gutter"
+            android:layout_marginTop="@dimen/space_8"
+            android:layout_marginEnd="@dimen/screen_gutter"
+            android:background="@drawable/bg_server_card"
+            android:baselineAligned="false"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:minHeight="@dimen/row_min_height"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/space_12"
+            android:paddingTop="@dimen/space_8"
+            android:paddingEnd="@dimen/space_4"
+            android:paddingBottom="@dimen/space_8"
+            android:stateListAnimator="@anim/press_scale"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <ImageView
+                android:layout_width="@dimen/tile_glyph"
+                android:layout_height="@dimen/tile_glyph"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_telegram_24dp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_12"
+                android:layout_weight="1"
+                android:text="@string/auth_link_telegram_cta"
+                android:textAppearance="@style/TextAppearance.App.Subtitle" />
+
+            <TextView
+                android:id="@+id/btn_cta_dismiss"
+                android:layout_width="@dimen/view_height_dp48"
+                android:layout_height="@dimen/view_height_dp48"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:contentDescription="@string/auth_link_telegram_cta_dismiss"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="✕"
+                android:textAppearance="@style/TextAppearance.App.Subtitle"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+
         <!-- The ONLY scroll-linked change on this screen: no colour step, no
              elevation, no shadow, no collapsing title. -->
         <View

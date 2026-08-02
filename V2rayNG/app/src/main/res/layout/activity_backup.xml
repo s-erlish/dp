@@ -48,17 +48,29 @@
                 android:layout_height="wrap_content"
                 android:text="@string/backup_grp_device" />
 
-            <include
-                android:id="@+id/row_backup_local"
-                layout="@layout/view_row" />
+            <com.google.android.material.card.MaterialCardView style="@style/Widget.Departament.CardSection">
 
-            <include
-                android:id="@+id/row_restore_local"
-                layout="@layout/view_row" />
+                <LinearLayout style="@style/Widget.Departament.CardSection.Body">
 
-            <include
-                android:id="@+id/row_share"
-                layout="@layout/view_row" />
+                    <include
+                        android:id="@+id/row_backup_local"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+
+                    <include
+                        android:id="@+id/row_restore_local"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+
+                    <include
+                        android:id="@+id/row_share"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
             <TextView
                 style="@style/SettingsSectionLabel"
@@ -66,17 +78,30 @@
                 android:layout_height="wrap_content"
                 android:text="@string/backup_grp_cloud" />
 
-            <include
-                android:id="@+id/row_webdav_settings"
-                layout="@layout/view_row" />
+            <com.google.android.material.card.MaterialCardView style="@style/Widget.Departament.CardSection">
 
-            <include
-                android:id="@+id/row_backup_webdav"
-                layout="@layout/view_row" />
+                <LinearLayout style="@style/Widget.Departament.CardSection.Body">
 
-            <include
-                android:id="@+id/row_restore_webdav"
-                layout="@layout/view_row" />
-        </LinearLayout>
+                    <include
+                        android:id="@+id/row_webdav_settings"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+
+                    <include
+                        android:id="@+id/row_backup_webdav"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+
+                    <include
+                        android:id="@+id/row_restore_webdav"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+</LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </LinearLayout>

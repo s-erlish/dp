@@ -5,7 +5,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.v2ray.ang.R
 import com.v2ray.ang.contracts.BaseAdapterListener
-import com.v2ray.ang.databinding.ViewRowBinding
+import com.v2ray.ang.databinding.ViewRowCardBinding
 import com.v2ray.ang.extension.toTrafficString
 import com.v2ray.ang.ui.component.RowBinder
 import com.v2ray.ang.viewmodel.UserAssetViewModel
@@ -35,7 +35,7 @@ class UserAssetAdapter(
     override fun getItemCount() = viewModel.itemCount
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserAssetViewHolder =
-        UserAssetViewHolder(ViewRowBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+        UserAssetViewHolder(ViewRowCardBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
     override fun onBindViewHolder(holder: UserAssetViewHolder, position: Int) {
         val item = viewModel.getAsset(position) ?: return
@@ -53,7 +53,7 @@ class UserAssetAdapter(
         val editable = item.assetUrl.locked != true && item.assetUrl.url != "file"
 
         RowBinder.bind(
-            root = holder.binding.root,
+            root = holder.binding.row.root,
             title = item.assetUrl.remarks,
             subtitle = subtitle,
             glyph = R.drawable.ic_file_24dp,
@@ -80,6 +80,6 @@ class UserAssetAdapter(
         )
     }
 
-    class UserAssetViewHolder(val binding: ViewRowBinding) :
+    class UserAssetViewHolder(val binding: ViewRowCardBinding) :
         RecyclerView.ViewHolder(binding.root)
 }
