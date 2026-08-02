@@ -34,9 +34,10 @@ jobs:
           --channel=0 \
           --install "ndk;28.2.13676358"
         echo "NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> $GITHUB_ENV
-        sed -i '10i\
-        \
-            ndkVersion = "28.2.13676358"' ${{ github.workspace }}/V2rayNG/app/build.gradle.kts
+        # No sed here. This step used to inject `ndkVersion` at line 10, which worked only while
+        # line 10 happened to be inside `android { }`. It is a comment banner now, so the injection
+        # landed at the top level and the Kotlin DSL refused to configure — this workflow could not
+        # run at all. It was redundant anyway: build.gradle.kts sets the same ndkVersion itself.
 
     - name: Restore cached libhevtun
       id: cache-libhevtun-restore
