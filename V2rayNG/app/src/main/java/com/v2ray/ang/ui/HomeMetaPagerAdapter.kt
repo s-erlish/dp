@@ -68,12 +68,33 @@ class HomeMetaPagerAdapter(
         val binding = LayoutSubscriptionMetaBarBinding.inflate(
             LayoutInflater.from(parent.context), parent, false
         )
-        // The ViewPager2 owns the horizontal gutters (padding) and the inter-page gap, so drop the
-        // card's own margins — a match_parent page plus the gutters would overflow the viewport.
-        (binding.root.layoutParams as? ViewGroup.MarginLayoutParams)?.let {
-            it.width = ViewGroup.LayoutParams.MATCH_PARENT
-            it.setMargins(0, 0, 0, 0)
-        }
+        // A PAGE MUST BE match_parent ON BOTH AXES, AND THIS IS NOT A STYLE PREFERENCE.
+        //
+        // ViewPager2 installs an OnChildAttachStateChangeListener that reads the page's
+        // LayoutParams the instant it is attached and throws
+        // `IllegalStateException: Pages must fill the whole ViewPager2 (use match_parent)`
+        // unless BOTH width and height are MATCH_PARENT (androidx.viewpager2 1.1.0,
+        // ViewPager2$4.onChildViewAttachedToWindow).
+        //
+        // `layout_subscription_meta_bar.xml` is a wrap_content card — it has to be, because
+        // `HomeFragment.measureHomeMetaHeight` measures every подписка's card and fixes the pager
+        // to the tallest — so the height that arrives here is WRAP_CONTENT and has to be
+        // overridden. Setting only the width (which is what this did) crashed the app the first
+        // time a page was attached, i.e. the moment the user added his first подписка: with no
+        // подписка the carousel has zero items and never attaches one, so the app started
+        // perfectly and died on the add, and on every launch after it, since the подписка was
+        // already stored by then.
+        //
+        // The page filling the pager is also what the carousel wants visually: the pager's height
+        // is the tallest card's, so every card is that height and peeking neighbours line up.
+        //
+        // The ViewPager2 owns the horizontal gutters (padding) and the inter-page gap, so the
+        // card's own margins go with the same call — a match_parent page plus the gutters would
+        // overflow the viewport.
+        binding.root.layoutParams = RecyclerView.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT,
+        )
         return VH(binding)
     }
 

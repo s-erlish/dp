@@ -1896,6 +1896,18 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
     private fun paintGate(gate: Gate) {
         val block = binding.layoutGate
+        // The heading, restored from the onboarding card this block replaced (5e8cd54's
+        // home_empty_title). It names the SHAPE the user is in; the caption under it keeps the
+        // reason, which is why the two are separate strings rather than one longer sentence.
+        block.tvGateTitle.setText(
+            when (gate) {
+                Gate.SIGN_IN -> R.string.home_gate_signin_title
+                Gate.ADD_SUBSCRIPTION -> R.string.home_gate_subscription_title
+                Gate.BUY -> R.string.home_gate_buy_title
+                Gate.SYNC_SERVERS -> R.string.home_gate_sync_title
+                Gate.SYNC_FAILED -> R.string.home_gate_sync_failed_title
+            }
+        )
         val captionRes = when (gate) {
             Gate.SIGN_IN -> R.string.home_gate_signin_caption
             Gate.ADD_SUBSCRIPTION -> R.string.home_gate_subscription_caption
@@ -1912,6 +1924,15 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
                 themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
             }
         )
+
+        // THE LOADING STATE of this block. «Загрузить серверы» is the action that STARTS the
+        // subscription refresh this screen is then waiting on, so while one is in flight it is
+        // disabled: an in-flight action shows it and cannot be fired twice (OWNER-FEEDBACK
+        // 2026-07-27 G2). The strip above already says «Загружаем…» and the connect object's sweep
+        // is spinning, so the button does not need to restate it — it needs to stop accepting taps
+        // that would stack a second refresh on the first. Every other gate's action starts nothing
+        // this screen waits on, so it stays live.
+        block.btnGatePrimary.isEnabled = !(gate == Gate.SYNC_SERVERS && backgroundLoads > 0)
 
         when (gate) {
             Gate.SIGN_IN -> {

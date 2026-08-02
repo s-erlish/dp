@@ -52,6 +52,25 @@
     android:visibility="gone"
     tools:visibility="visible">
 
+    <!--
+      THE HEADING, RESTORED (OWNER-DECISION-2026-08-02 §3: an element that was on
+      screen and is now gone is a regression, and recovering it from git history is
+      the correct fix). The onboarding card at 5e8cd54 opened with
+      @string/home_empty_title and carried @string/home_empty_subtitle under it; the
+      rebuild kept the supporting line alone, which left a fresh install's first
+      screen with no heading. The heading is back, on the type ramp rather than on
+      the card's own sizes, and the caption below is untouched.
+    -->
+    <TextView
+        android:id="@+id/tv_gate_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/space_8"
+        android:gravity="center"
+        android:maxLines="2"
+        android:textAppearance="@style/TextAppearance.App.Title"
+        tools:text="Добро пожаловать" />
+
     <TextView
         android:id="@+id/tv_gate_caption"
         android:layout_width="match_parent"

@@ -67,6 +67,21 @@
     <!-- The gate block, shown INSTEAD of the subscription card and the server  -->
     <!-- list when there is not one server to connect to. Never beside them.    -->
     <!-- ===================================================================== -->
+    <!--
+      THE HEADING, RESTORED. The onboarding card this block replaced opened with a
+      title and a supporting line under it (@string/home_empty_title +
+      @string/home_empty_subtitle at 5e8cd54, the last design the owner approved);
+      the rebuild kept only the supporting line, so the first screen of a fresh
+      install had no heading at all and read as a stray sentence over a button.
+      One heading per gate shape, sentence-case, in the screen's own voice — the
+      caption under it stays exactly as it was and still carries the reason.
+    -->
+    <string name="home_gate_signin_title">Добро пожаловать</string>
+    <string name="home_gate_subscription_title">Начнём с подписки</string>
+    <string name="home_gate_buy_title">Почти готово</string>
+    <string name="home_gate_sync_title">Подписка активна</string>
+    <string name="home_gate_sync_failed_title">Не получилось</string>
+
     <string name="home_gate_signin_caption">Войдите, чтобы получить серверы departament.</string>
     <string name="home_gate_signin">Войти</string>
     <string name="home_gate_add_subscription">Добавить подписку</string>
