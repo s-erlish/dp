@@ -266,10 +266,42 @@
     <string name="upd_none_title">Обновлений нет</string>
     <string name="upd_none_line">Установлена последняя версия.</string>
     <string name="upd_found_title">Доступна версия %1$s</string>
-    <string name="upd_found_line">Скачайте и установите новую версию вручную.</string>
-    <string name="upd_action_download">Скачать</string>
+    <string name="upd_found_line">Скачаем и установим обновление — данные и подписка останутся на месте.</string>
+    <string name="upd_action_download">Обновить</string>
+
+    <!-- Скачивание. Определённый прогресс, пока сервер прислал длину; иначе одна строка без цифр,
+         потому что «73%» без знаменателя — это не прогресс, а украшение. -->
+    <string name="upd_downloading">Скачиваем обновление…</string>
+    <string name="upd_downloading_size">%1$.1f МБ из %2$.1f МБ</string>
+    <string name="upd_downloading_done">Скачано %1$.1f МБ</string>
+    <string name="upd_action_cancel">Отменить</string>
+
+    <!-- Файл скачан и проверен: пакет наш, версия выше установленной. -->
+    <string name="upd_ready_title">Обновление готово</string>
+    <string name="upd_ready_line">Осталось подтвердить установку в системном окне.</string>
+    <string name="upd_action_install">Установить</string>
+
+    <!-- Установка из неизвестных источников: не ошибка, а недостающее разрешение. -->
+    <string name="upd_permission_title">Нужно разрешение на установку</string>
+    <string name="upd_permission_line">Разрешите departament устанавливать приложения — обновление уже скачано.</string>
+    <string name="upd_action_permission">Открыть настройки</string>
+
+    <!-- Отказы. У каждого своя причина, и «Повторить» стоит рядом с ней (G2). -->
     <string name="upd_error_title">Не удалось проверить обновления</string>
-    <string name="upd_error_line">Проверьте сеть и повторите.</string>
+    <string name="upd_error_unreachable">Не удалось связаться с сервером обновлений. Проверьте сеть и повторите.</string>
+    <string name="upd_error_no_channel_title">Обновления недоступны</string>
+    <string name="upd_error_no_channel">В этой сборке нет канала обновлений. Скачайте новую версию с сайта departament.</string>
+    <string name="upd_error_no_release">Пока не опубликовано ни одной версии.</string>
+    <string name="upd_error_no_asset">Для вашего устройства сборки в этой версии нет.</string>
+    <string name="upd_error_download_title">Не удалось скачать обновление</string>
+    <string name="upd_error_download">Связь прервалась или не хватило места. Повторите.</string>
+    <string name="upd_error_foreign_title">Файл не от departament</string>
+    <string name="upd_error_foreign">Скачанный файл — другое приложение, поэтому он удалён. Обновитесь вручную с сайта.</string>
+    <string name="upd_error_not_newer_title">Эта версия не новее</string>
+    <string name="upd_error_not_newer">Система откажется её установить. Дождитесь следующей сборки.</string>
+    <string name="upd_error_installer_title">Установщик не открылся</string>
+    <string name="upd_error_installer">Откройте скачанный файл вручную или обновитесь с сайта.</string>
+    <string name="upd_action_open_releases">Открыть страницу загрузки</string>
 
     <!-- ==================================================================
          A-34 settings/about/urlschemes - Схемы URL-адресов

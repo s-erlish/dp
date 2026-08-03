@@ -1,0 +1,228 @@
+name: Publish release
+
+# THE ONLY WORKFLOW IN THIS REPOSITORY THAT MAY CREATE A GITHUB RELEASE.
+#
+# It exists because the in-app updater reads this repository's releases
+# (`AppConfig.APP_RELEASE_REPO` = s-erlish/dp) and offers the asset it finds there. That makes a
+# published release a thing customers install, not a convenience artefact — so this workflow is
+# built to refuse rather than to publish something wrong:
+#
+#   * it will not publish without a real signing key (see "Require a real signing key");
+#   * it will not publish an APK the build tagged `-unsigned` or `-debugsigned`;
+#   * it will not publish an APK apksigner cannot verify;
+#   * it will not publish an APK missing either native library;
+#   * it will not publish when the tag and `versionName` disagree, because the updater compares
+#     the TAG against the installed versionName and then finds the asset BY versionName — two
+#     different numbers and the update is either invisible or unfindable.
+#
+# It publishes to a DRAFT release. Cutting the tag is the owner's decision; making the draft
+# visible is the second half of that decision and stays a human action.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build and publish (e.g. v2.2.2)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve the tag
+        id: tag
+        run: |
+          set -euo pipefail
+          tag="${{ inputs.tag || github.ref_name }}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          submodules: 'recursive'
+          fetch-depth: '0'
+
+      # An update is only ever OFFERED when the release's version is higher than the installed
+      # one, and it is only ever FOUND because the asset is called departament_<version>_<abi>.apk.
+      # Both numbers come from build.gradle.kts. A tag that disagrees with it produces a release
+      # that either nobody is offered or nobody can download, and neither failure is visible from
+      # the release page — so it is caught here instead.
+      - name: The tag must be the versionName it will publish
+        run: |
+          set -euo pipefail
+          declared=$(sed -n 's/^ *versionName *= *"\(.*\)".*/\1/p' V2rayNG/app/build.gradle.kts | head -n 1)
+          echo "tag=${{ steps.tag.outputs.version }} versionName=$declared"
+          if [ "${{ steps.tag.outputs.version }}" != "$declared" ]; then
+            echo "::error::tag ${{ steps.tag.outputs.tag }} does not match versionName $declared in V2rayNG/app/build.gradle.kts"
+            exit 1
+          fi
+
+      # A release is an identity, not just a build. Without the real key app/build.gradle.kts
+      # leaves the APK unsigned (uninstallable) and -PdebugSignedRelease produces a key that
+      # differs per runner — which means the NEXT release cannot install over this one and every
+      # user has to uninstall, losing every server, подписка and their session. Building without
+      # a key stays supported (debug.yml, release.yml); PUBLISHING without one does not.
+      - name: Require a real signing key
+        env:
+          APP_KEYSTORE_BASE64: ${{ secrets.APP_KEYSTORE_BASE64 }}
+          APP_KEYSTORE_PASSWORD: ${{ secrets.APP_KEYSTORE_PASSWORD }}
+          APP_KEYSTORE_ALIAS: ${{ secrets.APP_KEYSTORE_ALIAS }}
+          APP_KEY_PASSWORD: ${{ secrets.APP_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "$APP_KEYSTORE_BASE64" ]   || missing="$missing APP_KEYSTORE_BASE64"
+          [ -n "$APP_KEYSTORE_PASSWORD" ] || missing="$missing APP_KEYSTORE_PASSWORD"
+          [ -n "$APP_KEYSTORE_ALIAS" ]    || missing="$missing APP_KEYSTORE_ALIAS"
+          [ -n "$APP_KEY_PASSWORD" ]      || missing="$missing APP_KEY_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::cannot publish a release without a signing identity. Missing secret(s):$missing"
+            exit 1
+          fi
+          printf '%s' "$APP_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/departament-release.jks"
+          {
+            echo "DEPARTAMENT_KEYSTORE=$RUNNER_TEMP/departament-release.jks"
+            echo "DEPARTAMENT_KEYSTORE_PASSWORD=$APP_KEYSTORE_PASSWORD"
+            echo "DEPARTAMENT_KEY_ALIAS=$APP_KEYSTORE_ALIAS"
+            echo "DEPARTAMENT_KEY_PASSWORD=$APP_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK
+        run: |
+          echo "y" | sdkmanager --install "ndk;28.2.13676358" >/dev/null
+          echo "NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> $GITHUB_ENV
+
+      - name: Build libhev-socks5-tunnel (tun2socks native lib)
+        run: bash compile-hevtun.sh
+
+      # Same reasoning as release.yml: `jniLibs.srcDirs("libs")` means the ABI directories have to
+      # land at V2rayNG/app/libs/<abi>/, and copying the CONTENTS into an explicitly created
+      # destination has one behaviour rather than two.
+      - name: Copy libhev-socks5-tunnel into app
+        run: |
+          set -e
+          mkdir -p "${{ github.workspace }}/V2rayNG/app/libs"
+          cp -r "${{ github.workspace }}/libs/." "${{ github.workspace }}/V2rayNG/app/libs/"
+          test -f "${{ github.workspace }}/V2rayNG/app/libs/arm64-v8a/libhev-socks5-tunnel.so" \
+            || { echo "::error::arm64-v8a/libhev-socks5-tunnel.so is not where jniLibs expects it"; exit 1; }
+
+      - name: Fetch AndroidLibXrayLite tag
+        run: |
+          pushd AndroidLibXrayLite
+          echo "CURRENT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
+          popd
+
+      - name: Download libv2ray.aar
+        uses: robinraju/release-downloader@v1.12
+        with:
+          repository: '2dust/AndroidLibXrayLite'
+          tag: ${{ env.CURRENT_TAG }}
+          fileName: 'libv2ray.aar'
+          out-file-path: V2rayNG/app/libs/
+
+      - name: Grant gradlew permission
+        working-directory: V2rayNG
+        run: chmod +x ./gradlew
+
+      # No -PABI_FILTERS: every split plus the universal APK, so the updater has something to
+      # offer whatever device asks. build.gradle.kts names them
+      # departament_<versionName>_<abi>.apk, which is the name UpdateCheckerManager.selectAsset
+      # matches on — that filename IS the contract between this workflow and the client.
+      - name: Build release APKs
+        working-directory: V2rayNG
+        run: ./gradlew assemblePlaystoreRelease
+
+      # An artefact that cannot be installed must not be published looking like one that can.
+      # build.gradle.kts tags an unsigned release `-unsigned` and a throwaway-key one
+      # `-debugsigned` in the filename precisely so this check is one glob; apksigner then proves
+      # each APK actually carries a signature.
+      - name: Refuse to publish an uninstallable APK
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          found=0
+          signer=$(find "$ANDROID_HOME/build-tools" -name apksigner 2>/dev/null | sort | tail -n 1)
+          while IFS= read -r apk; do
+            found=$((found + 1))
+            case "$apk" in
+              *-unsigned.apk)
+                echo "::error::$apk is UNSIGNED and cannot be installed on any device."; exit 1;;
+              *-debugsigned.apk)
+                echo "::error::$apk carries a throwaway debug key and must never be published."; exit 1;;
+            esac
+            if [ -x "$signer" ]; then
+              "$signer" verify --print-certs "$apk" \
+                || { echo "::error::$apk carries no valid signature"; exit 1; }
+            else
+              echo "::error::apksigner is not on this runner; refusing to publish unverified APKs."
+              exit 1
+            fi
+            cp "$apk" dist/
+          done < <(find V2rayNG/app/build/outputs/apk -name 'departament_*.apk')
+          if [ "$found" -eq 0 ]; then echo "::error::no APK was produced"; exit 1; fi
+          echo "verified $found installable artefact(s):"
+          ls -l dist
+
+      # Whether the tunnel library actually ships is a fact about the APK, not an argument about
+      # the copy step. A degraded VPN must never be published silently as the normal one.
+      - name: Prove both native libraries are inside every APK
+        run: |
+          set -euo pipefail
+          for apk in dist/departament_*.apk; do
+            name=$(basename "$apk")
+            abi=${name%.apk}; abi=${abi##*_}
+            if [ "$abi" = "universal" ]; then
+              pattern='lib/[a-z0-9_-]*/'
+            else
+              pattern="lib/$abi/"
+            fi
+            for lib in libhev-socks5-tunnel.so libgojni.so; do
+              if ! unzip -l "$apk" | grep -qE "$pattern$lib"; then
+                echo "::error::$name carries no $pattern$lib"
+                exit 1
+              fi
+            done
+            echo "$name: both native libraries present"
+          done
+
+      # A DRAFT, on purpose. The tag says "this is the build"; publishing the draft says "ship it
+      # to every installed client", and those are two decisions. The updater ignores drafts, so
+      # nothing reaches a customer until a human presses the button.
+      - name: Publish the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.tag.outputs.tag }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/departament_*.apk --clobber
+          else
+            gh release create "$tag" dist/departament_*.apk \
+              --draft \
+              --title "departament ${{ steps.tag.outputs.version }}" \
+              --generate-notes
+          fi
+
+      - name: Upload APKs as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: departament-${{ steps.tag.outputs.version }}-apk
+          path: dist/departament_*.apk

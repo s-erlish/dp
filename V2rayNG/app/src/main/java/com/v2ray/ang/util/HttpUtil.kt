@@ -42,6 +42,9 @@ object HttpUtil {
      */
     private const val SUBSCRIPTION_ACCEPT = "application/json, text/plain;q=0.9, */*;q=0.8"
 
+    /** Copy chunk for a download that reports progress. `copyTo`'s own default, kept explicit. */
+    private const val DOWNLOAD_BUFFER_BYTES = 8 * 1024
+
     /**
      * Resolves the User-Agent of a subscription request. The caller-supplied value — the
      * per-subscription override, else the operator-configured UA — always wins and is never
@@ -430,9 +433,16 @@ object HttpUtil {
         }
     }
 
+    /**
+     * @param onProgress bytes written so far / total, or total `-1` when the server sent no
+     *   `Content-Length`. Called on the calling thread, so a UI consumer marshals it itself. It is
+     *   optional and defaults to null: a download the user is not watching should not pay for a
+     *   callback per chunk, and the existing asset downloader does not want one.
+     */
     fun downloadToFile(
         request: UrlContentRequest,
-        targetFile: File
+        targetFile: File,
+        onProgress: ((Long, Long) -> Unit)? = null
     ): Boolean {
         val url = request.url ?: return false
         val client = buildOkHttpClient(request.timeout, request.httpPort, request.proxyUsername, request.proxyPassword, followRedirects = true)
@@ -451,9 +461,27 @@ object HttpUtil {
                     return false
                 }
                 val body = response.body ?: return false
-                body.byteStream().use { input ->
-                    targetFile.outputStream().use { output ->
-                        input.copyTo(output)
+                if (onProgress == null) {
+                    body.byteStream().use { input ->
+                        targetFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                } else {
+                    val total = body.contentLength()
+                    var written = 0L
+                    onProgress(0L, total)
+                    body.byteStream().use { input ->
+                        targetFile.outputStream().use { output ->
+                            val buffer = ByteArray(DOWNLOAD_BUFFER_BYTES)
+                            while (true) {
+                                val read = input.read(buffer)
+                                if (read < 0) break
+                                output.write(buffer, 0, read)
+                                written += read
+                                onProgress(written, total)
+                            }
+                        }
                     }
                 }
                 true

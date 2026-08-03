@@ -1,11 +1,21 @@
 name: Build APK
 
+# Inherited from upstream v2rayNG, and it USED TO PUBLISH RELEASES.
+#
+# It took a `release_tag` input and ended in `svenstaro/upload-release-action` with the glob
+# `outputs/apk/*/release/*.apk` — which is every flavour, so a single run attached both
+# `departament_<v>_<abi>.apk` AND `departament_<v>-fdroid_<abi>.apk` to the tag. The fdroid ones
+# install under a launcher labelled «v2rayNG (F-Droid)» (`src/fdroid/res/values/strings.xml`), so
+# a release cut this way handed customers an app wearing upstream's name. It also ran no
+# unsigned/apksigner gate at all, and `svenstaro/upload-release-action` CREATES the release, so a
+# typo in the input was enough to publish one.
+#
+# The publishing half is gone. This workflow builds and uploads ARTIFACTS only; releases are cut
+# by `publish-release.yml`, which requires a real signing key, refuses `-unsigned`/`-debugsigned`
+# artefacts, checks the tag against `versionName`, and publishes a draft.
+
 on:
   workflow_dispatch:
-    inputs:
-      release_tag:
-        required: false
-        type: string
   push:
     branches:
       - master
@@ -120,11 +130,6 @@ jobs:
         name: x86-apk
         path: ${{ github.workspace }}/V2rayNG/app/build/outputs/apk/*/release/*x86*.apk
 
-    - name: Upload to release
-      uses: svenstaro/upload-release-action@v2
-      if: github.event.inputs.release_tag != ''
-      with:
-        file: ${{ github.workspace }}/V2rayNG/app/build/outputs/apk/*/release/*.apk
-        tag: ${{ github.event.inputs.release_tag }}
-        file_glob: true
-        prerelease: true
+    # NOTHING PUBLISHES FROM HERE. The upstream "Upload to release" step was removed — see the
+    # note at the top of this file for what it attached to a tag. Cut releases with
+    # `publish-release.yml`.

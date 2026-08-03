@@ -36,6 +36,35 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!--
+      The self-updater's install step, and the ONLY thing this permission is used for:
+      «Настройки → Проверить обновления» downloads departament's own APK from departament's own
+      GitHub release and hands it to the system package installer
+      (`CheckUpdateActivity.install()` → ACTION_VIEW / application/vnd.android.package-archive over
+      the `${applicationId}.cache` FileProvider).
+
+      Since Android 8 (API 26) an app that starts that intent without REQUEST_INSTALL_PACKAGES is
+      refused, so the alternative is not "no permission" — it is a «Скачать» button that ends in a
+      file the user has to find and open themselves. This build is distributed as a direct APK, so
+      the in-app update IS the update path.
+
+      Two things it deliberately is not:
+        - It is not a silent installer. The permission only lets us *ask*; the user still sees the
+          system installer, still has to allow this app as an unknown-app source
+          (canRequestPackageInstalls, which the screen checks and routes to), and still confirms.
+        - It is not a channel for third-party code. UpdateCheckerManager accepts only assets named
+          `departament_<version>[-fdroid]_<abi>.apk`, and re-parses the downloaded file before
+          offering it: a package name other than this application id, or a versionCode that is not
+          higher than the installed one, is deleted and reported instead of installed.
+
+      Note for the store listing, if there ever is one: Google Play forbids an app distributed
+      through Play from carrying its own update channel, so a Play build must ship without this
+      permission and without the row. `Utils.isGoogleFlavor()` exists for that gate and is
+      deliberately NOT applied here, because the `playstore` flavour is what CI publishes to GitHub
+      today — gating on it would disable the updater on the only flavour that has one.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!--
       Package visibility (Android 11+). The only feature that needs to see other apps is the
       per-app proxy picker: AppManagerUtil.loadNetworkAppList() calls getInstalledPackages() and
       PerAppProxyActivity / AppPickerActivity list what comes back so the user can route chosen

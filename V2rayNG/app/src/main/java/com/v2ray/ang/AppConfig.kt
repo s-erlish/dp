@@ -169,22 +169,42 @@ object AppConfig {
     const val APP_URL = "$GITHUB_URL/2dust/v2rayNG"
 
     /**
-     * The self-update feed. **Blank on purpose: departament publishes no release feed.**
+     * The repository this application is released from — **ours**, `owner/name`.
+     *
+     * It is one constant because everything the updater touches has to agree about it: the feed
+     * below, the browser fallback when the in-app install path is unavailable, and the audit trail
+     * in the log. Changing the owner or the name here retargets the whole updater in one edit.
+     */
+    const val APP_RELEASE_REPO = "s-erlish/dp"
+
+    /**
+     * The self-update feed: departament's own GitHub releases.
      *
      * This used to read `https://api.github.com/repos/2dust/v2rayNG/releases`, so «Проверить
      * обновления» compared departament's version against *upstream v2rayNG's* tags and, on a hit,
      * handed the customer upstream's APK — a different application, under a different
      * applicationId, signed with a different key. It could never upgrade anything; it side-installs
-     * a stranger's VPN client next to this one. That is worse than having no updater.
+     * a stranger's VPN client next to this one. It was then blanked, which stopped the harm and
+     * left the control answering «не удалось» forever.
      *
-     * Blank means the updater has nothing to reach and can no longer offer anyone else's build.
-     * Consumers must treat blank as «this build has no update channel» and not present the control
-     * at all — see `UpdateCheckerManager` and the «Проверить обновления» rows in `AboutActivity`
-     * and `SettingsTabFragment`. Fill this in with departament's own releases endpoint (and keep
-     * asset names matching `departament_<version>[-fdroid]_<abi>.apk`, which
-     * `UpdateCheckerManager.getDownloadUrl` already filters on) to turn the feature back on.
+     * It points at [APP_RELEASE_REPO] now, and three independent guards keep it honest, because a
+     * feed URL alone is not proof of provenance:
+     *
+     *  1. `UpdateCheckerManager.selectAsset` accepts only assets named the way *this* build names
+     *     its own outputs — `departament_<version>[-fdroid]_<abi>.apk` (`app/build.gradle.kts`) —
+     *     so `v2rayNG_*.apk` in any feed is unreachable;
+     *  2. the downloaded file is parsed before it is offered to the installer, and refused unless
+     *     its `packageName` is this application id;
+     *  3. its `versionCode` must exceed the installed one, which is what makes the offer an
+     *     upgrade rather than an «Приложение не установлено» dead end.
+     *
+     * Blank is still a supported value and still means «this build has no update channel»: the
+     * screen says so in words instead of failing.
      */
-    const val APP_API_URL = ""
+    const val APP_API_URL = "https://api.github.com/repos/$APP_RELEASE_REPO/releases"
+
+    /** The releases page, for the browser fallback when the device refuses the in-app install. */
+    const val APP_RELEASES_URL = "$GITHUB_URL/$APP_RELEASE_REPO/releases/latest"
 
     /** Customer support. Was upstream's GitHub issue tracker — a stranger's inbox for our users. */
     const val APP_ISSUES_URL = "https://t.me/departamentvpnbot"

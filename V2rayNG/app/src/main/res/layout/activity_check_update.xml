@@ -5,15 +5,28 @@
   ============================================================================
 
   24-tab-conformance.md A-36 marks this screen DELETE - it was unreachable, so it
-  cost nothing to cut. It is reachable now (a row on «О приложении»), and «нет
-  способа проверить обновление» is a product gap the peripherals audit called out, so
-  it is restyled instead of removed. The GitHub-release caveat stands: what this
-  screen does is TELL the user a newer build exists and open the download page.
+  cost nothing to cut. It is reachable now (a row in «Настройки» and one on «О
+  приложении»), and it is the product's only update path: departament ships as a
+  direct APK, so what happens here is what a user gets instead of a store.
 
-  The screen used to be two hand-rolled 16dp rows and a centred grey version label,
-  and it reported its outcome in toasts - three of them, one of which was an
-  exception message shown raw to a customer. It now has states: checking, up to date,
-  update available, and a failure that names the cause and offers «Повторить».
+  It reported its outcome in toasts once - three of them, one an exception message
+  shown raw to a customer. It has states now, and every one of them is drawn:
+
+      checking     · an inline arc and «Проверяем обновления…»
+      up to date   · «Обновлений нет»
+      available    · «Доступна версия X» + release notes + «Обновить»
+      downloading  · a determinate bar with «12,4 МБ из 31,0 МБ» and «Отменить»
+      ready        · «Обновление готово» + «Установить»
+      permission   · «Нужно разрешение на установку» + «Открыть настройки»
+      failed       · the MAPPED cause, and its retry immediately under it (G2)
+
+  WHY THE ACTION IS NOT THE EMPTY STATE'S ACTION. `EmptyStateBinder` puts its button
+  behind a ViewStub, and a stub inflates once - so the FIRST state that shows a
+  button fixes the tier for the rest of the screen's life. On a screen that alternates
+  between a Primary «Обновить» and a Tertiary «Повторить» that is a coin toss: whoever
+  loses gets the wrong tier. The two tiers are therefore two <include>s here, and
+  exactly ONE of them is ever visible - the component's "one action, or none" rule,
+  enforced by the screen instead of by the stub.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -61,6 +74,7 @@
                 android:layout_marginTop="@dimen/space_32"
                 layout="@layout/view_empty_state" />
 
+            <!-- CHECKING. An indeterminate arc: there is no total to divide by. -->
             <LinearLayout
                 android:id="@+id/checking"
                 android:layout_width="match_parent"
@@ -86,6 +100,47 @@
                     android:textAppearance="@style/TextAppearance.App.Subtitle" />
             </LinearLayout>
 
+            <!-- DOWNLOADING. The bar starts indeterminate (the size is unknown until
+                 the first chunk) and becomes determinate the moment a Content-Length
+                 arrives; if none ever does it keeps moving and the caption reports the
+                 megabytes so far, rather than inventing a percentage. Only that
+                 direction is legal at runtime - see CheckUpdateActivity.showDownloading. -->
+            <LinearLayout
+                android:id="@+id/downloading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_32"
+                android:orientation="vertical"
+                android:paddingStart="@dimen/screen_gutter"
+                android:paddingEnd="@dimen/screen_gutter"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:accessibilityLiveRegion="polite"
+                    android:text="@string/upd_downloading"
+                    android:textAppearance="@style/TextAppearance.App.Body" />
+
+                <com.google.android.material.progressindicator.LinearProgressIndicator
+                    android:id="@+id/download_progress"
+                    style="@style/Widget.Departament.Progress.Linear"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_12"
+                    android:max="100" />
+
+                <TextView
+                    android:id="@+id/download_detail"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_8"
+                    android:textAppearance="@style/TextAppearance.App.Subtitle"
+                    tools:text="12,4 МБ из 31,0 МБ" />
+            </LinearLayout>
+
+            <!-- What is in the new version, between the verdict and the button: the
+                 user decides whether to update after reading it, not before. -->
             <TextView
                 android:id="@+id/tv_release_notes"
                 android:layout_width="match_parent"
@@ -97,6 +152,34 @@
                 android:visibility="gone"
                 tools:text="Исправлено переподключение после смены сети."
                 tools:visibility="visible" />
+
+            <!-- The one action, in two tiers. 24 above it is the empty state's own
+                 title-line-action rhythm, continued. -->
+            <FrameLayout
+                android:id="@+id/action_area"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_24"
+                android:paddingStart="@dimen/screen_gutter"
+                android:paddingEnd="@dimen/screen_gutter"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <include
+                    android:id="@+id/action_primary"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    layout="@layout/view_action_primary" />
+
+                <include
+                    android:id="@+id/action_tertiary"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:visibility="gone"
+                    layout="@layout/view_action_tertiary" />
+            </FrameLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </LinearLayout>
