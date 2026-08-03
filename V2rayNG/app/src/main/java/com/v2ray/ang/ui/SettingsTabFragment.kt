@@ -105,21 +105,10 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         s.rowBoot.setOnClickListener { toggleStartOnBoot() }
 
         // ПОДПИСКА
-        // Список подписок. Экран существовал, умел добавлять, включать, обновлять и УДАЛЯТЬ
-        // подписку — и не был подключён ни к одной кнопке в приложении. Это и есть причина
-        // жалобы «удалять почему-то я тоже не могу подписки на телефоне»: удаление работало,
-        // до него нельзя было дойти. Идёт через launchSettingsScreen, чтобы оболочка
-        // перечитала список серверов, когда экран вернётся.
-        s.rowSubsList.setOnClickListener {
-            mainHost.launchSettingsScreen(Intent(requireContext(), SubSettingActivity::class.java))
-        }
-        // «Другие способы добавления» — ссылка, сервер вручную, файл конфигурации.
-        // Владелец сократил меню «Добавить подписку» до QR и буфера обмена (OWNER C1), и
-        // эти три способа переехали в MainHost.showAdvancedAddMethods() — но вызывать их
-        // стало нечему: код жил, компилировался и был недостижим. Это их вход. Идёт через
-        // хост, а не через собственный диалог, потому что «Импортировать из файла»
-        // открывает системный выбор файла на лаунчере оболочки.
-        s.rowAddOther.setOnClickListener { mainHost.showAdvancedAddMethods() }
+        // «Список подписок» (SubSettingActivity) и «Другие способы добавления»
+        // (MainHost.showAdvancedAddMethods) убраны отсюда по прямому указанию владельца
+        // (2026-08-02). Что при этом стало недостижимо — записано в комментарии на их месте в
+        // fragment_settings_tab.xml; ни один экран и ни одна функция не удалены.
         s.rowSubAutoUpdate.setOnClickListener { pickSubAutoUpdate() }
         s.rowRouting.setOnClickListener {
             mainHost.launchSettingsScreen(Intent(requireContext(), RoutingSettingActivity::class.java))
@@ -144,11 +133,10 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         s.rowTvReceive.setOnClickListener { startActivity(Intent(requireContext(), TvReceiveActivity::class.java)) }
 
         // О ПРИЛОЖЕНИИ
-        // Three screens that were built and then left with no way in: SettingsActivity hosts the
-        // whole advanced preference tree, and CheckUpdateActivity and LogcatActivity were declared
-        // in the manifest and referenced from nowhere. A screen with no launch site is not a
-        // feature, so each one gets a row here.
-        s.rowAdvanced.setOnClickListener { mainHost.launchSettingsScreen(SettingsActivity.newIntent(requireContext())) }
+        // CheckUpdateActivity and LogcatActivity were declared in the manifest and referenced from
+        // nowhere; a screen with no launch site is not a feature, so each one keeps its row here.
+        // «Дополнительно» (SettingsActivity) was removed by the owner on 2026-08-02 — see
+        // fragment_settings_tab.xml for the record of what that takes off the map.
         s.rowLogs.setOnClickListener { startActivity(Intent(requireContext(), LogcatActivity::class.java)) }
         s.rowCheckUpdate.setOnClickListener { startActivity(Intent(requireContext(), CheckUpdateActivity::class.java)) }
         s.rowAbout.setOnClickListener { startActivity(Intent(requireContext(), AboutActivity::class.java)) }

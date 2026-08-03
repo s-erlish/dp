@@ -277,11 +277,18 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     /** The negotiating breath: the outer rings swelling while the core talks to a server. */
     private var breathAnimator: ValueAnimator? = null
 
+    /**
+     * Whether the sweep is on screen, so the arc's wind-up fires on the EDGE into negotiating and
+     * not on every repaint that happens to find it already spinning. See [playArcWindUp].
+     */
+    private var sweepRunning = false
+
     // Cached easing curves (loaded once) so the imperative hero motion rides the same ease-out tempo
     // as res/interpolator and res/anim. No bounce.
     private val easeOutQuint by lazy { AnimationUtils.loadInterpolator(requireContext(), R.interpolator.ease_out_quint) }
     private val easeStandard by lazy { AnimationUtils.loadInterpolator(requireContext(), R.interpolator.ease_standard) }
 
+    private val durWindUp get() = resources.getInteger(R.integer.motion_windup).toLong()
     private val durState get() = resources.getInteger(R.integer.motion_state).toLong()
     private val durStateExit get() = resources.getInteger(R.integer.motion_state_exit).toLong()
     private val durReveal get() = resources.getInteger(R.integer.motion_reveal).toLong()
@@ -399,6 +406,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         const val BREATH_PERIOD_MS = 850L
         const val BREATH_ALPHA_MIN = 90
 
+        /** One full revolution — the arc's wind-up lands back where it started, so nothing snaps. */
+        const val FULL_TURN_DEGREES = 360f
+
         // The cold-start assemble plays once per PROCESS, not on every theme/language recreate.
         private var heroAssembled = false
     }
@@ -432,7 +442,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         wireStatusStrip()
         wireScrollHairline()
         setupServerList()
+        // The carousel decides which подписка's servers the list shows, so it is built second and
+        // the list is repainted once it has settled on a page.
         setupHomeMetaPager()
+        refreshServerList(-1)
         observeTunnel()
         observeAccount()
         observeNetwork()
@@ -645,11 +658,19 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         )
         frame.foreground = RippleDrawable(ColorStateList.valueOf(ripple), focus, mask)
 
-        // The confirm ring is the same geometry in the accent, emitted exactly once.
+        // The confirm rings: the same geometry in the accent, emitted exactly once each. The echo
+        // carries the same silhouette a hair thinner, so the pair reads as one ring and its wake
+        // rather than as two rings racing (ConnectHeroView.axaml: «тот же силуэт, чуть тоньше»).
+        val accent = themeColor(androidx.appcompat.R.attr.colorPrimary)
         binding.connectRingPulse.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.TRANSPARENT)
-            setStroke(stroke, themeColor(androidx.appcompat.R.attr.colorPrimary))
+            setStroke(stroke, accent)
+        }
+        binding.connectRingPulseEcho.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.TRANSPARENT)
+            setStroke((stroke - 1).coerceAtLeast(1), accent)
         }
 
         // The monogram's circle: the P3 plane, never the accent.
@@ -790,23 +811,52 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
-     * Repaints the list from the one cache.
+     * Repaints the list from the one cache — showing ONLY the servers of the подписка under the
+     * thumb.
      *
-     * Section headers are OFF: the subscription card above the list is that подписка's header, and a
-     * second one inside the list would say the same thing twice.
+     * THE CARD AND THE LIST ARE ONE OBJECT. Every подписка's servers used to be flattened into a
+     * single list under a carousel of several cards: «когда добавляешь несколько подписок, сервера
+     * все в один список делаются, просто стакаются друг на друга». Swiping to another card changed
+     * the header and nothing under it, so the card claimed a подписка the list did not keep.
+     * Filtering by the current page makes the card the list's real heading — which is also why
+     * section headers stay OFF here: a second heading inside the list would say the same thing
+     * twice.
+     *
+     * Servers with no подписка of their own (local, imported by link) belong to no card, so they
+     * show when there is no carousel at all — otherwise they would become unreachable, and a row
+     * the user can no longer find is a regression however tidy the grouping looks.
      *
      * This does NOT touch the carousel, because a bulk ping delivers one result per server and
      * rebuilding a ViewPager2 once per server would thrash it for a change no card shows.
      */
     private fun refreshServerList(index: Int) {
         val groups = mainViewModel.getProviderGroups()
-        homeAdapter?.setSections(mainViewModel.serversCache, groups, showHeaders = false, index = index)
+        val all = mainViewModel.serversCache
+        val pageSubId = homeMetaSubIds.getOrNull(homeMetaPage)
+        val shown = if (pageSubId.isNullOrEmpty()) {
+            all
+        } else {
+            all.filter { it.profile.subscriptionId == pageSubId }
+        }
+        // `index` addresses a row in the UNFILTERED cache (it is the position the ViewModel just
+        // touched), so translate it before handing it on — an index resolved against a different
+        // list repaints the wrong row.
+        val targetGuid = all.getOrNull(index)?.guid
+        val shownIndex = targetGuid?.let { guid -> shown.indexOfFirst { it.guid == guid } } ?: -1
+        homeAdapter?.setSections(shown, groups, showHeaders = false, index = shownIndex)
     }
 
-    /** The cache itself changed — an import, a delete, a refresh — so both surfaces follow it. */
+    /**
+     * The cache itself changed — an import, a delete, a refresh — so both surfaces follow it.
+     *
+     * The CAROUSEL goes first and the list second, because the list is now filtered by the page the
+     * carousel settles on: rebuilding it the other way round paints one подписка's servers under
+     * another подписка's card for a frame, and after a delete it would filter against a подписка
+     * that no longer exists.
+     */
     private fun refreshServerSurfaces(index: Int) {
-        refreshServerList(index)
         rebuildHomeMeta()
+        refreshServerList(index)
     }
 
     // ==================== The subscription card carousel ====================
@@ -849,6 +899,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
                 override fun onPageSelected(position: Int) {
                     homeMetaPage = position
                     updateHomeMetaDots(position)
+                    // The list under the card belongs to the card: swiping to another подписка
+                    // shows that подписка's servers, not the same flat pile under a new heading.
+                    refreshServerList(-1)
                     if (dragged) {
                         if (isBindingInitialized) binding.vpHomeMeta.tickHaptic()
                         dragged = false
@@ -1798,7 +1851,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         val negotiating = state.conn == Conn.CONNECTING
         // The sweep spins for the two things this screen has always spun it for: the core
         // negotiating a tunnel, and a подписка being fetched.
-        if (negotiating || backgroundLoads > 0) binding.connectSweep.show() else binding.connectSweep.hide()
+        val sweeping = negotiating || backgroundLoads > 0
+        if (sweeping) binding.connectSweep.show() else binding.connectSweep.hide()
+        if (sweeping && !sweepRunning) playArcWindUp()
+        sweepRunning = sweeping
         if (negotiating) startBreathing() else stopBreathing()
 
         val targetRing = when (state.conn) {
@@ -2030,8 +2086,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         if (!live) {
             binding.shieldFilled.alpha = 1f
             binding.shieldOutline.alpha = 0f
-            binding.connectRingPulse.clearAnimation()
-            binding.connectRingPulse.visibility = View.INVISIBLE
+            clearConfirmRings()
             return
         }
 
@@ -2040,29 +2095,66 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         binding.shieldOutline.animate().cancel()
         binding.shieldOutline.animate().alpha(0f).setDuration(durState).setInterpolator(easeStandard).start()
 
-        // The choreography itself lives in @anim/connect_confirm — one file, so the ring's scale,
-        // its fade and its tempo cannot drift away from the tokens they are written in.
-        val pulse = binding.connectRingPulse
-        pulse.clearAnimation()
-        pulse.visibility = View.VISIBLE
-        val confirm = AnimationUtils.loadAnimation(requireContext(), R.anim.connect_confirm)
-        confirm.setAnimationListener(object : Animation.AnimationListener {
+        // The choreography itself lives in @anim/connect_confirm and its echo — one file each, so
+        // the rings' scale, fade and tempo cannot drift away from the tokens they are written in.
+        //
+        // TWO RINGS. The lead ring, then a dimmer echo a beat behind it: the desktop's payoff
+        // (ConnectHeroView.axaml, Sonar.pulsing + Sonar.pulsing-echo), which Android emitted only
+        // the first half of. Two, and never a third — «максимум ДВА кольца, не радар».
+        emitConfirmRing(binding.connectRingPulse, R.anim.connect_confirm)
+        emitConfirmRing(binding.connectRingPulseEcho, R.anim.connect_confirm_echo)
+    }
+
+    /** Plays one confirm ring and returns the view to INVISIBLE when it has finished. */
+    private fun emitConfirmRing(ring: View, animRes: Int) {
+        ring.clearAnimation()
+        ring.visibility = View.VISIBLE
+        val anim = AnimationUtils.loadAnimation(requireContext(), animRes)
+        anim.setAnimationListener(object : Animation.AnimationListener {
             override fun onAnimationStart(animation: Animation?) = Unit
             override fun onAnimationRepeat(animation: Animation?) = Unit
             override fun onAnimationEnd(animation: Animation?) {
                 if (!isBindingInitialized) return
-                pulse.visibility = View.INVISIBLE
+                ring.visibility = View.INVISIBLE
             }
         })
-        pulse.startAnimation(confirm)
+        ring.startAnimation(anim)
+    }
+
+    private fun clearConfirmRings() {
+        binding.connectRingPulse.clearAnimation()
+        binding.connectRingPulse.visibility = View.INVISIBLE
+        binding.connectRingPulseEcho.clearAnimation()
+        binding.connectRingPulseEcho.visibility = View.INVISIBLE
+    }
+
+    /**
+     * THE WIND-UP. One revolution out of rest at the instant the sweep appears, on ease_out_quint,
+     * so the arc *runs up* to its steady spin instead of flashing on at full speed. It is the
+     * desktop's P0-3 (`ConnectHeroView.axaml`, `Ellipse.ConnectArc.arc-windup`), and 360° lands
+     * exactly where 0° was, so the steady spin underneath it is never snapped.
+     *
+     * Fires on the EDGE into negotiating only — a repaint that finds the sweep already spinning
+     * must not restart it — and never under reduced motion, where the sweep is the only signal.
+     */
+    private fun playArcWindUp() {
+        val sweep = binding.connectSweep
+        if (sweep.reducedMotion()) return
+        sweep.animate().cancel()
+        sweep.rotation = 0f
+        sweep.animate()
+            .rotationBy(FULL_TURN_DEGREES)
+            .setDuration(durWindUp)
+            .setInterpolator(easeOutQuint)
+            .withEndAction { if (isBindingInitialized) sweep.rotation = 0f }
+            .start()
     }
 
     /** Exit is 75 percent of enter, and it emits nothing. */
     private fun playRelease(ringTarget: Int, live: Boolean) {
         stopBreathing()
         tintRing(ringTarget, animate = live)
-        binding.connectRingPulse.clearAnimation()
-        binding.connectRingPulse.visibility = View.INVISIBLE
+        clearConfirmRings()
 
         if (!live) {
             binding.shieldFilled.alpha = 0f

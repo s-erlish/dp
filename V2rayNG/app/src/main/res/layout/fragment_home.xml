@@ -38,12 +38,22 @@
   or, when there is not one server to connect to, the gate block in place of the
   card and the list (layout_home_empty.xml). Never both.
 
-  THE RINGS ARE BACK AND THEY ARE NOT DECORATION. `CLAUDE.md`'s ban on decorative
-  gradients and glows is about PAGE BACKGROUNDS: no radial wash behind the whole
-  screen, no accent halo bleeding out of the shield. The connect object's own three
+  THE RINGS ARE BACK AND THEY ARE NOT DECORATION. The connect object's own three
   concentric rings are its state channel - one hue at three opacities, a geometry
   that never changes size - and they are the reason the owner recognised the screen.
-  They come back. The page gradient and the halo glow do not.
+  They come back. The halo glow does not.
+
+  THE BLUE GROUND IS THE OWNER'S, AND THIS ROOT MUST STAY TRANSPARENT.
+  The shell (`activity_main.xml`, `home_root`) paints `@drawable/bg_home_gradient` -
+  the brand's blue ground, with a light and a `drawable-night` twin - behind every
+  tab. Настройки and Аккаунт let it through; this file used to paint
+  `?android:attr/colorBackground` over it, an opaque flat token that covered the
+  gradient in BOTH themes. That is exactly what the owner reported on 2026-08-02:
+  «синего фона нет на светлой и темной версии на главной». The blue was never
+  removed from the tokens - it was hidden by one attribute on one view.
+  So: `@android:color/transparent`. The screen's ground is the shell's gradient, and
+  the mono overlay's neutral variant reaches it through
+  `MainActivity.applyThemeDecorations`. Do not reintroduce an opaque fill here.
 
   ZERO RAW VALUES. No dp, no sp, no hex, no fontFamily, no textSize anywhere in
   this file - every number is a token and every text element carries only a
@@ -58,7 +68,7 @@
     android:id="@+id/home_tab_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:attr/colorBackground"
+    android:background="@android:color/transparent"
     android:clipChildren="false"
     android:clipToPadding="false"
     android:fillViewport="true"
@@ -73,130 +83,27 @@
         android:paddingBottom="@dimen/space_24">
 
         <!--
-          THE STRIP AND THE ADD ACTION, on one line, at the top - where this screen
-          has always carried them, and in the order it always carried them:
-          отдача, время сессии, приём.
+          THE ADD ACTION. Adding a subscription is the one thing this screen owns that
+          is not the connection, so it sits alone at the top right and opens the SAME
+          menu every other add entry point does. 48dp box, 24dp glyph: the touch-target
+          floor with no fixed height on its row.
 
-          THE UNIT LIVES IN THE LABEL so the value stays a pure figure and the
-          tabular advance has nothing else on the line to fight.
-
-          THE RESERVE IS THE WHOLE POINT: android:minEms reserves N em, and an em IS
-          the text size, so the reserve scales with the type at every font scale
-          without a single sp literal. A value going 9,9 -> 10,1 moves nothing, and
-          neither does 00:09:59 -> 00:10:00.
-
-          The strip is on screen at rest, reading zeroes, exactly as it was: this is
-          the screen's ledger, not a reward for connecting, and a row that vanishes
-          when idle is a row the user cannot find. HomeFragment lands the figures on
-          it while a tunnel is up and returns them to zero when it goes.
+          THE LEDGER USED TO SHARE THIS LINE, AND IT DOES NOT ANY MORE. отдача · время
+          сессии · приём now sit UNDER the connect object — «скорость почему-то вверху,
+          хотя должны быть под кнопкой» — which is also where the desktop carries them
+          (ConnectHeroView.axaml, StatsRow: «Стата-строка ПОД щитом, НАД именем
+          сервера»). See @id/numeric_strip below the status word.
         -->
         <LinearLayout
             android:id="@+id/home_top_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:baselineAligned="false"
-            android:gravity="center_vertical"
+            android:gravity="center_vertical|end"
             android:orientation="horizontal"
             android:paddingStart="@dimen/screen_gutter"
             android:paddingEnd="@dimen/space_4">
 
-            <LinearLayout
-                android:id="@+id/numeric_strip"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:baselineAligned="false"
-                android:orientation="horizontal">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/tv_up"
-                        style="@style/TextAppearance.App.Numeric"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:minEms="3"
-                        android:text="@string/home_speed_zero"
-                        android:textAppearance="@style/TextAppearance.App.Title"
-                        tools:text="3,1" />
-
-                    <TextView
-                        android:id="@+id/tv_up_label"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_4"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:text="@string/home_strip_up_label"
-                        android:textAppearance="@style/TextAppearance.App.Caption" />
-                </LinearLayout>
-
-                <!-- The session clock. Its own column, because "how long have I been
-                     protected" is a different question from "how fast is it". -->
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/tv_uptime"
-                        style="@style/TextAppearance.App.Numeric"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:minEms="5"
-                        android:text="@string/home_uptime_zero"
-                        android:textAppearance="@style/TextAppearance.App.Title"
-                        tools:text="00:12:04" />
-
-                    <TextView
-                        android:id="@+id/tv_uptime_label"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_4"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:text="@string/home_strip_uptime_label"
-                        android:textAppearance="@style/TextAppearance.App.Caption" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/tv_down"
-                        style="@style/TextAppearance.App.Numeric"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:minEms="3"
-                        android:text="@string/home_speed_zero"
-                        android:textAppearance="@style/TextAppearance.App.Title"
-                        tools:text="24,8" />
-
-                    <TextView
-                        android:id="@+id/tv_down_label"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_4"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:text="@string/home_strip_down_label"
-                        android:textAppearance="@style/TextAppearance.App.Caption" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- The add action, top right, where it has always been. Adding a
-                 subscription is the one thing this screen owns that is not the
-                 connection, so it sits apart from the ledger of figures and opens
-                 the SAME menu every other add entry point does. 48dp box, 24dp
-                 glyph: the touch-target floor with no fixed height on its row. -->
             <ImageView
                 android:id="@+id/btn_home_add"
                 android:layout_width="@dimen/view_height_dp48"
@@ -358,11 +265,42 @@
                 android:layout_width="@dimen/connect_disc"
                 android:layout_height="@dimen/connect_disc"
                 android:layout_gravity="center"
-                android:clipChildren="false">
+                android:clipChildren="false"
+                android:duplicateParentState="true">
 
-                <!-- The confirm ring. Emitted exactly ONCE, at the instant the
-                     tunnel confirms, and by no other event in the product. Never
-                     loops, and there is never a second ring. -->
+                <!-- PRESS DEPTH. The disc darkens into the press — the desktop's
+                     «колодец» (ConnectHeroView.axaml PressScrim, P1-2) — under the
+                     shield, which draws over it and stays solid. It duplicates the
+                     frame's pressed state through the disc, so @anim/press_scrim runs
+                     in unison with @anim/press_scale on the frame; the object now has
+                     the depth as well as the scale. Not hit-testable: the tap belongs
+                     to the frame. -->
+                <View
+                    android:id="@+id/connect_press_scrim"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_gravity="center"
+                    android:alpha="0"
+                    android:background="@drawable/bg_connect_press_scrim"
+                    android:duplicateParentState="true"
+                    android:importantForAccessibility="no"
+                    android:stateListAnimator="@anim/press_scrim" />
+
+                <!-- THE CONFIRM PAYOFF: two rings and never three, emitted at the
+                     instant the tunnel confirms and by no other event in the product.
+                     The lead ring goes first; the echo follows it a beat later, dimmer
+                     and travelling slightly less far, which is what makes the moment
+                     read as locked rather than as a blip. Neither loops. This mirrors
+                     the desktop's Sonar.pulsing + Sonar.pulsing-echo pair, whose own
+                     note is «максимум ДВА кольца, не радар». -->
+                <View
+                    android:id="@+id/connect_ring_pulse_echo"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_gravity="center"
+                    android:importantForAccessibility="no"
+                    android:visibility="invisible" />
+
                 <View
                     android:id="@+id/connect_ring_pulse"
                     android:layout_width="match_parent"
@@ -444,6 +382,121 @@
                 android:maxLines="1"
                 android:text="@string/home_status_disconnected"
                 android:textAppearance="@style/TextAppearance.App.Title" />
+
+            <!--
+              THE LEDGER: отдача · время сессии · приём, in that order, UNDER the
+              connect object and ABOVE the server identity. That is where the owner
+              expects it — «скорость почему-то вверху, хотя должны быть под кнопкой» —
+              and it is the desktop's own order (ConnectHeroView.axaml StatsRow, «ПОД
+              щитом, НАД именем сервера»).
+
+              THE UNIT LIVES IN THE LABEL so the value stays a pure figure and the
+              tabular advance has nothing else on the line to fight.
+
+              THE RESERVE IS THE WHOLE POINT: android:minEms reserves N em, and an em
+              IS the text size, so the reserve scales with the type at every font scale
+              without a single sp literal. A value going 9,9 -> 10,1 moves nothing, and
+              neither does 00:09:59 -> 00:10:00.
+
+              The strip is on screen at rest, reading zeroes, exactly as it was: this
+              is the screen's ledger, not a reward for connecting, and a row that
+              vanishes when idle is a row the user cannot find. HomeFragment lands the
+              figures on it while a tunnel is up and returns them to zero when it goes.
+            -->
+            <LinearLayout
+                android:id="@+id/numeric_strip"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_16"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tv_up"
+                        style="@style/TextAppearance.App.Numeric"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minEms="3"
+                        android:text="@string/home_speed_zero"
+                        android:textAppearance="@style/TextAppearance.App.Title"
+                        tools:text="3,1" />
+
+                    <TextView
+                        android:id="@+id/tv_up_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_4"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="@string/home_strip_up_label"
+                        android:textAppearance="@style/TextAppearance.App.Caption" />
+                </LinearLayout>
+
+                <!-- The session clock. Its own column, because "how long have I been
+                     protected" is a different question from "how fast is it". -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tv_uptime"
+                        style="@style/TextAppearance.App.Numeric"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minEms="5"
+                        android:text="@string/home_uptime_zero"
+                        android:textAppearance="@style/TextAppearance.App.Title"
+                        tools:text="00:12:04" />
+
+                    <TextView
+                        android:id="@+id/tv_uptime_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_4"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="@string/home_strip_uptime_label"
+                        android:textAppearance="@style/TextAppearance.App.Caption" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tv_down"
+                        style="@style/TextAppearance.App.Numeric"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minEms="3"
+                        android:text="@string/home_speed_zero"
+                        android:textAppearance="@style/TextAppearance.App.Title"
+                        tools:text="24,8" />
+
+                    <TextView
+                        android:id="@+id/tv_down_label"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_4"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="@string/home_strip_down_label"
+                        android:textAppearance="@style/TextAppearance.App.Caption" />
+                </LinearLayout>
+            </LinearLayout>
 
             <!-- WHAT IT RUNS THROUGH: the country flag and the server identity,
                  under the object, which is the second of the three questions this

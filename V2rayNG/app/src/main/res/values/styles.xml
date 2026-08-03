@@ -457,12 +457,16 @@
         colorSecondaryContainer: a second accent-tinted fill would spend the accent
         budget twice on one screen. Label onSurface = 14.14:1. Up to two per screen.
 
-        It carries the same bevel as the Primary. A fill is a fill: leaving the
-        neutral one flat next to a modelled accent one would say the secondary
-        action is a different KIND of control rather than a quieter one, and on a
-        near-black background a flat #20242B slab has nothing separating it from the
-        surface at all. Because the ramp is luminance and not hue, one drawable
-        serves both.
+        NO BEVEL. It carried the Primary's one for a while, on the argument that a
+        fill is a fill — and the owner rejected the result: «кнопки… они блестят
+        почему-то и не доделаны, надо вернуть прежний дизайн». His gradient
+        instruction (OWNER-FEEDBACK D1) was about THE PRIMARY ACTION BUTTON. Over a
+        neutral #20242B fill on a near-black page the modelled light has almost no
+        fill to model: what reaches the eye is the white rim and the black settle
+        with very little between them, which is the "container half-drawn — a raised
+        slab peeking out behind the label" in his sign-in screenshot. A quieter
+        action reads quieter by being flat. The bevel belongs to exactly one control
+        per screen, and this is not it.
     -->
     <style name="Widget.Departament.Button.Secondary" parent="Widget.Departament.Button">
         <item name="backgroundTint">@color/btn_secondary_container</item>
@@ -471,7 +475,6 @@
         <item name="android:textAppearance">@style/TextAppearance.App.Title.Medium</item>
         <item name="strokeColor">@color/btn_focus_outer_accent</item>
         <item name="rippleColor">@color/ripple_accent</item>
-        <item name="android:foreground">@drawable/btn_overlay_secondary</item>
     </style>
 
     <style name="Widget.Departament.Button.Secondary.Tall" parent="Widget.Departament.Button.Secondary">
@@ -534,11 +537,12 @@
         this style pins TextAppearance.App.Title and a layout may never shrink it.
         Confirm copy says what it does («Удалить подписку»), never «OK».
 
-        It is beveled like the Primary, and that matters more here than anywhere: a
-        destructive confirm that reads flatter than the cancel beside it reads as
-        DISABLED, which is exactly the defect the owner reported on the desktop
-        (OWNER-FEEDBACK D3). Same modelled light, so the confirm carries the same
-        weight as any other filled action.
+        NO BEVEL — the owner's 2026-08-02 instruction, which scopes the modelled
+        fill to the primary action button and nothing else. What OWNER-FEEDBACK D3
+        actually requires of a destructive confirm is that it must not read as
+        DISABLED beside its cancel, and that is carried by the solid #F04452 fill and
+        the 16sp/700 white label (3.71:1, clearing the large-text floor) — not by a
+        rim light. A flat confirm next to a flat cancel is still the loud one.
     -->
     <style name="Widget.Departament.Button.Destructive" parent="Widget.Departament.Button">
         <item name="backgroundTint">@color/btn_destructive_container</item>
@@ -546,7 +550,6 @@
         <item name="iconTint">@color/btn_destructive_content</item>
         <item name="strokeColor">@color/btn_focus_inner_on_error</item>
         <item name="rippleColor">@color/ripple_on_accent</item>
-        <item name="android:foreground">@drawable/btn_overlay_destructive</item>
     </style>
 
     <style name="Widget.Departament.Button.Destructive.Tall" parent="Widget.Departament.Button.Destructive">
@@ -605,12 +608,16 @@
 
     <!-- Filled icon button: a neutral disc. R7 lists filled icon buttons in the INNER
          focus case, so the ring goes inside in the control's own on-colour at 40%.
-         Being filled, it gets the bevel — on @dimen/radius_pill, so the modelled
-         light follows the disc instead of a slab's corners. -->
+
+         NO BEVEL. It had one, and an icon button is chrome — «почему у серверов
+         появились кнопки справа» and «кнопки… они блестят почему-то» are the same
+         complaint from two directions: a 48dp utility disc that models a light source
+         claims the weight of a primary action it does not have. The gradient
+         instruction is scoped to the primary action button; everywhere else the ban
+         on decorative gradients stands. -->
     <style name="Widget.Departament.Button.Icon.Filled" parent="Widget.Departament.Button.Icon">
         <item name="backgroundTint">@color/btn_secondary_container</item>
         <item name="strokeColor">@color/btn_focus_inner_on_neutral</item>
-        <item name="android:foreground">@drawable/btn_overlay_icon_filled</item>
     </style>
 
     <style name="Widget.Departament.Button.Icon.Accent" parent="Widget.Departament.Button.Icon">
@@ -1364,9 +1371,10 @@
         forbids. state_activated is picked up by every button ColorStateList
         (@color/btn_primary_content and its five siblings), which take the label AND
         the icon to alpha 0 — so THE LABEL IS STILL MEASURED, the button keeps the
-        exact width it had a frame earlier, and it cannot jump. The
-        @drawable/btn_overlay_* foregrounds hold the resting bevel on the same state,
-        ahead of their pressed row, so a working control never reads as pressed.
+        exact width it had a frame earlier, and it cannot jump. On the Primary — the
+        one button that still carries a bevel — @drawable/btn_overlay_primary holds
+        the RESTING bevel on this same state, ahead of its pressed row, so a working
+        control never reads as pressed.
 
         Nothing else on the app sets isActivated on a MaterialButton, and no layout
         declares duplicateParentState, so no selected row can push a button into this

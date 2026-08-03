@@ -743,8 +743,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Real subscription groups (providers), pinned-first, used as section headers
      * on the Servers tab. Excludes the synthetic "All" pseudo-group.
      */
+    /**
+     * The подписки the user actually has, pinned first.
+     *
+     * `__default_subscription__` IS EXCLUDED, AND THAT IS THE FIX FOR THE PHANTOM CARD.
+     * It is not a подписка: it is the internal storage bucket that holds servers with no
+     * subscription of their own, and `SettingsManager.migrateServerListToSubscriptions` calls
+     * `ensureDefaultSubscription()` before it checks whether there is anything to migrate — so
+     * every fresh install writes a `SubscriptionItem(remarks = "Default")` under that key, and
+     * `MmkvManager.initSubsList` then adopts every key in `subStorage` as the subscription list.
+     *
+     * Drawn as a card it becomes «Подписка» (the heading falls back for a blank or "Default"
+     * remark) with «Ещё не обновлялась» and an empty body — the second, nameless подписка the
+     * owner saw appear next to his real one the moment he added it: «при добавлении пишет другую
+     * подписку без названия». It only surfaced after the first add because with no servers at all
+     * the gate block replaces the carousel entirely.
+     *
+     * Nothing is lost by leaving it out. Servers in that bucket still reach the list —
+     * `MmkvManager.decodeAllServerList` reads it explicitly, and `MainRecyclerAdapter.rebuildRows`
+     * collects everything without a matching подписка into its own «Локальные» section.
+     */
     fun getProviderGroups(): List<GroupMapItem> {
         return MmkvManager.decodeSubscriptions()
+            .filterNot { it.guid == AppConfig.DEFAULT_SUBSCRIPTION_ID }
             .sortedByDescending { it.subscription.pinned }
             .map { GroupMapItem(id = it.guid, remarks = it.subscription.remarks) }
     }

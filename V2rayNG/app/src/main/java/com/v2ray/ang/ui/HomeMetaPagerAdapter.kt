@@ -54,12 +54,20 @@ class HomeMetaPagerAdapter(
 
     /**
      * Repaints every page in place, for a change that alters what a card SAYS rather than which
-     * cards exist — the account answering with its own nicknames is the one that matters.
+     * cards exist — the account answering with its own nicknames, and the chevron flipping when the
+     * server list collapses.
+     *
+     * `notifyItemRangeChanged`, NEVER `notifyDataSetChanged`. This is a ViewPager2, i.e. a
+     * RecyclerView, and `notifyDataSetChanged` declares a STRUCTURAL change: the layout manager
+     * discards its state and re-lays out from the start, while ViewPager2's own current-item
+     * bookkeeping still believes it is on page N. The carousel visibly slides back to the first
+     * card — «если скрывать раскрывать сам бар с подпиской улетает влево», because collapsing the
+     * list calls straight through to here. A content-only notification rebinds the same holders in
+     * place and leaves the scroll offset alone, which is exactly what a repaint means.
      */
-    @SuppressLint("NotifyDataSetChanged")
     fun repaint() {
         if (subIds.isEmpty()) return
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, subIds.size)
     }
 
     override fun getItemCount(): Int = subIds.size

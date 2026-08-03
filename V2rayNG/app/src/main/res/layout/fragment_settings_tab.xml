@@ -993,145 +993,23 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- Список подписок (SubSettingActivity). Единственный вход на экран, где
-                     подписку можно добавить, включить, обновить и удалить: до этой волны
-                     экран был собран, объявлен в манифесте и не открывался ниоткуда. -->
-                <LinearLayout
-                    android:id="@+id/row_subs_list"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="@dimen/row_min_height"
-                    android:orientation="horizontal"
-                    android:paddingStart="@dimen/space_16"
-                    android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                <!-- REMOVED AT THE OWNER'S INSTRUCTION (2026-08-02).
+                     Two rows stood here: «Список подписок» (SubSettingActivity) and «Другие
+                     способы добавления» (MainHost.showAdvancedAddMethods). He asked for both
+                     gone from Настройки. Подписки are added, refreshed and deleted from their
+                     card on Главная, which is where he works with them.
 
-                    <FrameLayout
-                        android:layout_width="@dimen/tile_size"
-                        android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
-
-                        <ImageView
-                            android:layout_width="@dimen/tile_glyph"
-                            android:layout_height="@dimen/tile_glyph"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_subscriptions_24dp"
-                            app:tint="?attr/iconTintBlue" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_8"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_subs_list"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/settings_subs_list_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_marginStart="@dimen/space_4"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
-                    android:background="?attr/colorOutlineVariant" />
-
-                <!-- Другие способы добавления (MainHost.showAdvancedAddMethods).
-                     Владелец сократил меню «Добавить подписку» до QR и буфера обмена
-                     (OWNER C1). Три оставшихся способа — ссылка, сервер вручную, файл
-                     конфигурации — при этом переехали в код и не вызывались ниоткуда:
-                     рабочая функция без единого входа. Это их вход. Стоит сразу под
-                     «Списком подписок», потому что это второе, что делают с подпиской
-                     после того, как её добавили штатным путём. -->
-                <LinearLayout
-                    android:id="@+id/row_add_other"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="@dimen/row_min_height"
-                    android:orientation="horizontal"
-                    android:paddingStart="@dimen/space_16"
-                    android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
-
-                    <FrameLayout
-                        android:layout_width="@dimen/tile_size"
-                        android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
-
-                        <ImageView
-                            android:layout_width="@dimen/tile_glyph"
-                            android:layout_height="@dimen/tile_glyph"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_add_24dp"
-                            app:tint="?attr/iconTintBlue" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_8"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/add_other_methods_title"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/settings_add_other_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_marginStart="@dimen/space_4"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
-                    android:background="?attr/colorOutlineVariant" />
+                     WHAT THAT MAKES UNREACHABLE, recorded so it is a decision and not a loss:
+                       - SubSettingActivity + SubEditActivity — the subscription list screen and
+                         its editor (add by typed URL, rename, enable/disable, per-sub User-Agent
+                         and auto-update overrides, remote-DNS override, delete). The card on
+                         Главная carries refresh, pin, support, Telegram and delete; renaming and
+                         the per-sub overrides now have no UI.
+                       - MainHost.showAdvancedAddMethods() — «Добавить по ссылке», «Ввести
+                         сервер вручную» (the manual per-protocol editors) and «Импортировать из
+                         файла». Adding is QR + clipboard only, which is owner ruling C1.
+                     Both remain declared in the manifest and fully implemented; nothing was
+                     deleted, so restoring an entry point is one row. -->
 
                 <!-- Автообновление подписки -->
                 <LinearLayout
@@ -1509,76 +1387,16 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- Расширенные настройки. SettingsActivity hosts the 19-preference tree; without
-                     this row it had no launch site anywhere in the app, so none of those settings
-                     had a reachable editor. -->
-                <LinearLayout
-                    android:id="@+id/row_advanced"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="@dimen/row_min_height"
-                    android:orientation="horizontal"
-                    android:paddingStart="@dimen/space_16"
-                    android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                <!-- REMOVED AT THE OWNER'S INSTRUCTION (2026-08-02): the «Дополнительно»
+                     row that opened SettingsActivity.
 
-                    <FrameLayout
-                        android:layout_width="@dimen/tile_size"
-                        android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
-
-                        <ImageView
-                            android:layout_width="@dimen/tile_glyph"
-                            android:layout_height="@dimen/tile_glyph"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_settings_24dp"
-                            app:tint="?attr/iconTintBlue" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_8"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_advanced"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <!-- Что за этой строкой: ядро, туннель, DNS, фрагментация, проверка
-                             задержки. Строка ведёт на «Дополнительно», куда переехала
-                             «Маршрутизация по домену» с экрана локального прокси. -->
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/adv_entry_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_marginStart="@dimen/space_4"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
-                    android:background="?attr/colorOutlineVariant" />
+                     WHAT THAT MAKES UNREACHABLE: the whole legacy preference tree in
+                     res/xml/pref_settings.xml — core/tunnel/DNS/fragmentation/delay-test and the
+                     «Маршрутизация по домену» option that was moved into it from the local-proxy
+                     screen. The settings this tab already exposes as first-class rows (mode,
+                     appearance, language, per-app routing, local proxy, routing, assets,
+                     подписка auto-update, boot) are unaffected — they read and write the same
+                     MMKV keys directly. SettingsActivity stays declared and implemented. -->
 
                 <!-- Журнал -->
                 <LinearLayout

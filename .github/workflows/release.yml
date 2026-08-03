@@ -39,8 +39,25 @@ jobs:
       - name: Build libhev-socks5-tunnel (tun2socks native lib)
         run: bash compile-hevtun.sh
 
+      # `app/build.gradle.kts` declares `jniLibs.srcDirs("libs")`, so the ABI directories
+      # compile-hevtun.sh produced have to land at V2rayNG/app/libs/<abi>/.
+      #
+      # This used to be `cp -r <ws>/libs <ws>/V2rayNG/app`, which is correct ONLY while the
+      # destination does not already exist — V2rayNG/app/libs is untracked (.gitignore excludes
+      # *.so and *.aar) so on a clean runner it does not. The moment anything creates it first —
+      # a cached workspace, a self-hosted runner, a reordered step, one committed placeholder —
+      # the same command nests to V2rayNG/app/libs/libs/<abi>/, Gradle finds no ABI directory,
+      # and the .so silently vanishes from a perfectly green build. Copying the CONTENTS into an
+      # explicitly created destination has one behaviour instead of two.
       - name: Copy libhev-socks5-tunnel into app
-        run: cp -r "${{ github.workspace }}/libs" "${{ github.workspace }}/V2rayNG/app"
+        run: |
+          set -e
+          mkdir -p "${{ github.workspace }}/V2rayNG/app/libs"
+          cp -r "${{ github.workspace }}/libs/." "${{ github.workspace }}/V2rayNG/app/libs/"
+          echo "jniLibs source tree:"
+          ls -R "${{ github.workspace }}/V2rayNG/app/libs"
+          test -f "${{ github.workspace }}/V2rayNG/app/libs/arm64-v8a/libhev-socks5-tunnel.so" \
+            || { echo "::error::arm64-v8a/libhev-socks5-tunnel.so is not where jniLibs expects it"; exit 1; }
 
       - name: Fetch AndroidLibXrayLite tag
         run: |
@@ -133,6 +150,27 @@ jobs:
             echo "note: apksigner not on this runner; relied on the filename check alone."
           fi
           echo "installable artefact: $apk"
+
+      # Whether the tunnel library actually ships is a fact about the APK, not an argument about
+      # the copy step. `System.loadLibrary("hev-socks5-tunnel")` needs lib/arm64-v8a/ inside the
+      # archive; if it is absent the app degrades to the core's own tun (SettingsManager
+      # .isUsingHevTun consults TProxyService.isAvailable) instead of dying — but a degraded VPN
+      # must never be published silently as the normal one.
+      - name: Prove the tunnel library is inside the APK
+        run: |
+          set -e
+          apk=$(find V2rayNG/app/build/outputs/apk -name '*arm64-v8a*.apk' | head -n 1)
+          echo "native libraries in $apk:"
+          unzip -l "$apk" | grep -E '\.so$' || true
+          if ! unzip -l "$apk" | grep -q 'lib/arm64-v8a/libhev-socks5-tunnel\.so'; then
+            echo "::error::$apk carries no lib/arm64-v8a/libhev-socks5-tunnel.so — tun2socks cannot load."
+            exit 1
+          fi
+          if ! unzip -l "$apk" | grep -q 'lib/arm64-v8a/libgojni\.so'; then
+            echo "::error::$apk carries no lib/arm64-v8a/libgojni.so — the xray core cannot start."
+            exit 1
+          fi
+          echo "both native libraries present for arm64-v8a"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

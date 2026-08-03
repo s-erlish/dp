@@ -63,13 +63,90 @@
             android:textAppearance="@style/TextAppearance.App.Subtitle"
             tools:text="Действует до 31.12.2026" />
 
-        <TextView
-            android:id="@+id/tv_sub_devices"
+        <!-- THE TRAFFIC METER. The desktop's TrafficPill, expressed as this app's own meter
+             component: label beside the bar, never printed on it. On an unlimited plan the bar
+             is hidden and the value reads «1,9 ТБ · безлимит» — a bar with no ceiling is a lie
+             — and with no usage figure at all the whole meter goes rather than drawing 0 of 0. -->
+        <include
+            android:id="@+id/meter_traffic"
+            layout="@layout/view_meter"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_4"
-            android:fontFeatureSettings="&quot;tnum&quot; on"
-            android:textAppearance="@style/TextAppearance.App.Subtitle"
-            tools:text="Устройства: 1 / 3" />
+            android:layout_marginTop="@dimen/space_12" />
+
+        <!-- DEVICES, INSIDE THE CARD, AND TAPPABLE. The desktop makes the whole «Устройства»
+             measure a tap target onto the devices screen (MeterRow, «ВСЯ строка»); Android had
+             the figure as dead text and the only route to the screen was the hub row further
+             down. Both stay: this is a second door on the card that owns the allowance. -->
+        <LinearLayout
+            android:id="@+id/row_sub_devices"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_8"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:minHeight="@dimen/row_min_height"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tv_sub_devices"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFeatureSettings="&quot;tnum&quot; on"
+                android:maxLines="1"
+                android:textAppearance="@style/TextAppearance.App.Subtitle"
+                tools:text="Устройства: 1 / 3" />
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="@dimen/space_8"
+                android:importantForAccessibility="no"
+                app:srcCompat="@drawable/ic_chevron_right"
+                app:tint="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+
+        <!-- «ПРОДЛИТЬ» — the card's ONE primary action, full width, and it is shown on a
+             perpetual подписка too. The owner is explicit: «она должна быть и при бессрочной
+             подписке». A perpetual plan is the one a user is most likely to extend deliberately,
+             and hiding the control tells him the account cannot be topped up at all. -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_sub_renew"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_16"
+            android:text="@string/account_sub_renew" />
+
+        <!-- AUTO-RENEW: the toggle and the line that says what it will do next. Mirrors the
+             desktop's ShowAutoRenew block. Hidden only when the backend gives us no subscription
+             id to act on — a switch that cannot be honoured must not be offered. -->
+        <LinearLayout
+            android:id="@+id/row_sub_autorenew"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_12"
+            android:gravity="center_vertical"
+            android:minHeight="@dimen/row_min_height"
+            android:orientation="horizontal">
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switch_sub_autorenew"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/account_sub_autorenew" />
+
+            <TextView
+                android:id="@+id/tv_sub_autorenew"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_12"
+                android:layout_weight="1"
+                android:text="@string/account_sub_autorenew"
+                android:textAppearance="@style/TextAppearance.App.Subtitle" />
+        </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

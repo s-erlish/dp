@@ -359,6 +359,12 @@ class CoreVpnService : VpnService(), ServiceControl {
      * Starts the tun2socks process with the appropriate parameters.
      */
     private fun runTun2socks() {
+        // isUsingHevTun() is the user's preference AND TProxyService.isAvailable — see its kdoc.
+        // When the native bridge cannot load, this is false, nothing here touches TProxyService,
+        // and the core owns the tunnel instead (CoreConfigManager.needTun / the tun fd handed to
+        // startLoop). Do not "simplify" this back to reading the preference alone: that is what
+        // turned a missing .so into an ExceptionInInitializerError out of a static initialiser,
+        // past onStartCommand's catch(Exception), and killed :RunSoLibV2RayDaemon on connect.
         if (SettingsManager.isUsingHevTun()) {
             tun2SocksService = TProxyService(
                 context = applicationContext,
@@ -367,6 +373,13 @@ class CoreVpnService : VpnService(), ServiceControl {
                 restartCallback = { runTun2socks() }
             )
         } else {
+            if (MmkvManager.decodeSettingsBool(AppConfig.PREF_USE_HEV_TUNNEL, true)) {
+                LogUtil.w(
+                    AppConfig.TAG,
+                    "StartCore-VPN: hev-socks5-tunnel is unavailable in this build; " +
+                        "the core will carry the tunnel itself"
+                )
+            }
             tun2SocksService = null
         }
 

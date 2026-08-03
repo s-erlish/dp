@@ -45,6 +45,29 @@
     <string name="account_trial_badge">ПРОБНЫЙ</string>
     <string name="account_auto_renew">Автопродление</string>
 
+    <!-- The subscription card's own controls, brought across from the desktop's AccountView.
+         «Продлить» is shown on a perpetual подписка too — owner ruling, «она должна быть и при
+         бессрочной подписке». -->
+    <string name="account_sub_renew">Продлить</string>
+    <string name="account_sub_autorenew">Автопродление</string>
+    <string name="account_sub_autorenew_on">Автопродление включено</string>
+    <string name="account_sub_autorenew_next">Спишется %1$s · %2$s</string>
+    <string name="account_sub_autorenew_off">Автопродление выключено</string>
+    <string name="account_sub_autorenew_failed">Не удалось изменить автопродление</string>
+    <!-- The traffic meter on the subscription card. Unlimited plans state the figure used and
+         say so, because a bar with no ceiling encodes nothing. -->
+    <string name="account_meter_traffic">Трафик</string>
+    <string name="account_meter_traffic_of">%1$s из %2$s</string>
+    <string name="account_meter_traffic_unlimited">%1$s · безлимит</string>
+    <string name="account_meter_traffic_over">Лимит исчерпан</string>
+
+    <!-- «Способы входа»: what this account can be signed in with. Today that is Telegram, and
+         the row names the account it is actually linked to rather than only the method. -->
+    <string name="account_login_methods">Способы входа</string>
+    <string name="account_login_telegram">Telegram</string>
+    <string name="account_login_telegram_linked">Привязан · %1$s</string>
+    <string name="account_login_telegram_unlinked">Не привязан</string>
+
     <!-- Tariffs -->
     <string name="account_tariffs_header">Тарифы</string>
     <string name="account_tariffs_empty">Тарифы недоступны</string>

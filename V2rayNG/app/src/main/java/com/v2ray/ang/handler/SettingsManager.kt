@@ -27,6 +27,7 @@ import com.v2ray.ang.handler.MmkvManager.decodeSubsList
 import com.v2ray.ang.handler.MmkvManager.decodeSubscription
 import com.v2ray.ang.handler.MmkvManager.encodeSubscription
 import com.v2ray.ang.handler.MmkvManager.removeSubscription
+import com.v2ray.ang.service.TProxyService
 import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.Utils
@@ -665,10 +666,26 @@ object SettingsManager {
 
     /**
      * Check if HEV TUN is being used.
+     *
+     * Two conditions, and the second one is not cosmetic. The user's preference decides whether we
+     * WANT the hev-socks5-tunnel bridge; [TProxyService.isAvailable] decides whether the process
+     * CAN have it. If `libhev-socks5-tunnel.so` is not in this APK's ABI split, or refuses to load
+     * for any other reason, answering "yes" here builds a config with no tun inbound, hands the
+     * core a tun fd of 0, and then dies loading the library — a VPN that neither carries traffic
+     * nor survives the attempt.
+     *
+     * Answering "no" instead routes the start down the path the app already takes whenever a user
+     * turns the preference off: the core builds its own `tun` inbound ([CoreConfigManager.needTun]),
+     * receives the real fd, and owns the tunnel. Degraded, not dead.
+     *
+     * The preference is checked first so the library is never loaded by a process that had already
+     * opted out of it.
+     *
      * @return True if HEV TUN is used, false otherwise.
      */
     fun isUsingHevTun(): Boolean {
-        return MmkvManager.decodeSettingsBool(AppConfig.PREF_USE_HEV_TUNNEL, true)
+        if (!MmkvManager.decodeSettingsBool(AppConfig.PREF_USE_HEV_TUNNEL, true)) return false
+        return TProxyService.isAvailable
     }
 
     /**

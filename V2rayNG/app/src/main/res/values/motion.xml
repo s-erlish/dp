@@ -54,6 +54,12 @@
          AccelerateDecelerate pulse in AccountFragment. Reduced motion holds the
          skeleton static at opacity 0.7. Curve: ease_standard. -->
     <integer name="motion_pulse">1000</integer>
+    <!-- The connect arc's WIND-UP: one revolution out of rest at the instant the
+         sweep appears, on ease_out_quint, so the arc runs up to its steady spin
+         instead of flashing on at full speed. 200ms, matching the desktop's P0-3
+         (ConnectHeroView.axaml, Ellipse.ConnectArc.arc-windup). It is a one-shot
+         entrance and therefore eased, unlike motion_spin below. -->
+    <integer name="motion_windup">200</integer>
     <!-- One revolution of the 20dp inline indeterminate spinner arc. LINEAR, and
          the only linear animation in the product: a spinner is a continuous
          rotation, not a transition between two states, and an eased revolution

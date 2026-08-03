@@ -162,10 +162,19 @@
                         android:baselineAligned="true"
                         android:orientation="horizontal">
 
+                        <!-- THE GAP BELONGS TO THE FIGURE, NOT TO THE WORD, and that is the fix
+                             for «слово бессрочная подписка уехала вправо». In the perpetual and
+                             unknown states `renderTimeLines` hides the figure and the word carries
+                             the Title line alone — but the word used to own the 8dp gap, so with
+                             the figure gone it still started 8dp in, while «Баланс» and the
+                             ref-code below it sat on the card's gutter. Hanging the gap off the
+                             figure's END makes it disappear with the figure, so the word lands on
+                             the same gutter as every other line in this card. -->
                         <TextView
                             android:id="@+id/tv_time_figure"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:layout_marginEnd="@dimen/space_8"
                             android:textAppearance="@style/TextAppearance.App.Numeric.Display"
                             tools:text="3" />
 
@@ -173,7 +182,6 @@
                             android:id="@+id/tv_time_word"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="@dimen/space_8"
                             android:layout_weight="1"
                             android:ellipsize="end"
                             android:maxLines="1"
@@ -629,6 +637,83 @@
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ============ Способы входа ============
+             What this account can be signed in with, which the desktop names as its own block
+             («Способы входа», AccountView.axaml) and Android did not have at all. Today the
+             product has exactly one method, so the section states one row — and it states the
+             ACCOUNT it is linked to, not only the method, because "Telegram" alone answers a
+             question nobody asked. It is informational: there is no unlink action behind it, so
+             there is no chevron and the row is not clickable. -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_24"
+            android:layout_marginBottom="@dimen/space_8"
+            android:text="@string/account_login_methods"
+            android:textAppearance="@style/TextAppearance.App.Title" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="@dimen/radius_card"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:id="@+id/row_login_telegram"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:minHeight="@dimen/row_min_height"
+                android:orientation="horizontal"
+                android:paddingStart="@dimen/screen_gutter"
+                android:paddingEnd="@dimen/screen_gutter"
+                android:paddingVertical="@dimen/space_8">
+
+                <FrameLayout
+                    android:layout_width="@dimen/tile_size"
+                    android:layout_height="@dimen/tile_size"
+                    android:background="@drawable/bg_icon_neutral">
+
+                    <ImageView
+                        android:layout_width="@dimen/tile_glyph"
+                        android:layout_height="@dimen/tile_glyph"
+                        android:layout_gravity="center"
+                        android:importantForAccessibility="no"
+                        app:srcCompat="@drawable/ic_telegram_24dp"
+                        app:tint="@color/icon_glyph_neutral" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/space_12"
+                    android:layout_marginEnd="@dimen/space_8"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/account_login_telegram"
+                        android:textAppearance="@style/TextAppearance.App.Title" />
+
+                    <TextView
+                        android:id="@+id/tv_login_telegram_state"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_4"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="@string/account_login_telegram_unlinked"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        tools:text="Привязан · @erlish" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>

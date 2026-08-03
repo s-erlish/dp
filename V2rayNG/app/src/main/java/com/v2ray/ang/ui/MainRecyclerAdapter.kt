@@ -60,10 +60,12 @@ class MainRecyclerAdapter(
     /**
      * Opens the server-actions sheet for a row — edit, delete, share, QR, duplicate, make default.
      *
-     * Two affordances reach it and both are wired from here: a long press anywhere on the row, and
-     * the row's trailing `btn_row_actions` control, which exists because long press alone is a
-     * hidden route to actions that have no other one (M-52). A host that leaves this null gets
-     * neither — the trailing control is hidden rather than shown answering nothing.
+     * A LONG PRESS ANYWHERE ON THE ROW is the route, and the only one. A trailing «⋮» control was
+     * added beside it as a visible second door (9728c5c, M-52) and the owner removed it: «почему у
+     * серверов появились кнопки справа, если их вообще быть не должно». The row is back to the
+     * reference shape — flag, name, protocol chip, JSON chip, transport, ping — and this handler is
+     * what the long press calls. A host that leaves it null offers no actions at all, which is
+     * correct: an operator-locked list has none to offer.
      */
     var onItemLongClick: ((String) -> Unit)? = null
 
@@ -213,8 +215,13 @@ class MainRecyclerAdapter(
         binding.tvFlag.text = FlagUtil.resolveFlag(profile)
         binding.tvName.text = FlagUtil.stripLeadingFlag(profile.remarks)
 
-        // Protocol chips: blue primary, grey transport·security.
+        // Protocol chips: blue primary, gold JSON when the profile is an operator xray-json
+        // template, grey transport·security. The JSON chip is the reference row's mark for a
+        // template — chipJsonBg/chipJsonText were declared, themed in all three themes and read
+        // by nothing until it came back.
         binding.tvType.text = primaryProtocol(guid, profile)
+        binding.tvJson.visibility =
+            if (profile.configType == EConfigType.CUSTOM) View.VISIBLE else View.GONE
         binding.tvStatistics.text = transportSecurity(guid, profile)
 
         // Latency: three states, three different cells (00-rules.md 15). Measuring is the spinner
@@ -226,14 +233,21 @@ class MainRecyclerAdapter(
         val failed = aff?.pingResult == ServerAffiliationInfo.PingResult.FAILED
         binding.progressPing.visibility = if (measuring) View.VISIBLE else View.GONE
         binding.tvTestResult.visibility = if (measuring) View.GONE else View.VISIBLE
-        binding.tvTestResult.text = when {
+        val pingText = when {
             measuring -> ""
             failed -> PING_FAILED
             else -> aff?.getTestDelayString().orEmpty()
         }
+        binding.tvTestResult.text = pingText
         // Ping colours resolved from theme attrs so ThemeOverlay.Mono greys them out.
         val pingAttr = if (failed) R.attr.pingBad else R.attr.pingGood
-        binding.tvTestResult.setTextColor(MaterialColors.getColor(binding.tvTestResult, pingAttr))
+        val pingColor = MaterialColors.getColor(binding.tvTestResult, pingAttr)
+        binding.tvTestResult.setTextColor(pingColor)
+        // The dot carries the same verdict as the figure, in colour, at a glance. It shows only
+        // when there IS a verdict: blank means "never measured", and a dot with no number beside
+        // it would claim a result nobody has taken.
+        binding.viewPingDot.visibility = if (pingText.isBlank()) View.GONE else View.VISIBLE
+        binding.viewPingDot.background?.mutate()?.setTint(pingColor)
 
         // Selection: blue rounded outline via bg_server_row selected state.
         // Indicator bar tint via theme attr (mono-safe).
@@ -249,22 +263,18 @@ class MainRecyclerAdapter(
         binding.infoContainer.setOnClickListener {
             adapterListener?.onSelectServer(guid)
         }
-        // Long-press opens the server-actions sheet. Both hosts assign [onItemLongClick] and the
-        // sheet handles the operator-locked case, but this invocation was missing, which left
-        // delete, edit, share and QR — the only routes to any of them — unreachable.
+        // LONG-PRESS IS THE ROUTE TO THE ACTIONS SHEET — edit, share, QR, duplicate, delete.
+        // Both hosts assign [onItemLongClick]; this invocation was once missing entirely, which
+        // left all five unreachable, so it must not be dropped again.
+        //
+        // A trailing «⋮» button was added beside it in 9728c5c as a second, visible door. The
+        // owner rejected it — «почему у серверов появились кнопки справа, если их вообще быть не
+        // должно» — so the row is back to its reference shape and the long press is the route.
         binding.infoContainer.setOnLongClickListener {
             val handler = onItemLongClick ?: return@setOnLongClickListener false
             handler(guid)
             true
         }
-        // The visible door to the same sheet (M-52). Long-press survives above it: a hidden
-        // affordance is a bad ONLY route, not a bad shortcut. The trailing button is a clickable
-        // child, so it consumes its own touch and the row's select-server click never fires from
-        // it. When no host wired the sheet there is nothing behind the control, so it is not
-        // offered at all rather than drawn as a button that answers nothing.
-        val actions = onItemLongClick
-        binding.btnRowActions.visibility = if (actions != null) View.VISIBLE else View.GONE
-        binding.btnRowActions.setOnClickListener { actions?.invoke(guid) }
     }
 
     private fun primaryProtocol(guid: String, profile: ProfileItem): String {
