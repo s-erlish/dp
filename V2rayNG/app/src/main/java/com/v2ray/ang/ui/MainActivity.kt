@@ -972,16 +972,20 @@ class MainActivity : HelperBaseActivity(), MainHost {
         AlertDialog.Builder(this).setView(ivBinding.root).show()
     }
 
+    // Copying to the clipboard is one of the two actions in the product that change NOTHING on
+    // screen, so it is one of the two that still confirms itself — and it does it in a sentence
+    // that names what happened, rather than in upstream's «Успешно» / «Ошибка», which were the
+    // same two words every outcome in the app used to get.
     private fun share2Clipboard(guid: String) {
-        if (AngConfigManager.share2Clipboard(this, guid) == 0) toastSuccess(R.string.toast_success)
-        else toastError(R.string.toast_failure)
+        if (AngConfigManager.share2Clipboard(this, guid) == 0) toast(R.string.notice_copied)
+        else toastError(R.string.notice_copy_failed)
     }
 
     private fun shareFullContent(guid: String) {
         lifecycleScope.launch(Dispatchers.IO) {
             val result = AngConfigManager.shareFullContent2Clipboard(this@MainActivity, guid)
             launch(Dispatchers.Main) {
-                if (result == 0) toastSuccess(R.string.toast_success) else toastError(R.string.toast_failure)
+                if (result == 0) toast(R.string.notice_copied) else toastError(R.string.notice_copy_failed)
             }
         }
     }
@@ -1314,7 +1318,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    toastError(R.string.toast_failure)
+                    toastError(R.string.notice_add_failed)
                     hideLoading()
                 }
                 LogUtil.e(AppConfig.TAG, "Failed to import batch config", e)
@@ -1323,31 +1327,39 @@ class MainActivity : HelperBaseActivity(), MainHost {
     }
 
     /**
-     * Turns the rich [AngConfigManager.ImportResult] into precise, sentence-case feedback so adding
-     * a server or subscription is never silently successful nor falsely reported as a failure.
+     * The outcome of an add, in the product's own voice and only when the screen cannot say it
+     * itself.
+     *
+     * WHAT CAME OUT OF HERE, and why. This used to answer every branch with a `Toasty` capsule —
+     * green «Серверы добавлены: 4», green «Импортировано серверов: 4», red «Ошибка» — and that
+     * red one on the QR path is the message the owner named: «по qr коду когда добавляешь там
+     * внизу уведомление красное и тд, их убрать надо совсем».
+     *
+     * A successful add is SILENT now, because it is the one case where the screen answers
+     * completely on its own: the gate block is replaced by the подписка card, the card carries
+     * the name and the traffic, and the server list fills in under it, all in the same frame as
+     * the message would have been. A count of records on top of that is upstream telling the user
+     * about its own bookkeeping.
+     *
+     * The three cases where the tap has NO visible answer keep one sentence each — a подписка
+     * that fetched nothing, a link already added, a link that is not ours — and the blunt
+     * `toast_failure` («Ошибка») is replaced by a sentence that says what failed.
      */
     private fun showImportResult(result: AngConfigManager.ImportResult) {
         when {
-            // A subscription was just added: report how many of its servers actually loaded.
+            // A подписка was added. If it produced servers the screen says so by rebuilding
+            // itself; if it produced none, nothing on screen changes and that needs a word.
             result.countSub > 0 -> {
-                val loaded = result.subFetch?.configCount ?: 0
-                if (loaded > 0) {
-                    toastSuccess(getString(R.string.import_servers_added, loaded))
-                } else {
-                    toastError(getString(R.string.import_sub_empty))
-                }
+                if ((result.subFetch?.configCount ?: 0) <= 0) toastError(R.string.import_sub_empty)
                 mainViewModel.reloadServerList()
             }
-            // One or more individual servers were imported.
-            result.count > 0 -> {
-                toastSuccess(getString(R.string.title_import_config_count, result.count))
-                mainViewModel.reloadServerList()
-            }
-            // The subscription link is valid but was already added.
-            result.subDuplicate -> toast(getString(R.string.import_sub_duplicate))
+            // Individual servers: they appear in the list, which is the confirmation.
+            result.count > 0 -> mainViewModel.reloadServerList()
+            // The subscription link is valid but was already added — nothing changes on screen.
+            result.subDuplicate -> toast(R.string.import_sub_duplicate)
             // The subscription link is not from departament.
-            result.subRejected -> toast(getString(R.string.import_sub_foreign))
-            else -> toastError(R.string.toast_failure)
+            result.subRejected -> toast(R.string.import_sub_foreign)
+            else -> toastError(R.string.notice_add_failed)
         }
     }
 
@@ -1375,18 +1387,16 @@ class MainActivity : HelperBaseActivity(), MainHost {
             val result = mainViewModel.updateConfigViaSubAll()
             delay(500L)
             launch(Dispatchers.Main) {
-                if (result.successCount + result.failureCount + result.skipCount == 0) {
-                    toast(R.string.title_update_subscription_no_subscription)
-                } else if (result.successCount > 0 && result.failureCount + result.skipCount == 0) {
-                    toast(getString(R.string.title_update_config_count, result.configCount))
-                } else {
-                    toast(
-                        getString(
-                            R.string.title_update_subscription_result,
-                            result.configCount, result.successCount, result.failureCount, result.skipCount
-                        )
-                    )
-                }
+                // THE COUNTER IS GONE, and it is the second message the owner named: «Обновлено
+                // серверов: 13 (успешно: 1, ошибки: 0, пропущено: 1)». Four figures about the
+                // refresh's own bookkeeping, in upstream's voice, on top of a card that has just
+                // repainted with the new timestamp and a list that has just repainted with the new
+                // rows. The repaint IS the confirmation, so a refresh that worked says nothing.
+                //
+                // A refresh that produced NOTHING is the case with no visible answer, and it gets
+                // one sentence with a next step in it. `NoticePolicy` blocks the counter shape at
+                // the surface too, so the string cannot come back through another call site.
+                if (result.successCount == 0) toastError(R.string.notice_refresh_failed)
                 if (result.configCount > 0) {
                     mainViewModel.reloadServerList()
                 }

@@ -300,18 +300,50 @@
 
               FIRST child of the frame, so it lies UNDER the disc and everything the disc
               holds, and it is not hit-testable — the tap belongs to the frame. It starts
-              at the disc's own 176dp (match_parent inside the frame's 24dp padding) and
-              travels out through the two outer rings the frame's background draws.
-              HomeFragment loops it slowly at rest and, a little brighter and faster,
-              while connected: the desktop's «живой» layer (ConnectHeroView.axaml,
-              AmbientSonar.rest-idle / rest-live). Without it the object was a still
-              picture except during the 850ms negotiating breath, which is precisely the
-              complaint — «практически нет никакой анимации, только пульсация».
+              at the disc's own 176dp and travels out to just inside the outer ring the
+              frame's background draws. HomeFragment loops it slowly at rest and, a little
+              brighter and faster, while connected: the desktop's «живой» layer
+              (ConnectHeroView.axaml, AmbientSonar.rest-idle / rest-live). Without it the
+              object was a still picture except during the 850ms negotiating breath, which
+              is precisely the complaint — «практически нет никакой анимации, только
+              пульсация».
+
+              IT IS SIZED IN dp AND NEVER match_parent, AND THAT IS THE WHOLE BUG THIS
+              LAYER SHIPPED WITH. It was written `match_parent`×`match_parent` on the
+              assumption that a child of this padded frame resolves to the 176dp box —
+              the same assumption buildConnectObject states at HomeFragment.kt:681. It
+              does not. This frame is wrap_content, so it is measured AT_MOST(screen), a
+              bare View returns the AT_MOST size verbatim (View.getDefaultSize), and the
+              child came back (screen − 48dp) wide against a height that came from the
+              scroll pass — never square, and wide enough to drag the frame's own
+              wrap_content out to the full screen with it. The frame's background is a
+              LayerDrawable of two OVALS, so those two stretched with it: the owner's
+              «two gigantic flattened ovals», in every state, worst in the empty one where
+              fillViewport hands the frame the whole viewport. A uniform scaleX/scaleY
+              cannot make an oval — only a non-square bounds can.
+
+              AND IT IS ALSO WHY THE FIRST-RUN SCREEN HAD NO BUTTONS ON IT —
+              «стартовый экран кнопок нет для добавления и тд, еле подписку добавил».
+              Same measure pass, the other axis. fillViewport re-measures this column
+              with EXACTLY(viewport) whenever the content is shorter than the screen, so
+              LinearLayout hands each wrap_content child AT_MOST(what is left), the frame
+              passes that straight down, and this View swallowed the WHOLE remainder as
+              its height. The frame therefore grew to fill the viewport and everything
+              below it — the ledger, the server line and the gate block with «Добавить
+              подписку» on it — was pushed off the bottom of the screen. Collapsing the
+              server list reproduced it exactly, and for exactly the same reason: a
+              shorter column is what wakes fillViewport up.
+
+              So: an explicit square. 176dp = the disc, centred, travelling to at most
+              @1.20 = 211dp, which stops short of the 224dp frame. The object breathes
+              just outside its own edge, never reaches the screen gutter, and cannot
+              change this frame's measured size in either axis — a scale is a draw-time
+              transform and takes no part in layout.
             -->
             <View
                 android:id="@+id/connect_ring_ambient"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_width="@dimen/connect_disc"
+                android:layout_height="@dimen/connect_disc"
                 android:layout_gravity="center"
                 android:alpha="0"
                 android:importantForAccessibility="no" />
@@ -382,7 +414,7 @@
                     android:visibility="gone"
                     app:hideAnimationBehavior="inward"
                     app:indeterminateAnimationType="disjoint"
-                    app:indicatorColor="?attr/colorPrimary"
+                    app:indicatorColor="?attr/colorAccentFigure"
                     app:indicatorSize="@dimen/connect_disc"
                     app:showAnimationBehavior="inward"
                     app:trackColor="@android:color/transparent"
@@ -421,7 +453,7 @@
                     android:importantForAccessibility="no"
                     android:stateListAnimator="@anim/press_dip"
                     app:srcCompat="@drawable/ic_shield_filled"
-                    app:tint="?attr/colorPrimary" />
+                    app:tint="?attr/colorAccentFigure" />
             </FrameLayout>
         </FrameLayout>
 
@@ -468,10 +500,26 @@
               what the owner's screenshot shows; the caption that used to own the unit
               no longer exists to hold it.
 
-              THE RESERVE IS THE WHOLE POINT: android:minEms reserves N em, and an em
-              IS the text size, so the reserve scales with the type at every font scale
-              without a single sp literal. A value going 9,9 -> 10,1 moves nothing, and
-              neither does 00:09:59 -> 00:10:00.
+              THE TWO VALUES HANG OFF THE CENTRE, AND THAT IS WHY THIS ROW LOOKED
+              CROOKED. Three equal weights already put the timer on the true centre
+              line, but each value carried `minEms="4"` and no gravity, so the reserve's
+              slack sat AFTER the digits on both sides: on the left it fell between the
+              value and the timer, on the right it fell outside everything. The screen
+              read «↑ 1,0 KB/s␣␣␣␣␣␣ 00:11:52 ↓ 1,2 KB/s» — one gap ~32dp wider than the
+              other, which is exactly what the owner measured.
+
+              The reserve is gone and the two groups are pinned by their INNER edge
+              instead: the up column is `end`-aligned in its third, the down column is
+              `start`-aligned in its own. Both inner edges are one third from the middle,
+              so the gap either side of the timer is identical AT EVERY VALUE WIDTH, and
+              a value that grows grows OUTWARD, away from the timer, instead of pushing
+              at it. Nothing on the inner edge can move, which is what the reserve was
+              added to guarantee, and the arrow stays welded to its own number rather
+              than to a fixed-width box the number floats inside.
+
+              @style/TextAppearance.App.Numeric puts tabular figures on both, so a value
+              changing 1,0 -> 9,9 is zero motion; only a digit-count or unit change moves
+              the outer edge at all.
 
               The strip is on screen at rest, reading zeroes, exactly as it was: this
               is the screen's ledger, not a reward for connecting, and a row that
@@ -492,7 +540,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:baselineAligned="true"
-                    android:gravity="center"
+                    android:gravity="end|center_vertical"
                     android:orientation="horizontal">
 
                     <TextView
@@ -511,7 +559,6 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:maxLines="1"
-                        android:minEms="4"
                         android:text="@string/home_speed_zero"
                         android:textAppearance="@style/TextAppearance.App.Subtitle"
                         tools:text="1,0 KB/s" />
@@ -536,7 +583,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:baselineAligned="true"
-                    android:gravity="center"
+                    android:gravity="start|center_vertical"
                     android:orientation="horizontal">
 
                     <TextView
@@ -555,7 +602,6 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:maxLines="1"
-                        android:minEms="4"
                         android:text="@string/home_speed_zero"
                         android:textAppearance="@style/TextAppearance.App.Subtitle"
                         tools:text="1,2 KB/s" />

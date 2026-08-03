@@ -194,8 +194,25 @@ class AccountFragment : Fragment() {
                     ?: viewModel.tariffNameForPriceOptionId(sub.tariffPriceOptionId)
                     ?: sub.tariffBadgeName()
             },
-            // Live connected-device count comes from GET /client/devices for the active sub.
-            resolveUsedDevices = { viewModel.deviceCount.value ?: 0 },
+            // THE LIVE COUNT BELONGS TO ONE ПОДПИСКА AND IS OFFERED TO ONE CARD.
+            //
+            // `viewModel.deviceCount` is the result of GET /client/devices, and that endpoint
+            // answers about the ACTIVE подписка — there is no per-подписка device call in this API.
+            // This lambda used to ignore the `SubInfoDto` it is handed and return that one figure
+            // for every page, so a user with two подписки read the root's «Устройства: 2 / 3» on
+            // both cards. `/client/subscription/all` cannot rescue it either: it returns
+            // `connectedDevices = 0` for every item by design (SubscriptionDtos).
+            //
+            // So: the ROOT card gets the real figure, and any other card gets null, which prints
+            // the allowance alone. Showing nothing where nothing is known beats showing a number
+            // that is right about a different подписка.
+            resolveUsedDevices = { sub ->
+                if (sub.type.equals(SubscriptionSyncManager.TYPE_ROOT, ignoreCase = true)) {
+                    viewModel.deviceCount.value
+                } else {
+                    null
+                }
+            },
             // «Продлить» goes where buying goes — the tariff screen owns duration, extra devices
             // and the payment method, so the card hands off rather than growing a second checkout.
             onRenew = { openSubScreen(BuyTariffActivity::class.java) },
@@ -272,6 +289,11 @@ class AccountFragment : Fragment() {
         if (sub.type.equals(SubscriptionSyncManager.TYPE_ROOT, ignoreCase = true)) {
             viewModel.togglePrimaryAutoRenew(enabled, onError, onDone)
         } else {
+            // Unreachable from the UI now: `SubscriptionPagerAdapter.bindAutoRenew` hides the whole
+            // row when a secondary подписка has no id, so a switch that can only fail is never
+            // offered. Kept as the guard it always should have been, rather than as the place the
+            // impossible case was discovered — one flip, one revert and one error message after
+            // the fact.
             val id = sub.id.takeIf { it.isNotBlank() } ?: return onError(ApiError.Network(null))
             viewModel.toggleAutoRenew(id, enabled, onError, onDone)
         }
@@ -542,16 +564,26 @@ class AccountFragment : Fragment() {
         }
     }
 
-    /** Fills the management "Устройства" row's trailing "N / M" slot from the active sub, or hides it. */
+    /**
+     * Fills the management «Устройства» row's trailing «N / M» slot from the active подписка, or
+     * hides it.
+     *
+     * `?: 0` USED TO STAND IN FOR "NOT LOADED YET", and it printed «0 / 3» — a figure that is not
+     * unknown, it is WRONG, and it is wrong in the most alarming direction on a screen about a
+     * device allowance. `GET /client/devices` lands a second or two after the tab opens, so that
+     * is what the row said for the first second of every visit. The slot is now empty until the
+     * count is real, and this method is already re-run when it arrives (observeState collects
+     * `deviceCount`), so the value appears the instant it is known.
+     */
     private fun renderDevicesRowValue() {
         val sub = currentSubs.firstOrNull()
-        if (sub == null) {
+        val usedDevices = viewModel.deviceCount.value
+        if (sub == null || usedDevices == null) {
             binding.tvRowValueDevices.visibility = View.GONE
             return
         }
         val unlimitedDevices = sub.subscription?.raw()?.isUnlimitedDevices() == true
         val totalDevicesStr = if (unlimitedDevices) getString(R.string.account_unlimited) else sub.totalDevices.toString()
-        val usedDevices = viewModel.deviceCount.value ?: 0
         binding.tvRowValueDevices.text = "$usedDevices / $totalDevicesStr"
         binding.tvRowValueDevices.visibility = View.VISIBLE
     }

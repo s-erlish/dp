@@ -228,6 +228,19 @@
     <color name="mono_warningContainer">#232326</color>
     <color name="mono_skeleton">#232326</color>
 
+    <!-- MONO × DARK IS NOT CHANGED, and these three lines are how that is
+         guaranteed. The owner reported mono×light only - «а если с темной на
+         чернобелую то все нормально» - so the dark overlay keeps exactly the
+         colours it resolved to before the plate/figure roles existed: the chip
+         plate was colorPrimaryContainer, the plate had no boundary, and the
+         connect object's ink was colorPrimary. On black, white ink IS the
+         accent's weight (mono_primary 21:1 vs md_theme_primary 6.56:1 against
+         the background, and both read as "the bright thing"); it is on WHITE
+         that ink and accent stop being the same kind of mark. -->
+    <color name="mono_plateContainer">@color/mono_primaryContainer</color>
+    <color name="mono_plateOutline">@android:color/transparent</color>
+    <color name="mono_accentFigure">@color/mono_primary</color>
+
     <!-- =====================================================================
          BUTTON BEVEL — the depth tokens, DARK. See values/colors.xml for what the
          system is and why it carries no hue.

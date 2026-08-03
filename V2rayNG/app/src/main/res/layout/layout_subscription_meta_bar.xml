@@ -148,64 +148,87 @@
         android:orientation="vertical"
         android:visibility="visible">
 
-    <!-- Row 2: compact Happ-style traffic pill CENTERED horizontally, with the expiry marker
-         (∞ / "до <date>") pinned to the top-right corner on the same line. A FrameLayout lets
-         the short/thin pill sit dead-center while the expiry hugs the end. -->
-    <FrameLayout
+    <!--
+      ROW 2: THE TRAFFIC METER, AND THE LABEL IS NOT ON THE BAR ANY MORE.
+
+      `view_meter.xml`'s header names this file as the defect it ends: «The shipped
+      subscription meta bar centres an 11sp label over a moving accent fill: 2.9:1, and
+      it changes mid-word as the bar advances. That is the defect this file ends — the
+      label sits BESIDE the bar, on its own line, at the full 4.5:1 body floor.»
+
+      Both halves of that were true here. «1,7 ТБ / ∞» was printed IN the 16dp track, so
+      every glyph sat on whichever of the two colours the fill had reached — accent under
+      the used part, muted track under the rest — and the contrast was measured against
+      the wrong one either way. Worse, the boundary MOVES: as the month goes on the fill
+      crosses the label and the same word is legible on Monday and not on Thursday. There
+      is no text colour that fixes that, because the problem is that the text has two
+      grounds.
+
+      So the meter takes the shape the component file has always described:
+
+          1,7 ТБ / ∞ .............................. до 12.08.2026
+          [======================                                ]
+
+      The figure and the expiry share one line at body contrast on the card's own ground
+      (onSurface / onSurfaceVariant, at or above 4.5:1 in all four theme combinations),
+      and the bar is a rule under them carrying one thing: the fraction. It is also full
+      width now rather than a 160dp stub, so the fraction is readable to a few percent
+      instead of being a hint. Nothing was removed — the meter still shows exactly what
+      it showed, and it shows it legibly at every fill level.
+    -->
+    <LinearLayout
         android:id="@+id/layout_traffic"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/space_8">
+        android:layout_marginTop="@dimen/space_8"
+        android:orientation="vertical">
 
-        <!-- Traffic pill: thin rounded track with the usage label centered on it. Short fixed
-             width (~half the card) centered in the row rather than left-aligned. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:baselineAligned="true"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tv_traffic"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textAppearance="@style/TextAppearance.App.Caption"
+                android:textColor="?attr/colorOnSurface"
+                tools:text="1,7 ТБ / ∞" />
+
+            <!-- Expiry marker (∞ or «до <date>»), at the end of the same line. -->
+            <TextView
+                android:id="@+id/tv_expiry"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_12"
+                android:maxLines="1"
+                android:textAppearance="@style/TextAppearance.App.Caption"
+                tools:text="до 12.08.2026" />
+        </LinearLayout>
+
+        <!-- The bar: a rounded muted track and a clipped flat fill in the one accent
+             (bg_traffic_gradient). No decorative gradient, and nothing printed on it. -->
         <FrameLayout
             android:id="@+id/layout_traffic_pill"
-            android:layout_width="160dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal|center_vertical">
+            android:layout_marginTop="@dimen/space_4">
 
-            <!-- Traffic pill fill: a horizontal ProgressBar whose progressDrawable is a rounded
-                 muted track + a clipped rounded FLAT fill in the one accent (colorPrimary, via
-                 bg_traffic_gradient). No decorative gradient — flat pill. -->
             <ProgressBar
                 android:id="@+id/progress_traffic"
                 style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="match_parent"
-                android:layout_height="16dp"
-                android:layout_gravity="center_vertical"
+                android:layout_height="@dimen/meter_height"
                 android:max="1000"
                 android:progressDrawable="@drawable/bg_traffic_gradient"
                 tools:progress="430" />
-
-            <TextView
-                android:id="@+id/tv_traffic"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:gravity="center"
-                android:maxLines="1"
-                android:paddingStart="@dimen/space_8"
-                android:paddingEnd="@dimen/space_8"
-                android:textAppearance="@style/TextAppearance.App.Numeric"
-                android:textColor="?attr/colorOnSurface"
-                android:textFontWeight="500"
-                android:textSize="11sp"
-                tools:text="1,7 ТБ / ∞" />
-
         </FrameLayout>
-
-        <!-- Expiry marker (∞ or "до <date>") pinned to the top-right corner. -->
-        <TextView
-            android:id="@+id/tv_expiry"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="end|center_vertical"
-            android:maxLines="1"
-            android:textAppearance="@style/TextAppearance.App.Caption"
-            tools:text="до 12.08.2026" />
-
-    </FrameLayout>
+    </LinearLayout>
 
     <!-- Announce banner from the subscription (centered) -->
     <TextView

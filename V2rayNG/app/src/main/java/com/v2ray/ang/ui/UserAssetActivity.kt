@@ -212,11 +212,10 @@ class UserAssetActivity : HelperBaseActivity() {
             }
             downloading = false
             bindDownloadRow()
-            if (result.successCount > 0) {
-                toastSuccess(getString(R.string.asset_download_done, result.successCount))
-            } else {
-                toastError(R.string.asset_download_failed)
-            }
+            // Only the failure speaks. The download row rebinds with the new file dates the
+            // instant this returns, so «Скачано файлов: 3» reported a number about a list the
+            // user is already looking at.
+            if (result.successCount <= 0) toastError(R.string.asset_download_failed)
             refreshData()
         }
     }

@@ -6,10 +6,10 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
-import android.widget.Toast
 import com.v2ray.ang.AngApplication
 import com.v2ray.ang.enums.EConfigType
-import es.dmoral.toasty.Toasty
+import com.v2ray.ang.ui.Notice
+import com.v2ray.ang.ui.NoticePolicy
 import java.io.Serializable
 import java.net.URI
 import java.util.Locale
@@ -17,59 +17,49 @@ import java.util.Locale
 val Context.v2RayApplication: AngApplication?
     get() = applicationContext as? AngApplication
 
-/**
- * Shows a toast message with the given resource ID.
+/*
+ * ============================================================================
+ * THE THREE DOORS THE OLD NOTIFICATION LAYER CAME THROUGH.
+ * ============================================================================
  *
- * @param message The resource ID of the message to show.
+ * These names stay because ~50 call sites across upstream's screens use them, and a rename would
+ * be fifty edits that the next merge undoes. What changed is what is behind them: NOT `Toasty`
+ * (the green tick / red cross / system capsule the owner asked to have removed outright — «это же
+ * старые от в2рей уведомления… их убрать надо совсем») but `NoticePolicy`, which decides whether
+ * anything reaches a human at all, and `Notice`, the ONE bottom surface that shows it when it
+ * does. Read `NoticePolicy.kt`; the rules and the reasoning live there.
+ *
+ * The short version, for anyone porting an upstream call site:
+ *
+ *   - `toastSuccess(…)` shows NOTHING, ever. The state change is the confirmation.
+ *   - `toast(…)` / `toastError(…)` show the string ONLY if its resource id is on the policy's
+ *     allow-list. A new upstream message is silent until somebody reads it and lists it.
+ *   - the `CharSequence` overloads show nothing at all, because a built string has no id the
+ *     policy can recognise, and everything that is built by concatenation today is a counter, a
+ *     node summary or an exception message. To say something, pass a resource id.
  */
-fun Context.toast(message: Int) {
-    Toasty.normal(this, message).show()
-}
 
-/**
- * Shows a toast message with the given text.
- *
- * @param message The text of the message to show.
- */
-fun Context.toast(message: CharSequence) {
-    Toasty.normal(this, message).show()
-}
+/** A note about what happened, if the policy recognises it. @see NoticePolicy */
+fun Context.toast(message: Int) = Notice.say(this, message, NoticePolicy.Kind.INFO)
 
-/**
- * Shows a toast message with the given resource ID.
- *
- * @param message The resource ID of the message to show.
- */
-fun Context.toastSuccess(message: Int) {
-    Toasty.success(this, message, Toast.LENGTH_SHORT, true).show()
-}
+/** Built text has no identity the policy can check, so it is never shown. @see NoticePolicy */
+@Suppress("UNUSED_PARAMETER")
+fun Context.toast(message: CharSequence) = Unit
 
-/**
- * Shows a toast message with the given text.
- *
- * @param message The text of the message to show.
- */
-fun Context.toastSuccess(message: CharSequence) {
-    Toasty.success(this, message, Toast.LENGTH_SHORT, true).show()
-}
+/** Success is silent — the screen behind the message already said it. @see NoticePolicy */
+@Suppress("UNUSED_PARAMETER")
+fun Context.toastSuccess(message: Int) = Unit
 
-/**
- * Shows a toast message with the given resource ID.
- *
- * @param message The resource ID of the message to show.
- */
-fun Context.toastError(message: Int) {
-    Toasty.error(this, message, Toast.LENGTH_SHORT, true).show()
-}
+/** Success is silent — the screen behind the message already said it. @see NoticePolicy */
+@Suppress("UNUSED_PARAMETER")
+fun Context.toastSuccess(message: CharSequence) = Unit
 
-/**
- * Shows a toast message with the given text.
- *
- * @param message The text of the message to show.
- */
-fun Context.toastError(message: CharSequence) {
-    Toasty.error(this, message, Toast.LENGTH_SHORT, true).show()
-}
+/** A failure the user has to act on, if the policy recognises it. @see NoticePolicy */
+fun Context.toastError(message: Int) = Notice.say(this, message, NoticePolicy.Kind.FAILURE)
+
+/** Built text has no identity the policy can check, so it is never shown. @see NoticePolicy */
+@Suppress("UNUSED_PARAMETER")
+fun Context.toastError(message: CharSequence) = Unit
 
 const val THRESHOLD = 1000L
 const val DIVISOR = 1024.0

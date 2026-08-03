@@ -441,12 +441,19 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // Alternate — it is transparent at BOTH ends of the cycle, so the scale snapping back is
         // invisible and there is no click at the seam (the desktop's own note on
         // AmbientSonar.rest-idle).
+        //
+        // THE REACH IS BOUNDED BY THE FRAME AND THAT IS DELIBERATE. The wave's base is the disc,
+        // 176dp (fragment_home.xml sizes it in dp precisely so it cannot be anything else), and the
+        // frame is 224dp. 176 × 1.20 = 211dp, so the widest the wave ever gets still stops 6dp
+        // inside the outer ring: it breathes just outside the disc, the way the desktop's does
+        // (ConnectHeroView.axaml AmbientSonar, Ø200 in a 230 frame), and it never reaches the
+        // screen gutter. Do not raise these past 224/176 = 1.27.
         const val AMBIENT_WAVE_PERIOD_IDLE_MS = 6_500L
         const val AMBIENT_WAVE_PERIOD_LIVE_MS = 5_500L
-        const val AMBIENT_WAVE_SCALE_IDLE = 1.22f
-        const val AMBIENT_WAVE_SCALE_LIVE = 1.26f
-        const val AMBIENT_WAVE_ALPHA_IDLE = 0.28f
-        const val AMBIENT_WAVE_ALPHA_LIVE = 0.40f
+        const val AMBIENT_WAVE_SCALE_IDLE = 1.16f
+        const val AMBIENT_WAVE_SCALE_LIVE = 1.20f
+        const val AMBIENT_WAVE_ALPHA_IDLE = 0.18f
+        const val AMBIENT_WAVE_ALPHA_LIVE = 0.26f
         // The wave peaks early and spends the rest of the cycle fading — an exhale outwards.
         const val AMBIENT_WAVE_PEAK = 0.18f
 
@@ -540,6 +547,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // The ambient loops are INFINITE, so they are the two that would outlive the view and keep
         // driving the compositor from a destroyed hierarchy if they were ever forgotten here.
         stopAmbient()
+        // The in-flight bar is INDEFINITE by construction, so it is the one surface that would
+        // survive this screen if nothing took it down.
+        Notice.clearProgress()
         ringOuter = null
         ringMid = null
         ringInner = null
@@ -725,7 +735,14 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // The confirm rings: the same geometry in the accent, emitted exactly once each. The echo
         // carries the same silhouette a hair thinner, so the pair reads as one ring and its wake
         // rather than as two rings racing (ConnectHeroView.axaml: «тот же силуэт, чуть тоньше»).
-        val accent = themeColor(androidx.appcompat.R.attr.colorPrimary)
+        // THE OBJECT'S INK, and it is `colorAccentFigure` and not `colorPrimary`. The two are the
+        // same colour in both blue themes, by construction. They part company under the mono
+        // overlay, where `colorPrimary` is #111214 — right for a filled button, wrong for a 3dp
+        // stroke and a glyph: on a white ground it measures 18.8:1 and the whole object stops
+        // reading as an accent and starts reading as a hard outline drawing, which is what the
+        // owner photographed. `colorAccentFigure` carries the WEIGHT the accent has (5.99:1 in
+        // mono light against the blue accent's 5.97:1) instead of the accent's job. See attrs.xml.
+        val accent = themeColor(R.attr.colorAccentFigure)
         binding.connectRingPulse.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.TRANSPARENT)
@@ -740,10 +757,15 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // The ambient wave: the same silhouette again, thinner still, because it is the quietest
         // thing the object does and it does it forever. Its colour follows the rings' state channel
         // rather than being pinned to the accent — a wave leaving a grey idle object must be grey.
+        //
+        // ONE HAIRLINE, and it is a token and not `stroke - 1`. `stroke` is already resolved to
+        // PIXELS, so subtracting one from it took a 3dp ring down to 2.67dp at xxhdpi and 2.75dp at
+        // xxxhdpi — the same weight as the static rings for every user, which is not "thinner
+        // still", it is a second ring. @dimen/stroke_hairline is 1dp at every density.
         binding.connectRingAmbient.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.TRANSPARENT)
-            setStroke((stroke - 1).coerceAtLeast(1), ringColor)
+            setStroke(ambientStroke(), ringColor)
         }
 
         // The monogram's circle: the P3 plane, never the accent.
@@ -759,6 +781,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         setStroke(stroke, Color.TRANSPARENT)
     }
 
+    /** The ambient wave's weight: one hairline, at every density. @see buildConnectObject */
+    private fun ambientStroke() = resources.getDimensionPixelSize(R.dimen.stroke_hairline)
+
     /** One hue, three opacities. The geometry never changes; only this does. */
     private fun applyRingColor(colour: Int) {
         val stroke = resources.getDimensionPixelSize(R.dimen.stroke_ring)
@@ -768,7 +793,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // The ambient wave rides the same channel: it is the object exhaling, so it is the object's
         // colour. Guarded because this runs from buildConnectObject before the wave has a drawable.
         (binding.connectRingAmbient.background as? GradientDrawable)
-            ?.setStroke((stroke - 1).coerceAtLeast(1), colour)
+            ?.setStroke(ambientStroke(), colour)
     }
 
     /**
@@ -1484,12 +1509,13 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
                 pingMs = null
                 pingProbeFailures++
             }
-            // A FULL render, and it has to be: the reading is drawn beside the server IDENTITY, and
-            // that line is written by paintStatusLine. paintFigures() only fills the two speed
-            // columns, so repainting those alone left the «мс» figure at whatever the screen last
-            // resolved — which on a tunnel nobody navigates away from is "never shown at all".
-            // MSG_STATE_DELAY_RESULT arrives once per 30s probe and once per health check, never
-            // once per row of a bulk test, so this is not a hot path.
+            // A FULL render, and it still has to be — but no longer because the reading is drawn
+            // under the disc. It is not: the line below the object is the server's IDENTITY and
+            // carries no figure at all (see paintStatusLine). What this probe changes on THIS
+            // screen is `pingProbeFailures`, which resolveCondition turns into the «сервер не
+            // отвечает» condition after three consecutive misses, so the render is what surfaces
+            // that. MSG_STATE_DELAY_RESULT arrives once per 30s probe and once per health check,
+            // never once per row of a bulk test, so this is not a hot path.
             if (isBindingInitialized) render()
         }
 
@@ -1802,12 +1828,16 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
                 action = { openSubscription() },
             )
         }
-        if (backgroundLoads > 0) {
-            return Condition(
-                text = getString(R.string.home_condition_loading),
-                severity = Severity.INFO,
-            )
-        }
+        // «Обновляем данные…» IS NOT ONE OF THESE ANY MORE, and it is not gone either.
+        //
+        // Everything above is a CONDITION — a state of the account or the network that persists
+        // until something changes it, and that belongs in the strip under the header where the
+        // user meets it on the way down the screen. A refresh in flight is not one of those: it is
+        // an ACTION the user started, it ends by itself, and the owner asked for it in a different
+        // place — «это уведомление нужно снизу над панелью навигации». It moved to `Notice`, the
+        // one bottom surface, driven from `render()`. It is NOT removed: an action in flight must
+        // show itself (OWNER-FEEDBACK 2026-07-27 G2), and this is the only thing on the screen
+        // that says a refresh is happening while the list still holds the old rows.
         return null
     }
 
@@ -1819,6 +1849,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         paintHeader(state)
         paintLinkCta()
         paintCondition(state.condition)
+        paintProgress()
         paintConnect(state, animate)
         paintFigures()
         paintSlot(state)
@@ -1915,6 +1946,26 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             strip.statusStripAction.onSingleClick { action() }
         }
         if (!wasVisible) showStrip()
+    }
+
+    /**
+     * The in-flight signal, at the BOTTOM, above the navigation — where the owner asked for it.
+     *
+     * It used to be an inline banner at the TOP of Главная, resolved as if it were a condition
+     * alongside «Подписка истекла» and «Нет сети». It is not one: a refresh is an action with an
+     * end, not a state of the account, and putting it in the same slot pushed the connect object
+     * down the screen every time the app fetched anything. Now it takes the same bottom surface
+     * every other message in the product takes, so the screen never reflows for it.
+     *
+     * It is deliberately NOT policy-gated. `NoticePolicy` decides what may INTERRUPT the user;
+     * this is the app showing its own work, and G2 says an action in flight must show itself.
+     */
+    private fun paintProgress() {
+        if (backgroundLoads > 0) {
+            Notice.progress(requireContext(), getString(R.string.home_condition_loading))
+        } else {
+            Notice.clearProgress()
+        }
     }
 
     /** Half out, swap, half back: one `motion_state` in total, and the box never moves. */
@@ -2024,7 +2075,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         }
 
         val targetRing = when (state.conn) {
-            Conn.CONNECTED -> themeColor(androidx.appcompat.R.attr.colorPrimary)
+            // The rings' connected hue rides the same figure token as everything else the object
+            // draws — see buildConnectObject. Identical to colorPrimary in blue, a mid neutral in
+            // mono light, where near-black rings read as an outline drawing rather than an accent.
+            Conn.CONNECTED -> themeColor(R.attr.colorAccentFigure)
             Conn.CONNECTING -> themeColor(R.attr.connectActiveColor)
             Conn.ERROR -> themeColor(androidx.appcompat.R.attr.colorError)
             Conn.GATED, Conn.NO_SERVER -> themeColor(com.google.android.material.R.attr.colorOutline)
@@ -2064,10 +2118,17 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      *
      * So the single line resolves by priority:
      *
-     *  - a SERVER to name  -> the flag and the name, in the accent and bold (plus the live latency
-     *                         once a probe has landed on a live tunnel). This is the resting look,
-     *                         and it is the one in his reference: «flag glyph + Hybrid (Автовыбор)
-     *                         in blue, bold».
+     *  - a SERVER to name  -> the flag and the name, in the accent and bold, AND NOTHING ELSE. This
+     *                         is the resting look, and it is the one in his reference: «flag glyph +
+     *                         Hybrid (Автовыбор) in blue, bold».
+     *
+     *                         NO LATENCY HERE. 3c7428b appended «· 103 мс» to this line on a live
+     *                         tunnel and the owner rejected it — «а и пинга не должно показываться
+     *                         ниже кнопки где название локации». The line is an IDENTITY, not a
+     *                         measurement: it answers "what am I running through", and a figure that
+     *                         changes every few seconds inside it makes the one stable label on the
+     *                         screen unstable. The latency keeps the home he asked for it to keep —
+     *                         the server rows, where it sits beside the row it measures.
      *  - no server, but something to say -> the state word or the instruction, in its own colour and
      *                         with NO flag: a flag beside «Нажмите, чтобы повторить» would label the
      *                         instruction with a country.
@@ -2080,12 +2141,20 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         val accent = themeColor(androidx.appcompat.R.attr.colorPrimary)
         val name = state.serverName
 
+        // THE LEDGER AND THE GATE ARE MUTUALLY EXCLUSIVE (13-start-screen.md §4), and on the first
+        // run that is not a style rule, it is the difference between seeing «Добавить подписку» and
+        // not. A gated screen has no tunnel to meter and never will until the user acts, so the row
+        // can only ever read «0 KB/s 00:00:00 0 KB/s» — 32dp of zeroes standing between the object
+        // and the one action on the screen. «стартовый экран кнопок нет для добавления и тд, еле
+        // подписку добавил»: the block below has to reach the fold on a short phone.
+        //
+        // It is HIDDEN and not GONE-and-forgotten: the moment a подписка exists the gate goes and
+        // the ledger comes back in the same frame, at the same y, because everything above it is
+        // fixed height. Nothing is lost and nothing moves.
+        binding.numericStrip.isVisible = state.conn != Conn.GATED
+
         val identity: CharSequence? = when (state.conn) {
             Conn.ERROR, Conn.NO_SERVER, Conn.GATED -> null
-            Conn.CONNECTED -> name?.let { server ->
-                pingMs?.let { getString(R.string.home_server_latency, server, it) } ?: server
-            }
-
             else -> name
         }
         // The fallback line, for every state with no server to name. Each one keeps a string the

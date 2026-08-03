@@ -33,6 +33,35 @@
     <attr name="chipJsonText" format="color" />
     <attr name="chipJsonBg" format="color" />
 
+    <!-- ===================================================================
+         MONO'S CONTRACT IS NO ACCENT HUE, NOT NO CONTRAST.
+
+         Two roles, and both exist because of the same defect: a surface whose
+         only separation from its ground was CHROMA. In the blue themes a chip
+         plate at #D8E4FF or a meter track at #E9EEF7 reads as an object on
+         white at 1.2:1, because the eye reads the hue; strip the hue for the
+         mono overlay and the identical luminance step is all that is left, so
+         the plate disappears and the chip reads as a bare grey word floating on
+         the card. That is what the owner photographed: «если с белой темы
+         переключиться на черно белую то вот так становится».
+
+         plateContainer / plateOutline — a control plate that has to survive hue
+         removal. In BLUE they alias exactly what these surfaces already used,
+         with a transparent outline, so the blue themes do not move by one bit.
+         In MONO the fill steps down and a real boundary appears under it, which
+         is the WCAG 1.4.11 answer as well as the visual one.
+
+         accentFigure — the connect object's ink. `colorPrimary` in mono is
+         #111214, correctly: it is the fill of a filled button, where near-black
+         on white is the point. The connect object is not a fill, it is a 3dp
+         stroke and a glyph, and at 18.8:1 on white it stops reading as an
+         accent and starts reading as a hard outline drawing. This role carries
+         the WEIGHT the accent has, not the accent's job.
+         =================================================================== -->
+    <attr name="colorPlateContainer" format="color" />
+    <attr name="colorPlateOutline" format="color" />
+    <attr name="colorAccentFigure" format="color" />
+
     <!-- Latency ping (good / bad) and server selection indicator bar -->
     <attr name="pingGood" format="color" />
     <attr name="pingBad" format="color" />

@@ -53,7 +53,7 @@ class ScScannerActivity : HelperBaseActivity() {
                         .onSuccess { showImportResult(it) }
                         .onFailure {
                             LogUtil.e(AppConfig.TAG, "Failed to import scanned config", it)
-                            toastError(R.string.toast_failure)
+                            toastError(R.string.notice_add_failed)
                         }
                     startActivity(Intent(this@ScScannerActivity, MainActivity::class.java))
                     finish()
@@ -63,25 +63,21 @@ class ScScannerActivity : HelperBaseActivity() {
     }
 
     /**
-     * The same outcomes, in the same words, as `MainActivity.showImportResult` — through the string
-     * resources both now share. They used to be Russian literals compiled into this file, so the one
-     * screen that could not be translated was the one a shortcut opens.
+     * The same outcomes, and the same silence on success, as `MainActivity.showImportResult` — the
+     * QR route is the one the owner was looking at when he asked for the layer to go, so the two
+     * paths cannot answer differently.
      */
     private fun showImportResult(result: AngConfigManager.ImportResult) {
         when {
-            result.countSub > 0 -> {
-                val loaded = result.subFetch?.configCount ?: 0
-                if (loaded > 0) {
-                    toastSuccess(getString(R.string.import_servers_added, loaded))
-                } else {
-                    toastError(getString(R.string.import_sub_empty))
-                }
-            }
+            // Added, but the подписка fetched nothing: Главная will open on an empty state, which
+            // does not explain itself. Everything else that succeeded is visible on that screen.
+            result.countSub > 0 ->
+                if ((result.subFetch?.configCount ?: 0) <= 0) toastError(R.string.import_sub_empty)
 
-            result.count > 0 -> toastSuccess(getString(R.string.title_import_config_count, result.count))
-            result.subDuplicate -> toast(getString(R.string.import_sub_duplicate))
-            result.subRejected -> toast(getString(R.string.import_sub_foreign))
-            else -> toastError(R.string.toast_failure)
+            result.count > 0 -> Unit
+            result.subDuplicate -> toast(R.string.import_sub_duplicate)
+            result.subRejected -> toast(R.string.import_sub_foreign)
+            else -> toastError(R.string.notice_add_failed)
         }
     }
 }

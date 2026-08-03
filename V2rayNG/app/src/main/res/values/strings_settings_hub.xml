@@ -55,6 +55,7 @@
     <string name="settings_always_on">Постоянный VPN и блокировка</string>
     <string name="settings_always_on_sub">Подключаться всегда и блокировать трафик без VPN</string>
     <string name="settings_always_on_hint">Включите постоянный VPN и блокировку без VPN в системных настройках</string>
+    <string name="settings_always_on_unavailable">На этом устройстве нет системных настроек VPN</string>
 
     <!-- Автообновление подписки: нет подписок. Значение строки повторяет ps_no_subs_value
          на экране «Настройки подписок» — одно состояние называется одинаково на обоих

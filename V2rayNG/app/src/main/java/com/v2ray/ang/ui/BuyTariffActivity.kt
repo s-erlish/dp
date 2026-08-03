@@ -586,13 +586,13 @@ class BuyTariffActivity : BaseActivity() {
         val tariff = selectedTariff()
         val option = selectedOption()
         if (tariff == null || option == null) {
-            toast(getString(R.string.buy_select_option_first))
+            toast(R.string.buy_select_option_first)
             return
         }
 
         val methods = viewModel.publicConfig.value?.plategaMethods?.map { it.id to it.label } ?: emptyList()
         if (methods.isEmpty()) {
-            toastError(getString(R.string.buy_no_methods))
+            toastError(R.string.buy_no_methods)
             return
         }
 
@@ -631,7 +631,7 @@ class BuyTariffActivity : BaseActivity() {
         val amount = result.getDouble(EXTRA_AMOUNT, 0.0)
         val currency = result.getString(EXTRA_CURRENCY)?.ifBlank { null } ?: "RUB"
         if (tariffId.isBlank() || amount <= 0.0) {
-            toastError(getString(R.string.buy_select_option_first))
+            toastError(R.string.buy_select_option_first)
             return
         }
 
@@ -649,7 +649,7 @@ class BuyTariffActivity : BaseActivity() {
         if (methodId == PaymentMethodSheet.ID_BALANCE) {
             viewModel.payWithBalance(req) {
                 awaitingPaymentError = false
-                toastSuccess(getString(R.string.buy_success))
+                toastSuccess(R.string.buy_success)
                 finish()
             }
         } else {
@@ -694,21 +694,21 @@ class BuyTariffActivity : BaseActivity() {
     private fun openCheckout(init: PaymentInitDto) {
         val url = init.paymentUrl
         if (url.isBlank()) {
-            toastError(getString(R.string.buy_no_browser))
+            toastError(R.string.buy_no_browser)
             return
         }
         val uri = Uri.parse(url)
         pendingPayment = true
         try {
             CustomTabsIntent.Builder().build().launchUrl(this, uri)
-            toast(getString(R.string.buy_checkout_return))
+            toast(R.string.buy_checkout_return)
         } catch (e: ActivityNotFoundException) {
             try {
                 startActivity(Intent(Intent.ACTION_VIEW, uri))
-                toast(getString(R.string.buy_checkout_return))
+                toast(R.string.buy_checkout_return)
             } catch (e2: ActivityNotFoundException) {
                 pendingPayment = false
-                toastError(getString(R.string.buy_no_browser))
+                toastError(R.string.buy_no_browser)
             }
         }
     }

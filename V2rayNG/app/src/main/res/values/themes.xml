@@ -113,6 +113,15 @@
         <!-- Loading placeholder fill. -->
         <item name="colorSkeleton">@color/skeleton</item>
 
+        <!-- THE BLUE THEMES DO NOT MOVE. Each of these three aliases exactly
+             what the surface it feeds already resolved to, and the plate's
+             outline is transparent, so light and dark render bit-identically
+             before and after the mono fix. Only ThemeOverlay.Mono restates
+             them. See the block over these attrs in attrs.xml. -->
+        <item name="colorPlateContainer">@color/md_theme_primaryContainer</item>
+        <item name="colorPlateOutline">@android:color/transparent</item>
+        <item name="colorAccentFigure">@color/md_theme_primary</item>
+
         <!-- Edge-to-edge: fully transparent system bars so the page draws
              underneath them. Disable the auto contrast scrim (API 29+). -->
         <item name="android:statusBarColor">@android:color/transparent</item>
@@ -452,6 +461,12 @@
         <item name="chipTypeText">@color/mono_onPrimaryContainer</item>
         <item name="chipJsonText">@color/mono_onSurface</item>
         <item name="chipJsonBg">@color/mono_surfaceContainerHighest</item>
+
+        <!-- The three roles that carry mono's contract. Values and the measured
+             figures are in colors.xml / values-night/colors.xml beside them. -->
+        <item name="colorPlateContainer">@color/mono_plateContainer</item>
+        <item name="colorPlateOutline">@color/mono_plateOutline</item>
+        <item name="colorAccentFigure">@color/mono_accentFigure</item>
         <item name="pingGood">@color/mono_onSurfaceVariant</item>
         <item name="pingBad">@color/mono_onSurface</item>
         <item name="indicatorColor">@color/mono_primary</item>

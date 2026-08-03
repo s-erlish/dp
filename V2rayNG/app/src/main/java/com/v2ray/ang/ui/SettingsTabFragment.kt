@@ -64,8 +64,10 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         bindSettingsState()
     }
 
-    // Context-scoped toast helpers so the ported (Context.toast) calls work from a Fragment.
-    private fun toast(message: CharSequence) = requireContext().toast(message)
+    // Context-scoped helpers so the ported (Context.toast) call sites work from a Fragment. They
+    // take a STRING ID and never built text: NoticePolicy recognises a message by its id, and a
+    // CharSequence is by definition something it cannot vouch for.
+    private fun toast(message: Int) = requireContext().toast(message)
     private fun toastError(message: Int) = requireContext().toastError(message)
 
     /**
@@ -310,12 +312,15 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
      * system-level toggle — the app only provides the shortcut and a one-line explainer.
      */
     private fun openAlwaysOnSettings() {
-        toast(getString(R.string.settings_always_on_hint))
+        toast(R.string.settings_always_on_hint)
         try {
             startActivity(Intent(android.provider.Settings.ACTION_VPN_SETTINGS))
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to open system VPN settings", e)
-            toastError(R.string.toast_failure)
+            // The device has no VPN settings screen to open — a dead end the row cannot show, so
+            // it keeps a sentence. `toast_failure` («Ошибка») was upstream's word for every
+            // outcome in the app and says nothing about this one.
+            toastError(R.string.settings_always_on_unavailable)
         }
     }
 
@@ -539,7 +544,7 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         // With no subscriptions the interval has nothing to apply to, so the picker would
         // silently no-op. Tell the user to add one first instead.
         if (MmkvManager.decodeSubscriptions().isEmpty()) {
-            toast(getString(R.string.settings_sub_auto_update_empty))
+            toast(R.string.settings_sub_auto_update_empty)
             return
         }
         val entries = subAutoUpdateValues.map { subAutoUpdateLabel(it) }.toTypedArray()

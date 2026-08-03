@@ -41,8 +41,11 @@ class AngApplication : MultiDexApplication() {
         SettingsManager.initApp(this)
         SettingsManager.setNightMode()
 
-        es.dmoral.toasty.Toasty.Config.getInstance()
-            .setGravity(android.view.Gravity.BOTTOM, 0, 300)
-            .apply()
+        // NOTHING CONFIGURES `Toasty` HERE ANY MORE, because nothing uses it. The library's
+        // green-tick / red-cross capsules were the upstream notification layer the owner asked to
+        // have removed outright; `_Ext.toast*` now routes every one of those call sites through
+        // `NoticePolicy`, onto one themed bottom surface. Re-adding a Toasty config here would put
+        // the layer back without touching a single call site, which is exactly what the policy
+        // object exists to prevent.
     }
 }

@@ -38,6 +38,13 @@
     <string name="account_retry">Повторить</string>
     <string name="account_expires">Действует до %1$s</string>
     <string name="account_devices">Устройства: %1$s / %2$s</string>
+    <!-- The SAME row when the live connected count is not known for this подписка.
+         GET /client/subscription/all does not carry one (SubscriptionDtos: «NOT present on
+         /all — always 0 from this endpoint»), and only the ACTIVE подписка has a
+         /client/devices call behind it, so every secondary card was printing the root's
+         figure as if it were its own. The allowance is real and stays; the usage is not
+         known and is not invented. -->
+    <string name="account_devices_limit">Устройства: до %1$s</string>
     <string name="account_traffic">Трафик: %1$s / %2$s</string>
     <string name="account_unlimited">∞</string>
     <!-- DEAD: no reference in any .kt/.xml (checked 2026-07-26). Also ALL-CAPS, which copy law 9.2

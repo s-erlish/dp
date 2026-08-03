@@ -53,4 +53,19 @@
     <string name="import_sub_empty">Не удалось загрузить серверы подписки</string>
     <string name="import_sub_duplicate">Подписка уже добавлена</string>
     <string name="import_sub_foreign">Эта ссылка не от departament. Используйте подписку из нашего бота.</string>
+
+    <!-- THE TWO SENTENCES THAT REPLACED THE COUNTERS. See NoticePolicy.kt.
+
+         A successful add and a successful refresh say NOTHING now: the подписка card appears, its
+         timestamp moves and the list repaints under it, which is a better confirmation than a
+         figure covering the thing it counts. What survives is the case where the tap has no
+         visible answer at all — a link that did not parse, an operator that could not be reached —
+         and each one is one sentence with a next step in it, not «Ошибка» and not «Обновлено
+         серверов: 13 (успешно: 1, ошибки: 0, пропущено: 1)». -->
+    <string name="notice_add_failed">Не удалось добавить: ссылка не распознана</string>
+    <string name="notice_refresh_failed">Не удалось обновить подписку. Проверьте сеть и повторите</string>
+    <!-- Copying to the clipboard is one of the two actions in the app that leave the screen
+         exactly as they found it, so it is one of the two that still says something. -->
+    <string name="notice_copied">Скопировано в буфер обмена</string>
+    <string name="notice_copy_failed">Не удалось скопировать</string>
 </resources>

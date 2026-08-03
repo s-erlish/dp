@@ -36,8 +36,12 @@ class PermissionHelper(private val activity: AppCompatActivity) {
                 if (isGranted) {
                     onGranted()
                 } else {
-                    val message = "${activity.getString(R.string.toast_permission_denied)}  ${permissionType.getLabel()}"
-                    activity.toast(message)
+                    // The sentence alone, without the permission's technical label glued onto the
+                    // end of it. `permissionType.getLabel()` is upstream's own name for the
+                    // Android permission and reads as machine text beside a Russian sentence —
+                    // `NoticePolicy` would refuse the concatenation anyway, and losing it costs
+                    // nothing: the user just answered the system dialog that named it.
+                    activity.toast(R.string.toast_permission_denied)
                 }
             }
             permissionLauncher.launch(permission)

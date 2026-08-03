@@ -297,7 +297,12 @@ dependencies {
 
     // UI Libraries
     implementation(libs.material)
-    implementation(libs.toasty)
+    // NO `toasty`. It was upstream's notification layer — the green tick, the red cross, the
+    // system-chrome capsule floating over the screen — and the owner asked for the layer itself
+    // rather than for any one message: «это же старые от в2рей уведомления… их убрать надо
+    // совсем». `NoticePolicy` / `Notice` replaced it, on one themed bottom surface, and the
+    // dependency comes out with it so an upstream merge that adds a `Toasty.error(...)` call
+    // fails to compile instead of quietly putting the layer back.
     implementation(libs.editorkit)
     implementation(libs.flexbox)
 

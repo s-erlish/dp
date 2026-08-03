@@ -338,6 +338,38 @@
     <color name="mono_warningContainer">#E7E7E9</color>
     <color name="mono_skeleton">#E7E7E9</color>
 
+    <!-- ==================================================================
+         MONO × LIGHT: THE THREE VALUES THAT WERE MISSING.
+
+         The owner: «если с белой темы переключиться на черно белую то вот так
+         становится, а если с темной на чернобелую то все нормально». Dark was
+         fine because mono's ink there is WHITE on black - luminance alone
+         separates everything. On white it does not: every plate on this screen
+         was a tint of the accent (#D8E4FF at 1.19:1, #E9EEF7 at 1.09:1) and
+         read as an object only because it was BLUE. Take the hue away and the
+         protocol chips lose their fill entirely, the traffic pill loses its
+         plate, and the one thing that keeps its weight - the accent, remapped
+         to ink - becomes the heaviest mark on the screen.
+         ================================================================== -->
+
+    <!-- The plate under a chip, a badge or a meter track. A fill delta ALONE
+         cannot carry a plate on white without going grey enough to look like a
+         disabled control, so the plate is a fill PLUS a real boundary and the
+         boundary is what clears the 3:1 non-text floor.
+         #E0E0E3 on mono_surface #FFFFFF = 1.32:1 (the fill delta);
+         mono_onSurface #111214 on it = 14.28:1 (the chip's own label). -->
+    <color name="mono_plateContainer">#E0E0E3</color>
+    <!-- The boundary that does the work. 3.44:1 on mono_surface #FFFFFF and
+         3.13:1 on mono_surfaceContainer #F4F4F5 - it clears the floor on the
+         screen ground AND on a card, which is where these chips actually sit. -->
+    <color name="mono_plateOutline">#8A8A8E</color>
+    <!-- The connect object's ink: rings, shield, confirm rings, sweep. Matched
+         to the WEIGHT of the blue accent rather than to ink, because a 3dp
+         stroke is not a button fill. md_theme_primary #1E5FC7 measures 5.97:1
+         on white; this measures 5.99:1 (5.45:1 on a card). mono_primary #111214 is 18.74:1,
+         which is what made the object read as a hard outline drawing. -->
+    <color name="mono_accentFigure">#636366</color>
+
     <!-- Surface container ramp (blue theme, light) - enables layering & glass depth -->
     <color name="md_theme_surfaceContainerLowest">#FFFFFF</color>
     <color name="md_theme_surfaceContainerLow">#F7F9FD</color>

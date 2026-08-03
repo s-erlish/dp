@@ -7,6 +7,7 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.color.MaterialColors
 import com.v2ray.ang.R
+import com.v2ray.ang.auth.SubscriptionSyncManager
 import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.databinding.ItemSubscriptionCardBinding
 import java.util.Locale
@@ -21,10 +22,19 @@ import java.util.Locale
  * [resolveBadge]; a null/blank result HIDES the badge so a wrong tariff is never shown. The live
  * "used" device count (GET /client/devices) likewise lives on the fragment's ViewModel and is
  * passed in via [resolveUsedDevices], keeping this adapter free of any ViewModel dependency.
+ *
+ * [resolveUsedDevices] RETURNS NULL WHEN THE COUNT IS NOT KNOWN, and that is the whole point of its
+ * signature. It used to be `() -> Int` in effect — the fragment handed back the ViewModel's single
+ * `deviceCount` and ignored the подписка it was asked about — so EVERY card in the carousel printed
+ * the ROOT подписка's usage as its own. There is only one live count in the product, because there
+ * is only one `GET /client/devices` call and it is about the active подписка;
+ * `/client/subscription/all` carries `connectedDevices = 0` for every item it returns. A secondary
+ * card therefore shows its allowance and no usage, which is true, instead of a number that belongs
+ * to a different подписка, which is not.
  */
 class SubscriptionPagerAdapter(
     private val resolveBadge: (SubInfoDto) -> String?,
-    private val resolveUsedDevices: (SubInfoDto) -> Int,
+    private val resolveUsedDevices: (SubInfoDto) -> Int?,
     private val onRenew: (SubInfoDto) -> Unit,
     private val onOpenDevices: (SubInfoDto) -> Unit,
     private val onAutoRenew: (SubInfoDto, Boolean) -> Unit,
@@ -83,8 +93,10 @@ class SubscriptionPagerAdapter(
                     ctx.getString(R.string.account_expires, formatIsoDate(sub.expireAtIso))
             }
 
-            // Used = the live connected-device count resolved by the fragment; limit = total slots,
-            // or ∞ when the plan is unlimited.
+            // Used = the live connected-device count, and ONLY for the подписка that actually has
+            // one; limit = total slots, or ∞ when the plan is unlimited. A card with no live count
+            // says what the plan allows and stops there — «Устройства: до 3» — rather than
+            // borrowing the active подписка's figure, which is what every secondary card did.
             val unlimitedDevices = sub.subscription?.raw()?.isUnlimitedDevices() == true
             val totalDevicesStr = if (unlimitedDevices) {
                 ctx.getString(R.string.account_unlimited)
@@ -92,8 +104,11 @@ class SubscriptionPagerAdapter(
                 sub.totalDevices.toString()
             }
             val usedDevices = resolveUsedDevices(sub)
-            binding.tvSubDevices.text =
+            binding.tvSubDevices.text = if (usedDevices == null) {
+                ctx.getString(R.string.account_devices_limit, totalDevicesStr)
+            } else {
                 ctx.getString(R.string.account_devices, usedDevices.toString(), totalDevicesStr)
+            }
             binding.rowSubDevices.setOnClickListener { onOpenDevices(sub) }
 
             bindTrafficMeter(sub)
@@ -187,6 +202,20 @@ class SubscriptionPagerAdapter(
          */
         private fun bindAutoRenew(sub: SubInfoDto) {
             val ctx = binding.root.context
+            // THE ROW IS HIDDEN WHEN THE TOGGLE CANNOT BE HONOURED, which is what
+            // item_subscription_card.xml has always said and what nothing implemented: `id` is the
+            // path segment the secondary endpoint needs, and with it blank the switch flipped
+            // under the finger and then reported a failure it could have known about before it was
+            // ever offered. The ROOT подписка is addressed by its own id-less endpoint, so it
+            // never needs one. A control that cannot act is not disabled, it is absent — a
+            // disabled switch still claims the feature exists for this подписка.
+            val actionable =
+                sub.type.equals(SubscriptionSyncManager.TYPE_ROOT, ignoreCase = true) || sub.id.isNotBlank()
+            binding.rowSubAutorenew.visibility = if (actionable) View.VISIBLE else View.GONE
+            if (!actionable) {
+                binding.switchSubAutorenew.setOnCheckedChangeListener(null)
+                return
+            }
             binding.switchSubAutorenew.setOnCheckedChangeListener(null)
             binding.switchSubAutorenew.isChecked = sub.autoRenewEnabled
             binding.tvSubAutorenew.text = when {
