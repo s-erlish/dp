@@ -8,7 +8,7 @@ import com.v2ray.ang.BuildConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.core.CoreNativeManager
 import com.v2ray.ang.databinding.ActivityAboutBinding
-import com.v2ray.ang.extension.toastSuccess
+import com.v2ray.ang.extension.toast
 import com.v2ray.ang.ui.component.RowBinder
 import com.v2ray.ang.ui.component.SubPage
 import com.v2ray.ang.ui.component.ToolbarBinder
@@ -126,7 +126,7 @@ class AboutActivity : BaseActivity() {
 
     private fun copy(value: String) {
         Utils.setClipboard(this, value)
-        toastSuccess(R.string.editor_copied)
+        toast(R.string.notice_copied)
     }
 
     /**

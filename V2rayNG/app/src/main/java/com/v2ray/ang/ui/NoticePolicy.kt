@@ -106,6 +106,26 @@ object NoticePolicy {
         // that survives rule 1.
         R.string.account_referral_copied,
         R.string.account_sub_autorenew_failed,
+        // The account's failure family, behind `AccountFragment.messageFor`. It answers a WARM
+        // failure only — a refresh that broke while the tab already had data on it (a cold load
+        // has the error hero card instead and is handled before this) — so the screen shows
+        // yesterday's figures and, without these, said nothing about it. Each one is a sentence
+        // with a next step in it; the fragment's own comment has claimed they speak since it was
+        // written.
+        R.string.account_error_service_unavailable,
+        R.string.account_error_network,
+        R.string.account_error_unauthorized,
+        R.string.account_error_rate_limited,
+        R.string.account_error_timeout,
+        R.string.account_error_generic,
+        // The three account actions that end in a dead end with nothing to show for it: a device
+        // that is still in the list, an avatar that did not change, a checkout page that would not
+        // open. The last one is the twin of `buy_no_browser`, which was listed while the identical
+        // sentence on this screen was not.
+        R.string.account_avatar_error,
+        R.string.account_checkout_no_browser,
+        R.string.account_top_up_invalid,
+        R.string.devices_error_delete,
         // The buy flow — departament's own screens, and each of these blocks a tap.
         R.string.buy_select_option_first,
         R.string.buy_no_methods,
@@ -119,8 +139,17 @@ object NoticePolicy {
         R.string.asset_copy_failed,
         R.string.asset_download_failed,
         R.string.srv_delete_selected,
+        R.string.srv_chain_no_servers,
+        R.string.srv_chain_too_few,
         R.string.template_locked_toast,
         R.string.toast_action_not_allowed,
+        // Routing sets and deep links: an import that could not be read, an export with nothing in
+        // it, a scheme that would not parse. Each one answers a control the user pressed and each
+        // one leaves the screen exactly as it was, so silence here is a dead button.
+        R.string.routing_import_failed,
+        R.string.routing_export_empty,
+        R.string.scheme_import_failed,
+        R.string.log_share_failed,
         R.string.settings_always_on_hint,
         R.string.settings_always_on_unavailable,
         R.string.settings_sub_auto_update_empty,

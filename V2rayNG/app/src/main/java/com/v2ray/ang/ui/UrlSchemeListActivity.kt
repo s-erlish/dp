@@ -12,7 +12,7 @@ import com.v2ray.ang.databinding.ActivityUrlSchemeListBinding
 import com.v2ray.ang.databinding.ItemEditorSectionBinding
 import com.v2ray.ang.databinding.ViewCardSectionBinding
 import com.v2ray.ang.databinding.ViewRowBinding
-import com.v2ray.ang.extension.toastSuccess
+import com.v2ray.ang.extension.toast
 import com.v2ray.ang.ui.component.EmptyStateBinder
 import com.v2ray.ang.ui.component.RowBinder
 import com.v2ray.ang.ui.component.SubPage
@@ -88,7 +88,7 @@ class UrlSchemeListActivity : BaseActivity() {
                         contentDescription = getString(R.string.scheme_copy_cd),
                         onClick = {
                             Utils.setClipboard(this, scheme.uri)
-                            toastSuccess(R.string.editor_copied)
+                            toast(R.string.notice_copied)
                         },
                     ),
                 )

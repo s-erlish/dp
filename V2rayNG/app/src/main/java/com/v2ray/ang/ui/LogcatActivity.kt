@@ -14,6 +14,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.v2ray.ang.BuildConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityLogcatBinding
+import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.ui.component.EmptyStateBinder
@@ -79,7 +80,7 @@ class LogcatActivity : BaseActivity(), SwipeRefreshLayout.OnRefreshListener {
 
     private fun onLogLongClick(log: String): Boolean {
         Utils.setClipboard(this, log)
-        toastSuccess(R.string.editor_copied)
+        toast(R.string.notice_copied)
         return true
     }
 
@@ -134,7 +135,7 @@ class LogcatActivity : BaseActivity(), SwipeRefreshLayout.OnRefreshListener {
         EditorActionsSheet(this, getString(R.string.editor_actions_title))
             .action(R.string.log_action_copy, R.drawable.ic_copy, enabled = hasLines) {
                 Utils.setClipboard(this, viewModel.getAll().joinToString("\n"))
-                toastSuccess(R.string.editor_copied)
+                toast(R.string.notice_copied)
             }
             .action(R.string.log_action_share, R.drawable.ic_share_24dp, enabled = hasLines) {
                 shareLogcat()

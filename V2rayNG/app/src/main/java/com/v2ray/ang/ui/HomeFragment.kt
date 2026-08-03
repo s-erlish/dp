@@ -608,8 +608,18 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * Moves an already-running tunnel onto the newly selected server — the action on the shell's
      * «применить» snackbar. Goes through the connect state machine (in-progress flag, connecting
      * visual, watchdog) so a restart that stalls is reported like any other failed start.
+     *
+     * @param guid the server the offer NAMED. [restartV2Ray] starts whatever `getSelectServer()`
+     *   holds, so the selection is re-pointed at that server first: the bar lives for several
+     *   seconds and the selection can move under it, and a restart onto a server the message never
+     *   mentioned is the one outcome this whole offer exists to prevent.
      */
-    fun applySelectionToRunningTunnel() {
+    fun applySelectionToRunningTunnel(guid: String) {
+        val selected = MmkvManager.getSelectServer()
+        if (selected != guid) {
+            MmkvManager.setSelectServer(guid)
+            onSelectedServerChanged(selected, guid)
+        }
         connectInProgress = true
         tunnelError = false
         if (isBindingInitialized) applyRunningState(isLoading = true, isRunning = true)

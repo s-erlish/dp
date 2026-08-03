@@ -11,6 +11,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
+import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
@@ -148,11 +149,11 @@ class LocalProxyActivity : BaseActivity() {
         btnTogglePass.setOnClickListener { togglePasswordVisibility() }
         findViewById<ImageButton>(R.id.btn_copy_user).setOnClickListener {
             Utils.setClipboard(this, etSocksUser.text.toString())
-            toastSuccess(R.string.lp_copied)
+            toast(R.string.notice_copied)
         }
         findViewById<ImageButton>(R.id.btn_copy_pass).setOnClickListener {
             Utils.setClipboard(this, etSocksPass.text.toString())
-            toastSuccess(R.string.lp_copied)
+            toast(R.string.notice_copied)
         }
         findViewById<MaterialButton>(R.id.btn_reset_creds).setOnClickListener {
             generateAndFillCreds()
@@ -309,15 +310,15 @@ class LocalProxyActivity : BaseActivity() {
         btnToggleHotspotPass.setOnClickListener { setHotspotPasswordVisible(!hotspotPasswordVisible) }
         findViewById<ImageButton>(R.id.btn_copy_hotspot_endpoint).setOnClickListener {
             Utils.setClipboard(this, etHotspotEndpoint.text.toString())
-            toastSuccess(R.string.lp_copied)
+            toast(R.string.notice_copied)
         }
         findViewById<ImageButton>(R.id.btn_copy_hotspot_user).setOnClickListener {
             Utils.setClipboard(this, etHotspotUser.text.toString())
-            toastSuccess(R.string.lp_copied)
+            toast(R.string.notice_copied)
         }
         findViewById<ImageButton>(R.id.btn_copy_hotspot_pass).setOnClickListener {
             Utils.setClipboard(this, etHotspotPass.text.toString())
-            toastSuccess(R.string.lp_copied)
+            toast(R.string.notice_copied)
         }
     }
 

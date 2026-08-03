@@ -57,6 +57,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var protocolFilter: com.v2ray.ang.enums.EConfigType? = null
     val serversCache = mutableListOf<ServersCache>()
     val isRunning by lazy { MutableLiveData<Boolean>() }
+
+    /**
+     * THE SERVER THE LIVE TUNNEL IS ACTUALLY ON — which is not the same thing as the selected one,
+     * and the whole «Переподключиться» offer exists because it is not.
+     *
+     * Picking a server while a tunnel is up SELECTS it and leaves the connection alone
+     * (`MainActivity.setSelectServer`), so the moment the user declines that offer the selection
+     * runs AHEAD of the tunnel and stays ahead. Nothing in this process could tell the two apart:
+     * the core runs in `:RunSoLibV2RayDaemon` and its `currentConfig` is that process's field, so
+     * the shell only ever had `getSelectServer()` to go on — and that is the selection, by
+     * definition. This field closes that gap without asking the daemon anything.
+     *
+     * Written from the daemon's own state broadcasts, never guessed:
+     *  - a START that succeeded ran `startContextService`, which reads `getSelectServer()` at that
+     *    instant, so the selection IS the running server at exactly that moment and only then;
+     *  - a plain RUNNING is the handshake answer to `MSG_REGISTER_CLIENT` (a fresh Activity asking
+     *    a core that was already up). It adopts the selection ONLY when nothing is known yet,
+     *    because after a process restart there is no better answer, and overwriting a value we do
+     *    know would erase the very divergence this field exists to record;
+     *  - anything that means "not running" clears it.
+     */
+    var runningGuid: String? = null
+        private set
     val updateListAction by lazy { MutableLiveData<Int>() }
     val updateTestResultAction by lazy { MutableLiveData<String>() }
     val updateSpeedAction by lazy { MutableLiveData<Pair<Long, Long>>() }
@@ -820,11 +843,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         override fun onReceive(ctx: Context?, intent: Intent?) {
             when (intent?.getIntExtra("key", 0)) {
                 AppConfig.MSG_STATE_RUNNING -> {
+                    // The handshake answer: a core that was already up telling a fresh Activity so.
+                    // It carries no guid, and the selection may already have moved past the tunnel,
+                    // so it only fills [runningGuid] in when nothing is known — see that field.
                     isRunning.value = true
+                    if (runningGuid == null) runningGuid = MmkvManager.getSelectServer()
                 }
 
                 AppConfig.MSG_STATE_NOT_RUNNING -> {
                     isRunning.value = false
+                    runningGuid = null
                 }
 
                 AppConfig.MSG_STATE_START_SUCCESS -> {
@@ -832,6 +860,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // the connected state with the neutral gray «Прокси подключён» toast + shield,
                     // driven by MainActivity's isRunning observer.
                     isRunning.value = true
+                    // A start that just succeeded ran on whatever the selection held when
+                    // `startContextService` read it, so this is the one moment the two are the same
+                    // thing — and therefore the one moment worth recording.
+                    runningGuid = MmkvManager.getSelectServer()
                 }
 
                 AppConfig.MSG_STATE_START_FAILURE -> {
@@ -839,10 +871,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // neutral gray «Не удалось подключиться» toast (via connectInProgress) when
                     // this flips isRunning to false during an in-progress connect.
                     isRunning.value = false
+                    runningGuid = null
                 }
 
                 AppConfig.MSG_STATE_STOP_SUCCESS -> {
                     isRunning.value = false
+                    runningGuid = null
                 }
 
                 AppConfig.MSG_MEASURE_DELAY_SUCCESS -> {

@@ -13,6 +13,7 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.contracts.BaseAdapterListener
 import com.v2ray.ang.databinding.ActivityRoutingSettingBinding
+import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.MmkvManager
@@ -219,7 +220,7 @@ class RoutingSettingActivity : HelperBaseActivity() {
             toastError(R.string.routing_export_empty)
         } else {
             Utils.setClipboard(this, JsonUtil.toJson(rulesetList))
-            toastSuccess(R.string.editor_copied)
+            toast(R.string.notice_copied)
         }
     }
 

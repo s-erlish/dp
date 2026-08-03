@@ -1047,12 +1047,26 @@ class MainActivity : HelperBaseActivity(), MainHost {
      */
     private fun setSelectServer(guid: String) {
         val selected = MmkvManager.getSelectServer()
-        if (guid == selected) return
+        if (guid != selected) {
+            MmkvManager.setSelectServer(guid)
+            // The Главная half of the same mirror: its under-shield label and the subscription card.
+            homeFragment?.onSelectedServerChanged(selected, guid)
+        }
 
-        MmkvManager.setSelectServer(guid)
-        // The Главная half of the same mirror: its under-shield label and the subscription card.
-        homeFragment?.onSelectedServerChanged(selected, guid)
-        if (mainViewModel.isRunning.value == true) {
+        // THE OFFER IS DECIDED AGAINST THE RUNNING SERVER, NEVER AGAINST THE SELECTED ONE, and that
+        // is the whole correction here. This used to `return` the moment the tap landed on the row
+        // that was already selected — which, after the very first decline, is the row the user has
+        // to press. Selecting does not switch the tunnel, so declining leaves the selection sitting
+        // one server ahead of the connection; from that point the picked row IS the selection, the
+        // guard swallowed every further tap on it, and «Переподключиться» could not be reached
+        // again for the rest of the session. The screen made that worse rather than revealing it:
+        // Главная's under-shield line is drawn from the SELECTED server (`HomeFragment.resolveState`),
+        // so it already named the server the user was pressing, and the press answered with nothing.
+        //
+        // Now the write is what the change gates, and the offer is gated by the only question it
+        // was ever about: is the tunnel already on this server? While it is, there is nothing to
+        // apply and silence is honest. While it is not, the way back is offered every time.
+        if (mainViewModel.isRunning.value == true && mainViewModel.runningGuid != guid) {
             promptApplySelectedServer(guid)
         }
     }
@@ -1068,14 +1082,20 @@ class MainActivity : HelperBaseActivity(), MainHost {
         } else {
             getString(R.string.server_selected_reconnect_prompt, FlagUtil.stripLeadingFlag(name))
         }
-        Snackbar.make(binding.mainContent, message, Snackbar.LENGTH_LONG)
-            .setAnchorView(binding.bottomNav)
-            // The restart runs through the connect state machine, so a stalled one is reported like
-            // any other failed start rather than leaving the hero on the old server.
-            .setAction(R.string.server_selected_reconnect_action) {
-                homeFragment?.applySelectionToRunningTunnel()
-            }
-            .show()
+        val bar = Snackbar.make(binding.mainContent, message, Snackbar.LENGTH_LONG)
+        // Above the navigation, and ONLY while the navigation is actually on screen — the same
+        // guard `Notice.show` and [showActionSnackbar] already make. Anchoring to a hidden view
+        // parks the bar off the bottom of the window, silently: nothing throws and nothing paints.
+        if (binding.bottomNav.isVisible) bar.setAnchorView(binding.bottomNav)
+        // The restart runs through the connect state machine, so a stalled one is reported like
+        // any other failed start rather than leaving the hero on the old server. It carries the
+        // guid the SENTENCE NAMED: the action used to start whatever `getSelectServer()` held when
+        // it was pressed, so a selection that moved while the bar was up connected to one server
+        // while the words on the bar promised another.
+        bar.setAction(R.string.server_selected_reconnect_action) {
+            homeFragment?.applySelectionToRunningTunnel(guid)
+        }
+        bar.show()
     }
 
     private inner class ActivityAdapterListener : MainAdapterListener {
