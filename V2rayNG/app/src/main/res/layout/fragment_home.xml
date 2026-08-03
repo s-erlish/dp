@@ -22,18 +22,30 @@
 
   WHAT IS ON THIS SCREEN, top to bottom:
 
-      [ 56 ] the strip: отдача · время сессии · приём, and the add action
-      [ 56 ] the account row                          layout_home_account.xml
+      [ 56 ] the account row, FIRST                   layout_home_account.xml
+      [ 48 ] the add action, alone on its line, right
+      [ 56 ] the «Привязать Telegram» banner, in one state only
       [  1 ] hairline, alpha 0 until the content scrolls
       [ 48 ] the status strip, only when a condition applies
       [ 24 ]
       [224 ] the connect object: three concentric rings, one disc, one glyph
       [ 16 ]
-      [>=42] the status word, then the flag and the server it runs through
+      [ 24 ] the ledger: ↑ 1,0 KB/s   00:11:52   ↓ 1,2 KB/s   - one line, no captions
+      [ 22 ] the flag and the server, ONE centred line in the accent, bold
       [ 24 ]
       [  * ] the subscription card, one page per subscription
       [  * ] the server list, inline - this is the ONLY place a server is picked
       [ 24 ]
+
+  THE ACCOUNT ROW IS AT THE TOP AND THE LEDGER HAS NO CAPTIONS, and both are the owner
+  measuring this build against the one he approved, on 2026-08-03:
+
+      «плюсик лучше сделать ниже аккаунта»          - the add action held the first band
+      «↑ 1,0 KB/s  00:11:52  ↓ 1,2 KB/s»            - one line, arrows, no labels
+      «No «Отключено» word above it, and no grey circular flag tile»
+
+  Do not put the stacked «Отдача, Мбит/с» / «Время сессии» / «Приём, Мбит/с» captions
+  back, and do not put a status word above the server line. Read the notes at each.
 
   or, when there is not one server to connect to, the gate block in place of the
   card and the list (layout_home_empty.xml). Never both.
@@ -82,17 +94,30 @@
         android:orientation="vertical"
         android:paddingBottom="@dimen/space_24">
 
-        <!--
-          THE ADD ACTION. Adding a subscription is the one thing this screen owns that
-          is not the connection, so it sits alone at the top right and opens the SAME
-          menu every other add entry point does. 48dp box, 24dp glyph: the touch-target
-          floor with no fixed height on its row.
+        <!-- THE ACCOUNT ROW IS THE FIRST THING ON THE SCREEN, and that is an owner
+             instruction, not a preference: «сверху где отображается на главной аккаунт
+             типа управление аккаунтом, оно НЕ В САМОМ ВЕРХУ, выше плюсик и это лишнее
+             пространство занимает, плюсик лучше сделать НИЖЕ аккаунта». The add action
+             used to hold a 48dp band above it, holding nothing else since the ledger
+             moved under the connect object, so the screen opened on an empty strip.
 
-          THE LEDGER USED TO SHARE THIS LINE, AND IT DOES NOT ANY MORE. отдача · время
+             Rows bleed to the screen edge so their press feedback does; each row
+             carries the 16dp gutter itself, from @style/Widget.Departament.Row. -->
+        <include
+            android:id="@+id/layout_home_account"
+            layout="@layout/layout_home_account" />
+
+        <!--
+          THE ADD ACTION, UNDER THE ACCOUNT ROW. Adding a subscription is the one thing
+          this screen owns that is not the connection, so it sits alone at the right and
+          opens the SAME menu every other add entry point does. 48dp box, 24dp glyph:
+          the touch-target floor with no fixed height on its row.
+
+          THE LEDGER USED TO SHARE ITS LINE, AND IT DOES NOT ANY MORE. отдача · время
           сессии · приём now sit UNDER the connect object — «скорость почему-то вверху,
           хотя должны быть под кнопкой» — which is also where the desktop carries them
           (ConnectHeroView.axaml, StatsRow: «Стата-строка ПОД щитом, НАД именем
-          сервера»). See @id/numeric_strip below the status word.
+          сервера»). See @id/numeric_strip.
         -->
         <LinearLayout
             android:id="@+id/home_top_row"
@@ -117,12 +142,6 @@
                 app:srcCompat="@drawable/ic_add_24dp"
                 app:tint="?attr/colorOnSurface" />
         </LinearLayout>
-
-        <!-- Rows bleed to the screen edge so their press feedback does; each row
-             carries the 16dp gutter itself, from @style/Widget.Departament.Row. -->
-        <include
-            android:id="@+id/layout_home_account"
-            layout="@layout/layout_home_account" />
 
         <!--
           THE «ПРИВЯЗАТЬ TELEGRAM» BANNER, restored from 5e8cd54 (owner rule,
@@ -239,6 +258,22 @@
           no accent glow bleeding out behind the shield and no page gradient under
           the screen. The breathing that used to live on that glow lives on the rings
           now, where it is the object telling you it is negotiating.
+
+          IT IS ALIVE AT REST TOO, AND THE PRESS GOES THREE LAYERS DEEP. The owner:
+          «при нажатии на кнопку практически нет никакой анимации, только пульсация, а
+          на ПК по другому анимация сделана». Both halves of that are the desktop's, and
+          both are here now:
+
+            - the AMBIENT layer (HomeFragment.startAmbient) - a six-second breath on the
+              two outer rings and a wave leaving the disc (@id/connect_ring_ambient),
+              running at rest AND while connected, out of phase so the pair reads as
+              alive rather than as a metronome. It stands down for the negotiating
+              breath, under reduced motion, and while the app is in the background.
+              ConnectHeroView.axaml: AmbientRing.breathe-idle/-live +
+              AmbientSonar.rest-idle/-live.
+            - the PARALLAX PRESS - @anim/press_scale 0.97 on this frame, @anim/press_dip
+              0.97 again on the disc, and once more on the glyph, composing to the
+              desktop's own 0.94 disc and 0.91 glyph. Plus the scrim already here.
         -->
         <FrameLayout
             android:id="@+id/connect_frame"
@@ -260,13 +295,35 @@
 
                  The disc. Its fill and its own ring - the innermost and brightest of
                  the three - are built there too. -->
+            <!--
+              THE AMBIENT WAVE, and it is the layer this object was missing.
+
+              FIRST child of the frame, so it lies UNDER the disc and everything the disc
+              holds, and it is not hit-testable — the tap belongs to the frame. It starts
+              at the disc's own 176dp (match_parent inside the frame's 24dp padding) and
+              travels out through the two outer rings the frame's background draws.
+              HomeFragment loops it slowly at rest and, a little brighter and faster,
+              while connected: the desktop's «живой» layer (ConnectHeroView.axaml,
+              AmbientSonar.rest-idle / rest-live). Without it the object was a still
+              picture except during the 850ms negotiating breath, which is precisely the
+              complaint — «практически нет никакой анимации, только пульсация».
+            -->
+            <View
+                android:id="@+id/connect_ring_ambient"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center"
+                android:alpha="0"
+                android:importantForAccessibility="no" />
+
             <FrameLayout
                 android:id="@+id/connect_disc"
                 android:layout_width="@dimen/connect_disc"
                 android:layout_height="@dimen/connect_disc"
                 android:layout_gravity="center"
                 android:clipChildren="false"
-                android:duplicateParentState="true">
+                android:duplicateParentState="true"
+                android:stateListAnimator="@anim/press_dip">
 
                 <!-- PRESS DEPTH. The disc darkens into the press — the desktop's
                      «колодец» (ConnectHeroView.axaml PressScrim, P1-2) — under the
@@ -333,13 +390,24 @@
                     app:trackThickness="@dimen/stroke_ring" />
 
                 <!-- Two shields, crossfaded. Never tint-animated: the filled shield
-                     is accent from frame zero and only its alpha moves. -->
+                     is accent from frame zero and only its alpha moves.
+
+                     THE GLYPH SINKS DEEPER THAN THE DISC. @anim/press_dip runs on both
+                     shields as well as on the disc, so the press composes frame 0.97 ->
+                     disc 0.97 -> glyph 0.97 and the glyph is pressed INTO the disc
+                     rather than carried by it. That is the desktop's parallax dip
+                     (ConnectHeroView.axaml.cs, «глиф вдавливается в диск чуть глубже
+                     самого диска») and its figures land within a thousandth of ours.
+                     duplicateParentState is what feeds them the frame's pressed state
+                     through the disc. -->
                 <ImageView
                     android:id="@+id/shield_outline"
                     android:layout_width="@dimen/shield_glyph"
                     android:layout_height="@dimen/shield_glyph"
                     android:layout_gravity="center"
+                    android:duplicateParentState="true"
                     android:importantForAccessibility="no"
+                    android:stateListAnimator="@anim/press_dip"
                     app:srcCompat="@drawable/ic_shield_outline"
                     app:tint="?attr/colorOnSurfaceVariant" />
 
@@ -349,7 +417,9 @@
                     android:layout_height="@dimen/shield_glyph"
                     android:layout_gravity="center"
                     android:alpha="0"
+                    android:duplicateParentState="true"
                     android:importantForAccessibility="no"
+                    android:stateListAnimator="@anim/press_dip"
                     app:srcCompat="@drawable/ic_shield_filled"
                     app:tint="?attr/colorPrimary" />
             </FrameLayout>
@@ -359,11 +429,18 @@
             android:layout_width="match_parent"
             android:layout_height="@dimen/space_16" />
 
-        <!-- THE STATUS LINE. This and an empty state are the only centred text in
-             the product. There is NO status dot: the word carries the state and its
-             colour reinforces it, which is already two channels. The word is
-             swapped instantly, never crossfaded - it is the one string that has to
-             be legible in four seconds. -->
+        <!--
+          THE STATUS LINE, AND IT IS TWO LINES AND NEVER THREE: the ledger, then the
+          server. This and an empty state are the only centred text in the product.
+
+          THE STATUS WORD ABOVE THE SERVER IS GONE. The owner measured this build
+          against the one he approved and reported the difference: «No «Отключено»
+          word above it, and no grey circular flag tile». Nothing is lost with it —
+          the word only ever repeated what the object beside it was already saying in
+          colour (grey idle, accent connected, red failed), and the ONE line below the
+          ledger now carries the server when there is one and the state word when
+          there is not, which is what the reference build did. See paintStatusLine.
+        -->
         <LinearLayout
             android:id="@+id/status_line"
             android:layout_width="match_parent"
@@ -374,24 +451,22 @@
             android:paddingStart="@dimen/screen_gutter"
             android:paddingEnd="@dimen/screen_gutter">
 
-            <TextView
-                android:id="@+id/tv_status"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:maxLines="1"
-                android:text="@string/home_status_disconnected"
-                android:textAppearance="@style/TextAppearance.App.Title" />
-
             <!--
-              THE LEDGER: отдача · время сессии · приём, in that order, UNDER the
-              connect object and ABOVE the server identity. That is where the owner
-              expects it — «скорость почему-то вверху, хотя должны быть под кнопкой» —
-              and it is the desktop's own order (ConnectHeroView.axaml StatsRow, «ПОД
-              щитом, НАД именем сервера»).
+              THE LEDGER: ↑ отдача · время сессии · ↓ приём, ONE COMPACT LINE with no
+              captions under it, UNDER the connect object and ABOVE the server. That is
+              the reference build, described by the owner to the character — «↑ 1,0 KB/s
+              00:11:52 ↓ 1,2 KB/s», blue arrows, tabular figures, the timer in the
+              middle — and the stacked «Отдача, Мбит/с» / «Время сессии» / «Приём,
+              Мбит/с» captions this build grew are what he rejected. It is also the
+              desktop's order (ConnectHeroView.axaml StatsRow, «ПОД щитом, НАД именем
+              сервера»).
 
-              THE UNIT LIVES IN THE LABEL so the value stays a pure figure and the
-              tabular advance has nothing else on the line to fight.
+              THE ARROW IS THE LABEL. It costs one accent glyph instead of a two-word
+              caption, it needs no translation, and it is what the anchor build drew.
+              The unit rides WITH the value (0 KB/s -> 1,2 MB/s), because that is what
+              @string/speed_zero and Long.toSpeedString have always produced and it is
+              what the owner's screenshot shows; the caption that used to own the unit
+              no longer exists to hold it.
 
               THE RESERVE IS THE WHOLE POINT: android:minEms reserves N em, and an em
               IS the text size, so the reserve scales with the type at every font scale
@@ -407,124 +482,122 @@
                 android:id="@+id/numeric_strip"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_16"
+                android:layout_marginTop="@dimen/space_8"
                 android:baselineAligned="false"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical">
+                    android:baselineAligned="true"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tv_up_arrow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="@dimen/space_4"
+                        android:contentDescription="@string/home_strip_up_label"
+                        android:text="@string/home_strip_up_arrow"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        android:textColor="?attr/colorPrimary" />
 
                     <TextView
                         android:id="@+id/tv_up"
                         style="@style/TextAppearance.App.Numeric"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:minEms="3"
+                        android:maxLines="1"
+                        android:minEms="4"
                         android:text="@string/home_speed_zero"
-                        android:textAppearance="@style/TextAppearance.App.Title"
-                        tools:text="3,1" />
-
-                    <TextView
-                        android:id="@+id/tv_up_label"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_4"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:text="@string/home_strip_up_label"
-                        android:textAppearance="@style/TextAppearance.App.Caption" />
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        tools:text="1,0 KB/s" />
                 </LinearLayout>
 
-                <!-- The session clock. Its own column, because "how long have I been
+                <!-- The session clock. Dead centre, because "how long have I been
                      protected" is a different question from "how fast is it". -->
-                <LinearLayout
+                <TextView
+                    android:id="@+id/tv_uptime"
+                    style="@style/TextAppearance.App.Numeric"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/tv_uptime"
-                        style="@style/TextAppearance.App.Numeric"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:minEms="5"
-                        android:text="@string/home_uptime_zero"
-                        android:textAppearance="@style/TextAppearance.App.Title"
-                        tools:text="00:12:04" />
-
-                    <TextView
-                        android:id="@+id/tv_uptime_label"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_4"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:text="@string/home_strip_uptime_label"
-                        android:textAppearance="@style/TextAppearance.App.Caption" />
-                </LinearLayout>
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:text="@string/home_uptime_zero"
+                    android:textAppearance="@style/TextAppearance.App.Title"
+                    tools:text="00:11:52" />
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical">
+                    android:baselineAligned="true"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tv_down_arrow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="@dimen/space_4"
+                        android:contentDescription="@string/home_strip_down_label"
+                        android:text="@string/home_strip_down_arrow"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        android:textColor="?attr/colorPrimary" />
 
                     <TextView
                         android:id="@+id/tv_down"
                         style="@style/TextAppearance.App.Numeric"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:minEms="3"
-                        android:text="@string/home_speed_zero"
-                        android:textAppearance="@style/TextAppearance.App.Title"
-                        tools:text="24,8" />
-
-                    <TextView
-                        android:id="@+id/tv_down_label"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_4"
-                        android:ellipsize="end"
                         android:maxLines="1"
-                        android:text="@string/home_strip_down_label"
-                        android:textAppearance="@style/TextAppearance.App.Caption" />
+                        android:minEms="4"
+                        android:text="@string/home_speed_zero"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        tools:text="1,2 KB/s" />
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- WHAT IT RUNS THROUGH: the country flag and the server identity,
-                 under the object, which is the second of the three questions this
-                 screen answers. The flag is a 28dp fitting resolved by FlagUtil, and
-                 the name beside it never repeats it.
+            <!-- WHAT IT RUNS THROUGH: the flag and the server, ONE centred line under
+                 the ledger, in the accent and bold. This is the second of the three
+                 questions this screen answers, and in the reference build it is the
+                 only text under the object.
 
-                 INVISIBLE, never GONE: the line is always reserved, so nothing below
-                 it moves when the detail appears or goes. -->
+                 THE FLAG IS A BARE GLYPH. It used to sit in a grey circular tile
+                 (@drawable/bg_flag_tile) and the owner named that as a difference from
+                 what he had: a tile is a LIST affordance — it gives the rows below a
+                 common leading edge — and there is no column to align to here, so all
+                 it did was hang a grey disc off the middle of a centred line.
+
+                 ALWAYS VISIBLE, and that is what keeps the block below it still: the
+                 line resolves to a server, a state word or an instruction in every
+                 state there is, so it never has to be emptied and nothing under it can
+                 move. It starts INVISIBLE only for the frames before the first render.
+                 -->
             <LinearLayout
                 android:id="@+id/server_identity"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_8"
-                android:baselineAligned="false"
+                android:layout_marginTop="@dimen/space_12"
+                android:baselineAligned="true"
                 android:gravity="center"
+                android:minHeight="@dimen/tile_glyph"
                 android:orientation="horizontal"
                 android:visibility="invisible"
                 tools:visibility="visible">
 
                 <TextView
                     android:id="@+id/tv_server_flag"
-                    android:layout_width="@dimen/flag_size"
-                    android:layout_height="@dimen/flag_size"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
                     android:layout_marginEnd="@dimen/space_8"
-                    android:background="@drawable/bg_flag_tile"
                     android:gravity="center"
                     android:importantForAccessibility="no"
-                    android:textAppearance="@style/TextAppearance.App.Subtitle"
+                    android:textAppearance="@style/TextAppearance.App.Title"
                     tools:text="🇳🇱" />
 
                 <TextView
@@ -534,8 +607,9 @@
                     android:ellipsize="end"
                     android:gravity="center"
                     android:maxLines="1"
-                    android:textAppearance="@style/TextAppearance.App.Subtitle"
-                    tools:text="Нидерланды, Амстердам · 48 мс" />
+                    android:textAppearance="@style/TextAppearance.App.Title"
+                    android:textColor="?attr/colorPrimary"
+                    tools:text="Hybrid (Автовыбор)" />
             </LinearLayout>
         </LinearLayout>
 

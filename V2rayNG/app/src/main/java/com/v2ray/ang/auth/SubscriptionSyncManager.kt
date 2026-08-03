@@ -55,9 +55,26 @@ class SubscriptionSyncManager {
             val guid = managed[uuid]?.ifBlank { null } ?: Utils.getUuid()
 
             val item = (MmkvManager.decodeSubscription(guid) ?: SubscriptionItem()).apply {
-                remarks = info.displayName?.ifBlank { null }
-                    ?: info.tariffDisplayName?.ifBlank { null }
-                    ?: "Departament VPN"
+                // THE ПОДПИСКА'S OWN NICKNAME, AND NOTHING THAT ONLY LOOKS LIKE ONE.
+                //
+                // `displayName` is the label the user set in the cabinet and `defaultLabel` is the
+                // backend's per-sub placeholder («Подписка #2») — both name THIS подписка.
+                // `tariffDisplayName` does not: for this deployment it is the generic service name
+                // «departament vpn», the same string on every подписка, and [SubInfoDto] already
+                // filters it out of the tariff badge for exactly that reason. Stamping it here is
+                // what put «departament vpn» on the owner's card instead of his подписка's real
+                // name, because the remark then outranked the провайдер's own `profile-title`
+                // («🍀 erlish») for the rest of that подписка's life.
+                //
+                // With no nickname the remark is left BLANK on purpose. `updateConfigViaSub` runs
+                // three lines below and adopts the `profile-title` header as the remark while the
+                // remark is still blank — so the провайдер's real name lands automatically, which
+                // is the only route left now that editing a подписка is not a feature
+                // (OWNER-DECISION-2026-08-02 §5: «the naming has to be right at import time»).
+                // The old literal fallback also spelled the brand with capitals, against B2.
+                remarks = info.displayName?.takeIf { it.isNotBlank() }
+                    ?: info.defaultLabel?.takeIf { it.isNotBlank() }
+                    ?: ""
                 this.url = url
                 enabled = true
                 autoUpdate = true

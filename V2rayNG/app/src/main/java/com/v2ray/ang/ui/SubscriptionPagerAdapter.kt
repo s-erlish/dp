@@ -3,7 +3,9 @@ package com.v2ray.ang.ui
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.color.MaterialColors
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.databinding.ItemSubscriptionCardBinding
@@ -105,10 +107,27 @@ class SubscriptionPagerAdapter(
         }
 
         /**
-         * The traffic meter, on the same three-state contract `view_meter.xml` documents:
-         * unlimited hides the bar and states the figure used, over-quota turns the fill to the
-         * error tone and says so, and no usage data at all hides the meter rather than drawing
-         * 0 of 0 — which would read as an exhausted plan.
+         * THE TRAFFIC PILL, FINISHED. `view_meter.xml` has always described four states; this bound
+         * two of them, and the owner read the result as unfinished — «пилюля не сделана, надо
+         * дорабатывать чтобы было нормальное отображение и понятное для пользователя». All four are
+         * bound now, and every one of them leaves a figure on the card:
+         *
+         *  - under quota  bar at the real fraction, «12,4 из 50 ГБ», the accent fill;
+         *  - OVER quota   bar full, «Лимит исчерпан», AND THE FILL AND THE FIGURE GO RED. This is
+         *                 what view_meter.xml documents («over quota (>= 100%) fill ->
+         *                 ?attr/colorError and the value says «Лимит исчерпан»») and what nothing
+         *                 implemented: the value changed, the bar stayed accent-blue and read as a
+         *                 healthy full tank. An exhausted allowance now looks exhausted;
+         *  - unlimited    no bar — a bar with no ceiling is a lie — and «1,9 ТБ · безлимит»;
+         *  - NO DATA      the label and «Нет данных», with no bar. It used to hide the whole meter,
+         *                 which on a SECONDARY подписка is every single card: /client/subscription/all
+         *                 carries no connect payload at all, so `raw` is null for anything that is not
+         *                 the root, and the card simply had a hole where the pill belongs. A stated
+         *                 absence is finished; a silent gap is the thing he was looking at.
+         *
+         * Both colours are re-applied on EVERY bind, never only in the branch that needs them: this
+         * is a recycled holder, and a card that inherited the previous подписка's red fill would
+         * report a limit that is not its own.
          */
         private fun bindTrafficMeter(sub: SubInfoDto) {
             val ctx = binding.root.context
@@ -117,23 +136,37 @@ class SubscriptionPagerAdapter(
             val used: Long = raw?.trafficUsed ?: raw?.userTraffic?.usedTrafficBytes ?: 0L
             val limit: Long? = raw?.trafficLimitBytes
 
-            if (raw == null || (used <= 0L && limit == null)) {
-                meter.meter.visibility = View.GONE
-                return
-            }
             meter.meter.visibility = View.VISIBLE
             meter.meterLabel.setText(R.string.account_meter_traffic)
+
+            val accent = MaterialColors.getColor(meter.meterBar, androidx.appcompat.R.attr.colorPrimary)
+            val onSurface = MaterialColors.getColor(
+                meter.meterValue, com.google.android.material.R.attr.colorOnSurface
+            )
+            val danger = ContextCompat.getColor(ctx, R.color.color_destructive_text)
+
+            if (raw == null || (used <= 0L && limit == null)) {
+                meter.meterBar.visibility = View.GONE
+                meter.meterValue.setText(R.string.account_meter_traffic_none)
+                meter.meterValue.setTextColor(onSurface)
+                return
+            }
 
             if (limit == null || limit <= 0L) {
                 meter.meterBar.visibility = View.GONE
                 meter.meterValue.text =
                     ctx.getString(R.string.account_meter_traffic_unlimited, formatBytes(used))
+                meter.meterValue.setTextColor(onSurface)
                 return
             }
+
             meter.meterBar.visibility = View.VISIBLE
             val pct = ((used.toDouble() / limit.toDouble()) * 100).toInt().coerceIn(0, 100)
             meter.meterBar.setProgressCompat(pct, false)
-            meter.meterValue.text = if (used >= limit) {
+            val exhausted = used >= limit
+            meter.meterBar.setIndicatorColor(if (exhausted) danger else accent)
+            meter.meterValue.setTextColor(if (exhausted) danger else onSurface)
+            meter.meterValue.text = if (exhausted) {
                 ctx.getString(R.string.account_meter_traffic_over)
             } else {
                 ctx.getString(

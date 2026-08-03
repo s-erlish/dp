@@ -41,14 +41,18 @@
     <string name="home_server_latency">%1$s · %2$d мс</string>
 
     <!-- ===================================================================== -->
-    <!-- The top strip: отдача · время сессии · приём, in that order, on the     -->
-    <!-- same line as the add action. The UNIT lives in the label so the value   -->
-    <!-- stays a pure figure and its reserved width never has to grow for it.    -->
+    <!-- The ledger under the connect object: ↑ отдача · время сессии · ↓ приём, -->
+    <!-- ONE line, no captions. The arrow IS the label — it is what the          -->
+    <!-- reference build drew and it needs no translation — and the two words    -->
+    <!-- below survive only as the arrows' accessible names, which is the one    -->
+    <!-- place a screen reader still needs them spelled out. The UNIT rides      -->
+    <!-- with the value now that no caption exists to hold it.                   -->
     <!-- ===================================================================== -->
-    <string name="home_strip_up_label">Отдача, Мбит/с</string>
-    <string name="home_strip_uptime_label">Время сессии</string>
-    <string name="home_strip_down_label">Приём, Мбит/с</string>
-    <string name="home_speed_zero" translatable="false">0,0</string>
+    <string name="home_strip_up_arrow" translatable="false">↑</string>
+    <string name="home_strip_down_arrow" translatable="false">↓</string>
+    <string name="home_strip_up_label">Отдача</string>
+    <string name="home_strip_down_label">Приём</string>
+    <string name="home_speed_zero" translatable="false">0 KB/s</string>
     <string name="home_uptime_zero" translatable="false">00:00:00</string>
     <string name="home_uptime_format" translatable="false">%1$02d:%2$02d:%3$02d</string>
 
@@ -132,11 +136,13 @@
     <!-- Last resort only: the account nickname, then the provider's own title,
          then the subscription's remark all come first. -->
     <string name="home_sub_untitled">Подписка</string>
-    <!-- «09.07.2026 07:08 · Автообновление: 1 ч» -->
+    <!-- «10.07.2026 10:56 · 1 ч» — the refresh cadence is the VALUE, with no word in
+         front of it: «надо этот текст убрать и просто оставить отображение значения
+         типа 1ч 3ч и тд, без слова». -->
     <string name="home_sub_meta">%1$s · %2$s</string>
     <string name="home_sub_updated_never">Ещё не обновлялась</string>
-    <string name="home_sub_auto_update">Автообновление: %1$s</string>
-    <string name="home_sub_auto_update_off">выкл</string>
+    <!-- No auto-update: the only case with no period to print, so the value is a word. -->
+    <string name="home_sub_auto_update_off">вручную</string>
     <string name="home_sub_interval_hours">%1$d ч</string>
     <string name="home_sub_interval_minutes">%1$d мин</string>
     <string name="home_sub_traffic_used" translatable="false">%1$s / %2$s</string>

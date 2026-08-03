@@ -1,4 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  THE SUBSCRIPTION CARD on Главная, one page of the carousel.
+
+  THE CARD IS INERT AND ITS CONTROLS ARE NOT. Read @drawable/bg_card_inert and
+  @drawable/bg_control_disc before changing a background here — between them they carry
+  an owner defect report with two halves: the collapse chevron flooding the whole card
+  with light on press, and the card itself darkening/flickering because of a touch on
+  something sitting on it. The rule that came out of it is one line: NOTHING done to a
+  control on this card may change how the CARD is painted.
+
+  So the root gets a plain shape and never a <ripple>, and every icon affordance gets a
+  ripple with a MASK (bounded) and never ?attr/selectableItemBackgroundBorderless
+  (unbounded, and projected onto whatever is behind it).
+
+  The other half of that flicker is in Kotlin, not here: see HomeMetaPagerAdapter.repaint
+  and HomeFragment.setupHomeMetaPager, which stop RecyclerView's change animation from
+  cross-fading and sliding a full-width page every time the list is collapsed.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -9,7 +27,7 @@
     android:layout_marginTop="@dimen/space_8"
     android:layout_marginEnd="@dimen/screen_gutter"
     android:layout_marginBottom="@dimen/space_4"
-    android:background="@drawable/bg_server_card"
+    android:background="@drawable/bg_card_inert"
     android:orientation="vertical"
     android:paddingStart="@dimen/space_16"
     android:paddingTop="@dimen/space_12"
@@ -32,7 +50,7 @@
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:layout_marginEnd="@dimen/space_8"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/bg_control_disc"
             android:clickable="true"
             android:contentDescription="@string/title_servers"
             android:focusable="true"
@@ -55,7 +73,7 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textAppearance="@style/TextAppearance.App.Title"
-                tools:text="erlish" />
+                tools:text="🍀 erlish" />
 
             <TextView
                 android:id="@+id/tv_meta_subtitle"
@@ -66,7 +84,7 @@
                 android:maxLines="1"
                 android:textAppearance="@style/TextAppearance.App.Caption"
                 android:visibility="gone"
-                tools:text="09.07.2026 07:08 · Автообновление — 1 ч."
+                tools:text="10.07.2026 10:56 · 1 ч"
                 tools:visibility="visible" />
 
         </LinearLayout>
@@ -76,7 +94,7 @@
             android:id="@+id/btn_ping"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/bg_control_disc"
             android:clickable="true"
             android:contentDescription="@string/connection_test_pending"
             android:focusable="true"
@@ -89,7 +107,7 @@
             android:id="@+id/btn_refresh"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/bg_control_disc"
             android:clickable="true"
             android:contentDescription="@string/title_sub_update"
             android:focusable="true"
@@ -112,7 +130,7 @@
             android:id="@+id/btn_pin"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/bg_control_disc"
             android:clickable="true"
             android:contentDescription="@string/sub_pin"
             android:focusable="true"
@@ -240,7 +258,7 @@
             android:id="@+id/btn_telegram"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/bg_control_disc"
             android:clickable="true"
             android:contentDescription="@string/sub_telegram"
             android:focusable="true"

@@ -42,6 +42,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.CompositePageTransformer
 import androidx.viewpager2.widget.MarginPageTransformer
 import androidx.viewpager2.widget.ViewPager2
@@ -65,6 +66,7 @@ import com.v2ray.ang.dto.entities.isExpired
 import com.v2ray.ang.dto.entities.isUnlimited
 import com.v2ray.ang.dto.entities.trafficFraction
 import com.v2ray.ang.dto.entities.usedTraffic
+import com.v2ray.ang.extension.toSpeedString
 import com.v2ray.ang.extension.toTrafficString
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
@@ -87,7 +89,6 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.util.Date
 import java.util.Locale
-import kotlin.math.roundToLong
 
 /**
  * Главная — the screen the app opens on.
@@ -278,6 +279,18 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private var breathAnimator: ValueAnimator? = null
 
     /**
+     * The AMBIENT layer — the object breathing while nothing is happening to it. Two loops, out of
+     * phase by design (6s and 6.5s at rest), so the pair reads as alive rather than as a metronome.
+     * They run at rest AND while connected, and they stand down for the negotiating breath, which is
+     * a different statement at an order-of-magnitude different tempo.
+     */
+    private var ambientRingAnimator: ValueAnimator? = null
+    private var ambientWaveAnimator: ValueAnimator? = null
+
+    /** Which ambient tempo is on air, so a repaint does not restart a loop it is already running. */
+    private var ambientLive: Boolean? = null
+
+    /**
      * Whether the sweep is on screen, so the arc's wind-up fires on the EDGE into negotiating and
      * not on every repaint that happens to find it already spinning. See [playArcWindUp].
      */
@@ -385,14 +398,18 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // Under this many days left the subscription is «Истекает».
         const val EXPIRING_DAYS = 3
 
-        // Below 100 the speed carries one decimal, at or above it none.
-        const val SPEED_DECIMAL_BELOW = 100.0
-
         // ~2088-01-01 in epoch seconds. Some panels send a date this far out to mean "never".
         const val UNLIMITED_EXPIRE_SECONDS = 3_723_840_000L
 
         const val DISABLED_ALPHA = 0.38f
         const val RIPPLE_ALPHA = 26 // 10% of 255
+
+        // Names that identify no подписка and must never reach the card's heading: the two import
+        // placeholders AngConfigManager writes, and the generic service label the backend returns as
+        // `tariffDisplayName` (the same string on every подписка — see SubInfoDto.tariffBadgeName,
+        // which refuses it for the tariff badge for exactly this reason). Lower case; compared
+        // against a lower-cased, trimmed candidate.
+        val GENERIC_SUB_NAMES = setOf("default", "import sub", "departament", "departament vpn")
 
         // The three rings are ONE colour at three opacities: outermost faintest, the disc's own
         // brightest. That is the whole gradient this object is allowed, and it is a state channel
@@ -408,6 +425,35 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
         /** One full revolution — the arc's wind-up lands back where it started, so nothing snaps. */
         const val FULL_TURN_DEGREES = 360f
+
+        // THE AMBIENT BREATH, at rest and while connected: the desktop's «живой» layer
+        // (ConnectHeroView.axaml, AmbientRing.breathe-idle / breathe-live). Six seconds against the
+        // negotiating breath's 0.85 — an order of magnitude slower, so the two can never be
+        // confused for each other — and a narrow alpha band, because this says "alive", not
+        // "working". Connected runs one second faster and a little brighter: «активно».
+        const val AMBIENT_PERIOD_IDLE_MS = 6_000L
+        const val AMBIENT_PERIOD_LIVE_MS = 5_000L
+        const val AMBIENT_ALPHA_MIN = 150
+        const val AMBIENT_ALPHA_MAX_IDLE = 215
+        const val AMBIENT_ALPHA_MAX_LIVE = 255
+
+        // The resting sonar: one wave, leaving the disc and dying, on an endless loop. Not
+        // Alternate — it is transparent at BOTH ends of the cycle, so the scale snapping back is
+        // invisible and there is no click at the seam (the desktop's own note on
+        // AmbientSonar.rest-idle).
+        const val AMBIENT_WAVE_PERIOD_IDLE_MS = 6_500L
+        const val AMBIENT_WAVE_PERIOD_LIVE_MS = 5_500L
+        const val AMBIENT_WAVE_SCALE_IDLE = 1.22f
+        const val AMBIENT_WAVE_SCALE_LIVE = 1.26f
+        const val AMBIENT_WAVE_ALPHA_IDLE = 0.28f
+        const val AMBIENT_WAVE_ALPHA_LIVE = 0.40f
+        // The wave peaks early and spends the rest of the cycle fading — an exhale outwards.
+        const val AMBIENT_WAVE_PEAK = 0.18f
+
+        // The connecting breath also reaches the shield glyph, in unison with the rings: alpha
+        // 1 <-> 0.8 (ConnectHeroView.axaml, Path.shieldbreathe). Opacity only — never a transform,
+        // so it physically cannot drift out of its own centre.
+        const val SHIELD_BREATH_ALPHA_MIN = 0.8f
 
         // The cold-start assemble plays once per PROCESS, not on every theme/language recreate.
         private var heroAssembled = false
@@ -466,6 +512,21 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         render()
     }
 
+    /**
+     * The ambient loops are the only INFINITE motion on this screen, and an infinite animator keeps
+     * the compositor awake whether or not anyone can see it. The app going to the background is the
+     * one moment nobody can, so they stop here — the desktop pauses the same layer for the same
+     * reason (`ConnectHeroView.axaml.cs`, `_animationsPaused` / MotionSuppressed). [onResume]'s
+     * render() puts them back, at whatever tempo the state then calls for.
+     *
+     * A hidden TAB is not this case: hidden tabs stay RESUMED, and a tab the user is one swipe away
+     * from should be alive when he gets there.
+     */
+    override fun onPause() {
+        stopAmbient()
+        super.onPause()
+    }
+
     override fun onDestroyView() {
         timerHandler.removeCallbacks(healthCheckRunnable)
         timerHandler.removeCallbacks(healthRecheckRunnable)
@@ -476,6 +537,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         ringAnimator = null
         breathAnimator?.cancel()
         breathAnimator = null
+        // The ambient loops are INFINITE, so they are the two that would outlive the view and keep
+        // driving the compositor from a destroyed hierarchy if they were ever forgotten here.
+        stopAmbient()
         ringOuter = null
         ringMid = null
         ringInner = null
@@ -673,6 +737,15 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             setStroke((stroke - 1).coerceAtLeast(1), accent)
         }
 
+        // The ambient wave: the same silhouette again, thinner still, because it is the quietest
+        // thing the object does and it does it forever. Its colour follows the rings' state channel
+        // rather than being pinned to the accent — a wave leaving a grey idle object must be grey.
+        binding.connectRingAmbient.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.TRANSPARENT)
+            setStroke((stroke - 1).coerceAtLeast(1), ringColor)
+        }
+
         // The monogram's circle: the P3 plane, never the accent.
         binding.layoutHomeAccount.tvAvatarInitial.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
@@ -692,6 +765,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         ringOuter?.setStroke(stroke, ColorUtils.setAlphaComponent(colour, RING_ALPHA_OUTER))
         ringMid?.setStroke(stroke, ColorUtils.setAlphaComponent(colour, RING_ALPHA_MID))
         ringInner?.setStroke(stroke, colour)
+        // The ambient wave rides the same channel: it is the object exhaling, so it is the object's
+        // colour. Guarded because this runs from buildConnectObject before the wave has a drawable.
+        (binding.connectRingAmbient.background as? GradientDrawable)
+            ?.setStroke((stroke - 1).coerceAtLeast(1), colour)
     }
 
     /**
@@ -889,6 +966,39 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             adapter = pagerAdapter
             offscreenPageLimit = 1
             clipToPadding = false
+            // THE CARD NEVER ANIMATES ITSELF. This is the root cause of the two defects the owner
+            // kept hitting on this card, and both of them are the RecyclerView ItemAnimator that
+            // ViewPager2 keeps inside itself:
+            //
+            //   «моргает тулбар с подпиской, он ваще должен быть статичный»
+            //   «сам тулбар с подпиской опять багуется и двигается слева вправо и там заезжает
+            //    за экран»
+            //
+            // A ViewPager2 IS a RecyclerView, and DefaultItemAnimator's CHANGE animation cross-fades
+            // a scrap copy of the item over the real one while translating the incoming view from
+            // its pre-layout bounds to its post-layout bounds. On a page that fills the viewport,
+            // that delta is a whole page width the moment the item COUNT changes under a non-zero
+            // scroll offset — which is exactly the owner's repro: add a second подписка, delete it,
+            // come back to the first, then collapse the list. The card slides across and off screen.
+            //
+            // The reason it survived the previous fix is that ViewPager2 owns this animator and
+            // hands it back and forth: setPageTransformer(non-null) saves the animator and nulls it,
+            // setPageTransformer(null) RESTORES it. rebuildHomeMeta used to swap the transformer in
+            // and out with the подписка count, so dropping from two подписки to one handed the
+            // animator back and re-armed the bug. Hence both lines below: strip the animator here,
+            // once, and never let the transformer be set to null again (see setPageTransformer
+            // below, which is now unconditional).
+            (getChildAt(0) as? RecyclerView)?.itemAnimator = null
+            // Neighbour cards peek past the 16dp gutter; a 12dp gap keeps them from touching. With
+            // one подписка every page sits at position 0, so the transformer applies a zero offset
+            // and costs nothing — which is why it can safely be permanent.
+            setPageTransformer(
+                CompositePageTransformer().apply {
+                    addTransformer(
+                        MarginPageTransformer(resources.getDimensionPixelSize(R.dimen.space_12))
+                    )
+                }
+            )
             registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
                 private var dragged = false
 
@@ -935,25 +1045,33 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             measureHomeMetaHeight()
             return
         }
+        val shrank = count < homeMetaSubIds.size
         homeMetaSubIds = ids
         adapter.submit(ids)
-        // Neighbour cards peek past the 16dp gutter; a 12dp gap keeps them from touching.
-        binding.vpHomeMeta.setPageTransformer(
-            if (many) {
-                CompositePageTransformer().apply {
-                    addTransformer(MarginPageTransformer(resources.getDimensionPixelSize(R.dimen.space_12)))
-                }
-            } else {
-                null
-            }
-        )
+        // The page transformer is NOT touched here any more, and that is deliberate — it is set
+        // once in setupHomeMetaPager and stays. Swapping it with the подписка count is what handed
+        // ViewPager2's ItemAnimator back the moment a second подписка was deleted, and the animator
+        // is what slid the card off screen on the next repaint. Read the note there.
+        //
         // Keep the user on the card they were reading; on the FIRST build there is no such card, so
         // open on the подписка the selected server belongs to rather than always on the first one.
         val restore = keepSubId?.let { ids.indexOf(it) }?.takeIf { it >= 0 }
             ?: ids.indexOf(currentMetaSubId()).takeIf { it >= 0 }
             ?: 0
         homeMetaPage = restore.coerceIn(0, (count - 1).coerceAtLeast(0))
-        if (count > 0) binding.vpHomeMeta.setCurrentItem(homeMetaPage, false)
+        if (count > 0) {
+            binding.vpHomeMeta.setCurrentItem(homeMetaPage, false)
+            // AND WHEN THE COUNT SHRANK, ANCHOR THE LIST BY HAND. `setCurrentItem` returns early
+            // when the target equals ViewPager2's own `mCurrentItem` and it is idle — which is the
+            // common case after a delete (he was reading page 0, page 1 went away, the target is
+            // still 0) — so nothing resets the inner RecyclerView, and its LinearLayoutManager
+            // re-anchors on whatever stale child it can still find after a structural change. That
+            // is how a one-page carousel ends up laid out at a one-page scroll offset, i.e. off
+            // screen. `scrollToPosition` sets a pending scroll position, which makes the next
+            // layout pass anchor from scratch. Null-safe: if the child is ever not a RecyclerView
+            // this is simply a no-op, and the setCurrentItem above still ran.
+            if (shrank) (binding.vpHomeMeta.getChildAt(0) as? RecyclerView)?.scrollToPosition(homeMetaPage)
+        }
         buildHomeMetaDots(count)
         updateHomeMetaDots(homeMetaPage)
         binding.llHomeMetaDots.isVisible = many
@@ -1075,56 +1193,68 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
-     * The card's heading.
+     * The card's heading — THE ПОДПИСКА'S OWN NAME, and never the name of the service it belongs to.
      *
-     * WHEN THE ПОДПИСКА CAME FROM THE ACCOUNT, THE ACCOUNT'S OWN NICKNAME WINS. That is the owner's
-     * instruction — «чтобы при подтягивании подписки с акка писался ник подписки» — and it is the one
-     * thing the old build got wrong: it preferred the provider-sent `profile-title`, which for this
-     * deployment is the same generic service name on every подписка, so two differently-named
-     * подписки drew the same label.
+     * The owner reported the card reading «departament vpn» where his подписка is called «🍀 erlish».
+     * That string is the generic service label the backend returns as `tariffDisplayName`; the
+     * import used to stamp it into the local remark (`SubscriptionSyncManager`), and a remark
+     * outranked the провайдер's own `profile-title` header — which is where the real name lives. The
+     * import no longer writes it, and this order no longer lets a generic label win even on an
+     * install that already has one stored.
      *
-     * [accountNameFor] reads the LIVE account list, so renaming a подписка in Аккаунт shows here
-     * without waiting for a re-import; the imported remark is the same nickname one refresh behind,
-     * and stands in when the account has not answered yet.
+     * The order, and why each step is where it is:
+     *
+     *  1. the account's `displayName` — the nickname the user set in the cabinet. His instruction,
+     *     «чтобы при подтягивании подписки с акка писался ник подписки», is exactly this field.
+     *  2. the провайдер's `profile-title` — «🍀 erlish». Authoritative for a подписка the user never
+     *     renamed, and the only name a PASTED подписка has at all.
+     *  3. the local remark — the same nickname one refresh behind, for the window before the account
+     *     or the провайдер has answered.
+     *  4. the account's `defaultLabel` — «Подписка #2». A real per-подписка label, but a generated
+     *     one, so it sits below anything a human or the провайдер chose.
+     *  5. «Подписка».
+     *
+     * Steps 2 and 3 both refuse a GENERIC name: the two import placeholders, and the service label
+     * itself. Editing a подписка is not a feature (OWNER-DECISION-2026-08-02 §5), so a bad automatic
+     * name is permanent — the filter is the only thing standing between him and it.
      */
     private fun metaTitle(subId: String, sub: SubscriptionItem): String {
-        accountNameFor(subId)?.let { return it }
-        val remarks = sub.remarks.trim()
-        // Both import placeholders are filtered, not just "Default". AngConfigManager names a
-        // pasted подписка "import sub" (DEFAULT_SUBSCRIPTION_REMARKS) and only replaces it once the
-        // provider answers with a profile-title — so a provider that sends none used to leave the
-        // card reading literally «import sub». That was survivable while a rename existed; the
-        // owner has since ruled that editing a подписка is not a feature at all
-        // (OWNER-DECISION-2026-08-02 §5), so a bad automatic name is now PERMANENT and the naming
-        // has to be right without him. Falling through to the provider title and then to
-        // «Подписка» is the honest answer: a generic placeholder is not a name.
-        val genericRemarks = setOf("default", "import sub")
-        val fromRemarks = remarks.takeIf {
-            it.isNotEmpty() && it.lowercase() !in genericRemarks
-        }
-        if (isAccountManaged(subId)) {
-            // Account-managed: the remark IS the nickname the import wrote, so it outranks the
-            // provider's generic title.
-            fromRemarks?.let { return it }
-        }
-        sub.profileTitle.takeIf { it.isNotBlank() }?.let { return it }
-        fromRemarks?.let { return it }
+        val account = accountNameFor(subId)
+        account?.displayName?.let { return it }
+        realName(sub.profileTitle)?.let { return it }
+        realName(sub.remarks)?.let { return it }
+        account?.defaultLabel?.let { return it }
         return getString(R.string.home_sub_untitled)
     }
 
-    /** True when this local подписка is one the account manages, rather than a pasted link. */
-    private fun isAccountManaged(subId: String): Boolean =
-        runCatching { AuthTokenStore.getManagedGuids().containsValue(subId) }.getOrDefault(false)
+    /**
+     * [candidate] when it actually names a подписка, else null.
+     *
+     * Rejected: blank; `AngConfigManager`'s two import placeholders ("import sub" =
+     * DEFAULT_SUBSCRIPTION_REMARKS, and "Default"); and the generic service label, which
+     * [SubInfoDto.tariffBadgeName] already refuses for the same reason — it is the same string on
+     * every подписка, so it identifies nothing.
+     */
+    private fun realName(candidate: String?): String? {
+        val trimmed = candidate?.trim().orEmpty()
+        if (trimmed.isEmpty()) return null
+        return trimmed.takeIf { it.lowercase() !in GENERIC_SUB_NAMES }
+    }
+
+    /** The user's own nickname for a подписка and the backend's generated label, kept apart. */
+    private data class AccountSubName(val displayName: String?, val defaultLabel: String?)
 
     /**
-     * The nickname the account returns for this local подписка, or null when it is not an account
-     * one (or the account has not answered yet).
+     * What the account calls this local подписка, or null when it is not an account one (or the
+     * account has not answered yet). The two fields are returned SEPARATELY because they rank
+     * differently: `displayName` is a name a human chose and outranks everything, while
+     * `defaultLabel` is «Подписка #N» and must not outrank the провайдер's own title.
      *
      * The import remembers each подписка under an identity key — the constant "root" for the account's
      * primary, the remnawave uuid / id for a secondary — so the mapping back to a `SubInfoDto` is
      * that key, not a name match.
      */
-    private fun accountNameFor(subId: String): String? {
+    private fun accountNameFor(subId: String): AccountSubName? {
         val identity = runCatching {
             AuthTokenStore.getManagedGuids().entries.firstOrNull { it.value == subId }?.key
         }.getOrNull() ?: return null
@@ -1136,14 +1266,23 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             }
             key.isNotBlank() && key == identity
         } ?: return null
-        return info.displayName?.takeIf { it.isNotBlank() }
-            ?: info.defaultLabel?.takeIf { it.isNotBlank() }
+        return AccountSubName(
+            displayName = realName(info.displayName),
+            defaultLabel = realName(info.defaultLabel),
+        )
     }
 
     /**
      * The line under the card's heading: when the подписка last updated, and how often it does. The
      * timestamp is formatted from a resource pattern rather than a locale-dependent default so a
      * Russian sentence never ends in an English month.
+     *
+     * THE INTERVAL IS THE VALUE ALONE — «10.07.2026 10:56 · 1 ч», never «… · Автообновление — 1 ч».
+     * The owner's instruction: «надо этот текст убрать и просто оставить отображение значения типа
+     * 1ч 3ч и тд, без слова». The word was carrying nothing the figure does not: a period beside a
+     * timestamp on a подписка card is the refresh cadence and can be nothing else. The one case that
+     * still needs a word is the one with no period to show, and there the value IS the word:
+     * «вручную».
      */
     private fun metaSubtitle(sub: SubscriptionItem): String {
         val last = if (sub.lastUpdated > 0L) {
@@ -1162,7 +1301,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
                 getString(R.string.home_sub_interval_minutes, minutes.toInt())
             }
         }
-        return getString(R.string.home_sub_meta, last, getString(R.string.home_sub_auto_update, interval))
+        return getString(R.string.home_sub_meta, last, interval)
     }
 
     /**
@@ -1866,7 +2005,23 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         if (sweeping) binding.connectSweep.show() else binding.connectSweep.hide()
         if (sweeping && !sweepRunning) playArcWindUp()
         sweepRunning = sweeping
-        if (negotiating) startBreathing() else stopBreathing()
+
+        // THE TWO BREATHS, AND ONLY EVER ONE OF THEM. Negotiating owns the ring alphas at 850ms and
+        // says "working on it"; the ambient layer owns them at six seconds and says "alive". The
+        // ambient stands down for the whole of negotiation and comes back on the other side, at the
+        // connected tempo when the tunnel came up and the resting one when it did not. A disabled
+        // object — gated, no server, disconnecting — stays perfectly still: nothing is alive there.
+        if (negotiating) {
+            stopAmbient()
+            startBreathing()
+        } else {
+            stopBreathing()
+            when (state.conn) {
+                Conn.CONNECTED -> startAmbient(live = true)
+                Conn.DISCONNECTED, Conn.ERROR -> startAmbient(live = false)
+                else -> stopAmbient()
+            }
+        }
 
         val targetRing = when (state.conn) {
             Conn.CONNECTED -> themeColor(androidx.appcompat.R.attr.colorPrimary)
@@ -1898,30 +2053,33 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         paintStatusLine(state)
     }
 
+    /**
+     * ONE LINE UNDER THE LEDGER, and it says what the screen is running through.
+     *
+     * There is no status word above it any more. The owner compared this build with the one he
+     * approved and reported the extra line as a defect — «No «Отключено» word above it» — and the
+     * word was never carrying anything on its own: idle grey / negotiating amber / accent connected
+     * / failed red is already on the object the line sits under, and the object's contentDescription
+     * states the same thing for a screen reader.
+     *
+     * So the single line resolves by priority:
+     *
+     *  - a SERVER to name  -> the flag and the name, in the accent and bold (plus the live latency
+     *                         once a probe has landed on a live tunnel). This is the resting look,
+     *                         and it is the one in his reference: «flag glyph + Hybrid (Автовыбор)
+     *                         in blue, bold».
+     *  - no server, but something to say -> the state word or the instruction, in its own colour and
+     *                         with NO flag: a flag beside «Нажмите, чтобы повторить» would label the
+     *                         instruction with a country.
+     *
+     * The text is swapped INSTANTLY, never crossfaded: a crossfade is unreadable for its duration
+     * and this is the string that has to be legible in four seconds.
+     */
     private fun paintStatusLine(state: HomeState) {
-        val onSurface = themeColor(com.google.android.material.R.attr.colorOnSurface)
-        val (textRes, colour) = when (state.conn) {
-            Conn.DISCONNECTED -> R.string.home_status_disconnected to onSurface
-            Conn.CONNECTING -> R.string.home_status_connecting to onSurface
-            Conn.CONNECTED -> R.string.home_status_connected to
-                themeColor(com.google.android.material.R.attr.colorTertiary)
-            Conn.DISCONNECTING -> R.string.home_status_disconnecting to onSurface
-            Conn.ERROR -> R.string.home_status_error to
-                ContextCompat.getColor(requireContext(), R.color.color_destructive_text)
-            Conn.NO_SERVER -> R.string.home_status_no_server to onSurface
-            Conn.GATED -> gateStatusWord(state) to onSurface
-        }
-        // The word is swapped INSTANTLY. Text that crossfades is unreadable for the duration of the
-        // crossfade, and this is the one string that has to be legible in four seconds.
-        binding.tvStatus.setText(textRes)
-        binding.tvStatus.setTextColor(colour)
-
-        // WHAT IT RUNS THROUGH: the flag, then the server, then its live latency once a probe has
-        // landed. The whole line is INVISIBLE rather than GONE, so nothing below it moves.
+        val onSurfaceVariant = themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
+        val accent = themeColor(androidx.appcompat.R.attr.colorPrimary)
         val name = state.serverName
-        // The IDENTITY and a HINT are two different lines that share one slot, and only the
-        // identity gets the flag: a flag beside «Нажмите, чтобы повторить» would label the
-        // instruction with a country.
+
         val identity: CharSequence? = when (state.conn) {
             Conn.ERROR, Conn.NO_SERVER, Conn.GATED -> null
             Conn.CONNECTED -> name?.let { server ->
@@ -1930,16 +2088,37 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
             else -> name
         }
-        val hint: CharSequence? = when (state.conn) {
+        // The fallback line, for every state with no server to name. Each one keeps a string the
+        // two-line stack already used, so nothing is lost by collapsing them into one row, and the
+        // line is NEVER empty in a state that has something to say.
+        //
+        // ERROR takes the RECOVERY and not the verdict: the object above it is already red, so
+        // «Не удалось подключиться» would spend the only line restating a colour, while «Нажмите,
+        // чтобы повторить» spends it on the way out. State plus action, one channel each.
+        val fallback: CharSequence = when (state.conn) {
             Conn.ERROR -> getString(R.string.home_detail_retry)
             Conn.NO_SERVER -> getString(R.string.home_detail_pick_server)
-            else -> null
+            Conn.GATED -> getString(gateStatusWord(state))
+            Conn.CONNECTING -> getString(R.string.home_status_connecting)
+            Conn.DISCONNECTING -> getString(R.string.home_status_disconnecting)
+            Conn.DISCONNECTED -> getString(R.string.home_status_disconnected)
+            Conn.CONNECTED -> getString(R.string.home_status_connected)
         }
-        val detail = identity ?: hint
+        val detail: CharSequence = identity ?: fallback
+        val colour = when {
+            identity != null -> accent
+            state.conn == Conn.ERROR ->
+                ContextCompat.getColor(requireContext(), R.color.color_destructive_text)
+
+            else -> onSurfaceVariant
+        }
+
         binding.tvServerFlag.text = state.serverFlag.orEmpty()
         binding.tvServerFlag.isVisible = identity != null && state.serverFlag != null
-        binding.tvStatusDetail.text = detail ?: ""
-        binding.serverIdentity.visibility = if (detail == null) View.INVISIBLE else View.VISIBLE
+        binding.tvStatusDetail.text = detail
+        binding.tvStatusDetail.setTextColor(colour)
+        // Always laid out, so the block below it never moves when the line changes what it says.
+        binding.serverIdentity.visibility = View.VISIBLE
     }
 
     private fun gateStatusWord(state: HomeState): Int = when {
@@ -1952,12 +2131,18 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * The strip's two speed columns. A figure LANDS — it does not tick, count or animate — and it
      * reads zero at rest rather than blank: this row is the screen's ledger and it is always there.
      * The session clock is written by [uptimeRunnable], which owns it second by second.
+     *
+     * THE UNIT RIDES WITH THE VALUE — «1,0 KB/s», not a bare «1,0» under a «Отдача, Мбит/с»
+     * caption. The captions are gone (the owner's reference has none) so there is nothing left to
+     * hold the unit, and a bare figure whose scale is invisible is worse than no figure. This is
+     * `Long.toSpeedString`, which is what the anchor build printed here and what the whole app
+     * prints everywhere else, so the same rate can never read two different ways in one product.
      */
     private fun paintFigures() {
         if (!isBindingInitialized) return
         val zero = getString(R.string.home_speed_zero)
-        binding.tvUp.text = upBytesPerSec?.let { formatSpeed(it) } ?: zero
-        binding.tvDown.text = downBytesPerSec?.let { formatSpeed(it) } ?: zero
+        binding.tvUp.text = upBytesPerSec?.toSpeedString() ?: zero
+        binding.tvDown.text = downBytesPerSec?.toSpeedString() ?: zero
     }
 
     /** The subscription card + list, and the gate block, share one slot and are never both up. */
@@ -2184,6 +2369,12 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * are part of the object rather than a wash behind it. They swell in opacity together while the
      * sweep travels the disc — motion the user reads as "it is working on it", on the object itself.
      *
+     * AND IT REACHES THE SHIELD. The desktop breathes the glyph on the same clock and in the same
+     * direction (`ConnectHeroView.axaml`, `Path.shieldbreathe`: alpha 1 <-> 0.8, 850ms sine,
+     * Alternate) so the two waves read as ONE calm inhale rather than as two separate fidgets.
+     * OPACITY ONLY, never a transform — the desktop's own note, and for the same reason: an opacity
+     * animation has no centre to drift out of.
+     *
      * Reduced motion: nothing breathes and the sweep is the only signal.
      */
     private fun startBreathing() {
@@ -2198,16 +2389,112 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
                 val value = it.animatedValue as Int
                 ringOuter?.alpha = value
                 ringMid?.alpha = value
+                // The glyph rides the same wave, mapped onto its own narrower band. The OUTLINE is
+                // the shield on screen while negotiating; the filled one is at alpha 0 and is left
+                // alone, so nothing here can fight the connect crossfade.
+                val fraction = (value - BREATH_ALPHA_MIN).toFloat() / (OPAQUE - BREATH_ALPHA_MIN)
+                binding.shieldOutline.alpha =
+                    SHIELD_BREATH_ALPHA_MIN + (1f - SHIELD_BREATH_ALPHA_MIN) * fraction
             }
             start()
         }
     }
 
     private fun stopBreathing() {
+        val wasBreathing = breathAnimator != null
         breathAnimator?.cancel()
         breathAnimator = null
         ringOuter?.alpha = OPAQUE
         ringMid?.alpha = OPAQUE
+        // Only restore the glyph if this breath actually touched it. Every caller sets the shield
+        // alphas for the state it is entering immediately after this returns, but a blind write here
+        // would still put a frame of a fully opaque outline over a connected object.
+        if (wasBreathing && isBindingInitialized) binding.shieldOutline.alpha = 1f
+    }
+
+    /**
+     * THE AMBIENT LAYER — the object alive when nothing is happening to it.
+     *
+     * The owner's complaint about the connect control is that it barely moves: «при нажатии на
+     * кнопку практически нет никакой анимации, только пульсация, а на ПК по другому анимация
+     * сделана». The desktop's answer is a permanent low-contrast layer under the disc — a slow
+     * breathing ring and a slow wave leaving it — running BOTH at rest and while connected
+     * (`ConnectHeroView.axaml`, `AmbientRing.breathe-idle/-live` + `AmbientSonar.rest-idle/-live`,
+     * «чтобы герой дышал и в ПОКОЕ И в CONNECTED — не застывшая картинка»). Android had nothing at
+     * all between state changes. This is that layer, on this screen's own vocabulary: no new colour,
+     * no glow, no geometry that was not already here — the rings' own opacity, and one more ring.
+     *
+     * [live] picks the connected tempo: brighter, a little further, a second faster. «активно».
+     *
+     * It stands down for the negotiating breath (which owns the same ring alphas at 850ms), under
+     * reduced motion, and on view destruction — the two loops are infinite and are the only motion
+     * in this file that would otherwise outlive the screen.
+     */
+    private fun startAmbient(live: Boolean) {
+        if (!isBindingInitialized) return
+        if (binding.connectFrame.reducedMotion()) {
+            stopAmbient()
+            return
+        }
+        if (ambientLive == live && ambientRingAnimator?.isRunning == true) return
+        stopAmbient()
+        ambientLive = live
+
+        val maxAlpha = if (live) AMBIENT_ALPHA_MAX_LIVE else AMBIENT_ALPHA_MAX_IDLE
+        ambientRingAnimator = ValueAnimator.ofInt(AMBIENT_ALPHA_MIN, maxAlpha).apply {
+            duration = if (live) AMBIENT_PERIOD_LIVE_MS else AMBIENT_PERIOD_IDLE_MS
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.REVERSE
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener {
+                val value = it.animatedValue as Int
+                ringOuter?.alpha = value
+                ringMid?.alpha = value
+            }
+            start()
+        }
+
+        // The wave. NOT a reverse: it is transparent at BOTH ends of the cycle, so the scale
+        // snapping back to 1.0 at the seam is invisible and there is no click once a minute — the
+        // desktop's own reasoning for the same shape. It peaks early and spends the rest of the
+        // cycle fading, which is what makes it read as an exhale rather than a throb.
+        val wave = binding.connectRingAmbient
+        val reach = if (live) AMBIENT_WAVE_SCALE_LIVE else AMBIENT_WAVE_SCALE_IDLE
+        val peak = if (live) AMBIENT_WAVE_ALPHA_LIVE else AMBIENT_WAVE_ALPHA_IDLE
+        ambientWaveAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = if (live) AMBIENT_WAVE_PERIOD_LIVE_MS else AMBIENT_WAVE_PERIOD_IDLE_MS
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = easeOutQuint
+            addUpdateListener {
+                if (!isBindingInitialized) return@addUpdateListener
+                val t = it.animatedValue as Float
+                val scale = 1f + (reach - 1f) * t
+                wave.scaleX = scale
+                wave.scaleY = scale
+                wave.alpha = if (t <= AMBIENT_WAVE_PEAK) {
+                    peak * (t / AMBIENT_WAVE_PEAK)
+                } else {
+                    peak * (1f - (t - AMBIENT_WAVE_PEAK) / (1f - AMBIENT_WAVE_PEAK))
+                }
+            }
+            start()
+        }
+    }
+
+    /** Stops both ambient loops and returns the object to its resting look. */
+    private fun stopAmbient() {
+        ambientRingAnimator?.cancel()
+        ambientRingAnimator = null
+        ambientWaveAnimator?.cancel()
+        ambientWaveAnimator = null
+        ambientLive = null
+        ringOuter?.alpha = OPAQUE
+        ringMid?.alpha = OPAQUE
+        if (isBindingInitialized) {
+            binding.connectRingAmbient.alpha = 0f
+            binding.connectRingAmbient.scaleX = 1f
+            binding.connectRingAmbient.scaleY = 1f
+        }
     }
 
     /** The rings' only state channel. Width never changes; the colour crosses over motion_state. */
@@ -2496,18 +2783,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
     // ==================== Formatting ====================
 
-    /**
-     * One decimal below 100, none at or above it, comma decimal, and the unit is fixed at Мбит/с in
-     * the label — a real 40 Кбит/с renders `0,0`, which is a rounding and not a lie.
-     */
-    private fun formatSpeed(bytesPerSec: Long): String {
-        val mbps = bytesPerSec * 8.0 / 1_000_000.0
-        return if (mbps >= SPEED_DECIMAL_BELOW) {
-            mbps.roundToLong().toString()
-        } else {
-            String.format(Locale.US, "%.1f", mbps).replace('.', ',')
-        }
-    }
+    // The speed formatter that used to live here — one decimal of Мбит/с, with the unit stranded in
+    // a caption — went with the captions. `Long.toSpeedString` scales its own unit (B/s -> KB/s ->
+    // MB/s) and is what every other surface in the app already prints, so the same rate can no
+    // longer read two ways in one product. It is also what the reference build showed: «1,0 KB/s».
 
     /**
      * «14 августа» inside the current year, «14 августа 2027» otherwise. Never a numeric date on

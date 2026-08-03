@@ -410,32 +410,25 @@
         and never on the same screen as a full-strength connect control (00-rules.md 3.6).
         onPrimary #00183A on accent #4C8DFF = 5.51:1.
 
-        THE FOREGROUND IS THE BUTTON'S DEPTH, and it is here rather than in the
-        background because MaterialButton will not accept a background from a style:
-        MaterialButtonHelper.createBackground() builds its own MaterialShapeDrawable
-        and replaces whatever the View constructor read, and app:backgroundTint takes
-        a ColorStateList, which is flat by definition. So the fill stays the tint and
-        @drawable/btn_overlay_primary lays a modelled light source over it — a rim
-        along the top arc, a wash falling off above the label, a settle beneath it,
-        inverted on press and cross-faded on the 90/160ms press clock that
-        @anim/press_scale already runs the 0.97 squeeze on.
+        NO BEVEL, NO GLOSS, NO GRADIENT — AND THIS IS THE LAST STYLE TO LOSE ONE.
+        The modelled fill lived here on the strength of OWNER-FEEDBACK D1 («может
+        градиент какой-то»); the owner has since WITHDRAWN it, in as many words:
+        «кнопки остались почти везде такими же с градиентом, надо просто обычные
+        кнопки вернуть как и было раньше, это касается ВСЕХ кнопок». Every other
+        variant had already dropped its overlay one complaint at a time — Secondary,
+        Destructive, Icon.Filled, Outlined — and this was the one that was still
+        painting a rim light. It is a flat accent fill now, exactly as it was at the
+        anchor (5e8cd54), and 00-rules.md's blanket gradient ban is back in force with
+        no carve-out for buttons.
 
-        That answers the owner directly — «кнопки должны все быть проработанные
-        такие, а не просто сплошной цвет, может градиент какой-то, может даже
-        анимированный» — and it is the one place 00-rules.md's gradient ban is lifted
-        (OWNER-FEEDBACK D1). The ban still holds for page backgrounds and for
-        decorative glows behind screens; this is a control, and the ramp is pure
-        luminance, not a second hue.
+        @drawable/btn_overlay_primary and the btn_gloss_* pair it composes are left in
+        the tree unreferenced rather than deleted: they cost nothing, and the ratios
+        recorded in their headers are the evidence for why the flat fill is the safe
+        one. Do not re-attach them to any style.
 
-        The 5.51:1 survives ALL FIVE STATES by construction, not by luck — and the
-        construction is the whole guarantee, so do not weaken it. Both ramps are spent
-        clear of the label band (see @drawable/btn_gloss_rest: lift gone by 30% of the
-        height, settle starts at 74%, a 16sp label centred in a 48-52dp button sits at
-        ~30%-70%), disabled drops the overlay entirely, and loading only removes the
-        label it is hiding. AT THE BARE EDGES, where no glyph is ever drawn, the fill
-        does move: dark-pressed the top row measures 3.71:1 and light-at-rest the top
-        row measures 4.42:1. Widen either ramp into the label band and the button
-        stops clearing AA — that is the line, not the ramp strengths.
+        What carries "this is the primary action" instead: the accent fill itself, the
+        16sp/700 label at 5.51:1, and @anim/press_scale's 0.97 squeeze on the 90/160ms
+        press clock. Depth is motion here, not a painted light source.
     -->
     <style name="Widget.Departament.Button.Primary" parent="Widget.Departament.Button">
         <item name="backgroundTint">@color/btn_primary_container</item>
@@ -443,7 +436,6 @@
         <item name="iconTint">@color/btn_primary_content</item>
         <item name="strokeColor">@color/btn_focus_inner_on_accent</item>
         <item name="rippleColor">@color/ripple_on_accent</item>
-        <item name="android:foreground">@drawable/btn_overlay_primary</item>
     </style>
 
     <!-- The screen's ONE full-width CTA. 52 as a minimum, never as a height. -->
@@ -1371,10 +1363,10 @@
         forbids. state_activated is picked up by every button ColorStateList
         (@color/btn_primary_content and its five siblings), which take the label AND
         the icon to alpha 0 — so THE LABEL IS STILL MEASURED, the button keeps the
-        exact width it had a frame earlier, and it cannot jump. On the Primary — the
-        one button that still carries a bevel — @drawable/btn_overlay_primary holds
-        the RESTING bevel on this same state, ahead of its pressed row, so a working
-        control never reads as pressed.
+        exact width it had a frame earlier, and it cannot jump. NO button carries a
+        bevel any more — the owner withdrew the last one from the Primary this round
+        («это касается всех кнопок») — so there is no overlay left that has to hold a
+        resting row ahead of its pressed one; a flat fill cannot read as pressed.
 
         Nothing else on the app sets isActivated on a MaterialButton, and no layout
         declares duplicateParentState, so no selected row can push a button into this
@@ -1437,15 +1429,12 @@
         (@color/md_theme_outlineControl, 3.43:1) until they migrate to Secondary.
         Its stroke doubles as the focus ring, so R7 still holds.
 
-        It inherits Secondary and must therefore UNDO Secondary's bevel: with no fill
-        under it, that overlay would draw a modelled slab inside an outline and make
-        the shim look like a filled button, which is the opposite of what it is for.
-        It takes the quiet treatment instead — the accent press plate, nothing
-        painted at rest.
+        It takes the quiet treatment — the accent press plate, nothing painted at rest.
 
-        The cancel is an explicit transparent drawable, not @null: an attribute whose
-        value is @null is skipped by TypedArray, so View never calls setForeground()
-        and the inherited overlay would survive.
+        The explicit transparent foreground is BELT AND BRACES and stays even though no
+        ancestor style paints one any more: an attribute whose value is @null is skipped
+        by TypedArray, so View never calls setForeground() and an inherited overlay
+        would survive a future edit that reintroduced one upstream.
     -->
     <style name="Widget.App.Button.Outlined" parent="Widget.Departament.Button.Secondary">
         <item name="backgroundTint">@color/btn_quiet_container</item>

@@ -46,6 +46,15 @@ object AngConfigManager {
     private const val DEFAULT_SUBSCRIPTION_REMARKS = "import sub"
 
     /**
+     * Remarks that name the SERVICE rather than the подписка, and are therefore not a name at all:
+     * every подписка on this deployment would carry the same one. An older import stamped the
+     * backend's `tariffDisplayName` here, which is exactly this string — see the note at the
+     * provider-title adoption below, and `SubInfoDto.tariffBadgeName`, which refuses it for the
+     * tariff badge for the same reason. Lower case; compared against a trimmed, lower-cased remark.
+     */
+    private val GENERIC_SUB_REMARKS = setOf("departament", "departament vpn")
+
+    /**
      * Rich outcome of [importBatchConfig].
      *
      * Kept as a data class whose first two components are (count, countSub) on purpose: existing
@@ -969,14 +978,24 @@ object AngConfigManager {
                 // Real subscription title sent by the provider (used as the meta-bar heading).
                 decodeSubDirective(result?.profileTitle)?.let { v -> it.subscription.profileTitle = v }
                 // Adopt that provider title as the Servers group name too, but only while the
-                // subscription is still unnamed (blank or the generic "import sub"/"Default"
-                // placeholder) — a name the user typed in SubEditActivity must never be clobbered.
+                // subscription is still unnamed — a name that identifies THIS подписка must never
+                // be clobbered.
+                //
+                // "Unnamed" now includes the GENERIC SERVICE LABEL, and that addition is a fix, not
+                // a tidy-up. An older build stamped the backend's `tariffDisplayName` into the
+                // remark at import; for this deployment that is «departament vpn», the same string
+                // on every подписка, and it therefore blocked this adoption forever — the card on
+                // Главная read «departament vpn» where the провайдер was sending «🍀 erlish».
+                // SubscriptionSyncManager no longer writes it, but every install that already has
+                // one is only healed by treating it as the placeholder it is. There is no rename to
+                // fall back on (OWNER-DECISION-2026-08-02 §5), so this is the only route.
                 val providerTitle = it.subscription.profileTitle.trim()
                 if (providerTitle.isNotEmpty()) {
                     val currentRemarks = it.subscription.remarks.trim()
                     if (currentRemarks.isEmpty()
                         || currentRemarks.equals(DEFAULT_SUBSCRIPTION_REMARKS, ignoreCase = true)
                         || currentRemarks.equals("Default", ignoreCase = true)
+                        || currentRemarks.lowercase() in GENERIC_SUB_REMARKS
                     ) {
                         it.subscription.remarks = providerTitle
                     }

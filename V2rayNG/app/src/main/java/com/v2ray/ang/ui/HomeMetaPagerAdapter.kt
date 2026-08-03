@@ -64,10 +64,20 @@ class HomeMetaPagerAdapter(
      * card — «если скрывать раскрывать сам бар с подпиской улетает влево», because collapsing the
      * list calls straight through to here. A content-only notification rebinds the same holders in
      * place and leaves the scroll offset alone, which is exactly what a repaint means.
+     *
+     * AND IT CARRIES A PAYLOAD, which is the rest of that fix. A change notification with no
+     * payload lets the ItemAnimator run: `SimpleItemAnimator.canReuseUpdatedViewHolder` returns
+     * false for an empty payload list, RecyclerView then takes a scrap copy of the page and
+     * DefaultItemAnimator cross-fades the two while translating the incoming one from its old
+     * bounds to its new ones. On a page that is the full width of the viewport, that is a card
+     * blinking and sliding sideways — «моргает тулбар с подпиской» and «двигается слева вправо и
+     * там заезжает за экран». A non-empty payload makes the holder reusable, so the same view is
+     * simply re-bound where it stands. HomeFragment also strips the ItemAnimator outright; both are
+     * here because either one alone leaves a way back in.
      */
     fun repaint() {
         if (subIds.isEmpty()) return
-        notifyItemRangeChanged(0, subIds.size)
+        notifyItemRangeChanged(0, subIds.size, PAYLOAD_REPAINT)
     }
 
     override fun getItemCount(): Int = subIds.size
@@ -128,4 +138,13 @@ class HomeMetaPagerAdapter(
     }
 
     class VH(val binding: LayoutSubscriptionMetaBarBinding) : RecyclerView.ViewHolder(binding.root)
+
+    companion object {
+        /**
+         * Marks a repaint as content-only. Its VALUE is never read — what matters is that the
+         * payload list is not empty, because that is the flag `canReuseUpdatedViewHolder` keys off
+         * to skip the change animation entirely. See [repaint].
+         */
+        private const val PAYLOAD_REPAINT = "repaint"
+    }
 }

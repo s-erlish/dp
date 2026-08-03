@@ -4,6 +4,13 @@
   token recipe), never nested in another card. Incy: colorSurface, radius_card, 0
   elevation, 1dp outlineVariant stroke, space_16 padding, ONE blue accent (the tariff
   badge tile), sentence-case Russian, name + badge in the header, then expiry / devices.
+
+  THE CARD IS DENSE — «слишком много места занимается, там можно же все приуменьшить».
+  Text blocks sit 8 apart, a block against a control 12, and the two 56dp rows keep
+  their own height because that is the touch floor and not a spacing decision. Nothing
+  came off the card to buy it. The card's height is measured, not declared
+  (AccountFragment.measureSubCardHeight), so tightening a gap actually shortens the
+  carousel instead of leaving dead space inside a fixed frame.
 -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -59,7 +66,7 @@
             android:id="@+id/tv_sub_expiry"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_12"
+            android:layout_marginTop="@dimen/space_8"
             android:textAppearance="@style/TextAppearance.App.Subtitle"
             tools:text="Действует до 31.12.2026" />
 
@@ -118,7 +125,7 @@
             android:id="@+id/btn_sub_renew"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_16"
+            android:layout_marginTop="@dimen/space_12"
             android:text="@string/account_sub_renew" />
 
         <!-- AUTO-RENEW: the toggle and the line that says what it will do next. Mirrors the
@@ -128,7 +135,7 @@
             android:id="@+id/row_sub_autorenew"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_12"
+            android:layout_marginTop="@dimen/space_4"
             android:gravity="center_vertical"
             android:minHeight="@dimen/row_min_height"
             android:orientation="horizontal">

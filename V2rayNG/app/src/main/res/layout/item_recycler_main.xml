@@ -129,22 +129,15 @@
                     android:visibility="gone"
                     tools:visibility="visible" />
 
-                <!-- THE PING, AND ITS DOT, ON THE RIGHT. The dot carries the verdict at a
-                     glance — green measured, red failed — and the figure carries the
-                     number; both are tinted from ?attr/pingGood / ?attr/pingBad in
-                     MainRecyclerAdapter so the mono theme neutralises them together. The
-                     dot appears only when there IS a verdict: an unmeasured server shows
-                     neither, which is what tells "never tested" apart from "failed". -->
-                <View
-                    android:id="@+id/view_ping_dot"
-                    android:layout_width="@dimen/dot_size"
-                    android:layout_height="@dimen/dot_size"
-                    android:layout_marginStart="@dimen/space_4"
-                    android:background="@drawable/bg_status_dot"
-                    android:importantForAccessibility="no"
-                    android:visibility="gone"
-                    tools:visibility="visible" />
-
+                <!-- THE PING, ON THE RIGHT, AND NOTHING BESIDE IT. The figure carries
+                     both channels on its own: the number is the reading and its colour
+                     (?attr/pingGood / ?attr/pingBad, applied in MainRecyclerAdapter) is
+                     the verdict. There WAS a dot in front of it; the owner had it
+                     removed — «точка которая появляется она слишком далеко от пинга,
+                     лучше ее просто убрать и все» — and the reference build he is
+                     measuring against never had one. An unmeasured server shows an
+                     empty slot, which is still what tells "never tested" apart from
+                     "failed". -->
                 <TextView
                     android:id="@+id/tv_test_result"
                     android:layout_width="wrap_content"

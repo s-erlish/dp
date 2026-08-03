@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A CONTROL'S FEEDBACK, BOUNDED TO THE CONTROL. For the icon affordances that sit ON a
+  card — the subscription card's chevron, ping, refresh, pin and Telegram.
+
+  WHY THIS EXISTS, precisely. Those controls wore
+  ?attr/selectableItemBackgroundBorderless, which is `<ripple>` with NO layers at all.
+  A RippleDrawable with no layers is UNBOUNDED: RippleDrawable.isBounded() is
+  `getNumberOfLayers() > 0`, isProjected() is the inverse of it, and an unbounded ripple
+  neither clips to its own view nor stops at it — it draws a disc sized off the view's
+  larger side, spilling well past a 48dp box, and projects onto the nearest ancestor
+  that has a background. On this card that ancestor is the card. One tap on a 22dp
+  chevron therefore lit a 20dp-radius card corner to corner:
+
+      «кнопка скрытия раскрытия слишком сильно подсвечивается слишком огромный свет
+       появляется при нажатии»
+
+  Declaring a mask layer makes the ripple bounded (numberOfLayers > 0), so what appears
+  under the finger is a disc inside the control's own box and nothing outside it. The
+  mask is an OVAL because these controls are square boxes holding a round glyph; a
+  rectangular flash inside a round affordance reads as a rendering fault.
+
+  The tone is colorPrimaryContainer, the same the card used to flash — the colour was
+  never the problem, the area was.
+-->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorPrimaryContainer">
+
+    <item android:id="@android:id/mask">
+        <shape android:shape="oval">
+            <solid android:color="@android:color/white" />
+        </shape>
+    </item>
+</ripple>

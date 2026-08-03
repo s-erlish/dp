@@ -60,6 +60,10 @@
     <string name="account_meter_traffic_of">%1$s из %2$s</string>
     <string name="account_meter_traffic_unlimited">%1$s · безлимит</string>
     <string name="account_meter_traffic_over">Лимит исчерпан</string>
+    <!-- The подписка carries no traffic payload — every secondary подписка, whose endpoint
+         does not return one. The meter STAYS and says so: a card with a hole where the
+         figure belongs is what reads as unfinished. -->
+    <string name="account_meter_traffic_none">Нет данных</string>
 
     <!-- «Способы входа»: what this account can be signed in with. Today that is Telegram, and
          the row names the account it is actually linked to rather than only the method. -->

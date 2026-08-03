@@ -243,11 +243,9 @@ class MainRecyclerAdapter(
         val pingAttr = if (failed) R.attr.pingBad else R.attr.pingGood
         val pingColor = MaterialColors.getColor(binding.tvTestResult, pingAttr)
         binding.tvTestResult.setTextColor(pingColor)
-        // The dot carries the same verdict as the figure, in colour, at a glance. It shows only
-        // when there IS a verdict: blank means "never measured", and a dot with no number beside
-        // it would claim a result nobody has taken.
-        binding.viewPingDot.visibility = if (pingText.isBlank()) View.GONE else View.VISIBLE
-        binding.viewPingDot.background?.mutate()?.setTint(pingColor)
+        // There is NO dot beside the figure. The colour on the number already carries the verdict,
+        // and the owner had the second channel removed — «точка которая появляется она слишком
+        // далеко от пинга, лучше ее просто убрать и все». Blank still means "never measured".
 
         // Selection: blue rounded outline via bg_server_row selected state.
         // Indicator bar tint via theme attr (mono-safe).
