@@ -17,6 +17,7 @@ import com.v2ray.ang.dto.UrlContentRequest
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.extension.v2RayApplication
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.handler.RussianAppsPreset
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.ui.component.EmptyStateBinder
@@ -77,6 +78,17 @@ class PerAppProxyActivity : BaseActivity() {
     private var query: String = ""
     private var loadFailed = false
 
+    /**
+     * «Показать приложения набора»: the list below is restricted to the preset's packages.
+     *
+     * This is how the preset's CONTENTS are made visible, and it is deliberately not a second
+     * screen. The user sees the same rows they already understand — real icon, real name, working
+     * switch — and can still overrule any single one of them while the filter is up. A preset the
+     * user cannot see inside is indistinguishable from a hard-coded list, which is exactly what the
+     * owner asked this not to be.
+     */
+    private var presetFilter = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
@@ -103,6 +115,7 @@ class PerAppProxyActivity : BaseActivity() {
         }
 
         bindModeRow()
+        bindPresetRow()
         loadApps()
     }
 
@@ -152,6 +165,60 @@ class PerAppProxyActivity : BaseActivity() {
         )
     }
 
+    // -------------------------------------------------------------- preset
+
+    /**
+     * The «Российские приложения» row: one switch, applying and un-applying a NAMED set.
+     *
+     * The subtitle says what the набор does to traffic, and the value says how many of its apps are
+     * actually on this phone — a preset that lists forty packages and matches three should say so
+     * rather than implying it is doing forty apps' worth of work.
+     */
+    private fun bindPresetRow() {
+        val installed = appsAll.count { RussianAppsPreset.contains(it.packageName) }
+        RowBinder.bind(
+            root = binding.rowRuPreset.root,
+            title = getString(R.string.perapp_ru_preset),
+            subtitle = getString(R.string.perapp_ru_preset_hint),
+            glyph = R.drawable.ic_per_apps_24dp,
+            trailing = RowBinder.Trailing.Toggle(
+                checked = RussianAppsPreset.isApplied(),
+                onCheckedChange = { on -> togglePreset(on) },
+            ),
+        )
+        binding.rowRuPreset.root.contentDescription = getString(
+            R.string.perapp_ru_preset_installed,
+            installed,
+        )
+    }
+
+    /**
+     * Applies or un-applies the preset, and NEVER restarts the tunnel to do it.
+     *
+     * Applying adds only what is missing; un-applying gives back only what applying took, so an app
+     * the user ticked by hand before ever touching the switch survives it (see
+     * [RussianAppsPreset.applyTo] / [RussianAppsPreset.removeFrom]).
+     *
+     * The mode is moved to «Кроме выбранных» when it is «Все приложения», because the selection has
+     * no effect at all there and a switch that visibly does nothing is worse than no switch. That
+     * one step DOES mark a restart, exactly as the mode row itself does — it is a change of what the
+     * tunnel carries, not a preset detail — so the flip is offered only when the user actually asks
+     * for the preset, never on the silent first-run seeding.
+     */
+    private fun togglePreset(on: Boolean) {
+        val current = viewModel.getAll()
+        if (on) {
+            viewModel.applyPresetQuietly(added = RussianAppsPreset.applyTo(current), removed = emptySet())
+            if (currentMode() == Mode.ALL) applyMode(Mode.EXCEPT)
+            toastSuccess(R.string.perapp_ru_preset_pending)
+        } else {
+            viewModel.applyPresetQuietly(added = emptySet(), removed = RussianAppsPreset.removeFrom())
+        }
+        bindPresetRow()
+        adapter.refreshSelection()
+        updateMeta()
+    }
+
     // ---------------------------------------------------------------- list
 
     private fun loadApps() {
@@ -174,16 +241,24 @@ class PerAppProxyActivity : BaseActivity() {
                 loadFailed = true
                 LogUtil.e(ANG_PACKAGE, "Error loading apps", it)
             }
+            bindPresetRow()
             applyFilter()
         }
     }
 
     private fun applyFilter() {
         val key = query.trim().uppercase()
-        val visible = if (key.isEmpty()) {
-            appsAll
+        // The набор filter and the search compose: showing the набор and then typing narrows within
+        // it, rather than one silently cancelling the other.
+        val pool = if (presetFilter) {
+            appsAll.filter { RussianAppsPreset.contains(it.packageName) }
         } else {
-            appsAll.filter {
+            appsAll
+        }
+        val visible = if (key.isEmpty()) {
+            pool
+        } else {
+            pool.filter {
                 it.appName.uppercase().contains(key) || it.packageName.uppercase().contains(key)
             }
         }
@@ -245,6 +320,22 @@ class PerAppProxyActivity : BaseActivity() {
                 )
             }
 
+            isEmpty && presetFilter -> {
+                binding.recyclerView.isVisible = false
+                EmptyStateBinder.bind(
+                    root = binding.emptyState.root,
+                    glyph = R.drawable.ic_per_apps_24dp,
+                    title = getString(R.string.perapp_ru_preset_empty_title),
+                    line = getString(R.string.perapp_ru_preset_empty_line),
+                    actionLabel = getString(R.string.perapp_ru_preset_show_off),
+                    emphasis = EmptyStateBinder.Emphasis.TERTIARY,
+                    onAction = {
+                        presetFilter = false
+                        applyFilter()
+                    },
+                )
+            }
+
             isEmpty -> {
                 binding.recyclerView.isVisible = false
                 EmptyStateBinder.bind(
@@ -285,6 +376,16 @@ class PerAppProxyActivity : BaseActivity() {
             .action(R.string.perapp_action_invert, enabled = visible.isNotEmpty()) {
                 visible.forEach { viewModel.toggle(it) }
                 afterBulkChange()
+            }
+            .action(
+                labelRes = if (presetFilter) {
+                    R.string.perapp_ru_preset_show_off
+                } else {
+                    R.string.perapp_ru_preset_show
+                },
+            ) {
+                presetFilter = !presetFilter
+                applyFilter()
             }
             .action(
                 labelRes = R.string.perapp_action_auto,

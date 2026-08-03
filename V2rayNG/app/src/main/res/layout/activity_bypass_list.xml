@@ -55,6 +55,17 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 layout="@layout/view_row" />
+
+            <!-- «Российские приложения» — the named bypass preset, in the same card as the
+                 mode it depends on, because it is a shortcut for filling that mode's list
+                 and reads as a stray feature anywhere else. A plain row with a switch: the
+                 whole row is the target, and the contents are one tap away in the actions
+                 sheet, which filters the list below to exactly this set. -->
+            <include
+                android:id="@+id/row_ru_preset"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                layout="@layout/view_row" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 

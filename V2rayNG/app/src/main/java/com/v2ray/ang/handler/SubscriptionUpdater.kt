@@ -258,17 +258,27 @@ object SubscriptionUpdater {
             // the global one. It resolves per-sub → global → operator default at the fetch itself.
             val sub = SubscriptionCache(subId, subItem)
 
-            // Notify about update start
+            // Notify about update start.
+            //
+            // THE NAME IS RESOLVED, NEVER THE RAW REMARK. `subItem.remarks` is storage, and older
+            // builds stored upstream's «import sub» in it — which this line then formatted into the
+            // shade verbatim, so the user's phone told them «Обновляем «import sub»».
+            // [SubscriptionNaming] is the one place that answers what a подписка is called, and it
+            // refuses every placeholder; when it has nothing real to offer, the copy becomes a whole
+            // sentence instead of quoting an empty string.
             if (SettingsManager.isNotifyOnSubscriptionUpdate()) {
+                val name = SubscriptionNaming.nameOf(subItem)
                 NotificationHelper.notify(
                     NotificationChannelType.SUBSCRIPTION_UPDATE,
                     applicationContext,
-                    applicationContext.getString(R.string.title_pref_auto_update_subscription),
-                    applicationContext.getString(R.string.msg_updating_subscription, sub.subscription.remarks)
+                    applicationContext.getString(R.string.notification_subscription_title),
+                    if (name == null) {
+                        applicationContext.getString(R.string.msg_updating_subscription_unnamed)
+                    } else {
+                        applicationContext.getString(R.string.msg_updating_subscription, name)
+                    }
                 )
             }
-
-            LogUtil.i(AppConfig.TAG, "SubscriptionUpdater automatic update: ---${sub.subscription.remarks}")
             AngConfigManager.updateConfigViaSub(sub)
 
             // Clear notification — unconditional, so one posted before the switch was turned off

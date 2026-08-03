@@ -285,7 +285,11 @@ class AccountFragment : Fragment() {
                 subAdapter.notifyDataSetChanged()
             }
         }
-        val onDone: () -> Unit = { if (_binding != null) viewModel.loadSubscriptions() }
+        // The reload is the view model's now — and it refreshes the PROFILE too, which is where the
+        // root подписка's auto-renew flag actually lives. Reloading only the subscription list here
+        // re-merged against a stale cached profile and put the switch straight back, which is the
+        // whole of «отключение авто списания не работает». See AccountViewModel.reloadAfterAutoRenew.
+        val onDone: () -> Unit = {}
         if (sub.type.equals(SubscriptionSyncManager.TYPE_ROOT, ignoreCase = true)) {
             viewModel.togglePrimaryAutoRenew(enabled, onError, onDone)
         } else {

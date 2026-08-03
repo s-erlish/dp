@@ -312,9 +312,17 @@ object SpeedtestManager {
             socket.connect(InetSocketAddress(url, port), timeoutMs)
             return elapsedMs(start)
         } catch (e: UnknownHostException) {
-            LogUtil.e(AppConfig.TAG, "Unknown host: $url", e)
+            // A PROBE THAT FAILS IS A RESULT, NOT AN ERROR, and this is the app's noisiest log line
+            // by a wide margin. «Проверить все» probes every server in the list; a server that is
+            // down, filtered, or simply unreachable from the current network is the everyday
+            // outcome, the return value below already SAYS so (-1), and the row already draws it.
+            // Writing an ERROR with a stack trace per failed probe filled «Журнал» with red during
+            // exactly the operation the user ran on purpose.
+            //
+            // Kept at warn, one line, no trace: a failed probe is still worth being able to see.
+            LogUtil.w(AppConfig.TAG, "Ping: unknown host $url")
         } catch (e: IOException) {
-            LogUtil.e(AppConfig.TAG, "socketConnectTime IOException: $e")
+            LogUtil.w(AppConfig.TAG, "Ping: $url:$port unreachable (${e.message})")
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to establish socket connection to $url:$port", e)
         } finally {

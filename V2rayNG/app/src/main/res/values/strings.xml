@@ -48,6 +48,11 @@
 
     <!-- Notifications -->
     <string name="notification_action_stop_v2ray">Остановить</string>
+    <!-- Channel names, as the user reads them in Android's own notification settings. -->
+    <string name="notification_channel_subscription">Обновление подписки</string>
+    <string name="notification_channel_core_test">Проверка серверов</string>
+    <!-- The ongoing VPN notification, expanded: the live rate and nothing else. -->
+    <string name="notification_speed" translatable="false">↓ %1$s   ↑ %2$s</string>
     <string name="toast_permission_denied">Разрешение не получено</string>
     <string name="toast_permission_denied_notification">Разрешение на отображение уведомлений не получено</string>
     <string name="notification_action_more">Ещё…</string>
@@ -406,8 +411,14 @@
     <string name="title_update_config_count">Обновлено серверов: %d</string>
     <string name="title_update_subscription_result">Обновлено серверов: %1$d (успешно: %2$d, ошибки: %3$d, пропущено: %4$d)</string>
     <string name="title_update_subscription_no_subscription">Нет подписок</string>
-    <!-- Notification shown while a subscription is refreshing; %1$s is the subscription name. -->
+    <!-- The subscription-refresh notification. The title names the EVENT, not the preference that
+         enables it: «Автоматически обновлять подписки» is a settings row and read as one in the
+         shade. The text takes the RESOLVED подписка name (SubscriptionNaming), never a raw remark —
+         that is how «Обновляем «import sub»» reached the user — and falls back to a whole sentence
+         when the подписка has no name yet, rather than to «Обновляем «»». -->
+    <string name="notification_subscription_title">Обновление подписки</string>
     <string name="msg_updating_subscription">Обновляем «%1$s»</string>
+    <string name="msg_updating_subscription_unnamed">Обновляем подписку</string>
     <string name="toast_server_not_found_in_group">Выбранный сервер не найден в текущей группе</string>
     <string name="toast_fragment_not_available">Не удалось открыть текущий экран</string>
     <string name="title_locate_selected_config">Найти выбранный сервер</string>

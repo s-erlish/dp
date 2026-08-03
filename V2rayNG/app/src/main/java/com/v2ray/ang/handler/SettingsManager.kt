@@ -44,6 +44,9 @@ object SettingsManager {
 
     fun initApp(context: Context) {
         ensureDefaultSettings()
+        // «Российские приложения» mimo VPN, on out of the box — but only on an install whose
+        // per-app routing nobody has touched. See RussianAppsPreset.seedOnFirstRun.
+        RussianAppsPreset.seedOnFirstRun()
         //ensureDefaultSubscription()
         initRoutingRulesets(context)
         migrateServerListToSubscriptions()
@@ -286,9 +289,11 @@ object SettingsManager {
             return
         }
 
-        val defaultSub = SubscriptionItem(
-            remarks = "Default",
-        )
+        // NO PLACEHOLDER NAME. This is the linkless container that holds hand-added servers, not a
+        // подписка, and it is addressed by DEFAULT_SUBSCRIPTION_ID — nothing looks it up by its
+        // remark. Storing the English word «Default» in it only gave every display path one more
+        // string to filter out, and one of them always forgot. Blank is what it is.
+        val defaultSub = SubscriptionItem()
         encodeSubscription(DEFAULT_SUBSCRIPTION_ID, defaultSub)
     }
 
@@ -850,9 +855,8 @@ object SettingsManager {
      */
     private fun ensureDefaultSubscription() {
         if (decodeSubscription(DEFAULT_SUBSCRIPTION_ID) == null) {
-            val defaultSub = SubscriptionItem(
-                remarks = "Default",
-            )
+            // Blank, not «Default» — see the note in removeSubscriptionWithDefault.
+            val defaultSub = SubscriptionItem()
             encodeSubscription(DEFAULT_SUBSCRIPTION_ID, defaultSub)
 
             // Move top

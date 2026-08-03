@@ -339,6 +339,22 @@ class CoreVpnService : VpnService(), ServiceControl {
         // Handle the VPN service's own package according to the mode
         if (bypassApps) apps.add(selfPackageName) else apps.remove(selfPackageName)
 
+        // AN UNINSTALLED PACKAGE IS NOT AN ERROR, and logging it as one is why «Журнал» filled with
+        // red on a perfectly healthy connect.
+        //
+        // The selection is a list of package NAMES, and it long outlives the apps: uninstalling an
+        // app does not prune it, the «Подобрать автоматически» list is a remote file describing apps
+        // this phone may never have had, and the «Российские приложения» набор deliberately names
+        // every bank and operator app in the country so that whichever ones the user installs later
+        // are already covered. Every absent one threw here, and every throw wrote an ERROR line with
+        // a stack trace — on EVERY connect, one per package. Nothing was wrong, and the log said
+        // dozens of things were.
+        //
+        // So the skip is counted, not reported, and one INFO line states the outcome: a real
+        // diagnostic («37 из 40 применены») instead of 3 alarms, and still enough to notice a
+        // selection that has gone entirely stale.
+        var applied = 0
+        var missing = 0
         apps.forEach {
             try {
                 if (bypassApps) {
@@ -348,10 +364,16 @@ class CoreVpnService : VpnService(), ServiceControl {
                     // In proxy mode, only allow the selected apps
                     builder.addAllowedApplication(it)
                 }
+                applied++
             } catch (e: PackageManager.NameNotFoundException) {
-                LogUtil.e(AppConfig.TAG, "StartCore-VPN: Failed to configure app", e)
+                missing++
             }
         }
+        LogUtil.i(
+            AppConfig.TAG,
+            "StartCore-VPN: per-app rules applied to $applied of ${apps.size} packages" +
+                if (missing > 0) " ($missing not installed)" else ""
+        )
     }
 
     /**

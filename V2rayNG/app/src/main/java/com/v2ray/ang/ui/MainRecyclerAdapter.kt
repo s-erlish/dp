@@ -22,6 +22,7 @@ import com.v2ray.ang.dto.entities.ServersCache
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.handler.SubscriptionNaming
 import com.v2ray.ang.helper.ItemTouchHelperAdapter
 import com.v2ray.ang.helper.ItemTouchHelperViewHolder
 import com.v2ray.ang.template.TemplateManager
@@ -117,13 +118,17 @@ class MainRecyclerAdapter(
 
         // Ordered provider groups (pinned-first, per subs), then a "Local" group for the rest.
         val orderedSubIds = subs.map { it.id }.filter { it.isNotEmpty() }
-        val remarksById = subs.associate { it.id to it.remarks }
+        // THE HEADING IS RESOLVED, NEVER THE RAW REMARK. A group named from storage printed
+        // whatever the import happened to stamp — «import sub» among them. [SubscriptionNaming]
+        // refuses every placeholder, so a подписка that has not been named yet falls through to the
+        // server's own group name rather than announcing an English word to the user.
+        val remarksById = subs.associate { it.id to SubscriptionNaming.realName(it.remarks) }
         val grouped = servers.groupBy { it.profile.subscriptionId }
 
         for (subId in orderedSubIds) {
             val bucket = grouped[subId] ?: continue
             if (bucket.isEmpty()) continue
-            val remarks = remarksById[subId]?.takeIf { it.isNotBlank() }
+            val remarks = remarksById[subId]
                 ?: bucket.firstOrNull()?.profile?.remarks.orEmpty()
             list.add(Row.Header(subId, remarks, bucket.size))
             if (!collapsed.contains(subId)) bucket.forEach { list.add(Row.Server(it)) }

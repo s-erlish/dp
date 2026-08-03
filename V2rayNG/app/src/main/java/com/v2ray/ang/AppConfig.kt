@@ -25,6 +25,14 @@ object AppConfig {
     const val PREF_PER_APP_PROXY = "pref_per_app_proxy"
     const val PREF_PER_APP_PROXY_SET = "pref_per_app_proxy_set"
     const val PREF_BYPASS_APPS = "pref_bypass_apps"
+
+    // The «Российские приложения» bypass preset — see [handler.RussianAppsPreset].
+    /** Is the preset currently applied? */
+    const val PREF_RU_BYPASS_PRESET_ON = "pref_ru_bypass_preset_on"
+    /** Exactly what applying it ADDED, so switching it off gives back that and nothing else. */
+    const val PREF_RU_BYPASS_PRESET_OWNED = "pref_ru_bypass_preset_owned"
+    /** The one-time default-on has run (whatever it decided), so it never runs twice. */
+    const val PREF_RU_BYPASS_PRESET_SEEDED = "pref_ru_bypass_preset_seeded"
     const val PREF_LOCAL_DNS_ENABLED = "pref_local_dns_enabled"
     const val PREF_FAKE_DNS_ENABLED = "pref_fake_dns_enabled"
     const val PREF_APPEND_HTTP_PROXY = "pref_append_http_proxy"

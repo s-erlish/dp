@@ -59,6 +59,17 @@
     <string name="perapp_empty_line">Ни одно установленное приложение не запрашивает доступ в сеть.</string>
     <string name="perapp_error_title">Не удалось загрузить список</string>
     <string name="perapp_error_line">Проверьте, что приложению разрешено читать список программ, и повторите.</string>
+    <!-- «Российские приложения» — the named bypass preset. The subtitle states the CONSEQUENCE
+         («идут напрямую, мимо VPN»), never the mechanism, and the count is of what is actually on
+         this phone so the row is honest about how much it is doing. -->
+    <string name="perapp_ru_preset">Российские приложения</string>
+    <string name="perapp_ru_preset_hint">Госуслуги, банки, Mir Pay, Ozon, Wildberries, Яндекс, операторы — идут напрямую, мимо VPN</string>
+    <string name="perapp_ru_preset_installed">Установлено на этом устройстве: %1$d</string>
+    <string name="perapp_ru_preset_show">Показать приложения набора</string>
+    <string name="perapp_ru_preset_show_off">Показать все приложения</string>
+    <string name="perapp_ru_preset_empty_title">Ни одного приложения из набора</string>
+    <string name="perapp_ru_preset_empty_line">На этом устройстве нет приложений из набора. Он ничего не изменит, пока вы не установите хотя бы одно.</string>
+    <string name="perapp_ru_preset_pending">Набор применён. Изменения вступят в силу при следующем подключении.</string>
     <string name="perapp_picker_title">Выбор приложений</string>
     <string name="perapp_picker_done">Готово</string>
     <string name="perapp_picker_selected">Выбрано: %1$d</string>

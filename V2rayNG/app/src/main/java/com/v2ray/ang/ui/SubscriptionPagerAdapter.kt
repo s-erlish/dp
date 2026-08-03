@@ -7,9 +7,13 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.color.MaterialColors
 import com.v2ray.ang.R
+import com.v2ray.ang.auth.AuthTokenStore
 import com.v2ray.ang.auth.SubscriptionSyncManager
 import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.databinding.ItemSubscriptionCardBinding
+import com.v2ray.ang.dto.entities.SubscriptionItem
+import com.v2ray.ang.dto.entities.usedTraffic
+import com.v2ray.ang.handler.MmkvManager
 import java.util.Locale
 
 /**
@@ -148,8 +152,28 @@ class SubscriptionPagerAdapter(
             val ctx = binding.root.context
             val meter = binding.meterTraffic
             val raw = sub.subscription?.raw()
-            val used: Long = raw?.trafficUsed ?: raw?.userTraffic?.usedTrafficBytes ?: 0L
+            // THE SAME METER AS ГЛАВНАЯ, AND NOW THE SAME NUMBERS, which is the whole of «во вкладке
+            // аккаунт где тулбар с сабкой, там пилюли трафика нету, сделай такую же как на основной
+            // странице».
+            //
+            // The component was already here and already bound — it just had nothing to draw. It read
+            // ONLY the backend's raw remnawave record, and `/client/subscription/all` carries no
+            // connect payload at all, so `raw` is null for every SECONDARY подписка and the card fell
+            // through to «Нет данных» on each one. Главная never had that problem because it meters
+            // from the `subscription-userinfo` HEADER, which arrives on every single fetch of every
+            // подписка and is already persisted on the local [SubscriptionItem].
+            //
+            // So: the backend record first (it is the account's own answer), and the header figures
+            // as the fallback. Same component, same four states, same figures the user sees one tab
+            // over — a подписка can no longer report its allowance on one screen and «Нет данных» on
+            // the other.
+            val local = localSubscription(sub)
+            val used: Long = raw?.trafficUsed
+                ?: raw?.userTraffic?.usedTrafficBytes
+                ?: local?.usedTraffic
+                ?: 0L
             val limit: Long? = raw?.trafficLimitBytes
+                ?: local?.totalTraffic?.takeIf { it > 0L }
 
             meter.meter.visibility = View.VISIBLE
             meter.meterLabel.setText(R.string.account_meter_traffic)
@@ -160,7 +184,7 @@ class SubscriptionPagerAdapter(
             )
             val danger = ContextCompat.getColor(ctx, R.color.color_destructive_text)
 
-            if (raw == null || (used <= 0L && limit == null)) {
+            if (used <= 0L && limit == null) {
                 meter.meterBar.visibility = View.GONE
                 meter.meterValue.setText(R.string.account_meter_traffic_none)
                 meter.meterValue.setTextColor(onSurface)
@@ -190,6 +214,28 @@ class SubscriptionPagerAdapter(
                     formatBytes(limit),
                 )
             }
+        }
+
+        /**
+         * The LOCAL подписка this account record was imported as, or null when it has not been
+         * imported (or the map cannot be read).
+         *
+         * Keyed exactly the way `SubscriptionSyncManager.identityOf` writes the map, because a
+         * mismatch here is silently a null rather than a wrong card: the root подписка by its
+         * constant, a secondary by its remnawave uuid falling back to its id.
+         */
+        private fun localSubscription(sub: SubInfoDto): SubscriptionItem? {
+            val identity = if (sub.type.equals(SubscriptionSyncManager.TYPE_ROOT, ignoreCase = true)) {
+                SubscriptionSyncManager.TYPE_ROOT
+            } else {
+                sub.remnawaveUuid.ifBlank { sub.id }
+            }
+            if (identity.isBlank()) return null
+            return runCatching {
+                AuthTokenStore.getManagedGuids()[identity]
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { MmkvManager.decodeSubscription(it) }
+            }.getOrNull()
         }
 
         /**

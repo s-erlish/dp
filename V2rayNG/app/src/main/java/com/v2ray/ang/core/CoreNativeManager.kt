@@ -78,7 +78,12 @@ object CoreNativeManager {
         return try {
             Libv2ray.measureOutboundDelay(config, testUrl)
         } catch (e: Exception) {
-            LogUtil.e(AppConfig.TAG, "Failed to measure outbound delay", e)
+            // A FAILED PING IS THE ANSWER, NOT A FAULT. This is what «Проверить все» calls for every
+            // server in the list, and the core throws for each one that does not answer — a server
+            // that is down, blocked on this network, or simply slower than the timeout. The -1
+            // below is the result, the row already renders it, and an ERROR with a stack trace per
+            // unreachable server is what made «Журнал» look broken after a routine check.
+            LogUtil.w(AppConfig.TAG, "Ping: no answer (${e.message})")
             -1L
         }
     }

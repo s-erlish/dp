@@ -117,6 +117,21 @@
     <dimen name="glyph_20">20dp</dimen>
     <!-- The glyph inside the 40dp tile. 22 is a size here and never a gap. -->
     <dimen name="tile_glyph">22dp</dimen>
+    <!--
+      The waiting ring inside the same 40dp tile, and it is deliberately NOT 40.
+
+      `indicatorSize` on a CircularProgressIndicator is the diameter of the arc's
+      CENTRELINE, not the size of the view: the component draws a `trackThickness`
+      stroke astride that circle and Material reserves `indicatorSize + 2 ×
+      indicatorInset` when it measures itself. Setting indicatorSize to the tile's own
+      40dp and then pinning the view to 40dp too leaves nowhere for the stroke or the
+      inset, so the arc paints over the tile's edge and is clipped by it — «там где
+      кружок идёт он залазит за рамки какие-то».
+
+      28 leaves 2dp of inset and 2dp of stroke inside the 40dp slot with room to spare,
+      and reads as a ring around the 20dp success check that replaces it.
+    -->
+    <dimen name="tile_progress_ring">28dp</dimen>
     <dimen name="flag_size">28dp</dimen>
     <dimen name="avatar_chip">36dp</dimen>
     <!-- The leading icon tile on every settings / account row. -->

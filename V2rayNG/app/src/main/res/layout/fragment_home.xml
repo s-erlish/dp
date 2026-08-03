@@ -209,15 +209,21 @@
                 android:textColor="?attr/colorOnSurfaceVariant" />
         </LinearLayout>
 
-        <!-- The ONLY scroll-linked change on this screen: no colour step, no
-             elevation, no shadow, no collapsing title. -->
-        <View
-            android:id="@+id/header_hairline"
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/stroke_hairline"
-            android:alpha="0"
-            android:background="?attr/colorOutlineVariant"
-            android:importantForAccessibility="no" />
+        <!--
+          THERE IS NO HAIRLINE HERE ANY MORE, and its removal is the owner's:
+          «полоска появляется под плюсиком и над кнопкой подключения».
+
+          It was a full-bleed 1dp rule that faded in the instant the page scrolled
+          one pixel. That is a STICKY-HEADER affordance — it exists to separate a
+          pinned header from content moving under it — and this screen has no pinned
+          header: the account row and the «+» scroll away with everything else, and
+          the rule scrolled with them. So it never divided anything. It just drew a
+          line across the screen between the «+» and the connect object the moment
+          the user touched the page.
+
+          Nothing replaces it. The screen's separation is rhythm and the 16dp gutter,
+          which is what every other surface in the product uses.
+        -->
 
         <!-- The shared status-strip component in its INLINE placement: a persistent
              CONDITION, no auto-dismiss. Its hairline is hidden and its bar is
@@ -460,6 +466,48 @@
         <Space
             android:layout_width="match_parent"
             android:layout_height="@dimen/space_16" />
+
+        <!--
+          THE «ПОДКЛЮЧЕНО» PILL. The confirmation the screen was missing:
+          «нету плашки подключено когда подключаешься к серверу, нету этого
+          состояния типа».
+
+          IT IS ONE STATE AND ONLY ONE. The pill exists when the tunnel is UP and at no
+          other moment — it is not a status field that cycles through
+          «Отключено»/«Подключение…»/«Подключено», because the owner removed exactly that
+          word from exactly this region («No «Отключено» word above it») and the object
+          200dp above already says idle / negotiating / failed in colour. A confirmation
+          is a different thing from a status readout: it is the payoff for an action, so
+          it appears when the action succeeds and is absent the rest of the time.
+
+          IT IS NOT ON THE IDENTITY LINE, and that is the other half of the instruction.
+          The line below the ledger keeps naming the server and nothing else; the state
+          lives HERE, in its own place, above the ledger — which is also where the desktop
+          puts it (ConnectHeroView.axaml StatusText: the state under the shield, the stats
+          row under that, the server name last).
+
+          GONE, not INVISIBLE: it occupies no height at rest, so the ledger and the server
+          line sit where they always have and the screen does not carry a reserved gap for
+          a badge that is usually absent. It is the only thing on this screen that moves
+          the block below it, and it moves it exactly once per connection.
+        -->
+        <TextView
+            android:id="@+id/tv_connected_pill"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="@dimen/space_12"
+            android:background="@drawable/bg_status_pill"
+            android:gravity="center"
+            android:paddingStart="@dimen/space_12"
+            android:paddingTop="@dimen/space_4"
+            android:paddingEnd="@dimen/space_12"
+            android:paddingBottom="@dimen/space_4"
+            android:text="@string/home_status_connected"
+            android:textAppearance="@style/TextAppearance.App.Chip.Ui"
+            android:textColor="?attr/colorAccentFigure"
+            android:visibility="gone"
+            tools:visibility="visible" />
 
         <!--
           THE STATUS LINE, AND IT IS TWO LINES AND NEVER THREE: the ledger, then the

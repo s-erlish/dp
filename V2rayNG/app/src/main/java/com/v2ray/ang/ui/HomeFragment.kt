@@ -11,7 +11,6 @@ import android.graphics.Outline
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
-import android.graphics.drawable.RippleDrawable
 import android.graphics.drawable.StateListDrawable
 import android.net.ConnectivityManager
 import android.net.Network
@@ -36,7 +35,6 @@ import androidx.core.graphics.ColorUtils
 import androidx.core.view.doOnPreDraw
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
-import androidx.core.widget.NestedScrollView
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -70,6 +68,7 @@ import com.v2ray.ang.extension.toSpeedString
 import com.v2ray.ang.extension.toTrafficString
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
+import com.v2ray.ang.handler.SubscriptionNaming
 import com.v2ray.ang.ui.component.Haptic
 import com.v2ray.ang.ui.component.SkeletonBinder
 import com.v2ray.ang.ui.component.onSingleClick
@@ -402,14 +401,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         const val UNLIMITED_EXPIRE_SECONDS = 3_723_840_000L
 
         const val DISABLED_ALPHA = 0.38f
-        const val RIPPLE_ALPHA = 26 // 10% of 255
-
-        // Names that identify no подписка and must never reach the card's heading: the two import
-        // placeholders AngConfigManager writes, and the generic service label the backend returns as
-        // `tariffDisplayName` (the same string on every подписка — see SubInfoDto.tariffBadgeName,
-        // which refuses it for the tariff badge for exactly this reason). Lower case; compared
-        // against a lower-cased, trimmed candidate.
-        val GENERIC_SUB_NAMES = setOf("default", "import sub", "departament", "departament vpn")
 
         // The three rings are ONE colour at three opacities: outermost faintest, the disc's own
         // brightest. That is the whole gradient this object is allowed, and it is a state channel
@@ -493,7 +484,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         wireHeaderRow()
         wireConnect()
         wireStatusStrip()
-        wireScrollHairline()
         setupServerList()
         // The carousel decides which подписка's servers the list shows, so it is built second and
         // the list is repainted once it has settled on a page.
@@ -706,8 +696,25 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         binding.connectDisc.background = LayerDrawable(arrayOf(fill, ringInner))
         applyRingColor(ringColor)
 
-        // Every focusable control draws a 2dp accent ring. The disc had none at all — the product's
-        // primary control was unreachable by keyboard, D-pad and switch access in practice.
+        // THE PRESS IS DEPRESSION AND NOTHING ELSE — no ripple, no lightening, no highlight, and
+        // the rings do not react at all. The owner: «при зажатии кнопки она вся выделяется с этими
+        // кружками вокруг кнопки... при нажатии почему-то он светлеет, хотя просто должен
+        // прогибаться и все без света какого-то».
+        //
+        // What was here was a RippleDrawable whose mask was a 224dp OVAL — the frame's whole box,
+        // rings included — so holding the object washed a 10% accent over the entire assembly and
+        // lit the two rings that are supposed to be a pure state channel. That is both halves of
+        // what he reported, from one drawable.
+        //
+        // The geometry it was hiding behind stays, all of it: @anim/press_scale on this frame,
+        // @anim/press_dip on the disc and again on both shields, and the press scrim that darkens
+        // the well under the glyph. The object still sinks three layers deep; it just does it in
+        // the dark now.
+        //
+        // The FOCUS ring survives as a plain StateListDrawable. It is not press feedback — it is
+        // the 2dp accent outline every focusable control in the product draws, and it is the only
+        // thing making the app's primary control reachable by keyboard, D-pad and switch access.
+        // Losing it to a press fix would trade one defect for a worse one.
         val focus = StateListDrawable().apply {
             addState(
                 intArrayOf(android.R.attr.state_focused),
@@ -722,15 +729,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             )
             addState(intArrayOf(), ColorDrawable(Color.TRANSPARENT))
         }
-        val mask = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(Color.WHITE)
-        }
-        val ripple = ColorUtils.setAlphaComponent(
-            themeColor(androidx.appcompat.R.attr.colorPrimary),
-            RIPPLE_ALPHA,
-        )
-        frame.foreground = RippleDrawable(ColorStateList.valueOf(ripple), focus, mask)
+        frame.foreground = focus
 
         // The confirm rings: the same geometry in the accent, emitted exactly once each. The echo
         // carries the same silhouette a hair thinner, so the pair reads as one ring and its wake
@@ -862,30 +861,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         }
         strip.statusStripBar.clipToOutline = true
         strip.statusStrip.isVisible = false
-    }
-
-    /**
-     * The ONE scroll-linked change on this screen: a hairline under the header row fades in once the
-     * content has moved. No colour step, no elevation, no shadow, no collapsing title.
-     */
-    private fun wireScrollHairline() {
-        // The SAM constructor is explicit because View and NestedScrollView both declare a
-        // setOnScrollChangeListener overload and a bare lambda is ambiguous between them.
-        binding.homeTabRoot.setOnScrollChangeListener(
-            NestedScrollView.OnScrollChangeListener { _, _, scrollY, _, _ ->
-                if (!isBindingInitialized) return@OnScrollChangeListener
-                val hairline = binding.headerHairline
-                val target = if (scrollY > 0) 1f else 0f
-                if (hairline.alpha == target) return@OnScrollChangeListener
-                hairline.animate().cancel()
-                if (hairline.reducedMotion()) {
-                    hairline.alpha = target
-                    return@OnScrollChangeListener
-                }
-                hairline.animate().alpha(target)
-                    .setDuration(durState).setInterpolator(easeStandard).start()
-            }
-        )
     }
 
     // ==================== The inline server list ====================
@@ -1245,26 +1220,25 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      */
     private fun metaTitle(subId: String, sub: SubscriptionItem): String {
         val account = accountNameFor(subId)
-        account?.displayName?.let { return it }
-        realName(sub.profileTitle)?.let { return it }
-        realName(sub.remarks)?.let { return it }
-        account?.defaultLabel?.let { return it }
-        return getString(R.string.home_sub_untitled)
+        // THE RANKING LIVES IN [SubscriptionNaming] NOW, and not here. It used to be this Fragment's
+        // private business, which is precisely why the background worker that posts «Обновляем «…»»
+        // could not reach it and formatted the raw remark instead — putting «import sub» in the
+        // user's notification shade. One resolver, every surface: this card, the server-list group
+        // heading, and the notification.
+        return SubscriptionNaming.titleOf(
+            requireContext(),
+            sub,
+            accountDisplayName = account?.displayName,
+            accountDefaultLabel = account?.defaultLabel,
+        )
     }
 
     /**
-     * [candidate] when it actually names a подписка, else null.
-     *
-     * Rejected: blank; `AngConfigManager`'s two import placeholders ("import sub" =
-     * DEFAULT_SUBSCRIPTION_REMARKS, and "Default"); and the generic service label, which
-     * [SubInfoDto.tariffBadgeName] already refuses for the same reason — it is the same string on
-     * every подписка, so it identifies nothing.
+     * [candidate] when it actually names a подписка, else null — the shared filter, applied here so
+     * the account payload's own fields go through exactly the same test as the stored remark. See
+     * [SubscriptionNaming.PLACEHOLDERS] for what is refused and why.
      */
-    private fun realName(candidate: String?): String? {
-        val trimmed = candidate?.trim().orEmpty()
-        if (trimmed.isEmpty()) return null
-        return trimmed.takeIf { it.lowercase() !in GENERIC_SUB_NAMES }
-    }
+    private fun realName(candidate: String?): String? = SubscriptionNaming.realName(candidate)
 
     /** The user's own nickname for a подписка and the backend's generated label, kept apart. */
     private data class AccountSubName(val displayName: String?, val defaultLabel: String?)
@@ -2188,6 +2162,35 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         binding.tvStatusDetail.setTextColor(colour)
         // Always laid out, so the block below it never moves when the line changes what it says.
         binding.serverIdentity.visibility = View.VISIBLE
+
+        // THE CONFIRMATION, and only on the one state that earns it. See the pill's own note in
+        // fragment_home.xml: it is not a status field, so it does not spell out «Отключено» or
+        // «Подключение…» — those belong to the object's colour and to the line above.
+        paintConnectedPill(state.conn == Conn.CONNECTED)
+    }
+
+    /**
+     * Reveals or removes the «Подключено» pill.
+     *
+     * It fades rather than appearing whole, and it takes its height with it when it goes, so the
+     * ledger under it settles once instead of the screen keeping a permanent gap for a badge that
+     * is absent most of the time. Reduced motion snaps, like every other transition here.
+     */
+    private fun paintConnectedPill(connected: Boolean) {
+        val pill = binding.tvConnectedPill
+        if (pill.isVisible == connected) return
+        pill.animate().cancel()
+        if (!connected) {
+            pill.isVisible = false
+            return
+        }
+        pill.isVisible = true
+        if (pill.reducedMotion()) {
+            pill.alpha = 1f
+            return
+        }
+        pill.alpha = 0f
+        pill.animate().alpha(1f).setDuration(durReveal).setInterpolator(easeOutQuint).start()
     }
 
     private fun gateStatusWord(state: HomeState): Int = when {

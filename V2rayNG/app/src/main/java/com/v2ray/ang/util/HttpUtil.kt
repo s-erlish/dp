@@ -85,6 +85,16 @@ object HttpUtil {
     const val FALLBACK_DEVICE_MODEL = "Android Device"
 
     /**
+     * The host of [url], for a log line that must name an endpoint without leaking one.
+     *
+     * A подписка address carries the account token in its path — logging the URL whole put a working
+     * credential into «Журнал» and into every log a user might send to support. The host answers the
+     * question a log actually has ("which server did we talk to") and carries no secret.
+     */
+    fun hostOf(url: String): String =
+        runCatching { URL(url).host }.getOrNull()?.takeIf { it.isNotBlank() } ?: "(invalid address)"
+
+    /**
      * Converts the domain part of a URL string to its IDN (Punycode, ASCII Compatible Encoding) format.
      *
      * For example, a URL like "https://例子.中国/path" will be converted to "https://xn--fsqu00a.xn--fiqs8s/path".

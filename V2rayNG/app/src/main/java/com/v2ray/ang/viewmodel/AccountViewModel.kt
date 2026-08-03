@@ -233,8 +233,20 @@ class AccountViewModel : ViewModel() {
             totalDevices = rootFromAll?.totalDevices
                 ?: raw?.hwidDeviceLimit?.takeIf { it > 0 } ?: 0,
             connectedDevices = rootFromAll?.connectedDevices ?: 0,
-            // The root sub's auto-renew is exposed on the profile (as in the web cabinet).
-            autoRenewEnabled = profile?.autoRenewEnabled ?: rootFromAll?.autoRenewEnabled ?: false,
+            // THE ROOT SUB'S AUTO-RENEW IS EXPOSED ON THE PROFILE (as in the web cabinet), and that
+            // is why [reloadAfterAutoRenew] re-reads the profile and not only the list: this field
+            // is the only one on the card whose source is not one of the two subscription endpoints.
+            //
+            // Written as an explicit branch because the old elvis chain could not do what it looked
+            // like it did: `UserProfileDto.autoRenewEnabled` is a non-null Boolean, so
+            // `profile?.autoRenewEnabled ?: rootFromAll?...` fell through to `/all` only when the
+            // whole PROFILE was null — never when the profile simply omitted the flag. Same
+            // behaviour, minus the dead-looking fallback.
+            autoRenewEnabled = if (profile != null) {
+                profile.autoRenewEnabled
+            } else {
+                rootFromAll?.autoRenewEnabled ?: false
+            },
             expireAtIso = raw?.expireAt?.takeIf { it.isNotBlank() } ?: rootFromAll?.expireAtIso,
             isTrial = rootFromAll?.isTrial ?: false,
             tariffPrice = rootFromAll?.tariffPrice,
@@ -423,7 +435,10 @@ class AccountViewModel : ViewModel() {
         onDone: () -> Unit = {},
     ) = viewModelScope.launch {
         repo.toggleAutoRenew(id, autoRenew)
-            .onSuccess { onDone() }
+            .onSuccess {
+                reloadAfterAutoRenew()
+                onDone()
+            }
             .onFailure { t -> onError(t as? ApiError ?: ApiError.Network(t)) }
     }
 
@@ -434,8 +449,37 @@ class AccountViewModel : ViewModel() {
         onDone: () -> Unit = {},
     ) = viewModelScope.launch {
         repo.togglePrimaryAutoRenew(autoRenew)
-            .onSuccess { onDone() }
+            .onSuccess {
+                reloadAfterAutoRenew()
+                onDone()
+            }
             .onFailure { t -> onError(t as? ApiError ?: ApiError.Network(t)) }
+    }
+
+    /**
+     * WHY TURNING AUTO-RENEW OFF DID NOT WORK, AND WHY IT DOES NOW.
+     *
+     * The PATCH was always fine. What put the switch back was the reload after it: the root
+     * подписка's auto-renew flag does not come from `/subscription/all` or from
+     * `/client/subscription` — [buildRootSub] reads it off the PROFILE, mirroring the web cabinet —
+     * and the only thing the toggle refreshed was the subscription list. So the merge re-ran against
+     * `_profile.value`, the copy of the profile fetched when the tab last opened, which still said
+     * auto-renew was on. The list republished, the pager re-bound, `setChecked(true)` ran, and the
+     * switch flipped back under the user's finger.
+     *
+     * The asymmetry the owner reported falls straight out of that: an account with auto-renew ON has
+     * a cached profile saying ON, so turning it ON is a no-op that looks like it worked, and turning
+     * it OFF is the only direction with a stale value to fight — «отключение авто списания не
+     * работает».
+     *
+     * So the flag's own source is re-read, not just the list. Both refreshes converge whichever
+     * finishes first: [refreshProfile] re-merges against the cached list, and
+     * [fetchAndApplySubscriptions] re-merges against `_profile.value`. The switch therefore ends up
+     * showing what the SERVER says, in both directions, which is the only thing it should ever show.
+     */
+    private fun reloadAfterAutoRenew() {
+        refreshProfile()
+        loadSubscriptions()
     }
 
     fun activateTrial(onDone: () -> Unit = {}) = viewModelScope.launch {

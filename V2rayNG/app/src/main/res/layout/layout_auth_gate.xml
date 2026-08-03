@@ -214,12 +214,21 @@
                             android:layout_width="@dimen/tile_size"
                             android:layout_height="@dimen/tile_size">
 
+                            <!-- THE ARC SIZES ITSELF AND IS CENTRED IN THE TILE; it is not
+                                 stretched to the tile's own bounds. `indicatorSize` is the
+                                 arc's centreline diameter, so pinning both it and the view
+                                 to 40dp left no room for the 2dp stroke or the component's
+                                 inset and the ring drew over — and was clipped by — the
+                                 tile's edge. wrap_content lets Material reserve
+                                 indicatorSize + 2 × inset, which is what keeps a round
+                                 thing round. See @dimen/tile_progress_ring. -->
                             <com.google.android.material.progressindicator.CircularProgressIndicator
                                 android:id="@+id/gate_ring_arc"
                                 style="@style/Widget.Departament.Progress.Circular.Inline"
-                                android:layout_width="@dimen/tile_size"
-                                android:layout_height="@dimen/tile_size"
-                                app:indicatorSize="@dimen/tile_size"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_gravity="center"
+                                app:indicatorSize="@dimen/tile_progress_ring"
                                 app:trackColor="?attr/colorOutlineVariant" />
 
                             <!-- The success beat's terminal frame: the arc fades out,

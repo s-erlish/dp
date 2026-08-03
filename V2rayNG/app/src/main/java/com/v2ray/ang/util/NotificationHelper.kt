@@ -128,7 +128,7 @@ object NotificationHelper {
 
         val channel = NotificationChannel(
             channelType.channelId,
-            channelType.channelName,
+            context.getString(channelType.channelNameRes),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
             lockscreenVisibility = Notification.VISIBILITY_PRIVATE

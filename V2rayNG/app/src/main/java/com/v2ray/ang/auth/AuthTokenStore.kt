@@ -1,5 +1,6 @@
 package com.v2ray.ang.auth
 
+import android.os.Build
 import android.os.SystemClock
 import android.provider.Settings
 import com.google.gson.Gson
@@ -113,52 +114,124 @@ object AuthTokenStore {
     // Emulator/QA sentinel: many devices report this exact ANDROID_ID, so it isn't unique.
     private const val BAD_ANDROID_ID = "9774d56d682e549c"
 
+    /** Namespaces the two derivations below so they can never collide on one device. */
+    private const val ID_SALT_ANDROID = "departament-hwid-v1|android_id|"
+    private const val ID_SALT_BUILD = "departament-hwid-v1|build|"
+
     /**
-     * Stable per-device HWID that survives reinstall, computed once and reused.
+     * A candidate identity and whether it is worth writing down.
      *
-     * Existing installs keep whatever id is already cached (no churn). First run derives the id
-     * from [Settings.Secure.ANDROID_ID] — stable for the signing key + device + user across
-     * reinstalls — hashed to a 32-hex-char id (MD5) to match the UUID-without-dashes format the
-     * backend expects, so a clean reinstall on the same device yields the SAME HWID and the panel
-     * keeps a single device slot. Falls back to a random uuid only when ANDROID_ID is unusable.
+     * The distinction is the whole reason this type exists. A DERIVED id is a pure function of the
+     * device, so persisting it is free: the same value comes back next launch anyway. A FALLBACK id
+     * is a guess made because the device would not answer, and persisting THAT is what burns device
+     * slots forever — one unlucky read at first launch and the install is pinned to a random value
+     * no later launch can correct, which is exactly the failure this whole file exists to prevent.
+     */
+    private data class Candidate(val id: String, val derived: Boolean)
+
+    /**
+     * Stable per-device HWID that SURVIVES UNINSTALL/REINSTALL, computed once and reused.
+     *
+     * Read this before changing it — the app has already shipped the wrong answer here once.
+     *
+     * **What it is keyed on.** [Settings.Secure.ANDROID_ID], hashed to 32 lowercase hex chars so it
+     * matches the UUID-without-dashes shape the panel expects. ANDROID_ID is stored by the OS, not
+     * by the app, so wiping app data or uninstalling does not touch it: a clean reinstall on the
+     * same phone derives the SAME HWID and the subscription keeps ONE device slot. From API 26 it
+     * is scoped per (device, user, app signing key), which is precisely the property we want — and
+     * it is also the one caveat: an app signed with a DIFFERENT key is a different app to the OS
+     * and legitimately gets a different value. A debug-signed build and a release-signed build of
+     * departament therefore report two devices on one phone. That is the OS, not this function, and
+     * it stops mattering the moment every install the user receives is signed with the release key.
+     *
+     * **Why the previous "stable device id" was not.** `98f5397` kept a `Utils.getUuid()` — a fresh
+     * random UUID minted on first run and persisted in this store. MMKV lives in the app's private
+     * data directory, so uninstall deletes it, and the next install minted another one. Every update
+     * the user side-loaded therefore registered as a brand-new device and consumed another slot
+     * against the plan's `hwidDeviceLimit`; a 3-device subscription bricked after two updates.
+     *
+     * **Migration.** An id already on disk always wins, whatever it was keyed on. An install that
+     * upgrades into this build keeps the identity the panel already knows and does NOT appear as yet
+     * another new device — the derivation below only ever runs when there is nothing to carry
+     * forward, i.e. on a genuinely fresh install.
+     *
+     * **Nothing new is requested from the user.** No permission, no Play-restricted identifier
+     * (advertising id, IMEI, serial): only values every app may read.
      */
     fun deviceId(): String {
         val store = store()
+        // MIGRATION FIRST, ALWAYS. Whatever this install has been telling the panel, it keeps
+        // telling it. Re-deriving over a stored id would make every upgrade a new device — the same
+        // defect as a reinstall, just triggered by us instead of by the user.
         val existing = store?.decodeString(KEY_DEVICE_ID)
         if (!existing.isNullOrBlank()) {
             cachedDeviceId = existing
             return existing
         }
-        // The store may simply have no id yet, or may be unreadable at this moment. Either way the
-        // id is derived, not invented: [computeStableDeviceId] is a pure function of ANDROID_ID, so
-        // the value handed out here is the same one the store would have held. The HWID therefore
-        // stays stable through a Keystore outage instead of burning a device slot on the panel, and
-        // the derived id is written back as soon as the store can be opened again.
-        val generated = cachedDeviceId ?: computeStableDeviceId().also { cachedDeviceId = it }
-        store?.encode(KEY_DEVICE_ID, generated)
-        return generated
+        cachedDeviceId?.let { cached ->
+            // Held from earlier in this process. Write it through if the store has since opened, so
+            // a Keystore that was busy at launch does not cost the id its permanence.
+            store?.encode(KEY_DEVICE_ID, cached)
+            return cached
+        }
+        val candidate = computeDeviceId()
+        cachedDeviceId = candidate.id
+        // Only a DERIVED id is written down. A fallback stays in memory for this process only, so
+        // the next launch gets another chance to derive the real one instead of inheriting a guess.
+        if (candidate.derived) store?.encode(KEY_DEVICE_ID, candidate.id)
+        return candidate.id
     }
 
-    /** MD5(ANDROID_ID) as 32 lowercase hex chars, or a random uuid when ANDROID_ID is unusable. */
-    private fun computeStableDeviceId(): String {
+    /**
+     * ANDROID_ID first; a hardware-attribute digest when the OS will not answer; a random uuid only
+     * when even that fails.
+     *
+     * The middle tier matters more than it looks. It is not unique between two identical handsets,
+     * but it IS identical across reinstalls of the same handset — and since the panel scopes device
+     * entries to one subscription, "the same phone keeps one slot" is worth far more here than
+     * "two people with the same phone model would collide", which requires them to share an account.
+     * A random uuid has neither property.
+     */
+    private fun computeDeviceId(): Candidate {
         val androidId = try {
             Settings.Secure.getString(
                 AngApplication.application.contentResolver,
                 Settings.Secure.ANDROID_ID,
             )
         } catch (e: Throwable) {
+            LogUtil.w(AppConfig.TAG, "ANDROID_ID unavailable, falling back to build attributes")
             null
         }
-        if (androidId.isNullOrBlank() || androidId == BAD_ANDROID_ID) {
-            return Utils.getUuid()
+        if (!androidId.isNullOrBlank() && androidId != BAD_ANDROID_ID) {
+            hex(ID_SALT_ANDROID + androidId)?.let { return Candidate(it, derived = true) }
         }
-        return try {
-            MessageDigest.getInstance("MD5")
-                .digest(androidId.toByteArray(Charsets.UTF_8))
-                .joinToString("") { "%02x".format(it) }
-        } catch (e: Throwable) {
-            Utils.getUuid()
-        }
+        hex(ID_SALT_BUILD + buildFingerprint())?.let { return Candidate(it, derived = true) }
+        return Candidate(Utils.getUuid(), derived = false)
+    }
+
+    /**
+     * The device's own unchanging description. Every field is a build-time constant of the ROM, so
+     * the string is the same on every launch and every reinstall of the same handset, and it changes
+     * only when the user flashes a different build — at which point they are, for our purposes,
+     * on a different device anyway.
+     */
+    private fun buildFingerprint(): String = listOf(
+        Build.MANUFACTURER,
+        Build.BRAND,
+        Build.DEVICE,
+        Build.BOARD,
+        Build.MODEL,
+        Build.PRODUCT,
+        Build.HARDWARE,
+    ).joinToString("|") { it.orEmpty() }
+
+    /** MD5 as 32 lowercase hex chars — the UUID-without-dashes shape the panel stores. */
+    private fun hex(input: String): String? = try {
+        MessageDigest.getInstance("MD5")
+            .digest(input.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+    } catch (e: Throwable) {
+        null
     }
 
     /** Persists a new session. No refresh token in this backend. */

@@ -38,23 +38,6 @@ import java.net.URI
 object AngConfigManager {
 
     /**
-     * Generic placeholder used as a subscription's [SubscriptionItem.remarks] when neither the
-     * sub URL `#fragment` nor a provider `profile-title` yields a real name. Kept as a single
-     * constant so import (fallback) and update (the "may I adopt the provider title?" check)
-     * agree on what counts as "still unnamed".
-     */
-    private const val DEFAULT_SUBSCRIPTION_REMARKS = "import sub"
-
-    /**
-     * Remarks that name the SERVICE rather than the подписка, and are therefore not a name at all:
-     * every подписка on this deployment would carry the same one. An older import stamped the
-     * backend's `tariffDisplayName` here, which is exactly this string — see the note at the
-     * provider-title adoption below, and `SubInfoDto.tariffBadgeName`, which refuses it for the
-     * tariff badge for the same reason. Lower case; compared against a trimmed, lower-cased remark.
-     */
-    private val GENERIC_SUB_REMARKS = setOf("departament", "departament vpn")
-
-    /**
      * Rich outcome of [importBatchConfig].
      *
      * Kept as a data class whose first two components are (count, countSub) on purpose: existing
@@ -884,11 +867,16 @@ object AngConfigManager {
                 return SubscriptionUpdateResult(skipCount = 1)
             }
 
-            // Validate subscription info
-            if (TextUtils.isEmpty(it.guid)
-                || TextUtils.isEmpty(it.subscription.remarks)
-                || TextUtils.isEmpty(it.subscription.url)
-            ) {
+            // Validate subscription info.
+            //
+            // A BLANK REMARK IS NOT A REASON TO SKIP, and it used to be. A подписка is identified by
+            // its guid and its url; the remark is a display name that this very function is
+            // responsible for FILLING IN from the провайдер's `profile-title` a few dozen lines
+            // below. Refusing to fetch until it is already named made that adoption unreachable —
+            // which is why the import had to invent «import sub» to get past this line at all. With
+            // the placeholder gone, this guard would have skipped every freshly added подписка
+            // forever.
+            if (TextUtils.isEmpty(it.guid) || TextUtils.isEmpty(it.subscription.url)) {
                 return SubscriptionUpdateResult(skipCount = 1)
             }
 
@@ -898,7 +886,11 @@ object AngConfigManager {
             }
             val fetchUrl = resolveSecureSubUrl(url, it.subscription)
                 ?: return SubscriptionUpdateResult(failureCount = 1)
-            LogUtil.i(AppConfig.TAG, fetchUrl)
+            // THE ADDRESS IS NOT LOGGED. A подписка URL carries the account token in its path, so
+            // this line put a working credential into «Журнал», into logcat, and into every log the
+            // user might export or screenshot for support. The host alone answers the only question
+            // the log has to answer here — which операторский endpoint was contacted.
+            LogUtil.i(AppConfig.TAG, "Subscription fetch: ${HttpUtil.hostOf(fetchUrl)}")
             // The panel picks the response format (XRAY_JSON template vs base64 link list) from
             // the User-Agent, so a per-subscription override wins over everything, then the
             // global override from the provider screen, then the operator-configured UA. All
@@ -931,7 +923,20 @@ object AngConfigManager {
                     )
                 )
             } catch (e: Exception) {
-                LogUtil.e(AppConfig.ANG_PACKAGE, "Update subscription: proxy not ready or other error", e)
+                // THE FIRST ATTEMPT IS EXPECTED TO FAIL WHEN NO TUNNEL IS UP, so it is not an error.
+                //
+                // This call is deliberately routed through the local HTTP proxy port, which only
+                // exists while the core is running. Refreshing a подписка with the VPN off — the
+                // ordinary case, and what the background worker does every few hours — therefore
+                // threw here EVERY time, and the ERROR line with its stack trace was the first thing
+                // in «Журнал» on a session where nothing had gone wrong. The direct retry two lines
+                // below is what actually fetches it, and it succeeds.
+                //
+                // One INFO line, and the reason, so a genuine proxy failure is still traceable.
+                LogUtil.i(
+                    AppConfig.TAG,
+                    "Subscription fetch via the local proxy did not answer, retrying directly: ${e.message}"
+                )
                 null
             }
             if (result == null || result.body.isEmpty()) {
@@ -944,7 +949,14 @@ object AngConfigManager {
                         )
                     )
                 } catch (e: Exception) {
-                    LogUtil.e(AppConfig.TAG, "Update subscription: Failed to get URL content with user agent", e)
+                    // THIS one is a real failure — both routes are exhausted and the подписка did
+                    // not refresh — so it stays at error level. The address is not in the message:
+                    // it carries the account token (see the fetch log above).
+                    LogUtil.e(
+                        AppConfig.TAG,
+                        "Subscription not refreshed: ${HttpUtil.hostOf(fetchUrl)} did not answer",
+                        e
+                    )
                     null
                 }
             }
@@ -977,32 +989,23 @@ object AngConfigManager {
                 decodeSubDirective(result?.webPageUrl)?.let { v -> it.subscription.webPageUrl = v }
                 // Real subscription title sent by the provider (used as the meta-bar heading).
                 decodeSubDirective(result?.profileTitle)?.let { v -> it.subscription.profileTitle = v }
-                // Adopt that provider title as the Servers group name too, but only while the
-                // subscription is still unnamed — a name that identifies THIS подписка must never
-                // be clobbered.
+                // Adopt that provider title as the подписка's stored name too, but only while the
+                // подписка is still unnamed — a name that identifies THIS подписка must never be
+                // clobbered.
                 //
-                // "Unnamed" now includes the GENERIC SERVICE LABEL, and that addition is a fix, not
-                // a tidy-up. An older build stamped the backend's `tariffDisplayName` into the
-                // remark at import; for this deployment that is «departament vpn», the same string
-                // on every подписка, and it therefore blocked this adoption forever — the card on
-                // Главная read «departament vpn» where the провайдер was sending «🍀 erlish».
-                // SubscriptionSyncManager no longer writes it, but every install that already has
-                // one is only healed by treating it as the placeholder it is. There is no rename to
-                // fall back on (OWNER-DECISION-2026-08-02 §5), so this is the only route.
+                // THIS IS ALSO THE HEALING PATH FOR EVERY INSTALL THAT ALREADY STORED A
+                // PLACEHOLDER. [SubscriptionNaming.isUnnamed] treats «import sub», «Default» and the
+                // generic service label as no name at all, so the first refresh after this build
+                // replaces each of them with what the провайдер actually calls the подписка
+                // («🍀 erlish»). There is no rename to fall back on (OWNER-DECISION-2026-08-02 §5),
+                // so this is the only route by which a bad stored name can ever be corrected.
                 val providerTitle = it.subscription.profileTitle.trim()
-                if (providerTitle.isNotEmpty()) {
-                    val currentRemarks = it.subscription.remarks.trim()
-                    if (currentRemarks.isEmpty()
-                        || currentRemarks.equals(DEFAULT_SUBSCRIPTION_REMARKS, ignoreCase = true)
-                        || currentRemarks.equals("Default", ignoreCase = true)
-                        || currentRemarks.lowercase() in GENERIC_SUB_REMARKS
-                    ) {
-                        it.subscription.remarks = providerTitle
-                    }
+                if (providerTitle.isNotEmpty() && SubscriptionNaming.isUnnamed(it.subscription)) {
+                    it.subscription.remarks = providerTitle
                 }
                 it.subscription.lastUpdated = System.currentTimeMillis()
                 MmkvManager.encodeSubscription(it.guid, it.subscription)
-                LogUtil.i(AppConfig.TAG, "Subscription updated: ${it.subscription.remarks}, $count configs")
+                LogUtil.i(AppConfig.TAG, "Subscription updated: $count configs")
                 return SubscriptionUpdateResult(
                     configCount = count,
                     successCount = 1
@@ -1066,10 +1069,17 @@ object AngConfigManager {
 
         val uri = URI(Utils.fixIllegalUrl(url))
         val subItem = SubscriptionItem()
-        // Name the group after the URL's #fragment when present; the real provider title
-        // (`profile-title`) is not known until the first fetch, so [updateConfigViaSub] later
-        // upgrades this placeholder to the real name (e.g. "erlish") on the first update.
-        subItem.remarks = uri.fragment?.trim()?.takeIf { it.isNotEmpty() } ?: DEFAULT_SUBSCRIPTION_REMARKS
+        // Name the подписка after the URL's #fragment when present, and LEAVE IT BLANK otherwise —
+        // no placeholder is stored, because a placeholder that is stored is a placeholder that gets
+        // shown. Upstream's «import sub» reached the card heading, the server-list group name and
+        // the shade («Обновляем «import sub»»), and with no rename UI to correct it
+        // (OWNER-DECISION-2026-08-02 §5) it was permanent.
+        //
+        // Blank is not a gap: the real provider title (`profile-title`) arrives on the very first
+        // fetch, a few lines into [updateConfigViaSub], which adopts it into a still-unnamed
+        // подписка. Until then every display path resolves the name through [SubscriptionNaming],
+        // which answers «Подписка» rather than printing an empty string.
+        subItem.remarks = uri.fragment?.trim().orEmpty()
         subItem.url = url
         val guid = Utils.getUuid()
         MmkvManager.encodeSubscription(guid, subItem)
