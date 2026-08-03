@@ -1090,7 +1090,18 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private fun metaTitle(subId: String, sub: SubscriptionItem): String {
         accountNameFor(subId)?.let { return it }
         val remarks = sub.remarks.trim()
-        val fromRemarks = remarks.takeIf { it.isNotEmpty() && !it.equals("Default", ignoreCase = true) }
+        // Both import placeholders are filtered, not just "Default". AngConfigManager names a
+        // pasted подписка "import sub" (DEFAULT_SUBSCRIPTION_REMARKS) and only replaces it once the
+        // provider answers with a profile-title — so a provider that sends none used to leave the
+        // card reading literally «import sub». That was survivable while a rename existed; the
+        // owner has since ruled that editing a подписка is not a feature at all
+        // (OWNER-DECISION-2026-08-02 §5), so a bad automatic name is now PERMANENT and the naming
+        // has to be right without him. Falling through to the provider title and then to
+        // «Подписка» is the honest answer: a generic placeholder is not a name.
+        val genericRemarks = setOf("default", "import sub")
+        val fromRemarks = remarks.takeIf {
+            it.isNotEmpty() && it.lowercase() !in genericRemarks
+        }
         if (isAccountManaged(subId)) {
             // Account-managed: the remark IS the nickname the import wrote, so it outranks the
             // provider's generic title.

@@ -67,3 +67,31 @@ Note for whoever picks it up: an APK built in this environment **cannot be run**
 and the confirmation has to come from a CI build the owner can install. Note also that a build signed
 with a per-runner debug key cannot install over a previous one (`UNASSIGNED-WORK.md` R-02), so
 "does not start" must be separated from "did not install" before anything is concluded.
+
+## 5. Editing a подписка is not a feature — decided, not lost
+
+Three settings rows came out at his instruction: «Дополнительно», «Список подписок» and «Другие
+способы добавления». Removing the second one takes `SubSettingActivity`/`SubEditActivity`'s only
+door with it, and with that door goes **renaming a подписка, the per-sub User-Agent and auto-update
+overrides, the per-sub remote-DNS override, and add-by-typed-URL**. That was put to him explicitly
+rather than accepted quietly.
+
+His answer: **«не надо оставлять, в целом не предусмотрено редактирование подписки»**.
+
+So this is a product decision, not a regression, and it is recorded here precisely so nobody
+"restores" it later under the refine-never-remove rule. A подписка is something the client
+**receives** — from the account, a QR code or the clipboard — and then refreshes, pins, gets support
+for, or deletes. It is not something the user authors or edits. The card on Главная already carries
+that whole set.
+
+Consequences that follow from it, and are therefore also decided:
+
+- `SubEditActivity` and `SubSettingActivity` are dead code. Do not build a new entry point for them.
+  Deleting them outright is a legitimate follow-up; leaving them unreferenced is also fine.
+- Anything that needs a per-subscription override — User-Agent, auto-update interval, remote DNS —
+  must come from the operator's data or a global default, never from a per-sub editor.
+- The one thing to watch, because it is now unfixable from the UI: a подписка whose provider returns
+  no `profile-title` is named by whatever the import chose. `AngConfigManager.importUrlAsSubscription`
+  names it literally `"import sub"`, and `HomeFragment.metaTitle` filters only `"Default"`. With no
+  rename, a bad default name is permanent — so the naming has to be right at import time. Fix it
+  there.
