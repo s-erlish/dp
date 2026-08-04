@@ -260,32 +260,42 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         }
     }
 
-    /**
-     * 13.1, in one place. Every message names the cause AND the fix; none carries an HTTP code, a
-     * URL or a response body — the raw reason goes to the log, not to the customer.
-     */
-    @StringRes
-    private fun messageFor(cause: ApiError, surface: Surface, awaitingTelegram: Boolean): Int = when {
-        // A wrong TOTP code is not "wrong password": it names the authenticator app, because that
-        // is where the user has to look.
-        surface == Surface.TWO_FACTOR && cause is ApiError.Unauthorized -> R.string.auth_2fa_wrong
-        cause is ApiError.Unauthorized -> R.string.auth_err_credentials
-        cause is ApiError.Gone -> R.string.auth_err_gone
-        cause is ApiError.RateLimited -> R.string.auth_err_rate_limited
-        cause is ApiError.ServiceUnavailable -> R.string.auth_err_unavailable
-        cause is ApiError.Network -> R.string.auth_err_network
-        // The manager reports the 180s poll deadline as Timeout as well, so the phrasing is chosen
-        // by WHERE we were: waiting on a human reads differently from waiting on a server.
-        cause is ApiError.Timeout && awaitingTelegram -> R.string.auth_err_tg_timeout
-        cause is ApiError.Timeout -> R.string.auth_err_timeout
-        cause is ApiError.NotConfigured -> R.string.auth_err_not_configured
-        else -> R.string.auth_err_generic
-    }
+    companion object {
+        /**
+         * 13.1, in one place. Every message names the cause AND the fix; none carries an HTTP code,
+         * a URL or a response body — the raw reason goes to the log, not to the customer.
+         *
+         * Public and on the companion because the Telegram flow that runs from the START SCREEN
+         * (README §3, `ui/component/GateView`) reports the same failures on a surface this
+         * ViewModel does not own: its overlay lifts and the reason lands in the gate's caption. Two
+         * copies of this `when` would let the same 410 read two different ways in one product.
+         */
+        @StringRes
+        fun messageFor(
+            cause: ApiError,
+            surface: Surface = Surface.GATE,
+            awaitingTelegram: Boolean = false,
+        ): Int = when {
+            // A wrong TOTP code is not "wrong password": it names the authenticator app, because
+            // that is where the user has to look.
+            surface == Surface.TWO_FACTOR && cause is ApiError.Unauthorized -> R.string.auth_2fa_wrong
+            cause is ApiError.Unauthorized -> R.string.auth_err_credentials
+            cause is ApiError.Gone -> R.string.auth_err_gone
+            cause is ApiError.RateLimited -> R.string.auth_err_rate_limited
+            cause is ApiError.ServiceUnavailable -> R.string.auth_err_unavailable
+            cause is ApiError.Network -> R.string.auth_err_network
+            // The manager reports the 180s poll deadline as Timeout as well, so the phrasing is
+            // chosen by WHERE we were: waiting on a human reads differently from waiting on a
+            // server.
+            cause is ApiError.Timeout && awaitingTelegram -> R.string.auth_err_tg_timeout
+            cause is ApiError.Timeout -> R.string.auth_err_timeout
+            cause is ApiError.NotConfigured -> R.string.auth_err_not_configured
+            else -> R.string.auth_err_generic
+        }
 
-    private companion object {
         /** 5.6: 429 disables the submit for a minute; the countdown is deliberately not printed. */
-        const val RATE_LIMIT_COOLDOWN_MS = 60_000L
-        const val KEY_DEEP_LINK = "auth_opened_deep_link"
-        const val KEY_TEMP_TOKEN = "auth_temp_token"
+        private const val RATE_LIMIT_COOLDOWN_MS = 60_000L
+        private const val KEY_DEEP_LINK = "auth_opened_deep_link"
+        private const val KEY_TEMP_TOKEN = "auth_temp_token"
     }
 }

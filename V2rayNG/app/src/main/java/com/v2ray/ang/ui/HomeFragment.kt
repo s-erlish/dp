@@ -74,6 +74,7 @@ import com.v2ray.ang.extension.toTrafficString
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionNaming
+import com.v2ray.ang.ui.component.GateView
 import com.v2ray.ang.ui.component.Haptic
 import com.v2ray.ang.ui.component.HomeHandoff
 import com.v2ray.ang.ui.component.SkeletonBinder
