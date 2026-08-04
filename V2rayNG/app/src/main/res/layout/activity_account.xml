@@ -37,6 +37,16 @@
   needs its avatar's 48dp hit box to overhang the 16dp gutter by the 8dp of padding
   that centres a 32dp circle inside it. Every other block sets
   layout_marginHorizontal="@dimen/screen_gutter" and lines up on the same 16.
+
+  THE TILES TAKE THEIR FILL FROM A THEME ATTRIBUTE, NOT FROM A COLOUR RESOURCE.
+  ThemeOverlay.Mono overrides ATTRIBUTES; it cannot reach @color/icon_tile_neutral,
+  so a tile drawn straight from @drawable/bg_icon_neutral stayed the blue theme's
+  #20242B on the one screen whose whole point is the absence of colour. The shape
+  stays in the drawable (@drawable/bg_tile_neutral) and the fill arrives as
+  android:backgroundTint="?attr/colorSurfaceContainerHighest"; the glyph takes
+  ?attr/colorOnSurfaceVariant for the same reason. NOT ?attr/iconTileBg* — that one
+  is the COLOURED tile and resolves blue in the blue theme, which is what these
+  three rows must not be.
 -->
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -81,10 +91,16 @@
                 android:padding="@dimen/space_8"
                 android:stateListAnimator="@anim/press_icon">
 
+                <!-- NEUTRAL, and tinted from an attribute for the same reason the row
+                     tiles below are: §5's profile row draws the avatar slot on
+                     the neutral tile fill with a muted monogram — a grey disc, not the blue
+                     one this used to be. Blue here would have been a fourth accent
+                     surface on a screen whose accent belongs to the ring. -->
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:background="@drawable/bg_avatar_circle" />
+                    android:background="@drawable/bg_avatar_circle"
+                    android:backgroundTint="?attr/colorSurfaceContainerHighest" />
 
                 <TextView
                     android:id="@+id/tv_avatar_initial"
@@ -93,7 +109,7 @@
                     android:gravity="center"
                     android:text="?"
                     android:textAppearance="@style/TextAppearance.App.Chip"
-                    android:textColor="?attr/iconTintBlue"
+                    android:textColor="?attr/colorOnSurfaceVariant"
                     tools:ignore="HardcodedText" />
 
                 <ImageView
@@ -441,7 +457,7 @@
                     android:paddingHorizontal="@dimen/space_8"
                     android:paddingVertical="@dimen/space_2"
                     android:textAppearance="@style/TextAppearance.App.Chip"
-                    android:textColor="?attr/colorPrimary"
+                    android:textColor="?attr/colorOnPrimaryContainer"
                     android:visibility="gone"
                     tools:ignore="HardcodedText"
                     tools:text="Base"
@@ -657,7 +673,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -665,7 +682,7 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_acc_upgrade"
-                            app:tint="@color/icon_glyph_neutral" />
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
                     <LinearLayout
@@ -714,7 +731,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -722,7 +740,7 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_acc_devices"
-                            app:tint="@color/icon_glyph_neutral" />
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
                     <LinearLayout
@@ -784,7 +802,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -792,7 +811,7 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_acc_history"
-                            app:tint="@color/icon_glyph_neutral" />
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
                     <LinearLayout
@@ -871,7 +890,8 @@
                 <FrameLayout
                     android:layout_width="@dimen/tile_size"
                     android:layout_height="@dimen/tile_size"
-                    android:background="@drawable/bg_icon_neutral">
+                    android:background="@drawable/bg_tile_neutral"
+                    android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                     <ImageView
                         android:layout_width="@dimen/tile_glyph"
@@ -879,7 +899,7 @@
                         android:layout_gravity="center"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_telegram_24dp"
-                        app:tint="@color/icon_glyph_neutral" />
+                        app:tint="?attr/colorOnSurfaceVariant" />
                 </FrameLayout>
 
                 <LinearLayout
@@ -917,20 +937,17 @@
              and the row follows without a values-night twin of this layout.
 
              The TILE stays neutral: a red plate under a red glyph under a red label is
-             the same signal three times. -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="@dimen/screen_gutter"
-            android:layout_marginTop="@dimen/space_24"
-            android:layout_marginBottom="@dimen/space_8"
-            android:text="@string/account_group_signin"
-            android:textAppearance="@style/TextAppearance.App.Title" />
+             the same signal three times.
 
+             AND IT CARRIES NO SECTION HEADER. §5 ends the tab on the card itself, and
+             «Аккаунт и вход» over one row that already says «Выйти из аккаунта» was a
+             title restating the only thing underneath it. The heading above «Способы
+             входа» stays, because that card's row does NOT say what it is a method OF. -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="@dimen/screen_gutter"
+            android:layout_marginTop="@dimen/space_12"
             app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
@@ -946,7 +963,8 @@
                 <FrameLayout
                     android:layout_width="@dimen/tile_size"
                     android:layout_height="@dimen/tile_size"
-                    android:background="@drawable/bg_icon_neutral">
+                    android:background="@drawable/bg_tile_neutral"
+                    android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                     <ImageView
                         android:layout_width="@dimen/tile_glyph"

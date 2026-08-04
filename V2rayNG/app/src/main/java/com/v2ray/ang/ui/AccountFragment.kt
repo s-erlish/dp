@@ -18,7 +18,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.browser.customtabs.CustomTabsIntent
-import androidx.core.view.doOnPreDraw
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
@@ -44,7 +43,6 @@ import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.auth.dto.UserProfileDto
 import com.v2ray.ang.databinding.ActivityAccountBinding
 import com.v2ray.ang.databinding.DialogTopUpBinding
-import com.v2ray.ang.databinding.ItemSubscriptionCardBinding
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
@@ -530,7 +528,9 @@ class AccountFragment : Fragment() {
 
         buildDots(count)
         binding.llSubDots.isVisible = count > 1
-        measureSubCardHeight()
+        // No page measuring any more: after §5 a page IS the 172dp ring and nothing else, so the
+        // pager's height is that constant and the layout states it. The old probe inflated a
+        // whole card per render to arrive at a number the layout already knew.
 
         renderDevicesRowValue()
         // Fetch the REAL connected-device count for the active (first/root) sub and pre-warm
@@ -538,37 +538,6 @@ class AccountFragment : Fragment() {
         list.firstOrNull()?.remnawaveUuid?.takeIf { it.isNotBlank() }?.let { viewModel.loadDevices(it) }
 
         renderHeroState()
-    }
-
-    /**
-     * ViewPager2 cannot wrap_content, so fix its height to the tallest page it will actually draw.
-     *
-     * The card's height is no longer knowable in advance: it carries a traffic meter that is there
-     * or not, a devices row, «Продлить» and the auto-renew line, and every one of those grows with
-     * the user's font scale. `@dimen/sub_card_height` was a single number guessed against the old
-     * three-line card, so anything below the fold was simply clipped. Measuring one page at the
-     * real page width and taking the max — the same recipe `HomeFragment.measureHomeMetaHeight`
-     * uses for the подписка carousel on Главная — is a number that cannot go stale.
-     */
-    private fun measureSubCardHeight() {
-        val pager = binding.vpSubscriptions
-        if (currentSubs.isEmpty()) return
-        pager.doOnPreDraw {
-            val b = _binding ?: return@doOnPreDraw
-            val inner = pager.width - pager.paddingStart - pager.paddingEnd
-            if (inner <= 0) return@doOnPreDraw
-            val widthSpec = View.MeasureSpec.makeMeasureSpec(inner, View.MeasureSpec.EXACTLY)
-            val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-            val probe = ItemSubscriptionCardBinding.inflate(layoutInflater, pager, false)
-            probe.root.layoutParams = ViewGroup.LayoutParams(inner, ViewGroup.LayoutParams.WRAP_CONTENT)
-            probe.root.measure(widthSpec, heightSpec)
-            val measured = probe.root.measuredHeight
-            val floor = resources.getDimensionPixelSize(R.dimen.sub_card_height)
-            val target = maxOf(measured, floor)
-            if (target > 0 && b.vpSubscriptions.layoutParams.height != target) {
-                b.vpSubscriptions.layoutParams = b.vpSubscriptions.layoutParams.apply { height = target }
-            }
-        }
     }
 
     /**
@@ -792,6 +761,7 @@ class AccountFragment : Fragment() {
 
         b.tvTimeLabel.isVisible = true
         b.tvTimeFigure.isVisible = true
+        b.tvTimeWord.isVisible = true
 
         val dateWord = monthWord(date)
         when {
@@ -825,10 +795,14 @@ class AccountFragment : Fragment() {
             }
 
             else -> {
-                b.tvTimeLabel.setText(R.string.account_time_active)
+                // THE DESIGN'S OWN SENTENCE, and the only branch it writes: §5.3 puts
+                // «Действует до 04.06.2099» under the tariff name — one line, numeric date, no
+                // split figure. The label carries all of it and the figure stands down, which is
+                // exactly the shape renderTimeLines already uses for the date-less variants.
+                b.tvTimeLabel.text = getString(R.string.account_time_valid_until, shortDate(date))
                 b.tvTimeLabel.setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
-                b.tvTimeFigure.text = date.day.toString()
-                b.tvTimeWord.text = dateWord
+                b.tvTimeFigure.isVisible = false
+                b.tvTimeWord.isVisible = false
                 if (daysLeft <= COUNTDOWN_FROM_DAYS) {
                     val count = dayWord(daysLeft)
                     b.tvTimeDetail.text = getString(R.string.account_time_detail_left, daysLeft, count)
@@ -836,7 +810,6 @@ class AccountFragment : Fragment() {
                 } else {
                     b.tvTimeDetail.isVisible = false
                 }
-                tintFigure(onSurface)
             }
         }
     }
@@ -846,6 +819,7 @@ class AccountFragment : Fragment() {
         val b = _binding ?: return
         b.tvTimeLabel.isVisible = false
         b.tvTimeFigure.isVisible = false
+        b.tvTimeWord.isVisible = true
         b.tvTimeWord.setText(titleRes)
         b.tvTimeWord.setTextColor(color)
         b.tvTimeDetail.setText(subtitleRes)
@@ -901,6 +875,15 @@ class AccountFragment : Fragment() {
 
     /** «3 августа» — one phrase, one face, for the detail line. */
     private fun longDate(date: Ymd): String = getString(R.string.account_date_long, date.day, monthWord(date))
+
+    /**
+     * «04.06.2099» — the numeric date the design writes after «Действует до», zero-padded so a
+     * column of dates on the tab keeps the same width whatever the day is. Not localised on
+     * purpose: it is the same dd.MM.yyyy the payment history and the auto-renew line already
+     * print, and three date shapes on one tab is what a user reads as three different things.
+     */
+    private fun shortDate(date: Ymd): String =
+        String.format(Locale.US, "%02d.%02d.%04d", date.day, date.month, date.year)
 
     private fun resolveThemeColor(attr: Int): Int {
         val tv = android.util.TypedValue()

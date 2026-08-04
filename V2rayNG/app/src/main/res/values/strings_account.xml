@@ -128,6 +128,12 @@
          One silhouette, three temperatures: the label names the state, the figure and the word
          beside it carry it, and the detail line appears only while a day count is worth reading.
          The month word is always UI-face Russian — the figure face has no Cyrillic at all. -->
+    <!-- The healthy state's whole sentence, and it is the DESIGN'S sentence, word for word:
+         handoff §5.3 writes «Действует до 04.06.2099» under the tariff name. It replaces
+         «Активна до 4 июня 2099» in that one branch only — the urgent branches keep the split
+         label/figure silhouette, because the design draws no urgent state to copy from and the
+         colour that rides on the figure is the tab's only expiry warning. -->
+    <string name="account_time_valid_until">Действует до %1$s</string>
     <string name="account_time_active">Активна до</string>
     <string name="account_time_left">Осталось</string>
     <string name="account_time_today">Истекает</string>
