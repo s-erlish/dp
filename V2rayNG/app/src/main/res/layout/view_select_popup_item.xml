@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    ONE OPTION inside @layout/view_select_popup (handoff README §6).
+
+      [ 10 ][ label, weight 1 ][ 6 ][ check 16 ][ 10 ]     min height 38
+
+    The CHECK SLOT IS ALWAYS PRESENT and only its alpha moves, so picking a
+    different option never reflows the popup and never changes its width — the
+    same rule the row marker follows. It is hidden from TalkBack because the
+    option announces its selected state properly (SelectPopup does that), and a
+    check a screen reader has to describe twice is noise.
+
+    The label is the Subtitle role's 13sp/400 metrics in colorOnSurface rather
+    than colorOnSurfaceVariant: this is a value being offered, not a caption
+    about one. That override is what @style/TextAppearance.App.SelectOption is
+    for — a layout never sets a size, a face or a colour by hand.
+
+    Press: @anim/press_button 0.965 (§1 puts an option on the button rung) plus
+    the background step in @drawable/bg_select_item. No ripple.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/select_option"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_select_item"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:minHeight="@dimen/select_option_min_height"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/select_option_padding_h"
+    android:paddingTop="@dimen/select_option_padding_v"
+    android:paddingEnd="@dimen/select_option_padding_h"
+    android:paddingBottom="@dimen/select_option_padding_v"
+    android:stateListAnimator="@anim/press_button">
+
+    <TextView
+        android:id="@+id/select_option_label"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textAppearance="@style/TextAppearance.App.SelectOption"
+        tools:text="Cloudflare + Google" />
+
+    <ImageView
+        android:id="@+id/select_option_check"
+        android:layout_width="@dimen/select_option_check"
+        android:layout_height="@dimen/select_option_check"
+        android:layout_marginStart="@dimen/space_6"
+        android:importantForAccessibility="no"
+        app:srcCompat="@drawable/ic_action_done"
+        app:tint="?attr/colorOnSurface" />
+
+</LinearLayout>

@@ -22,6 +22,7 @@ import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
 import com.v2ray.ang.tv.TvReceiveActivity
 import com.v2ray.ang.tv.TvSendActivity
+import com.v2ray.ang.ui.component.SelectPopup
 import com.v2ray.ang.util.LogUtil
 
 /**
@@ -221,7 +222,7 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
      *   2 TUN + Proxy = VPN(tun) mode, local-proxy sharing ON (PREF_PROXY_SHARING)
      */
     private fun pickMode() {
-        val entries = arrayOf(
+        val entries = listOf(
             getString(R.string.settings_mode_value_tun),
             getString(R.string.settings_mode_value_proxy),
             getString(R.string.settings_mode_value_tun_proxy),
@@ -233,28 +234,39 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
             proxySharing -> 2
             else -> 0
         }
-        AlertDialog.Builder(requireContext())
-            .setTitle(R.string.settings_mode)
-            .setSingleChoiceItems(entries, idx) { dialog, which ->
-                when (which) {
-                    0 -> { // TUN
-                        MmkvManager.encodeSettings(AppConfig.PREF_MODE, AppConfig.VPN)
-                        MmkvManager.encodeSettings(AppConfig.PREF_PROXY_SHARING, false)
-                    }
-                    1 -> { // Proxy only
-                        MmkvManager.encodeSettings(AppConfig.PREF_MODE, "Proxy only")
-                    }
-                    else -> { // TUN + Proxy
-                        MmkvManager.encodeSettings(AppConfig.PREF_MODE, AppConfig.VPN)
-                        MmkvManager.encodeSettings(AppConfig.PREF_PROXY_SHARING, true)
-                    }
+        // THE FIRST ROW ON THE SELECT POPUP (handoff README §6). The dialog this
+        // replaces dimmed the whole screen to ask a two-word question; the flyout opens
+        // where the value already is. The three modes, the keys they write and the
+        // tunnel restart are byte-for-byte what the dialog did — only the surface moved.
+        //
+        // `caret` is not passed yet: the row's trailing glyph is still the navigation
+        // chevron, and §6 gives a select row a CARET (@drawable/ic_arrow_drop_down)
+        // instead. Rotating a right-pointing chevron by 180° would point it at the
+        // screen edge. The Настройки wave swaps the glyph and passes it here; the
+        // popup works either way.
+        SelectPopup.show(
+            anchor = binding.rowMode,
+            options = entries,
+            selectedIndex = idx,
+            widthRes = R.dimen.select_popup_w_mode,
+            valueView = binding.valueMode,
+        ) { which ->
+            when (which) {
+                0 -> { // TUN
+                    MmkvManager.encodeSettings(AppConfig.PREF_MODE, AppConfig.VPN)
+                    MmkvManager.encodeSettings(AppConfig.PREF_PROXY_SHARING, false)
                 }
-                bindSettingsState()
-                restartIfRunning()
-                dialog.dismiss()
+                1 -> { // Proxy only
+                    MmkvManager.encodeSettings(AppConfig.PREF_MODE, "Proxy only")
+                }
+                else -> { // TUN + Proxy
+                    MmkvManager.encodeSettings(AppConfig.PREF_MODE, AppConfig.VPN)
+                    MmkvManager.encodeSettings(AppConfig.PREF_PROXY_SHARING, true)
+                }
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            bindSettingsState()
+            restartIfRunning()
+        }
     }
 
     /** Maps a ping method to its short Russian label shown on the settings row. */

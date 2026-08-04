@@ -129,4 +129,27 @@
          Equals the inset plane in every theme: a skeleton is a shape, not text.
          Replaces the centred spinner over a blank screen. -->
     <attr name="colorSkeleton" format="color" />
+
+    <!-- =================================================================== -->
+    <!-- THE PRESS PLANE (handoff README §1, §8 «Фон под нажатием»).          -->
+    <!--                                                                      -->
+    <!-- The second channel of a press, and the only one besides the scale:   -->
+    <!-- while a row or a card is held its background steps DOWN the ramp.    -->
+    <!-- Not up, not a ripple, not a glow — §1 is explicit that a pressed     -->
+    <!-- object is pushed IN, and the shipped step to colorSurfaceContainer-  -->
+    <!-- High was going the wrong way.                                        -->
+    <!--                                                                      -->
+    <!-- It is an attr and not a plain @color because §8 gives it two         -->
+    <!-- different values — #0D1017 in the blue dark theme, #0B0B0C in mono — -->
+    <!-- and the mono overlay is applied at RUNTIME, so only an attribute can -->
+    <!-- be remapped for it. Resolves:                                        -->
+    <!--   blue dark  #0D1017   one step below surface #141619               -->
+    <!--   blue light #EAEFF7   one step below surface #FFFFFF               -->
+    <!--   mono dark  #0B0B0C                                                 -->
+    <!--   mono light #E7E7E9                                                 -->
+    <!-- Consumers: @drawable/bg_row and its two edge variants,               -->
+    <!-- @drawable/bg_select_item, and any pressable object that is not a     -->
+    <!-- MaterialButton.                                                      -->
+    <!-- =================================================================== -->
+    <attr name="colorPressBg" format="color" />
 </resources>

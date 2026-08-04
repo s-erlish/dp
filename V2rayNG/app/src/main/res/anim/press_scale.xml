@@ -1,40 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- THE press recipe, D-11 / R4, and the only one in the product: scale 0.97,
-     in over @integer/motion_press_in 90ms on ease_out_quart, out over
-     @integer/motion_press_out 160ms on ease_out_quint. The asymmetry is the
-     point - the finger-down must read as instant, the release as a relax.
-     Was 0.97's predecessor 0.96 with ease_out_quart in both directions; three
-     different press scales existed across the two clients and that is why the
-     number is now a single token (@fraction/press_scale).
+<!-- LEGACY SPELLING OF RUNG 2. Identical to @anim/press_button: scale 0.965, in
+     @integer/motion_press_in 70ms on ease_press_in, out
+     @integer/motion_press_out 200ms on ease_press_out.
 
-     R5, before you attach this: OBJECTS scale, ROWS DO NOT. A row is a slice of a
-     surface and scaling it tears the hairlines above and below it, which reads as
-     a rendering bug; a row inside a card or group steps its background to
-     ?attr/colorSurfaceContainerHigh instead. Free-standing pressable objects
-     (server row, subscription card, tariff card, device card, empty-state CTA)
-     scale.
+     It was ONE press value for the whole product (0.97 on the 90/160 clock),
+     which is why it is called press_scale rather than press_button. The handoff
+     README §1 replaces that single value with a four-rung ladder — row/card
+     0.975, button/chip/option 0.965, borderless icon 0.88, connect 0.97 — so
+     "the press scale" is no longer a thing that exists and the name no longer
+     says what the file does.
 
-     NO ripple/glow change here; a ripple, where one is wanted, comes from
-     ?attr/selectableItemBackground on the same view - except the bottom
-     navigation, where 00-rules.md 0.4.8 forbids it outright.
-
-     Reduced motion: at ANIMATOR_DURATION_SCALE == 0 the system runs these at 0ms
-     and the view snaps to the end scale, so there is nothing to check at the
-     call site. Apply via android:stateListAnimator on the pressable view. -->
+     The file stays, and stays correct, because deleting a token that thirty-odd
+     layouts reference is how a wave breaks screens it never opened. NEW WORK
+     NAMES THE RUNG: @anim/press_row, @anim/press_button, @anim/press_icon,
+     @anim/press_connect. A call site still pointing here is telling you it has
+     not been visited yet. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_pressed="true">
         <set>
             <objectAnimator
                 android:duration="@integer/motion_press_in"
-                android:interpolator="@interpolator/ease_out_quart"
+                android:interpolator="@interpolator/ease_press_in"
                 android:propertyName="scaleX"
-                android:valueTo="0.97"
+                android:valueTo="0.965"
                 android:valueType="floatType" />
             <objectAnimator
                 android:duration="@integer/motion_press_in"
-                android:interpolator="@interpolator/ease_out_quart"
+                android:interpolator="@interpolator/ease_press_in"
                 android:propertyName="scaleY"
-                android:valueTo="0.97"
+                android:valueTo="0.965"
                 android:valueType="floatType" />
         </set>
     </item>
@@ -42,13 +36,13 @@
         <set>
             <objectAnimator
                 android:duration="@integer/motion_press_out"
-                android:interpolator="@interpolator/ease_out_quint"
+                android:interpolator="@interpolator/ease_press_out"
                 android:propertyName="scaleX"
                 android:valueTo="1.0"
                 android:valueType="floatType" />
             <objectAnimator
                 android:duration="@integer/motion_press_out"
-                android:interpolator="@interpolator/ease_out_quint"
+                android:interpolator="@interpolator/ease_press_out"
                 android:propertyName="scaleY"
                 android:valueTo="1.0"
                 android:valueType="floatType" />

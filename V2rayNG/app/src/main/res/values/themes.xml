@@ -112,6 +112,31 @@
         <item name="warningContainer">@color/warning_container</item>
         <!-- Loading placeholder fill. -->
         <item name="colorSkeleton">@color/skeleton</item>
+        <!-- The press plane (handoff README §1). A held row steps DOWN to it. -->
+        <item name="colorPressBg">@color/press_bg</item>
+
+        <!-- ================================================================ -->
+        <!-- THE RIPPLE IS OFF, PRODUCT-WIDE. Handoff README, «Главное         -->
+        <!-- правило»: «В сборке НЕТ ... ripple как отклика на нажатие», and   -->
+        <!-- §1 spells out what replaces it — a scale from the press ladder    -->
+        <!-- plus a background step DOWN to ?attr/colorPressBg. A ripple is a  -->
+        <!-- radial splash that reads as light coming OFF the surface; this    -->
+        <!-- design pushes the object IN.                                      -->
+        <!--                                                                   -->
+        <!-- One line, and it is deliberately here rather than in sixty        -->
+        <!-- layouts. ?attr/selectableItemBackground, its borderless twin, and -->
+        <!-- every platform widget that draws its own ripple all tint it with  -->
+        <!-- colorControlHighlight; transparent means none of them can paint   -->
+        <!-- one, whether or not the layout that asked for it has been visited -->
+        <!-- yet. A screen still swaps its background to @drawable/bg_row when -->
+        <!-- its wave reaches it — that is what adds the press STEP — but no   -->
+        <!-- screen can be left with a glow in the meantime.                   -->
+        <!--                                                                   -->
+        <!-- The @color/ripple_* ColorStateLists stay in res/color/ untouched: -->
+        <!-- they are still the tone a future opt-in would use, and deleting   -->
+        <!-- a token to prove a point is not how anything here is removed.     -->
+        <!-- ================================================================ -->
+        <item name="colorControlHighlight">@android:color/transparent</item>
 
         <!-- THE BLUE THEMES DO NOT MOVE. Each of these three aliases exactly
              what the surface it feeds already resolved to, and the plate's
@@ -444,6 +469,9 @@
         <item name="warningText">@color/mono_warningText</item>
         <item name="warningContainer">@color/mono_warningContainer</item>
         <item name="colorSkeleton">@color/mono_skeleton</item>
+        <!-- §8's mono column gives the press plane its own value (#0B0B0C dark),
+             so it is restated here rather than inherited. -->
+        <item name="colorPressBg">@color/mono_press_bg</item>
 
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>

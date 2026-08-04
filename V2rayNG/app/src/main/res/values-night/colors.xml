@@ -271,4 +271,28 @@
     <color name="btn_gloss_bottom">#26000000</color>
     <color name="btn_gloss_press_top">#33000000</color>
     <color name="btn_gloss_press_bottom">#14FFFFFF</color>
+
+    <!-- =====================================================================
+         THE PRESS PLANE — README §1 and §8's «Фон под нажатием».
+         Reached from a layout as ?attr/colorPressBg; see values/colors.xml for
+         what the role is and why it steps DOWN.
+         ===================================================================== -->
+
+    <!-- §8, dark: #0D1017. A NEW value, not a rename — nothing in this file
+         carried it, and the closest neighbours are deliberately not it
+         (surfaceContainerLowest #08090B is darker, surfaceContainerLow #111316
+         is lighter and has no blue in it). It sits BELOW colorSurface #141619,
+         which is the whole point: the shipped press stepped UP to
+         surfaceContainerHigh #1A1D21 and §1 asks for down. onSurface #F2F4F8 on
+         it measures 17.4:1, so a held row loses nothing. -->
+    <color name="press_bg">#0D1017</color>
+    <!-- §8's mono column, «Фон под нажатием #0B0B0C»: the same step with the
+         blue taken out of it. -->
+    <color name="mono_press_bg">#0B0B0C</color>
+
+    <!-- The selected option inside a select popup, dark: 8% white over the
+         popup's #20242B body composites to ≈#2D3037 — one visible step up, the
+         direction §6 asks for. See values/colors.xml for the recorded
+         divergence from the prototype, which paints no step at all. -->
+    <color name="select_item_selected">#14FFFFFF</color>
 </resources>

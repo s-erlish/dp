@@ -85,7 +85,8 @@
         HEADLINE — face: GOLOS TEXT (ui). 24sp / 700 / -0.01 / lh 28.
         Screen title on a scroll-title screen, welcome, empty-state title. Russian,
         therefore Golos: this role carried @font/space_grotesk before, which is the
-        no-op D-1 describes.
+        no-op D-1 describes. This is the handoff §8's «24/700 заголовок экрана» and
+        §7's «крупный заголовок 24sp/700» on every sub-screen.
     -->
     <style name="TextAppearance.App.Headline" parent="TextAppearance.App.Headline.Api28">
         <item name="android:fontFamily">@font/golos_text_bold</item>
@@ -95,6 +96,18 @@
         <item name="android:letterSpacing">-0.01</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
         <item name="android:textAllCaps">false</item>
+    </style>
+
+    <!--
+        HEADLINE SMALL — face: GOLOS TEXT (ui). 20sp / 700 / -0.01 / lh 24.
+        Handoff §8's «20/700 заголовок прогрузки»: the step title on the loading
+        screens, which sits between a screen title and a section header because the
+        loading screen has no other text competing with it. One step down from
+        Headline, not a new face and not a new weight.
+    -->
+    <style name="TextAppearance.App.Headline.Small" parent="TextAppearance.App.Headline">
+        <item name="android:textSize">20sp</item>
+        <item name="lineHeight">24sp</item>
     </style>
 
     <!--
@@ -130,6 +143,38 @@
     </style>
 
     <!--
+        TARIFF — face: GOLOS TEXT (ui). 18sp / 700 / 0 / lh 22.
+        Handoff §8's «18/700 тариф», and it has exactly one consumer: the name of a
+        plan on «Купить подписку» («Base», «Pro»). It exists because that card has to
+        outrank the section header above it (16/700) while staying under the screen
+        title (24/700), and there was no step between them.
+        Do not reach for it anywhere else — a second consumer means the ramp has a
+        hole somewhere and the fix is there, not here.
+    -->
+    <style name="TextAppearance.App.Title.Tariff" parent="TextAppearance.App.Title">
+        <item name="android:textSize">18sp</item>
+        <item name="lineHeight">22sp</item>
+    </style>
+
+    <!--
+        BUTTON — face: GOLOS TEXT (ui). 15sp / 700 / 0 / lh 20.
+        Handoff §8's «15/700 кнопка». Every labelled button's label, and nothing
+        else: a button label is set on a fill and sits alone, so it reads a size
+        larger than it measures, and 16 made every CTA shout. 15 is a size and not a
+        ramp step to interpolate — there is no 15 anywhere else in the product.
+
+        NOT applied to the button styles below yet, and that is deliberate. Switching
+        every CTA from 16/700 to 15/700 changes the line length of a dozen Russian
+        labels on screens this wave does not own; the screen waves apply it as they
+        visit each one. Until then Widget.Departament.Button keeps
+        TextAppearance.App.Title.
+    -->
+    <style name="TextAppearance.App.Button" parent="TextAppearance.App.Title">
+        <item name="android:textSize">15sp</item>
+        <item name="lineHeight">20sp</item>
+    </style>
+
+    <!--
         BODY — face: GOLOS TEXT (ui). 14sp / 400 / +0.01 / lh 20 (1.43).
         Primary reading copy, dialog body, snackbar text. Cap a paragraph at roughly
         60 characters; that is a layout job, not a style one.
@@ -146,8 +191,8 @@
 
     <!--
         SUBTITLE — face: GOLOS TEXT (ui). 13sp / 400 / +0.01 / lh 18.
-        Row subtitles, the supporting line, field labels, a row's trailing value.
-        onSurfaceVariant #9BA1AD = 6.99:1 on surface.
+        Handoff §8's «13/400 значение»: a row's trailing value, the supporting line,
+        a field label. onSurfaceVariant #9BA1AD = 6.99:1 on surface.
     -->
     <style name="TextAppearance.App.Subtitle" parent="TextAppearance.App.Subtitle.Api28">
         <item name="android:fontFamily">@font/golos_text_regular</item>
@@ -160,15 +205,35 @@
     </style>
 
     <!--
-        CAPTION — face: GOLOS TEXT (ui). 12sp / 400 / +0.02 / lh 16.
-        Metadata, timestamps, helper text. The tracking floor for a heading is
-        +0.02em; anything above it at heading size is the eyebrow tell and is banned.
+        ONE OPTION inside a select popup (§6). The Subtitle role's 13sp/400 metrics
+        in colorOnSurface rather than colorOnSurfaceVariant, and the difference is
+        the whole reason it is a role of its own: an option is a VALUE being offered,
+        and the muted tone belongs to captions about values. The prototype sets the
+        popup's own colour to the full-strength ink token and lets every option
+        inherit it.
+    -->
+    <style name="TextAppearance.App.SelectOption" parent="TextAppearance.App.Subtitle">
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+
+    <!--
+        CAPTION — face: GOLOS TEXT (ui). 12.5sp / 400 / +0.02 / lh 17.
+        Handoff §8's «12.5/400 подпись»: the second line of a settings row, metadata,
+        timestamps, helper text.
+
+        12.5 and not 12, and the half point is not a rounding error — §6 states it
+        twice («подпись 12.5sp») and it is the difference between a subtitle that
+        reads as a smaller sibling of the row title and one that reads as fine print.
+        sp accepts a fraction; nothing downstream rounds it.
+
+        The tracking floor for a heading is +0.02em; anything above it at heading
+        size is the eyebrow tell and is banned.
     -->
     <style name="TextAppearance.App.Caption" parent="TextAppearance.App.Caption.Api28">
         <item name="android:fontFamily">@font/golos_text_regular</item>
         <item name="fontFamily">@font/golos_text_regular</item>
-        <item name="android:textSize">12sp</item>
-        <item name="lineHeight">16sp</item>
+        <item name="android:textSize">12.5sp</item>
+        <item name="lineHeight">17sp</item>
         <item name="android:letterSpacing">0.02</item>
         <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
         <item name="android:textAllCaps">false</item>
@@ -243,6 +308,20 @@
     <!-- Numeric at the Display size, for the one hero figure per screen. -->
     <style name="TextAppearance.App.Numeric.Display" parent="TextAppearance.App.Display">
         <item name="android:fontFeatureSettings">"tnum" on, "lnum" on, "zero" on</item>
+    </style>
+
+    <!--
+        RING — face: SPACE GROTESK (brand). 28sp / 700 / -0.01 / lh 32.
+        Handoff §8's «28/700 цифра кольца»: the figure inside the connect ring, and
+        that alone. It is smaller than Display 34 because it lives INSIDE a 176dp
+        disc with a stroke around it rather than alone on a page, and tabular figures
+        matter more here than anywhere else in the product — this number changes once
+        a second while the user is looking straight at it.
+    -->
+    <style name="TextAppearance.App.Numeric.Ring" parent="TextAppearance.App.Numeric">
+        <item name="android:textSize">28sp</item>
+        <item name="lineHeight">32sp</item>
+        <item name="android:letterSpacing">-0.01</item>
     </style>
 
     <!-- ========================================================================= -->
@@ -384,8 +463,11 @@
         have a state-dependent strokeColor, and the stroke draws inside the bounds, so
         a permanently-declared ring costs exactly zero layout shift.
 
-        radius 16, not pill (D-6, R1). Pill is for circles and tracks; a 52x342 stadium
-        with a label in it is the shape the owner rejected.
+        RADIUS 24, not 16 and not pill — @dimen/radius_button, whose header records
+        why D-6's 16 was reversed: the handoff package is the owner's own design
+        and it draws every labelled button at the top of §8's 24–26 band. Still not
+        radius_pill, which clamps to half the height and would give a 48dp button a
+        24dp stadium end whatever its width.
     -->
     <style name="Widget.Departament.Button" parent="Widget.Material3.Button">
         <item name="android:insetTop">0dp</item>
@@ -396,7 +478,7 @@
         <item name="android:paddingEnd">@dimen/space_24</item>
         <item name="android:textAppearance">@style/TextAppearance.App.Title</item>
         <item name="android:textAllCaps">false</item>
-        <item name="android:stateListAnimator">@anim/press_scale</item>
+        <item name="android:stateListAnimator">@anim/press_button</item>
         <item name="shapeAppearanceOverlay">@style/ShapeAppearance.Departament.Button</item>
         <item name="iconSize">@dimen/glyph_20</item>
         <item name="iconPadding">@dimen/space_8</item>
@@ -435,7 +517,7 @@
         <item name="android:textColor">@color/btn_primary_content</item>
         <item name="iconTint">@color/btn_primary_content</item>
         <item name="strokeColor">@color/btn_focus_inner_on_accent</item>
-        <item name="rippleColor">@color/ripple_on_accent</item>
+        <item name="rippleColor">@android:color/transparent</item>
     </style>
 
     <!-- The screen's ONE full-width CTA. 52 as a minimum, never as a height. -->
@@ -466,7 +548,7 @@
         <item name="iconTint">@color/btn_secondary_content</item>
         <item name="android:textAppearance">@style/TextAppearance.App.Title.Medium</item>
         <item name="strokeColor">@color/btn_focus_outer_accent</item>
-        <item name="rippleColor">@color/ripple_accent</item>
+        <item name="rippleColor">@android:color/transparent</item>
     </style>
 
     <style name="Widget.Departament.Button.Secondary.Tall" parent="Widget.Departament.Button.Secondary">
@@ -498,7 +580,7 @@
         <item name="android:paddingEnd">@dimen/space_12</item>
         <item name="android:textAppearance">@style/TextAppearance.App.Title.Medium</item>
         <item name="android:textAllCaps">false</item>
-        <item name="android:stateListAnimator">@anim/press_scale</item>
+        <item name="android:stateListAnimator">@anim/press_button</item>
         <item name="shapeAppearanceOverlay">@style/ShapeAppearance.Departament.Button</item>
         <item name="android:textColor">@color/btn_tertiary_content</item>
         <item name="iconTint">@color/btn_tertiary_content</item>
@@ -507,7 +589,7 @@
         <item name="iconGravity">textStart</item>
         <item name="strokeWidth">@dimen/stroke_focus</item>
         <item name="strokeColor">@color/btn_focus_outer_accent</item>
-        <item name="rippleColor">@color/ripple_accent</item>
+        <item name="rippleColor">@android:color/transparent</item>
         <item name="elevation">0dp</item>
         <item name="backgroundTint">@color/btn_quiet_container</item>
     </style>
@@ -541,7 +623,7 @@
         <item name="android:textColor">@color/btn_destructive_content</item>
         <item name="iconTint">@color/btn_destructive_content</item>
         <item name="strokeColor">@color/btn_focus_inner_on_error</item>
-        <item name="rippleColor">@color/ripple_on_accent</item>
+        <item name="rippleColor">@android:color/transparent</item>
     </style>
 
     <style name="Widget.Departament.Button.Destructive.Tall" parent="Widget.Departament.Button.Destructive">
@@ -589,11 +671,14 @@
         <item name="android:minHeight">@dimen/view_height_dp48</item>
         <item name="iconSize">@dimen/tile_glyph</item>
         <item name="iconTint">@color/btn_icon_glyph</item>
-        <item name="android:stateListAnimator">@anim/press_scale</item>
+        <!-- Rung 3 of the press ladder, 0.88 (README §1, «Иконка (borderless)»).
+             A 22dp glyph in a 48dp target has almost no area for the eye to
+             measure against, so the travel has to be four times a card's. -->
+        <item name="android:stateListAnimator">@anim/press_icon</item>
         <item name="shapeAppearanceOverlay">@style/ShapeAppearance.Departament.Pill</item>
         <item name="strokeWidth">@dimen/stroke_focus</item>
         <item name="strokeColor">@color/btn_focus_outer_accent</item>
-        <item name="rippleColor">@color/ripple_neutral</item>
+        <item name="rippleColor">@android:color/transparent</item>
         <item name="elevation">0dp</item>
         <item name="backgroundTint">@color/btn_icon_container</item>
     </style>
@@ -610,6 +695,10 @@
     <style name="Widget.Departament.Button.Icon.Filled" parent="Widget.Departament.Button.Icon">
         <item name="backgroundTint">@color/btn_secondary_container</item>
         <item name="strokeColor">@color/btn_focus_inner_on_neutral</item>
+        <!-- Back to rung 2, 0.965. The ladder's 0.88 rung is for a BORDERLESS
+             glyph; once there is a fill the eye has a boundary to measure the
+             movement against, and 12% on a visible disc reads as a flinch. -->
+        <item name="android:stateListAnimator">@anim/press_button</item>
     </style>
 
     <style name="Widget.Departament.Button.Icon.Accent" parent="Widget.Departament.Button.Icon">
@@ -635,8 +724,10 @@
 
     <!--
         The track: 48 tall so a segmented control and a button on the same row align,
-        radius_button 16, colorSurfaceContainerHighest fill, space_4 padding.
+        radius_control 16, colorSurfaceContainerHighest fill, space_4 padding.
         Concentricity: a 16 track with 4 padding holds a 12 segment exactly.
+        The track stays at 16 while a labelled BUTTON moved to 24 (README §8):
+        a segment is an input, and §8 says nothing about inputs.
         innerCornerSize keeps the middle segments at 12 instead of M3's default 0.
     -->
     <style name="Widget.Departament.SegmentGroup" parent="Widget.Material3.MaterialButtonToggleGroup">
@@ -675,7 +766,7 @@
         <item name="iconTint">@color/segment_content</item>
         <item name="iconSize">@dimen/glyph_20</item>
         <item name="shapeAppearanceOverlay">@style/ShapeAppearance.Departament.Fitting</item>
-        <item name="rippleColor">@color/ripple_accent</item>
+        <item name="rippleColor">@android:color/transparent</item>
         <item name="strokeWidth">0dp</item>
         <item name="elevation">0dp</item>
         <item name="android:stateListAnimator">@null</item>
@@ -697,8 +788,8 @@
         ABOVE THE FIELD and is always visible (00-rules.md 7.4). A placeholder is an
         example of the value («например, 500»), never the label.
 
-        Radius 16 (D-7), height 56 as a MINIMUM (R10) — the same number as
-        row_min_height, so a form and a list share one rhythm and Material's own 56dp
+        Radius @dimen/radius_control 16, height 56 as a MINIMUM (R10) — the same
+        number as row_min_height, so a form and a list share one rhythm and Material's own 56dp
         OutlinedBox floor is not fought.
 
         The boundary is @color/md_theme_outlineControl, not colorOutline: a field
@@ -710,10 +801,10 @@
     -->
     <style name="Widget.Departament.TextField" parent="Widget.Material3.TextInputLayout.OutlinedBox">
         <item name="boxBackgroundColor">?attr/colorSurfaceContainerHighest</item>
-        <item name="boxCornerRadiusTopStart">@dimen/radius_button</item>
-        <item name="boxCornerRadiusTopEnd">@dimen/radius_button</item>
-        <item name="boxCornerRadiusBottomStart">@dimen/radius_button</item>
-        <item name="boxCornerRadiusBottomEnd">@dimen/radius_button</item>
+        <item name="boxCornerRadiusTopStart">@dimen/radius_control</item>
+        <item name="boxCornerRadiusTopEnd">@dimen/radius_control</item>
+        <item name="boxCornerRadiusBottomStart">@dimen/radius_control</item>
+        <item name="boxCornerRadiusBottomEnd">@dimen/radius_control</item>
         <item name="boxStrokeColor">@color/field_stroke_selector</item>
         <item name="boxStrokeWidth">@dimen/stroke_control</item>
         <item name="boxStrokeWidthFocused">@dimen/stroke_focus</item>
@@ -818,10 +909,21 @@
         Trailing slot holds EXACTLY ONE of: chevron 20, switch, value text, icon
         button, chip. Never two.
 
-        R5: the press feedback is the background STEP inside @drawable/bg_row, not a
-        scale. Scaling a row tears the hairlines above and below it. Free-standing
-        pressable OBJECTS (server card, subscription card, tariff card) scale instead,
-        via @style/Widget.Departament.Card.Pressable.
+        THE PRESS IS BOTH CHANNELS NOW, and this reverses R5. R5 said rows do not
+        scale, because scaling one was found to tear the hairlines above and below
+        it. The handoff README §1 puts a row on rung 1 of the press ladder anyway
+        (0.975), and answers R5's objection by scaling EVERY row on a card by the
+        same factor at the same instant, so a divider travels with the rows it sits
+        between instead of being left behind by one of them.
+
+          scale       @anim/press_row 0.975
+          background  @drawable/bg_row, stepping DOWN to ?attr/colorPressBg
+
+        Both, always. The scale without the step reads as a row that shrank for no
+        reason; the step without the scale is the shipped behaviour §1 replaces.
+        A row with TEXT in it should be attached from Kotlin with
+        `row.pressFeedback(R.anim.press_row)` instead, which adds the hardware layer
+        that keeps the label from twitching on the rebound (§11 grabl 1).
     -->
     <style name="Widget.Departament.Row" parent="">
         <item name="android:layout_width">match_parent</item>
@@ -834,6 +936,7 @@
         <item name="android:gravity">center_vertical</item>
         <item name="android:orientation">horizontal</item>
         <item name="android:background">@drawable/bg_row</item>
+        <item name="android:stateListAnimator">@anim/press_row</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
     </style>
@@ -852,6 +955,7 @@
     -->
     <style name="Widget.Departament.Row.Action" parent="Widget.Departament.Row">
         <item name="android:background">@null</item>
+        <item name="android:stateListAnimator">@null</item>
         <item name="android:clickable">false</item>
         <item name="android:focusable">false</item>
     </style>
@@ -919,13 +1023,15 @@
         <item name="contentPadding">0dp</item>
     </style>
 
-    <!-- A card the user presses as one object: this is where scale 0.97 is correct,
-         because an object is not a slice of a surface (R5). -->
+    <!-- A card the user presses as one object. Rung 1 of the press ladder, 0.975
+         (README §1, «Строка списка / карточка») — the same rung a row is on now,
+         because §1 puts them there together and the old split between "objects
+         scale, rows do not" is what it replaces. -->
     <style name="Widget.Departament.Card.Pressable" parent="Widget.Departament.Card">
-        <item name="android:stateListAnimator">@anim/press_scale</item>
+        <item name="android:stateListAnimator">@anim/press_row</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
-        <item name="rippleColor">@color/ripple_neutral</item>
+        <item name="rippleColor">@android:color/transparent</item>
         <item name="checkedIconVisible">false</item>
     </style>
 
@@ -1181,7 +1287,9 @@
 
         <item name="colorControlNormal">?attr/colorOnSurfaceVariant</item>
         <item name="colorControlActivated">?attr/colorPrimary</item>
-        <item name="colorControlHighlight">@color/ripple_accent</item>
+        <!-- Transparent, like AppThemeBase: a dialog is not exempt from the
+             product-wide ripple ban (handoff README, «Главное правило»). -->
+        <item name="colorControlHighlight">@android:color/transparent</item>
 
         <item name="android:textColorPrimary">?attr/colorOnSurface</item>
         <item name="android:textColorSecondary">?attr/colorOnSurfaceVariant</item>
@@ -1252,7 +1360,7 @@
         <item name="android:textColor">@color/btn_tertiary_content</item>
         <item name="android:textAllCaps">false</item>
         <item name="shapeAppearanceOverlay">@style/ShapeAppearance.Departament.Button</item>
-        <item name="rippleColor">@color/ripple_accent</item>
+        <item name="rippleColor">@android:color/transparent</item>
     </style>
 
     <!-- ========================================================================= -->

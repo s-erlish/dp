@@ -435,4 +435,45 @@
     <color name="btn_gloss_press_top">#1F000000</color>
     <!-- ...and the base catches what the top lost. -->
     <color name="btn_gloss_press_bottom">#0AFFFFFF</color>
+
+    <!-- =====================================================================
+         THE PRESS PLANE, and the SELECTED OPTION — README §1 and §6.
+         Light column; values-night/ carries dark, ThemeOverlay.Mono the mono
+         remap. Reached from a layout as ?attr/colorPressBg.
+         ===================================================================== -->
+
+    <!--
+      THE SECOND CHANNEL OF A PRESS: the plane a row or card sits on while the
+      finger is down. README §1 — «шаг фона ВНИЗ по рампе», down and never up,
+      and never a ripple or a glow around the object.
+
+      Light steps to the surfaceContainerHigh plane (#EAEFF7), which is a real
+      rung of this theme's own ramp rather than an invented tint: on a white
+      surface "down" is the only direction with anywhere to go. onSurface
+      #111826 over it measures 15.4:1, so nothing a row draws loses contrast
+      while it is held.
+    -->
+    <color name="press_bg">#EAEFF7</color>
+    <!-- Mono light: the same step on the greyscale ramp. -->
+    <color name="mono_press_bg">#E7E7E9</color>
+
+    <!--
+      The SELECTED option inside a select popup (§6: «выбранный — фон на шаг
+      выше и галочка 16dp справа»).
+
+      A translucent ink wash rather than a named plane, and that is deliberate:
+      the popup body already sits on the TOP rung of the surface ramp
+      (colorSurfaceContainerHighest), so there is no higher named step for the
+      selected option to move to. 6% ink over it composites one visible step in
+      the direction §6 asks for, and it costs no mono mapping — it carries no
+      hue, so the mono overlay renders it identically without restating it.
+
+      DIVERGENCE, recorded rather than silently resolved: the prototype paints
+      this option with its own top surface rung, which in both of the prototype's
+      themes is the SAME colour
+      as the popup body, so the step §6 describes does not actually appear there
+      and the check is the only mark. README is the contract and README asks for
+      the step, so the step is what ships.
+    -->
+    <color name="select_item_selected">#0F000000</color>
 </resources>

@@ -10,16 +10,16 @@
      one rigid card and the owner read it as almost no animation at all:
      «при нажатии на кнопку практически нет никакой анимации, только пульсация».
 
-     Applied to the disc AND to the two shields, on top of @anim/press_scale on the
+     Applied to the disc AND to the two shields, on top of @anim/press_connect on the
      frame, the scales compose to the desktop's figures exactly:
 
          frame 0.97 x disc 0.97               = 0.941   (desktop disc  0.94)
          frame 0.97 x disc 0.97 x shield 0.97 = 0.913   (desktop glyph 0.94 x 0.97
                                                          = 0.912)
 
-     Same clock as @anim/press_scale and @anim/press_scrim, so the four layers cannot
-     drift: in over motion_press_in 90ms on ease_out_quart, out over motion_press_out
-     160ms on ease_out_quint. Attach with android:stateListAnimator on a view that
+     Same clock as @anim/press_connect and @anim/press_scrim, so the four layers cannot
+     drift: in over motion_press_in 70ms on ease_press_in, out over
+     motion_press_out 200ms on ease_press_out. Attach with android:stateListAnimator on a view that
      duplicates the frame's pressed state; reduced motion collapses it to 0ms
      declaratively, exactly like every other press in the product.
 
@@ -30,13 +30,13 @@
         <set>
             <objectAnimator
                 android:duration="@integer/motion_press_in"
-                android:interpolator="@interpolator/ease_out_quart"
+                android:interpolator="@interpolator/ease_press_in"
                 android:propertyName="scaleX"
                 android:valueTo="0.97"
                 android:valueType="floatType" />
             <objectAnimator
                 android:duration="@integer/motion_press_in"
-                android:interpolator="@interpolator/ease_out_quart"
+                android:interpolator="@interpolator/ease_press_in"
                 android:propertyName="scaleY"
                 android:valueTo="0.97"
                 android:valueType="floatType" />
@@ -46,13 +46,13 @@
         <set>
             <objectAnimator
                 android:duration="@integer/motion_press_out"
-                android:interpolator="@interpolator/ease_out_quint"
+                android:interpolator="@interpolator/ease_press_out"
                 android:propertyName="scaleX"
                 android:valueTo="1.0"
                 android:valueType="floatType" />
             <objectAnimator
                 android:duration="@integer/motion_press_out"
-                android:interpolator="@interpolator/ease_out_quint"
+                android:interpolator="@interpolator/ease_press_out"
                 android:propertyName="scaleY"
                 android:valueTo="1.0"
                 android:valueType="floatType" />

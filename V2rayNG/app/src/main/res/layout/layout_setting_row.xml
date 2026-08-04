@@ -5,7 +5,7 @@
     android:id="@+id/setting_row_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="?attr/selectableItemBackground"
+    android:background="@drawable/bg_row"
     android:clickable="true"
     android:focusable="true"
     android:gravity="center_vertical"
@@ -14,7 +14,7 @@
     android:paddingStart="@dimen/space_16"
     android:paddingEnd="@dimen/space_16"
     android:paddingVertical="@dimen/space_12"
-    android:stateListAnimator="@anim/press_scale">
+    android:stateListAnimator="@anim/press_row">
 
     <!-- Neutral tile by default: blue is reserved for promoted rows (accent budget).
          A row that wants the blue tile overrides setting_icon_bg background +

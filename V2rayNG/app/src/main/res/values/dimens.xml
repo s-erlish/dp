@@ -34,15 +34,34 @@
     <dimen name="view_height_dp160">160dp</dimen>
 
     <!-- ============================================================= -->
-    <!-- SPACING. The ONLY spacing values in the product (3.1).         -->
-    <!-- Rhythm: parts of one object 4-12, objects 16, sections 24,     -->
-    <!-- the two major breaks 32. Never one gap value everywhere.       -->
+    <!-- SPACING. The ONLY spacing values in the product.                -->
+    <!--                                                                -->
+    <!-- The handoff README §8 states the scale as                      -->
+    <!--   2 · 4 · 6 · 8 · 10 · 12 · 14 · 16 · 20 · 22 · 24             -->
+    <!-- and the six steps it adds to the old 4/8/12/16/24/32 set are   -->
+    <!-- not decoration: the prototype's own settings row is            -->
+    <!-- padding 10x16, its select popup is padding 6 with 4x10 options,-->
+    <!-- and its section header is 22 above / 8 below. Rounding those   -->
+    <!-- to the nearest old step is what makes a screen look "almost    -->
+    <!-- right"; the numbers below are the ones to reach for.           -->
+    <!--                                                                -->
+    <!-- Rhythm: parts of one object 2-14, objects 16, sections 20-24.  -->
+    <!-- Never one gap value everywhere.                                -->
     <!-- ============================================================= -->
+    <dimen name="space_2">2dp</dimen>
     <dimen name="space_4">4dp</dimen>
+    <dimen name="space_6">6dp</dimen>
     <dimen name="space_8">8dp</dimen>
+    <dimen name="space_10">10dp</dimen>
     <dimen name="space_12">12dp</dimen>
+    <dimen name="space_14">14dp</dimen>
     <dimen name="space_16">16dp</dimen>
+    <dimen name="space_20">20dp</dimen>
+    <dimen name="space_22">22dp</dimen>
     <dimen name="space_24">24dp</dimen>
+    <!-- NOT on §8's scale. Kept because live layouts reference it and nothing
+         in this repo is deleted to make a table tidier; do not reach for it in
+         new work — the largest gap the handoff uses is 24. -->
     <dimen name="space_32">32dp</dimen>
     <!-- The one horizontal screen inset. values-sw600dp/ must override to 24dp. -->
     <dimen name="screen_gutter">16dp</dimen>
@@ -53,32 +72,69 @@
     <dimen name="divider_inset_start">68dp</dimen>
 
     <!-- ============================================================= -->
-    <!-- RADIUS. Shape lock (D-6, D-7):                                 -->
-    <!--   12  fittings      chips, badges, tiles, flags, segment thumb  -->
-    <!--   16  controls      every labelled button, input, search field, -->
-    <!--                     price option, segmented track               -->
-    <!--   20  objects       cards, dialogs, sheet/flyout bodies, toast  -->
-    <!--   24  sheet lip     top corners only                           -->
-    <!--   100 round         ONLY where width == height or the shape is  -->
-    <!--                     a track: icon-only buttons, avatars, dots,  -->
-    <!--                     sheet handle, connect disc, meter, switch   -->
-    <!--                     track, M3 nav active indicator              -->
-    <!-- Concentricity: inner radius = outer radius - the padding        -->
-    <!-- between them. Never a 20 inside a 16.                           -->
+    <!-- RADIUS — the handoff README §8 ladder, eight rungs:             -->
+    <!--    8  chip / badge          radius_chip                        -->
+    <!--   11  select option         radius_select_item                 -->
+    <!--   12  icon tile             radius_tile                        -->
+    <!--   14  small card            radius_card_small                  -->
+    <!--   16  select popup, input   radius_popup / radius_control      -->
+    <!--   19  edge row in a card    radius_row_edge  (= card 20 - 1dp   -->
+    <!--                             stroke; see the note below)        -->
+    <!--   20  card / object         radius_card                        -->
+    <!--   24  button, sheet lip     radius_button / radius_sheet       -->
+    <!--  100  round                 radius_pill — ONLY where width ==  -->
+    <!--                             height or the shape is a track     -->
+    <!--                                                                -->
+    <!-- Concentricity still holds: inner radius = outer radius minus    -->
+    <!-- the padding between them. A 16 popup with 6dp padding holds an  -->
+    <!-- 11 option (16 - 6 = 10, rounded to the ladder's 11) — which is  -->
+    <!-- exactly what the prototype measures.                            -->
     <!-- ============================================================= -->
-    <dimen name="radius_chip">12dp</dimen>
+
+    <!-- §8 «чип 8». Was 12, and the 12 lives on as radius_tile, which is the
+         other thing that value was carrying. A chip is a LABEL — smaller, so a
+         tighter corner; a tile is a 40dp object and keeps its 12. -->
+    <dimen name="radius_chip">8dp</dimen>
+    <!-- §6: one option inside the select popup. -->
+    <dimen name="radius_select_item">11dp</dimen>
+    <!-- The 40dp leading tile on every row, and every other 40dp fitting. -->
     <dimen name="radius_tile">12dp</dimen>
-    <!-- D-6: buttons are a 16dp rounded RECTANGLE, not a pill. This supersedes
-         00-rules.md 3.2's "buttons are pill" on the owner's recorded rejection of
-         capsule CTAs (v2rayN Assets/GlobalStyles.axaml:3-14). D-7 puts inputs,
-         the search field, the price option and the segmented track on the same
-         16. 16 completes the Incy scale chip 12 / button 16 / card 20 / sheet 24. -->
-    <dimen name="radius_button">16dp</dimen>
-    <!-- Alias of radius_button. 10-design-system.md 2.6/4.3 calls this token
-         radius_control while D-6 and 22-components.md 20.1 call it radius_button;
-         both names resolve to the same 16dp so neither spelling can break a build. -->
-    <dimen name="radius_control">@dimen/radius_button</dimen>
+    <!-- §8 «мелкая карточка»: a card that is an item in a list rather than a
+         section of a screen — a device, a payment, a price option. -->
+    <dimen name="radius_card_small">14dp</dimen>
+    <!-- §6: the select popup body, and every input/field/search box.
+         radius_control is the name a form reaches for, radius_popup the name the
+         flyout reaches for; both are the same 16 and both are load-bearing, so
+         neither is an alias of the other by accident. -->
+    <dimen name="radius_popup">16dp</dimen>
+    <dimen name="radius_control">16dp</dimen>
+    <!--
+      §6: THE EDGE ROW'S OWN CORNER, and it exists because of README §11 grabl 4.
+
+      A section card cannot clip its children — if it did, a select popup opened
+      on the last row would be sliced off at the card's bottom edge. With
+      clipChildren off, the card stops rounding its first and last rows for them,
+      so those rows have to round themselves. 19 and not 20: the card paints a
+      1dp stroke inside its 20dp corner, so the fill the row has to match is one
+      device pixel tighter. See @drawable/bg_row_top / @drawable/bg_row_bottom.
+    -->
+    <dimen name="radius_row_edge">19dp</dimen>
     <dimen name="radius_card">20dp</dimen>
+    <!--
+      §8 «кнопка 24–26». Was 16.
+
+      This reverses D-6, and it is the owner's own reversal: the handoff package
+      is his design, assembled by him and handed over on 2026-08-04 with the
+      instruction to reproduce it 1:1, and it draws every labelled button at the
+      top of the 24–26 band. It is still NOT radius_pill — a 48dp button at 24
+      is a stadium, a 52dp CTA at 24 is not, and nothing here clamps to half the
+      height the way radius_pill does.
+
+      What did NOT move with it: inputs, the search field and the segmented
+      track stay at radius_control 16. A 56dp field at 24 reads as a pill with
+      text in it, and §8 says nothing about fields.
+    -->
+    <dimen name="radius_button">24dp</dimen>
     <!-- Bottom-sheet / drawer top corners only (24,24,0,0). -->
     <dimen name="radius_sheet">24dp</dimen>
     <!-- Effective full-round: larger than half of any control height we ship. -->
@@ -182,4 +238,52 @@
     <!-- Bottom-sheet drag handle: 36x4, radius_pill. -->
     <dimen name="sheet_handle_w">36dp</dimen>
     <dimen name="sheet_handle_h">4dp</dimen>
+
+    <!-- ============================================================= -->
+    <!-- THE SELECT POPUP (README §6, «Выбор из списка»).               -->
+    <!-- Every number here was read off the prototype and matches §6.   -->
+    <!-- Bound by SelectPopup; a screen names a width and nothing else. -->
+    <!-- ============================================================= -->
+
+    <!-- Anchor offset from the row's TOP-RIGHT corner. The popup hangs below
+         the row's own 48dp of height and 8 in from its right edge, so its top
+         edge lands on the divider under the row it belongs to. -->
+    <dimen name="select_popup_offset_top">48dp</dimen>
+    <dimen name="select_popup_offset_right">8dp</dimen>
+    <!-- The body's inset around the option stack. 6, not 8: at 8 the 11dp option
+         corner and the 16dp body corner stop being concentric. -->
+    <dimen name="select_popup_padding">6dp</dimen>
+    <!-- The drop shadow, §6 «тень 20×44dp»: 20 down, 44 of blur. Android spends
+         both on one elevation value; 20 reproduces the offset, and the blur
+         follows from it. This is the ONE shadow in the product — everything else
+         gets its depth from the surface ramp. -->
+    <dimen name="select_popup_elevation">20dp</dimen>
+    <!-- The row that owns an open popup lifts above its neighbours so they
+         cannot draw over the flyout (README §11 grabl 5). Below the popup's own
+         elevation, above everything else in the card. -->
+    <dimen name="select_popup_row_elevation">12dp</dimen>
+    <!-- One option. Height is a MINIMUM: a two-line Russian label grows it. -->
+    <dimen name="select_option_min_height">38dp</dimen>
+    <dimen name="select_option_padding_h">10dp</dimen>
+    <dimen name="select_option_padding_v">4dp</dimen>
+    <!-- The check on the selected option. 16, deliberately smaller than the
+         20dp row marker: this is a mark inside a 38dp option, not beside a
+         56dp row. -->
+    <dimen name="select_option_check">16dp</dimen>
+
+    <!-- CONTENT widths, one per picker, sized to the LONGEST option so the body
+         never reflows when the selection changes (§6). These are the width of
+         the option stack; SelectPopup adds select_popup_padding and the 1dp
+         stroke on each side, which is why the prototype measures 14 more. -->
+    <dimen name="select_popup_w_mode">176dp</dimen>
+    <dimen name="select_popup_w_dns">210dp</dimen>
+    <dimen name="select_popup_w_ping">208dp</dimen>
+    <dimen name="select_popup_w_appearance">186dp</dimen>
+    <dimen name="select_popup_w_language">166dp</dimen>
+    <dimen name="select_popup_w_interval">176dp</dimen>
+    <!-- Not in §6's table. The three remaining pickers §6 names — «Доменная
+         стратегия», «Сортировка», «Автообновление подписки» — have no measured
+         width in the handoff, so they take the default until the owner gives
+         one; SelectPopup falls back to this when a caller passes 0. -->
+    <dimen name="select_popup_w_default">200dp</dimen>
 </resources>
