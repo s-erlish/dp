@@ -189,6 +189,13 @@
             android:baselineAligned="true"
             android:orientation="horizontal">
 
+            <!-- §4: «Строка слева (12sp/500, tnum)». Numeric and not Caption, and the
+                 difference is the figures: this line is «1,7 ТБ / 10 ТБ», it is redrawn
+                 every few seconds on a live tunnel, and Golos's proportional digits make
+                 the whole string twitch sideways as a 1 becomes an 8. Space Grotesk with
+                 tnum holds every digit on the same advance, so only the digit changes.
+                 The size and the weight are written out because the type scale's 12.5/400
+                 caption is a different role — this is a readout. -->
             <TextView
                 android:id="@+id/tv_traffic"
                 android:layout_width="0dp"
@@ -196,18 +203,26 @@
                 android:layout_weight="1"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textAppearance="@style/TextAppearance.App.Caption"
+                android:textAppearance="@style/TextAppearance.App.Numeric"
                 android:textColor="?attr/colorOnSurface"
+                android:textFontWeight="500"
+                android:textSize="12sp"
+                tools:ignore="UnusedAttribute"
                 tools:text="1,7 ТБ / ∞" />
 
-            <!-- Expiry marker (∞ or «до <date>»), at the end of the same line. -->
+            <!-- Expiry marker (∞ or «до <date>»), at the end of the same line, on the same
+                 readout face so the two halves of the line share one rhythm. -->
             <TextView
                 android:id="@+id/tv_expiry"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/space_12"
                 android:maxLines="1"
-                android:textAppearance="@style/TextAppearance.App.Caption"
+                android:textAppearance="@style/TextAppearance.App.Numeric"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textFontWeight="500"
+                android:textSize="12sp"
+                tools:ignore="UnusedAttribute"
                 tools:text="до 12.08.2026" />
         </LinearLayout>
 
