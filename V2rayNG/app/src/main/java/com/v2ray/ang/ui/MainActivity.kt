@@ -194,6 +194,16 @@ interface MainHost {
     fun refreshSubscriptions()
 
     /**
+     * Whether Главная's entrance (handoff §3, «Сборка главной») is being held for a full-screen
+     * flow overlay, so the tab parks in its pre-entrance state at [HomeFragment.onViewCreated]
+     * instead of assembling itself behind the overlay.
+     *
+     * Set by [MainActivity.holdHomeEntrance] and cleared by [MainActivity.revealHome]. It lives on
+     * the shell rather than in Главная because it has to be answerable BEFORE Главная has a view.
+     */
+    val homeEntranceHeld: Boolean
+
+    /**
      * Opens a settings sub-screen and applies whatever it changed on the way back: a theme or
      * language change recreates the activity, a core-config change restarts a running tunnel, a
      * group change reloads the server list.
@@ -465,6 +475,54 @@ class MainActivity : HelperBaseActivity(), MainHost {
 
     override val serverActions: MainAdapterListener
         get() = adapterListener
+
+    override val homeEntranceHeld: Boolean
+        get() = entranceHeld
+
+    // ==================== The overlay hand-off (handoff §3, §11 grabl 6) ====================
+
+    /**
+     * Whether a full-screen flow overlay has asked Главная to wait before assembling itself.
+     * @see holdHomeEntrance
+     */
+    private var entranceHeld = false
+
+    /**
+     * ARM the hand-off: call this BEFORE raising a full-screen loading overlay over the shell.
+     *
+     * Главная is stamped into its pre-entrance state — the account row, the «+», the connect
+     * object, the speeds, the server line, the подписка card and the visible server rows all at
+     * alpha 0 — and stays there. Without this the tab assembles itself the moment it is created,
+     * finishes in about 1.3 seconds and the overlay comes down over a screen that is already whole,
+     * which is README §11 grabl 6.
+     *
+     * Safe before Главная exists: the flag is the shell's, and the tab reads it in onViewCreated.
+     */
+    fun holdHomeEntrance() {
+        entranceHeld = true
+        homeFragment?.holdEntrance()
+    }
+
+    /**
+     * RELEASE the hand-off — the single call the overlay's owner makes, and the whole reason it
+     * takes the teardown as a lambda.
+     *
+     * [dismissOverlay] runs and Главная starts assembling INSIDE THE SAME synchronous block, so
+     * both land in one traversal and the compositor never gets a frame with the overlay gone and
+     * the screen already built. Anything that puts a post, a delay or a second animation callback
+     * between the two re-opens grabl 6.
+     *
+     *     mainActivity.revealHome { (overlay.parent as? ViewGroup)?.removeView(overlay) }
+     *
+     * §3 puts this at 6450ms — the overlay fades over its last 520ms and is REMOVED here, not
+     * hidden. Calling it without a prior [holdHomeEntrance] is harmless: Главная will already have
+     * assembled, and an entrance plays once per view.
+     */
+    fun revealHome(dismissOverlay: () -> Unit) {
+        entranceHeld = false
+        dismissOverlay()
+        homeFragment?.playEntrance()
+    }
 
     override fun showAddMenu(anchor: View) = showImportMenu(anchor)
 

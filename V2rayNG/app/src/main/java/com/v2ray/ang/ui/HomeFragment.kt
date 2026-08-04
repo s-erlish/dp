@@ -1,6 +1,10 @@
 package com.v2ray.ang.ui
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.AnimatorSet
 import android.animation.ArgbEvaluator
+import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.app.Activity
 import android.content.Context
@@ -32,6 +36,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
+import androidx.core.view.children
 import androidx.core.view.doOnPreDraw
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
@@ -314,6 +319,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private val easeOutQuint by lazy { AnimationUtils.loadInterpolator(requireContext(), R.interpolator.ease_out_quint) }
     private val easeOutQuart by lazy { AnimationUtils.loadInterpolator(requireContext(), R.interpolator.ease_out_quart) }
     private val easeStandard by lazy { AnimationUtils.loadInterpolator(requireContext(), R.interpolator.ease_standard) }
+    private val easeInOut by lazy { AnimationUtils.loadInterpolator(requireContext(), R.interpolator.ease_in_out) }
 
     private val durWindUp get() = resources.getInteger(R.integer.motion_windup).toLong()
     private val durState get() = resources.getInteger(R.integer.motion_state).toLong()
@@ -322,6 +328,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private val durRevealExit get() = resources.getInteger(R.integer.motion_reveal_exit).toLong()
     private val durAppear get() = resources.getInteger(R.integer.motion_appear).toLong()
     private val durAppearSlow get() = resources.getInteger(R.integer.motion_appear_slow).toLong()
+    private val durScreen get() = resources.getInteger(R.integer.motion_screen).toLong()
 
     // ---- The session clock ----
 
@@ -434,44 +441,31 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         /** One full revolution — the arc's wind-up lands back where it started, so nothing snaps. */
         const val FULL_TURN_DEGREES = 360f
 
-        // THE AMBIENT BREATH, at rest and while connected: the desktop's «живой» layer
-        // (ConnectHeroView.axaml, AmbientRing.breathe-idle / breathe-live). Six seconds against the
-        // negotiating breath's 0.85 — an order of magnitude slower, so the two can never be
-        // confused for each other — and a narrow alpha band, because this says "alive", not
-        // "working". Connected runs one second faster and a little brighter: «активно».
-        const val AMBIENT_PERIOD_IDLE_MS = 6_000L
-        const val AMBIENT_PERIOD_LIVE_MS = 5_000L
-        const val AMBIENT_ALPHA_MIN = 150
-        const val AMBIENT_ALPHA_MAX_IDLE = 215
-        const val AMBIENT_ALPHA_MAX_LIVE = 255
+        // Where the connected settle lands. §4 asks for a DECAY, so the rings arrive at full
+        // brightness on the moment of connection and come to rest a little under it — far enough
+        // to be a fade, near enough that the object is still plainly the connected one. Any lower
+        // and a live tunnel reads as dimmer than an idle one, which is backwards.
+        const val RING_SETTLED_ALPHA = 200
 
-        // The resting sonar: one wave, leaving the disc and dying, on an endless loop. Not
-        // Alternate — it is transparent at BOTH ends of the cycle, so the scale snapping back is
-        // invisible and there is no click at the seam (the desktop's own note on
-        // AmbientSonar.rest-idle).
-        //
-        // THE REACH IS BOUNDED BY THE FRAME AND THAT IS DELIBERATE. The wave's base is the disc,
-        // 176dp (fragment_home.xml sizes it in dp precisely so it cannot be anything else), and the
-        // frame is 224dp. 176 × 1.20 = 211dp, so the widest the wave ever gets still stops 6dp
-        // inside the outer ring: it breathes just outside the disc, the way the desktop's does
-        // (ConnectHeroView.axaml AmbientSonar, Ø200 in a 230 frame), and it never reaches the
-        // screen gutter. Do not raise these past 224/176 = 1.27.
-        const val AMBIENT_WAVE_PERIOD_IDLE_MS = 6_500L
-        const val AMBIENT_WAVE_PERIOD_LIVE_MS = 5_500L
-        const val AMBIENT_WAVE_SCALE_IDLE = 1.16f
-        const val AMBIENT_WAVE_SCALE_LIVE = 1.20f
-        const val AMBIENT_WAVE_ALPHA_IDLE = 0.18f
-        const val AMBIENT_WAVE_ALPHA_LIVE = 0.26f
-        // The wave peaks early and spends the rest of the cycle fading — an exhale outwards.
-        const val AMBIENT_WAVE_PEAK = 0.18f
+        // §4's «переход 500 мс» on the traffic meter's fill. It has no token: motion.xml's nearest
+        // rungs are 460 and 560, and this number is stated to the millisecond in the handoff.
+        const val METER_FILL_MS = 500L
 
         // The connecting breath also reaches the shield glyph, in unison with the rings: alpha
         // 1 <-> 0.8 (ConnectHeroView.axaml, Path.shieldbreathe). Opacity only — never a transform,
         // so it physically cannot drift out of its own centre.
         const val SHIELD_BREATH_ALPHA_MIN = 0.8f
 
-        // The cold-start assemble plays once per PROCESS, not on every theme/language recreate.
-        private var heroAssembled = false
+        // §3's assemble, in its own numbers. The two durations that have tokens use them
+        // (motion_appear 460, motion_appear_slow 720, motion_screen 560); 520 has no rung on
+        // §8's scale and is written out, as are the travels, which §3 states in dp.
+        const val ENTRANCE_MID_MS = 520L
+        const val ENTRANCE_DROP = 22f
+        const val ENTRANCE_RISE = 26f
+        const val ENTRANCE_RING_SCALE = 0.7f
+        const val ENTRANCE_ROW_SLIDE = 44f
+        const val ENTRANCE_ROWS_DELAY_MS = 700L
+        const val ENTRANCE_ROW_STAGGER_MS = 85L
     }
 
     private val requestVpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -511,7 +505,11 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         observeNetwork()
         applyListInsets()
         render()
-        playColdStartAssemble()
+        // THE ASSEMBLE, unless somebody is holding it. A flow overlay is up over Главная on exactly
+        // one path — first run — and on that path the shell has already armed the hold, so the
+        // screen waits in its pre-entrance state until the overlay's owner releases it in one
+        // transaction. Every other launch assembles itself here. @see playEntrance
+        if (mainHost.homeEntranceHeld) holdEntrance() else playEntrance()
     }
 
     /**
@@ -551,6 +549,11 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         ringAnimator = null
         breathAnimator?.cancel()
         breathAnimator = null
+        pillTint?.cancel()
+        pillTint = null
+        // The assemble is the one animation here with start delays measured in whole seconds, so it
+        // is the one most likely to still be pending when the screen goes.
+        cancelEntrance()
         // The ambient loops are INFINITE, so they are the two that would outlive the view and keep
         // driving the compositor from a destroyed hierarchy if they were ever forgotten here.
         stopAmbient()
@@ -824,17 +827,202 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         ringInner?.setStroke(activeStroke, colour)
     }
 
+    // ==================== THE ENTRANCE (handoff §3, «Сборка главной») ====================
+
     /**
-     * The cold-start assemble: the object settles in once per process, scaling up from 0.9 as it
-     * fades in. It is the first thing the app says and it was removed by the redesign; it is back,
-     * still once per process and still skipped under reduced motion.
+     * ARMS the entrance without playing it: Главная is stamped into its pre-entrance state and will
+     * stay there until [playEntrance] is called.
+     *
+     * THIS IS ONE HALF OF THE OVERLAY HAND-OFF (§11 grabl 6). Whoever raises a full-screen loading
+     * overlay over this screen calls `MainActivity.holdHomeEntrance()` BEFORE the overlay goes up;
+     * without it Главная assembles itself behind the overlay, finishes long before the overlay is
+     * taken down, and what the user finally sees is the whole screen at once — which is precisely
+     * the flash grabl 6 is about.
+     *
+     * Safe at any point in the fragment's life and safe to call twice.
      */
-    private fun playColdStartAssemble() {
-        if (heroAssembled) return
-        heroAssembled = true
-        val frame = binding.connectFrame
-        if (frame.reducedMotion()) return
-        frame.startAnimation(AnimationUtils.loadAnimation(requireContext(), R.anim.shield_assemble))
+    fun holdEntrance() {
+        if (!isBindingInitialized) return
+        entrancePlayed = false
+        cancelEntrance()
+        primeEntrance()
+    }
+
+    /**
+     * PLAYS the entrance, and this is the single call the overlay's owner makes.
+     *
+     * THE OTHER HALF OF GRABL 6, and the reason it is one method rather than two: it stamps the
+     * start values and starts the animators SYNCHRONOUSLY, inside this call, so the caller can
+     * write
+     *
+     *     mainActivity.revealHome { overlay.removeFromParent() }
+     *
+     * and have the overlay's removal and the first frame of the assemble land in the same
+     * traversal. Nothing here is posted or delayed — a `postDelayed` between the two is exactly
+     * how the screen gets one frame of finished Главная in the middle.
+     *
+     * Plays ONCE per view. A repaint, a tab switch, a subscription refresh and a rotation all reach
+     * this file and none of them is an entrance; [holdEntrance] is the only thing that re-arms it.
+     */
+    fun playEntrance() {
+        if (!isBindingInitialized || entrancePlayed) return
+        entrancePlayed = true
+        if (binding.connectFrame.reducedMotion()) {
+            clearEntrance()
+            return
+        }
+        primeEntrance()
+        val set = AnimatorSet()
+        set.playTogether(entranceSteps().flatMap { it.animators() })
+        set.addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) = clearEntrance()
+            override fun onAnimationCancel(animation: Animator) = clearEntrance()
+        })
+        entranceAnimator = set
+        set.start()
+        playServerRowEntrance()
+    }
+
+    /**
+     * The seven elements of §3's table, in its own order and with its own numbers.
+     *
+     * ONE AnimatorSet WITH START DELAYS, NEVER A CHAIN OF postDelayed. A chain outlives the screen:
+     * every link is a message on the main looper holding a reference to a view that may be detached
+     * by the time it runs, and cancelling it means remembering every token. An AnimatorSet is one
+     * handle, [cancelEntrance] drops it in one line, and the delays are declarative.
+     */
+    private fun entranceSteps(): List<EntranceStep> = listOf(
+        // Строка аккаунта — сверху, −22dp, 460 мс, задержка 60 мс.
+        EntranceStep(binding.layoutHomeAccount.root, -ENTRANCE_DROP, 1f, durAppear, 60),
+        // Кнопка «+» — сверху, −22dp, 460 мс, 130 мс.
+        EntranceStep(binding.btnHomeAdd, -ENTRANCE_DROP, 1f, durAppear, 130),
+        // Кольцо кнопки — из 0.7×, 720 мс, 180 мс. The one element that scales rather than travels:
+        // it is the centre of the screen and it arrives by growing into its own place.
+        EntranceStep(binding.connectFrame, 0f, ENTRANCE_RING_SCALE, durAppearSlow, 180),
+        // Скорости — снизу, +26dp, 520 мс, 420 мс.
+        EntranceStep(binding.numericStrip, ENTRANCE_RISE, 1f, ENTRANCE_MID_MS, 420),
+        // Название сервера — снизу, +26dp, 520 мс, 500 мс.
+        EntranceStep(binding.serverIdentity, ENTRANCE_RISE, 1f, ENTRANCE_MID_MS, 500),
+        // Карточка провайдера — снизу, +26dp, 560 мс, 580 мс.
+        EntranceStep(binding.subscriptionSlot, ENTRANCE_RISE, 1f, durScreen, 580),
+    )
+
+    /**
+     * One element of the assemble: where it comes from, how long it takes and when it starts.
+     *
+     * The travel is in dp and converted here, because §3 states it in dp and a px constant would be
+     * a different distance on every phone. The curve is `cubic-bezier(0.22, 1, 0.36, 1)` for all
+     * seven rows of the table — @interpolator/ease_out_quint is exactly that curve, so no new
+     * interpolator was added.
+     */
+    private inner class EntranceStep(
+        val view: View,
+        val fromDp: Float,
+        val fromScale: Float,
+        val duration: Long,
+        val delayMs: Long,
+    ) {
+        fun animators(): List<Animator> {
+            val from = fromDp * resources.displayMetrics.density
+            val moves = mutableListOf<Animator>(
+                ObjectAnimator.ofFloat(view, View.ALPHA, 0f, 1f),
+            )
+            if (from != 0f) moves += ObjectAnimator.ofFloat(view, View.TRANSLATION_Y, from, 0f)
+            if (fromScale != 1f) {
+                moves += ObjectAnimator.ofFloat(view, View.SCALE_X, fromScale, 1f)
+                moves += ObjectAnimator.ofFloat(view, View.SCALE_Y, fromScale, 1f)
+            }
+            moves.forEach {
+                it.duration = duration
+                it.startDelay = delayMs
+                it.interpolator = easeOutQuint
+            }
+            return moves
+        }
+    }
+
+    /**
+     * Строки серверов — «слева, −44dp, 560 мс, 700 мс + 85 мс на каждую».
+     *
+     * ONLY THE ROWS THAT ARE ON SCREEN WHEN IT STARTS, and that is why this walks the
+     * RecyclerView's ATTACHED CHILDREN instead of counting adapter positions. A list of thirty
+     * servers has thirty positions and only six of them are visible; staggering by position would
+     * hand the thirtieth row 700 + 29 × 85 ≈ 3.2 seconds of delay and then play its slide when the
+     * user finally scrolls down to it, which reads as the list hanging. The children of the
+     * RecyclerView at this instant ARE the visible set, so the stagger is bounded by what fits on a
+     * screen and the rest of the list is simply already in place.
+     *
+     * It is also why this is not in onBindViewHolder: bind runs on every scroll, so the slide would
+     * replay for the rest of the session. The reset is the adapter's
+     * (MainRecyclerAdapter.onViewRecycled) — a row recycled mid-slide must not carry a stale
+     * translationX into whatever server it is re-used for.
+     *
+     * doOnPreDraw and not post{}: the list is asked for its children at the last moment before the
+     * frame is drawn, which is the first instant they exist. It is one-shot and it detaches itself
+     * with the view.
+     */
+    private fun playServerRowEntrance() {
+        val list = binding.rvHomeServers
+        list.doOnPreDraw {
+            if (!isBindingInitialized) return@doOnPreDraw
+            val travel = -ENTRANCE_ROW_SLIDE * resources.displayMetrics.density
+            list.children.forEachIndexed { index, row ->
+                row.animate().cancel()
+                row.alpha = 0f
+                row.translationX = travel
+                row.animate()
+                    .alpha(1f)
+                    .translationX(0f)
+                    .setStartDelay(ENTRANCE_ROWS_DELAY_MS + index * ENTRANCE_ROW_STAGGER_MS)
+                    .setDuration(durScreen)
+                    .setInterpolator(easeOutQuint)
+                    .withEndAction {
+                        row.translationX = 0f
+                        row.alpha = 1f
+                    }
+                    .start()
+            }
+        }
+    }
+
+    /** Stamps every element of the assemble into its start state. */
+    private fun primeEntrance() {
+        entranceSteps().forEach { step ->
+            step.view.alpha = 0f
+            step.view.translationY = step.fromDp * resources.displayMetrics.density
+            step.view.scaleX = step.fromScale
+            step.view.scaleY = step.fromScale
+        }
+        binding.rvHomeServers.children.forEach { it.alpha = 0f }
+    }
+
+    /**
+     * Returns every element to its resting transform.
+     *
+     * THE TRANSFORMS ARE ALWAYS CLEARED, never left at their end values, because a translationY of
+     * "0" that arrived from an animation is not the same thing as a view with no transform: it
+     * keeps the view on its own render node and it is what leaks into a recycled row. Runs on both
+     * end and cancel.
+     */
+    private fun clearEntrance() {
+        if (!isBindingInitialized) return
+        entranceSteps().forEach { step ->
+            step.view.alpha = 1f
+            step.view.translationY = 0f
+            step.view.scaleX = 1f
+            step.view.scaleY = 1f
+        }
+        binding.rvHomeServers.children.forEach {
+            it.animate().cancel()
+            it.alpha = 1f
+            it.translationX = 0f
+        }
+    }
+
+    /** Drops the whole assemble — one handle for the set, one loop for the rows. */
+    private fun cancelEntrance() {
+        entranceAnimator?.cancel()
+        entranceAnimator = null
     }
 
     private fun wireConnect() {
@@ -2093,21 +2281,16 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         if (sweeping && !sweepRunning) playArcWindUp()
         sweepRunning = sweeping
 
-        // THE TWO BREATHS, AND ONLY EVER ONE OF THEM. Negotiating owns the ring alphas at 850ms and
-        // says "working on it"; the ambient layer owns them at six seconds and says "alive". The
-        // ambient stands down for the whole of negotiation and comes back on the other side, at the
-        // connected tempo when the tunnel came up and the resting one when it did not. A disabled
-        // object — gated, no server, disconnecting — stays perfectly still: nothing is alive there.
+        // THE ONE BREATH LEFT. Negotiating owns the ring alphas at 850ms and says "working on it";
+        // every other state is still, because §4 gives the object exactly one other motion — the
+        // 5.5s settle after a connect, which is one-shot and belongs to the TRANSITION rather than
+        // to the state, so it is fired from playConfirm below and not from this repaint path.
+        // A repaint that finds the tunnel already up must not restart it: the decay runs once.
         if (negotiating) {
             stopAmbient()
             startBreathing()
         } else {
             stopBreathing()
-            when (state.conn) {
-                Conn.CONNECTED -> startAmbient(live = true)
-                Conn.DISCONNECTED, Conn.ERROR -> startAmbient(live = false)
-                else -> stopAmbient()
-            }
         }
 
         val targetRing = when (state.conn) {
@@ -2441,6 +2624,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         if (haptic) binding.connectFrame.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
         stopBreathing()
         tintRing(ringTarget, animate = live)
+        // §4: the connected ring is «акцентное, медленное затухание яркости 5.5 с». It starts HERE,
+        // on the edge into connected, so it plays once per connection and not once per repaint.
+        settleRing(live)
 
         if (!live) {
             binding.shieldFilled.alpha = 1f
@@ -2513,6 +2699,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private fun playRelease(ringTarget: Int, live: Boolean) {
         stopBreathing()
         tintRing(ringTarget, animate = live)
+        // The settle belongs to the connection that just ended: if it is still decaying, it stops
+        // here and the rings go back to their resting brightness with the rest of the object.
+        stopAmbient()
         clearConfirmRings()
 
         if (!live) {
@@ -2567,12 +2756,15 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         val wasBreathing = breathAnimator != null
         breathAnimator?.cancel()
         breathAnimator = null
+        // NOTHING IS WRITTEN UNLESS THIS BREATH WAS ACTUALLY RUNNING. paintConnect calls this on
+        // every repaint of every non-negotiating state, and a blind reset here would stamp the
+        // rings back to full brightness in the middle of the connected settle — restarting that
+        // 5.5s decay from the top on every traffic tick. It would also put one frame of a fully
+        // opaque outline over an already-connected object.
+        if (!wasBreathing) return
         ringOuter?.alpha = OPAQUE
         ringMid?.alpha = OPAQUE
-        // Only restore the glyph if this breath actually touched it. Every caller sets the shield
-        // alphas for the state it is entering immediately after this returns, but a blind write here
-        // would still put a frame of a fully opaque outline over a connected object.
-        if (wasBreathing && isBindingInitialized) binding.shieldOutline.alpha = 1f
+        if (isBindingInitialized) binding.shieldOutline.alpha = 1f
     }
 
     /**

@@ -208,6 +208,27 @@ class MainRecyclerAdapter(
         }
     }
 
+    /**
+     * THE ENTRANCE'S CLEAN-UP, and the only part of it this file has.
+     *
+     * Главная's assemble (handoff §3) slides the rows that are on screen in from −44dp, staggered
+     * 85ms apart, once — `HomeFragment.playServerRowEntrance`, which drives the RecyclerView's
+     * attached children directly and never touches bind, so the slide cannot replay on every
+     * scroll. What bind cannot protect against is a row being recycled MID-SLIDE: the holder goes
+     * back to the pool still carrying a translationX and a fractional alpha, and the next server
+     * bound into it inherits both — a row that arrives already half off-screen and stays there,
+     * for the rest of the session, with nothing in bind to explain it.
+     *
+     * So the transform is dropped exactly where the view leaves the screen. Cheap, unconditional,
+     * and it costs nothing on the ordinary path where there was no animation to cancel.
+     */
+    override fun onViewRecycled(holder: BaseViewHolder) {
+        super.onViewRecycled(holder)
+        holder.itemView.animate().cancel()
+        holder.itemView.translationX = 0f
+        holder.itemView.alpha = 1f
+    }
+
     private fun bindHeader(holder: HeaderViewHolder, header: Row.Header) {
         val context = holder.binding.root.context
         val title = header.remarks.ifBlank { context.getString(R.string.servers_section_local) }
