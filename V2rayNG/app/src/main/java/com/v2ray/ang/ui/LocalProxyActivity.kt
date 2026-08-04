@@ -6,6 +6,7 @@ import android.view.View
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.LinearLayout
+import androidx.core.widget.NestedScrollView
 import androidx.core.widget.doAfterTextChanged
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.materialswitch.MaterialSwitch
@@ -16,6 +17,8 @@ import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
+import com.v2ray.ang.ui.component.SubPage
+import com.v2ray.ang.ui.component.ToolbarBinder
 import com.v2ray.ang.util.Utils
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -73,12 +76,24 @@ class LocalProxyActivity : BaseActivity() {
     private var hotspotPasswordVisible = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
-        setContentViewWithToolbar(
-            R.layout.activity_local_proxy,
-            showHomeAsUp = true,
-            title = getString(R.string.title_local_proxy)
+        // Handoff README §7: the sub-page lekalo puts a 24sp/700 title UNDER a 44dp back
+        // control, which activity_base's 16sp MaterialToolbar cannot draw. The header is
+        // @layout/view_sub_header inside the screen's own layout, so this goes through
+        // setContentView + ToolbarBinder like every other sub-page rather than through
+        // setContentViewWithToolbar. Nothing else about the screen changes: it never used
+        // the base layout's progress bar, and the back affordance still closes through
+        // SubPage so the exit transition matches the entrance.
+        setContentView(R.layout.activity_local_proxy)
+
+        val header = findViewById<View>(R.id.toolbar)
+        ToolbarBinder.bind(
+            root = header,
+            title = getString(R.string.title_local_proxy),
+            activity = this,
         )
+        ToolbarBinder.attachTo(header, findViewById<NestedScrollView>(R.id.main_content))
 
         bindSocksSection()
         bindLocalProxySection()

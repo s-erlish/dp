@@ -11,6 +11,17 @@
   state it never had («Записей пока нет»). Search moved out of the vanished ActionBar
   onto the screen; copy / share / clear moved out of the same overflow into the
   editors' shared sheet.
+
+  2026-08 REDESIGN (handoff README §7): the sub-page lekalo header.
+
+  WHAT §7 DRAWS AND THIS SCREEN DOES NOT: a five-line monospaced slab with
+  «Копировать» and «Очистить» as rows under it. The list stays a list, and that is
+  not a shortfall — the prototype's slab is five fixed demo lines, while this screen
+  carries a searchable log with a level chip per line, a pull to refresh, a skeleton,
+  an empty state and a long press that copies one line. Collapsing it into a static
+  block would delete all six. «Копировать» / «Очистить» stay in the editors' shared
+  action sheet behind @id/toolbar_action for the same reason: they act on the
+  SEARCHED set, and a row in a card cannot say that.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -23,7 +34,7 @@
 
     <include
         android:id="@+id/toolbar"
-        layout="@layout/view_toolbar" />
+        layout="@layout/view_sub_header" />
 
     <FrameLayout
         android:layout_width="match_parent"

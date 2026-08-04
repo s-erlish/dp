@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ============================================================================
+  THE SUB-PAGE HEADER — handoff README §7, «Единое лекало».
+  ============================================================================
+
+      кнопка назад 44dp (смещена на −10dp влево)
+        → крупный заголовок 24sp/700
+        → необязательное пояснение 13sp
+        → группы карточек
+
+  It is @layout/view_toolbar's replacement ON SUB-SCREENS ONLY, and it is a
+  different object rather than a variant of one: view_toolbar draws a 16sp title
+  BESIDE the back arrow, which is the shape a tab screen and a form want. §7 puts
+  the title UNDER the arrow at 24sp/700, which turns the top of the page into a
+  heading the eye lands on before it starts reading rows. Home and the tab screens
+  keep view_toolbar; nothing here changes for them.
+
+  THE IDS ARE view_toolbar's ON PURPOSE. ToolbarSlots resolves toolbar_back,
+  toolbar_leading_gap, toolbar_title, toolbar_action and toolbar_hairline by id,
+  so every screen that already calls ToolbarBinder.bind / attachTo keeps working
+  after nothing more than swapping the include's layout= attribute. A screen that
+  wants the optional note reaches for @id/toolbar_note itself — that slot is this
+  file's own and ships gone.
+
+  THE GUTTER ARITHMETIC, and why there is no −10dp margin here. §7 measures a 44dp
+  back control pulled 10dp left, which lands its 24dp glyph exactly on the 16dp
+  screen gutter (16 − 10 + (44 − 24) / 2 = 16). This file reaches that same pixel
+  from the other side: Widget.Departament.Button.Icon.Toolbar is a 48dp target —
+  the Android touch floor, which 44 is under — so marginStart space_4 puts its
+  glyph at 4 + (48 − 24) / 2 = 16. Same glyph, same place, one more dp of finger.
+  It is also exactly what view_toolbar.xml already does, so the back affordance
+  does not move between the two headers.
+
+  56 IS A MINIMUM ON THE BAR AND THE TITLE HAS NO HEIGHT AT ALL. At font scale
+  200% a 24sp headline needs ~50dp of line box; every text box here is
+  wrap_content and grows with it (00-rules.md 14.5).
+
+  THE HAIRLINE ships at alpha 0 and is faded in by ToolbarBinder.attachTo once the
+  content behind it has scrolled. It never appears at rest, and nothing else about
+  this header changes on scroll — no colour, no elevation, no shadow.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/toolbar"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?android:attr/colorBackground"
+    android:elevation="0dp"
+    android:orientation="vertical"
+    android:paddingBottom="@dimen/space_8">
+
+    <!-- The back row. §7 «padding:4px 16px 0» — the 4 above the control, the 16 is
+         the gutter the title below already stands on. -->
+    <LinearLayout
+        android:id="@+id/toolbar_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:baselineAligned="false"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/space_4"
+        android:paddingTop="@dimen/space_4"
+        android:paddingEnd="@dimen/space_4">
+
+        <!-- ICON GAP (inherited from view_toolbar): res/drawable carries no
+             ic_arrow_back, so the 24dp chevron is mirrored, which draws the correct
+             left-pointing affordance. When ic_arrow_back lands, set it on app:icon
+             and DELETE the scaleX line. -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/toolbar_back"
+            style="@style/Widget.Departament.Button.Icon.Toolbar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/cd_back"
+            android:scaleX="-1"
+            app:icon="@drawable/ic_chevron_right" />
+
+        <!-- ToolbarBinder shows this when a screen passes no activity, i.e. has no
+             back affordance. A sub-page always has one, so it ships gone. -->
+        <Space
+            android:id="@+id/toolbar_leading_gap"
+            android:layout_width="@dimen/space_12"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- AT MOST ONE, and on §7's lekalo most screens have none: an action is a
+             row in a card, where it can carry a name. The slot stays because
+             ToolbarBinder resolves it and because «Добавить правило» style toolbar
+             actions already bound here must keep working. -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/toolbar_action"
+            style="@style/Widget.Departament.Button.Icon.Toolbar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            app:icon="@drawable/ic_more_vert_24dp"
+            tools:ignore="ContentDescription"
+            tools:visibility="visible" />
+    </LinearLayout>
+
+    <!-- §7 «крупный заголовок 24sp/700», 8 under the back control. Headline is the
+         ramp's 24/700 role; the face is @font/golos_text_bold, which has Cyrillic —
+         the wordmark face does not, and that is D-11. -->
+    <TextView
+        android:id="@+id/toolbar_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_8"
+        android:paddingStart="@dimen/screen_gutter"
+        android:paddingEnd="@dimen/screen_gutter"
+        android:textAppearance="@style/TextAppearance.App.Headline"
+        tools:text="Локальный прокси" />
+
+    <!-- §7 «необязательное пояснение 13sp», 6 under the title. One sentence that
+         says what the screen is for; a note that restates the title is deleted, not
+         written. Ships gone — a screen shows it by giving it text. -->
+    <TextView
+        android:id="@+id/toolbar_note"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_6"
+        android:paddingStart="@dimen/screen_gutter"
+        android:paddingEnd="@dimen/screen_gutter"
+        android:textAppearance="@style/TextAppearance.App.Subtitle"
+        android:visibility="gone"
+        tools:text="Отсканируйте QR-код, показанный на телевизоре."
+        tools:visibility="visible" />
+
+    <View
+        android:id="@+id/toolbar_hairline"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/stroke_hairline"
+        android:layout_marginTop="@dimen/space_8"
+        android:alpha="0"
+        android:background="?attr/colorOutlineVariant" />
+</LinearLayout>

@@ -14,6 +14,15 @@
   group state its own precondition - a row that cannot work yet is drawn disabled at
   0.38 with the reason in its subtitle (R6), instead of failing with a toast after
   the user taps it.
+
+  2026-08 REDESIGN (handoff README §7): the header is the sub-page lekalo,
+  @layout/view_sub_header. The rest of the screen already WAS the lekalo - two
+  labelled groups of card rows - so nothing else moves.
+
+  NO NOTE UNDER THE TITLE. §7 gives this screen «Файл с серверами и настройками»,
+  and res/values carries no such string; the handoff's demo copy is not a resource
+  and strings are not invented here (owner's rule). @id/toolbar_note stays gone
+  until the owner names one.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -26,7 +35,7 @@
 
     <include
         android:id="@+id/toolbar"
-        layout="@layout/view_toolbar" />
+        layout="@layout/view_sub_header" />
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/main_content"
