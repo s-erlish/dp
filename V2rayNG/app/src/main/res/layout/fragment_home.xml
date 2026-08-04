@@ -323,58 +323,29 @@
                  sits 10dp inboard of the active ring, so the ring cannot be its border.
                  The disc keeps its fill and nothing else. All of it is built in
                  HomeFragment.buildConnectObject. -->
-            <!--
-              THE AMBIENT WAVE, and it is the layer this object was missing.
+            <!-- THE AMBIENT WAVE IS RETIRED, and its View with it.
 
-              FIRST child of the frame, so it lies UNDER the disc and everything the disc
-              holds, and it is not hit-testable — the tap belongs to the frame. It starts
-              at the disc's own 176dp and travels out to just inside the outer ring the
-              frame's background draws. HomeFragment loops it slowly at rest and, a little
-              brighter and faster, while connected: the desktop's «живой» layer
-              (ConnectHeroView.axaml, AmbientSonar.rest-idle / rest-live). Without it the
-              object was a still picture except during the 850ms negotiating breath, which
-              is precisely the complaint — «практически нет никакой анимации, только
-              пульсация».
+                 It was a fourth ring under the disc, looping outwards on a 6-second
+                 scale-and-fade at rest and a 5.5-second one while connected. Handoff §4
+                 does not have it: «Кольцо не пульсирует постоянно — только меняет
+                 яркость, БЕЗ МАСШТАБА» (§11 grabl 8), and its state table gives the object
+                 exactly three looks — muted and STATIC when off, one travelling arc while
+                 negotiating, and a slow 5.5s brightness decay once connected. A permanent
+                 scale loop is the one thing all three of those rule out, so the loop is
+                 gone and the decay (HomeFragment.settleRing, @integer/motion_ring_fade) is
+                 what says "alive" now.
 
-              IT IS SIZED IN dp AND NEVER match_parent, AND THAT IS THE WHOLE BUG THIS
-              LAYER SHIPPED WITH. It was written `match_parent`×`match_parent` on the
-              assumption that a child of this padded frame resolves to the 176dp box —
-              the same assumption buildConnectObject states at HomeFragment.kt:681. It
-              does not. This frame is wrap_content, so it is measured AT_MOST(screen), a
-              bare View returns the AT_MOST size verbatim (View.getDefaultSize), and the
-              child came back (screen − 48dp) wide against a height that came from the
-              scroll pass — never square, and wide enough to drag the frame's own
-              wrap_content out to the full screen with it. The frame's background is a
-              LayerDrawable of two OVALS, so those two stretched with it: the owner's
-              «two gigantic flattened ovals», in every state, worst in the empty one where
-              fillViewport hands the frame the whole viewport. A uniform scaleX/scaleY
-              cannot make an oval — only a non-square bounds can.
-
-              AND IT IS ALSO WHY THE FIRST-RUN SCREEN HAD NO BUTTONS ON IT —
-              «стартовый экран кнопок нет для добавления и тд, еле подписку добавил».
-              Same measure pass, the other axis. fillViewport re-measures this column
-              with EXACTLY(viewport) whenever the content is shorter than the screen, so
-              LinearLayout hands each wrap_content child AT_MOST(what is left), the frame
-              passes that straight down, and this View swallowed the WHOLE remainder as
-              its height. The frame therefore grew to fill the viewport and everything
-              below it — the ledger, the server line and the gate block with «Добавить
-              подписку» on it — was pushed off the bottom of the screen. Collapsing the
-              server list reproduced it exactly, and for exactly the same reason: a
-              shorter column is what wakes fillViewport up.
-
-              So: an explicit square. 176dp = the disc, centred, travelling to at most
-              @1.20 = 211dp, which stops short of the 224dp frame. The object breathes
-              just outside its own edge, never reaches the screen gutter, and cannot
-              change this frame's measured size in either axis — a scale is a draw-time
-              transform and takes no part in layout.
-            -->
-            <View
-                android:id="@+id/connect_ring_ambient"
-                android:layout_width="150dp"
-                android:layout_height="150dp"
-                android:layout_gravity="center"
-                android:alpha="0"
-                android:importantForAccessibility="no" />
+                 The View is gone rather than left at alpha 0: an invisible child still
+                 measures and lays out on every pass of a frame that is re-measured with
+                 the scroll. What it taught is worth keeping though, so: a child of this
+                 frame MUST be sized in dp. This frame is wrap_content inside a
+                 fillViewport ScrollView, a bare View returns its AT_MOST size verbatim
+                 (View.getDefaultSize), and a `match_parent` child therefore swallowed the
+                 whole remaining viewport and dragged the frame — and its two background
+                 ovals — out with it, in both axes. That is what the owner saw as «two
+                 gigantic flattened ovals» and as a first-run screen whose buttons had been
+                 pushed off the bottom. connect_sweep and connect_disc below are sized in
+                 dp for that reason and must stay that way. -->
 
             <!-- THE NEGOTIATING SWEEP, AND IT RIDES THE ACTIVE RING (§4, code_reference
                  «Кнопка подключения»: `circle r=85 stroke-width=2` in a 214 box, i.e. the

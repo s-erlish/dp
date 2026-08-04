@@ -279,16 +279,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private var breathAnimator: ValueAnimator? = null
 
     /**
-     * The AMBIENT layer — the object breathing while nothing is happening to it. Two loops, out of
-     * phase by design (6s and 6.5s at rest), so the pair reads as alive rather than as a metronome.
-     * They run at rest AND while connected, and they stand down for the negotiating breath, which is
-     * a different statement at an order-of-magnitude different tempo.
+     * The connected settle: one 5.5s decay of the rings' brightness after the tunnel comes up, and
+     * nothing after it. @see settleRing — this is the whole of what used to be two infinite loops.
      */
-    private var ambientRingAnimator: ValueAnimator? = null
-    private var ambientWaveAnimator: ValueAnimator? = null
-
-    /** Which ambient tempo is on air, so a repaint does not restart a loop it is already running. */
-    private var ambientLive: Boolean? = null
+    private var ringSettleAnimator: ValueAnimator? = null
 
     /**
      * Whether the sweep is on screen, so the arc's wind-up fires on the EDGE into negotiating and
@@ -794,20 +788,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             setStroke((confirmStroke - 1).coerceAtLeast(1), accent)
         }
 
-        // The ambient wave: the same silhouette again, thinner still, because it is the quietest
-        // thing the object does and it does it forever. Its colour follows the rings' state channel
-        // rather than being pinned to the accent — a wave leaving a grey idle object must be grey.
-        //
-        // ONE HAIRLINE, and it is a token and not `stroke - 1`. `stroke` is already resolved to
-        // PIXELS, so subtracting one from it took a 3dp ring down to 2.67dp at xxhdpi and 2.75dp at
-        // xxxhdpi — the same weight as the static rings for every user, which is not "thinner
-        // still", it is a second ring. @dimen/stroke_hairline is 1dp at every density.
-        binding.connectRingAmbient.background = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(Color.TRANSPARENT)
-            setStroke(ambientStroke(), ringColor)
-        }
-
         // The monogram's circle: the P3 plane, never the accent.
         binding.layoutHomeAccount.tvAvatarInitial.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
@@ -820,9 +800,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         setColor(Color.TRANSPARENT)
         setStroke(stroke, Color.TRANSPARENT)
     }
-
-    /** The ambient wave's weight: one hairline, at every density. @see buildConnectObject */
-    private fun ambientStroke() = resources.getDimensionPixelSize(R.dimen.stroke_hairline)
 
     /**
      * The two outer rings' weight: 1.5dp (handoff §4).
@@ -845,10 +822,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         ringOuter?.setStroke(frameStroke, ColorUtils.setAlphaComponent(colour, RING_ALPHA_OUTER))
         ringMid?.setStroke(frameStroke, ColorUtils.setAlphaComponent(colour, RING_ALPHA_MID))
         ringInner?.setStroke(activeStroke, colour)
-        // The ambient wave rides the same channel: it is the object exhaling, so it is the object's
-        // colour. Guarded because this runs from buildConnectObject before the wave has a drawable.
-        (binding.connectRingAmbient.background as? GradientDrawable)
-            ?.setStroke(ambientStroke(), colour)
     }
 
     /**
@@ -2603,39 +2576,31 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
-     * THE AMBIENT LAYER — the object alive when nothing is happening to it.
+     * THE CONNECTED SETTLE — §4's «акцентное, медленное затухание яркости 5.5 с», and the only
+     * thing the object does once it is up.
      *
-     * The owner's complaint about the connect control is that it barely moves: «при нажатии на
-     * кнопку практически нет никакой анимации, только пульсация, а на ПК по другому анимация
-     * сделана». The desktop's answer is a permanent low-contrast layer under the disc — a slow
-     * breathing ring and a slow wave leaving it — running BOTH at rest and while connected
-     * (`ConnectHeroView.axaml`, `AmbientRing.breathe-idle/-live` + `AmbientSonar.rest-idle/-live`,
-     * «чтобы герой дышал и в ПОКОЕ И в CONNECTED — не застывшая картинка»). Android had nothing at
-     * all between state changes. This is that layer, on this screen's own vocabulary: no new colour,
-     * no glow, no geometry that was not already here — the rings' own opacity, and one more ring.
+     * ONE SHOT, NOT A LOOP, and that is the whole point of it. What was here was an infinite
+     * REVERSE on the rings' opacity plus a second infinite loop scaling a fourth ring outwards —
+     * a permanent pulse, which is §11 grabl 8 («Постоянная пульсация кольца назойлива») and which
+     * §4 rules out twice over: «не пульсирует постоянно», «без масштаба». So the object arrives
+     * bright at the moment of connection and fades to its resting brightness over
+     * @integer/motion_ring_fade (5500ms) on ease_in_out — the longest, quietest motion in the
+     * product, and it ends. Idle is «приглушённое, СТАТИЧНОЕ»: nothing runs there at all.
      *
-     * [live] picks the connected tempo: brighter, a little further, a second faster. «активно».
+     * The decay rides the rings' drawable alpha and never their colour, so it composes with
+     * [tintRing] instead of fighting it — the hue is the state, this is only the brightness.
      *
-     * It stands down for the negotiating breath (which owns the same ring alphas at 850ms), under
-     * reduced motion, and on view destruction — the two loops are infinite and are the only motion
-     * in this file that would otherwise outlive the screen.
+     * It also means no infinite animator survives this screen: the negotiating breath is the one
+     * that is left, and it stops the instant negotiation does.
      */
-    private fun startAmbient(live: Boolean) {
+    private fun settleRing(live: Boolean) {
         if (!isBindingInitialized) return
-        if (binding.connectFrame.reducedMotion()) {
-            stopAmbient()
-            return
-        }
-        if (ambientLive == live && ambientRingAnimator?.isRunning == true) return
         stopAmbient()
-        ambientLive = live
-
-        val maxAlpha = if (live) AMBIENT_ALPHA_MAX_LIVE else AMBIENT_ALPHA_MAX_IDLE
-        ambientRingAnimator = ValueAnimator.ofInt(AMBIENT_ALPHA_MIN, maxAlpha).apply {
-            duration = if (live) AMBIENT_PERIOD_LIVE_MS else AMBIENT_PERIOD_IDLE_MS
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.REVERSE
-            interpolator = AccelerateDecelerateInterpolator()
+        if (!live) return
+        if (binding.connectFrame.reducedMotion()) return
+        ringSettleAnimator = ValueAnimator.ofInt(OPAQUE, RING_SETTLED_ALPHA).apply {
+            duration = resources.getInteger(R.integer.motion_ring_fade).toLong()
+            interpolator = easeInOut
             addUpdateListener {
                 val value = it.animatedValue as Int
                 ringOuter?.alpha = value
@@ -2643,48 +2608,14 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             }
             start()
         }
-
-        // The wave. NOT a reverse: it is transparent at BOTH ends of the cycle, so the scale
-        // snapping back to 1.0 at the seam is invisible and there is no click once a minute — the
-        // desktop's own reasoning for the same shape. It peaks early and spends the rest of the
-        // cycle fading, which is what makes it read as an exhale rather than a throb.
-        val wave = binding.connectRingAmbient
-        val reach = if (live) AMBIENT_WAVE_SCALE_LIVE else AMBIENT_WAVE_SCALE_IDLE
-        val peak = if (live) AMBIENT_WAVE_ALPHA_LIVE else AMBIENT_WAVE_ALPHA_IDLE
-        ambientWaveAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = if (live) AMBIENT_WAVE_PERIOD_LIVE_MS else AMBIENT_WAVE_PERIOD_IDLE_MS
-            repeatCount = ValueAnimator.INFINITE
-            interpolator = easeOutQuint
-            addUpdateListener {
-                if (!isBindingInitialized) return@addUpdateListener
-                val t = it.animatedValue as Float
-                val scale = 1f + (reach - 1f) * t
-                wave.scaleX = scale
-                wave.scaleY = scale
-                wave.alpha = if (t <= AMBIENT_WAVE_PEAK) {
-                    peak * (t / AMBIENT_WAVE_PEAK)
-                } else {
-                    peak * (1f - (t - AMBIENT_WAVE_PEAK) / (1f - AMBIENT_WAVE_PEAK))
-                }
-            }
-            start()
-        }
     }
 
-    /** Stops both ambient loops and returns the object to its resting look. */
+    /** Cancels the settle and returns the rings to their resting brightness. */
     private fun stopAmbient() {
-        ambientRingAnimator?.cancel()
-        ambientRingAnimator = null
-        ambientWaveAnimator?.cancel()
-        ambientWaveAnimator = null
-        ambientLive = null
+        ringSettleAnimator?.cancel()
+        ringSettleAnimator = null
         ringOuter?.alpha = OPAQUE
         ringMid?.alpha = OPAQUE
-        if (isBindingInitialized) {
-            binding.connectRingAmbient.alpha = 0f
-            binding.connectRingAmbient.scaleX = 1f
-            binding.connectRingAmbient.scaleY = 1f
-        }
     }
 
     /** The rings' only state channel. Width never changes; the colour crosses over motion_state. */
