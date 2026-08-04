@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Durations the sub-pages need that `values/motion.xml` does not carry.
+
+  A separate file for the same reason `motion_onboarding.xml` is one — `motion.xml`
+  belongs to the foundation wave and is edited by everyone — and NOT a second motion
+  scale. Everything already named there is used from there; only a number the handoff
+  states outright and the foundation had no reason to know about lands here.
+-->
+<resources>
+
+    <!--
+      README §7 «Устройства»: «при удалении строка гаснет, подпись меняется на
+      "Отключено от подписки", через 700 мс уходит из списка». 700 is the whole gesture
+      — the dim, the held moment in which the new subtitle can be read, and the exit —
+      not the length of any one of its parts.
+    -->
+    <integer name="motion_device_release">700</integer>
+
+</resources>

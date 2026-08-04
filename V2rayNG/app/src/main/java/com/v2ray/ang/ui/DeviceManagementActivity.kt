@@ -12,6 +12,7 @@ import com.v2ray.ang.auth.AccountCache
 import com.v2ray.ang.auth.AccountRepository
 import com.v2ray.ang.auth.AccountSession
 import com.v2ray.ang.auth.ApiError
+import com.v2ray.ang.auth.AuthTokenStore
 import com.v2ray.ang.auth.dto.DeviceDto
 import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.databinding.ActivityDevicesBinding
@@ -66,6 +67,10 @@ class DeviceManagementActivity : BaseActivity() {
 
         binding.rvDevices.layoutManager = LinearLayoutManager(this)
         binding.rvDevices.adapter = adapter
+        // §7: «Своё устройство помечено "Это устройство" акцентом и не удаляется». The same id the
+        // subscription fetch sends as its HWID header, so the row this marks is genuinely the row
+        // the server bound to this installation.
+        adapter.setOwnHwid(AuthTokenStore.deviceId())
 
         // Prefer the UUID passed via intent; otherwise resolve it from the already-loaded
         // AccountSession profile (no network). This lets the cache-first fast path in [loadDevices]
@@ -223,7 +228,13 @@ class DeviceManagementActivity : BaseActivity() {
                     // The cached list is now stale (one fewer device); drop it and re-fetch,
                     // bypassing the cache so the UI reflects the deletion immediately.
                     AccountCache.invalidateDevices(uuid)
-                    loadDevices(forceRefresh = true)
+                    // §7: the row dims, says «Отключено от подписки», and leaves 700ms later. The
+                    // refetch waits for that, because submitting a fresh list mid-animation would
+                    // yank the row out from under it and the sentence would never be read.
+                    hideLoading()
+                    adapter.release(device, binding.rvDevices) {
+                        loadDevices(forceRefresh = true)
+                    }
                 }
                 .onFailure {
                     hideLoading()
@@ -248,6 +259,8 @@ class DeviceManagementActivity : BaseActivity() {
     private fun showEmpty(show: Boolean) {
         binding.layoutDevicesEmpty.visibility = if (show) View.VISIBLE else View.GONE
         binding.rvDevices.visibility = if (show) View.GONE else View.VISIBLE
+        // §7's footnote explains what «Удалить» costs, so it goes with the rows that offer it.
+        binding.tvDevicesFootnote.visibility = if (show) View.GONE else View.VISIBLE
         // Hide the "devices connected to your subscription" note while the empty/error
         // overlay is up — it contradicts "no devices" / "subscription not found". §7 moved
         // that sentence into the header, so this is the header's note now.

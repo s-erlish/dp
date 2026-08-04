@@ -15,6 +15,8 @@ import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.dto.PaymentDto
 import com.v2ray.ang.databinding.ActivityPaymentHistoryBinding
 import com.v2ray.ang.ui.adapter.PaymentsAdapter
+import com.v2ray.ang.ui.component.SubPage
+import com.v2ray.ang.ui.component.ToolbarBinder
 import com.v2ray.ang.viewmodel.AccountViewModel
 import kotlinx.coroutines.launch
 
@@ -41,12 +43,19 @@ class PaymentHistoryActivity : BaseActivity() {
     private var showingCache = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
-        setContentViewWithToolbar(
-            binding.root,
-            showHomeAsUp = true,
+        // README §7's lekalo draws the title at 24sp/700 UNDER the back control, which
+        // activity_base's 16sp MaterialToolbar cannot do — so the header is @layout/view_sub_header
+        // inside this screen's own layout. The screen never used the base progress bar; its own
+        // @id/progress_history sits over the list, where the rows it is waiting for will appear.
+        setContentView(binding.root)
+        ToolbarBinder.bind(
+            root = binding.toolbar.root,
             title = getString(R.string.history_title),
+            activity = this,
         )
+        ToolbarBinder.attachTo(binding.toolbar.root, binding.rvPayments)
 
         binding.rvPayments.layoutManager = LinearLayoutManager(this)
         binding.rvPayments.adapter = paymentsAdapter

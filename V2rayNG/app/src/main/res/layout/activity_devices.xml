@@ -18,16 +18,11 @@
   where §7 puts a screen's one sentence of explanation. The id stays: the screen
   hides that line while the empty state is up.
 
-  WHAT §7 ASKS FOR AND IS NOT HERE YET, both blocked on copy that res/values does
-  not carry and that is not invented here:
-
-    · «Это устройство» — the accent mark on the row for the phone you are holding,
-      which also makes that row undeletable.
-    · «Отключено от подписки» — the subtitle a deleted row changes to while it
-      fades over 700ms before leaving the list.
-
-  Both are strings the owner has to name. Deleting still works exactly as it did,
-  through the confirm dialog @string/devices_delete_message.
+  §7's TWO BEHAVIOURS NOW LAND, and they live in DeviceAdapter rather than here:
+  the device you are holding is marked «Это устройство» in the accent and offers no
+  «Удалить»; a removed row dims, says «Отключено от подписки» instead of its meta
+  line, and leaves the list 700ms later. The confirm dialog
+  (@string/devices_delete_message) still guards the tap.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -67,18 +62,37 @@
             android:paddingBottom="@dimen/space_32"
             android:scrollbars="none">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rv_devices"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/screen_gutter"
-                android:layout_marginTop="@dimen/space_16"
-                android:layout_marginEnd="@dimen/screen_gutter"
-                android:background="@drawable/bg_card_inert"
-                android:clipToOutline="true"
-                android:nestedScrollingEnabled="false"
-                android:scrollbars="none"
-                tools:listitem="@layout/item_device" />
+                android:orientation="vertical">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rv_devices"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/screen_gutter"
+                    android:layout_marginTop="@dimen/space_16"
+                    android:layout_marginEnd="@dimen/screen_gutter"
+                    android:background="@drawable/bg_card_inert"
+                    android:clipToOutline="true"
+                    android:nestedScrollingEnabled="false"
+                    android:scrollbars="none"
+                    tools:listitem="@layout/item_device" />
+
+                <!-- §7's footnote, under the card and not inside it: it explains what
+                     «Удалить» costs, which is the reason it is read BEFORE the tap and
+                     the reason it is not a row. Hidden with the list. -->
+                <TextView
+                    android:id="@+id/tv_devices_footnote"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_12"
+                    android:paddingStart="@dimen/screen_gutter"
+                    android:paddingEnd="@dimen/screen_gutter"
+                    android:text="@string/devices_footnote"
+                    android:textAppearance="@style/TextAppearance.App.Subtitle" />
+            </LinearLayout>
         </androidx.core.widget.NestedScrollView>
 
         <LinearLayout

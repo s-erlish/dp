@@ -5,7 +5,7 @@
   ============================================================================
 
       плитка 40dp → 16dp → имя 14sp + «Активно: … · ID: …» 12.5sp
-      → справа «Удалить» красным
+      → справа «Это устройство» акцентом ИЛИ «Удалить» красным
 
   It was a MaterialCardView with an 8dp gap under it, i.e. one card per device in a
   vertical grid. §7 draws the devices as ROWS inside ONE card, and CLAUDE.md's «no
@@ -70,6 +70,11 @@
                 android:textAppearance="@style/TextAppearance.App.Body"
                 tools:text="Google Pixel 8" />
 
+            <!-- ONE subtitle, «Активно: … · ID: …», wrapping to two lines — the prototype's
+                 own composition, and §11 grabl 9's limit. It was two stacked TextViews, which
+                 gave a three-line row where the design draws two and left the ID sitting on a
+                 line of its own. The adapter joins them; nothing about the ID is lost.
+                 It is also what the deleted row's «Отключено от подписки» replaces. -->
             <TextView
                 android:id="@+id/tv_device_meta"
                 android:layout_width="match_parent"
@@ -78,18 +83,29 @@
                 android:ellipsize="end"
                 android:maxLines="2"
                 android:textAppearance="@style/TextAppearance.App.Caption"
-                tools:text="Активно: 09.07.2026" />
-
-            <TextView
-                android:id="@+id/tv_device_hwid"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_2"
-                android:ellipsize="middle"
-                android:maxLines="1"
-                android:textAppearance="@style/TextAppearance.App.Caption"
-                tools:text="ID: a1b2c3d4e5f6" />
+                tools:text="Активно: 09.07.2026 · ID: a1b2c3d4e5f6" />
         </LinearLayout>
+
+        <!--
+          THE TRAILING SLOT HOLDS EXACTLY ONE OF THESE TWO, and which one is not a
+          decoration but the row's whole contract (§7): the device you are holding is
+          marked «Это устройство» in the accent and CANNOT be removed — a row that
+          offered «Удалить» there would log you out of your own subscription — and every
+          other device offers the named destructive action.
+
+          The badge is a TextView and not a disabled button on purpose: it is a fact
+          about the row, not an affordance that happens to be off.
+        -->
+        <TextView
+            android:id="@+id/tv_device_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_12"
+            android:text="@string/devices_this_device"
+            android:textAppearance="@style/TextAppearance.App.Body"
+            android:textColor="?attr/colorPrimary"
+            android:visibility="gone"
+            tools:visibility="visible" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_device_delete"

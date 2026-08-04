@@ -1,17 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Payment-history screen. Pure-dark screen background; the list is a column of
-  item_payment cards. The centred block doubles as the empty state ("Платежей
-  пока нет" + a wire-ready «Купить подписку» CTA) and the error state — its text
-  and visibility are driven by PaymentHistoryActivity via tv_empty.
+  ============================================================================
+  «История платежей» (PaymentHistoryActivity) — handoff README §7.
+  ============================================================================
+
+      кнопка назад → «История платежей» 24sp/700 → список операций
+
+  The list is a column of item_payment cards. The centred block doubles as the
+  empty state («Платежей пока нет» + a «Купить подписку» CTA) and the error state —
+  its text and visibility are driven by PaymentHistoryActivity via tv_empty.
+
+  THE HEADER IS THE LEKALO'S, not activity_base's MaterialToolbar: §7 puts the
+  title UNDER the back control at 24sp/700, which a Toolbar cannot draw. The ids
+  are view_toolbar's, so ToolbarBinder binds it in one call. Pull-to-refresh
+  (P-14's sibling on this screen) is untouched — it stays under the header, so
+  the gesture never fights the title.
 -->
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:attr/colorBackground"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical"
     tools:context=".ui.PaymentHistoryActivity">
+
+    <include
+        android:id="@+id/toolbar"
+        layout="@layout/view_sub_header" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/refresh_layout"
@@ -77,8 +99,9 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:indeterminateTint="?attr/iconTintBlue"
+        android:indeterminateTint="?attr/colorPrimary"
         android:visibility="gone"
         tools:visibility="visible" />
 
-</FrameLayout>
+    </FrameLayout>
+</LinearLayout>
