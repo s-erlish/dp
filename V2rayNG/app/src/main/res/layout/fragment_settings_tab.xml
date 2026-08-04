@@ -18,18 +18,25 @@
       CONSEQUENCES of the padding, never fixed heights — a fixed height clips a Russian label at
       font scale 200% (П-29).
     - The gap before the trailing slot is 12 when something is there to trail (§6: «правый отступ
-      12dp только когда справа есть значение или переключатель») and 0 when nothing is.
+      12dp только когда справа есть значение или переключатель») and 0 when nothing is — the
+      prototype's own rule, `gap: (isToggle || pop || r[6]) ? '12px' : '0px'`. A chevron is not
+      «значение»: it is the row's own punctuation, already spaced by its 4dp, and holding a second
+      12dp open in front of it shortens the label for nothing. Eleven rows here trail only a
+      chevron and set no gap at all.
     - The subtitle is capped at two lines. §11 grabl 9: «длинные подписи ломают ритм строк».
 
     WHAT CHANGED IN THE 2026-08 PORT, and why each one is here rather than in a shared style:
 
     1. TILES ARE NEUTRAL. They were bg_icon_blue / _green / _orange / _purple / _red / _yellow — six
        fills encoding a category system this product does not have (D-5), and the prototype draws
-       every one of them grey in the blue theme too. @drawable/bg_tile_neutral is the repo's own
-       neutral tile and resolves to @color/icon_tile_neutral, which is #20242B on dark — §8's «Плитка
-       #20242B» to the character — and #E3EAF4 on light. The glyph is ?attr/colorOnSurfaceVariant,
-       #9BA1AD on dark, which is §8's «tileFg». Both are tokens with a light value and a mono
-       mapping; no hex is written here (П-24).
+       every one of them grey in the blue theme too. @drawable/bg_tile_neutral carries the shape;
+       the FILL comes from ?attr/colorSurfaceContainerHighest through backgroundTint, and the glyph
+       from ?attr/colorOnSurfaceVariant. Both are theme ATTRIBUTES rather than the drawable's own
+       @color/icon_tile_neutral, and that is the whole point: the attribute is #20242B on dark —
+       §8's «Плитка #20242B» to the character — #E3EAF4 on light, and the mono overlay remaps it to
+       mono_surfaceContainerHighest by itself. A colour resource cannot be remapped by an overlay,
+       so the plain drawable would have left 25 faintly blue tiles on a screen whose whole premise
+       is that it has no colour (П-24). No hex is written here.
     2. THE RIPPLE IS GONE. Every row carried ?attr/selectableItemBackground. §1 replaces the splash
        with two channels that push the object IN: @anim/press_row 0.975 and @drawable/bg_row, whose
        pressed state steps the fill DOWN to ?attr/colorPressBg. SettingsTabFragment additionally
@@ -60,12 +67,16 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/transparent"
+    android:clipChildren="false"
+    android:clipToPadding="false"
     android:fillViewport="true"
     android:scrollbars="none">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:orientation="vertical"
         android:paddingTop="@dimen/space_6"
         android:paddingBottom="@dimen/space_16">
@@ -118,7 +129,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -184,7 +196,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -248,7 +261,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -317,7 +331,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -386,7 +401,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -452,7 +468,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -518,7 +535,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -533,7 +551,6 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -588,7 +605,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -603,7 +621,6 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -682,7 +699,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -752,7 +770,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -817,7 +836,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -910,7 +930,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -976,7 +997,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -1042,7 +1064,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -1153,7 +1176,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -1219,7 +1243,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -1234,7 +1259,6 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:text="@string/settings_routing"
                         android:textAppearance="@style/TextAppearance.App.Body" />
@@ -1274,7 +1298,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -1289,7 +1314,6 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:text="@string/settings_assets"
                         android:textAppearance="@style/TextAppearance.App.Body" />
@@ -1329,7 +1353,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -1344,7 +1369,6 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -1423,7 +1447,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -1438,7 +1463,6 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:text="@string/settings_tv_send"
                         android:textAppearance="@style/TextAppearance.App.Body" />
@@ -1479,7 +1503,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -1494,7 +1519,6 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:text="@string/settings_tv_receive"
                         android:textAppearance="@style/TextAppearance.App.Body" />
@@ -1569,7 +1593,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -1584,7 +1609,6 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:text="@string/settings_logs"
                         android:textAppearance="@style/TextAppearance.App.Body" />
@@ -1624,7 +1648,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -1639,7 +1664,6 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:text="@string/settings_check_update"
                         android:textAppearance="@style/TextAppearance.App.Body" />
@@ -1679,7 +1703,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -1743,7 +1768,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -1758,7 +1784,6 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:text="@string/settings_backup"
                         android:textAppearance="@style/TextAppearance.App.Body" />
@@ -1798,7 +1823,8 @@
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_tile_neutral">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -1813,7 +1839,6 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
