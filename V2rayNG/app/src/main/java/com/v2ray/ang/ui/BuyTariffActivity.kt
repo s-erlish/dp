@@ -2,6 +2,7 @@ package com.v2ray.ang.ui
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -14,6 +15,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.viewModels
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.core.widget.NestedScrollView
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
@@ -28,6 +30,8 @@ import com.v2ray.ang.auth.dto.TariffGroupDto
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
+import com.v2ray.ang.ui.component.SubPage
+import com.v2ray.ang.ui.component.ToolbarBinder
 import com.v2ray.ang.util.reducedMotion
 import com.v2ray.ang.viewmodel.AccountViewModel
 import kotlinx.coroutines.Job
@@ -65,8 +69,13 @@ class BuyTariffActivity : BaseActivity() {
     private val tariffsByKey = LinkedHashMap<String, TariffDto>()
     private val cardViews = LinkedHashMap<String, MaterialCardView>()
     private val optionContainers = LinkedHashMap<String, LinearLayout>()
-    // Per-tariff check marks so the whole list needn't be rebuilt on re-select.
-    private val checkMarks = mutableMapOf<String, ImageView>()
+    // Per-tariff carets, so opening a tariff needn't rebuild the list.
+    private val carets = mutableMapOf<String, ImageView>()
+    // Per-tariff name + price, which light up in the accent while the tariff is open.
+    private val tariffNames = mutableMapOf<String, TextView>()
+    private val tariffPrices = mutableMapOf<String, TextView>()
+    // Per-tariff «Текущий» badges, repainted when the account's subscriptions arrive.
+    private val tariffBadges = mutableMapOf<String, TextView>()
     // Per-tariff option rows, so the selected row can be highlighted without a rebuild.
     private val optionRows = mutableMapOf<String, MutableList<Pair<PriceOptionDto, View>>>()
 
@@ -91,7 +100,6 @@ class BuyTariffActivity : BaseActivity() {
     private lateinit var btnRetry: MaterialButton
     private lateinit var tvPending: TextView
     private lateinit var stateView: TextView
-    private lateinit var tariffsHeader: TextView
     private lateinit var tariffsContainer: LinearLayout
     private lateinit var checkoutCard: MaterialCardView
     private lateinit var extraDevicesRow: LinearLayout
@@ -103,8 +111,20 @@ class BuyTariffActivity : BaseActivity() {
     private lateinit var btnPay: MaterialButton
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
-        setContentViewWithToolbar(R.layout.activity_buy_tariff, title = getString(R.string.buy_title))
+        // README §7's lekalo puts the title at 24sp/700 UNDER the back control and one sentence of
+        // explanation under that — «Выберите тариф и срок», which is also what the section label
+        // above the cards used to say and no longer needs to.
+        setContentView(R.layout.activity_buy_tariff)
+        val header = findViewById<View>(R.id.toolbar)
+        ToolbarBinder.bind(
+            root = header,
+            title = getString(R.string.buy_title),
+            activity = this,
+            note = getString(R.string.buy_note),
+        )
+        ToolbarBinder.attachTo(header, findViewById<NestedScrollView>(R.id.main_content))
 
         progressBuy = findViewById(R.id.progress_buy)
         skeleton = findViewById(R.id.ll_skeleton)
@@ -112,7 +132,6 @@ class BuyTariffActivity : BaseActivity() {
         btnRetry = findViewById(R.id.btn_retry)
         tvPending = findViewById(R.id.tv_pending)
         stateView = findViewById(R.id.tv_state)
-        tariffsHeader = findViewById(R.id.tv_tariffs_header)
         tariffsContainer = findViewById(R.id.ll_tariffs)
         checkoutCard = findViewById(R.id.card_checkout)
         extraDevicesRow = findViewById(R.id.ll_extra_devices)
@@ -169,6 +188,8 @@ class BuyTariffActivity : BaseActivity() {
         }
         viewModel.loadPublicConfig()
         viewModel.refreshProfile()
+        // What the account already owns, for «Текущий».
+        viewModel.loadSubscriptions()
     }
 
     private fun observe() {
@@ -191,6 +212,23 @@ class BuyTariffActivity : BaseActivity() {
         // busy CTA comes back busy on the other side of one (D10).
         lifecycleScope.launch {
             viewModel.paymentInFlight.collect { renderPayBusy(it) }
+        }
+        // §7's «Текущий». The catalog cannot answer which tariff is already owned, and this
+        // activity holds its OWN AccountViewModel, so the list starts empty and the badge has to
+        // wait for it rather than be decided once at inflation. An account whose subscriptions
+        // never arrive shows no badge, which is the honest fallback: a wrong «Текущий» would tell
+        // someone they already have what they are about to buy.
+        lifecycleScope.launch {
+            viewModel.subscriptions.collect { paintCurrentBadges() }
+        }
+    }
+
+    /** Shows «Текущий» on every card whose tariff the account already subscribes to. */
+    private fun paintCurrentBadges() {
+        for ((key, badge) in tariffBadges) {
+            val tariff = tariffsByKey[key]
+            badge.visibility =
+                if (tariff != null && isCurrentTariff(tariff)) View.VISIBLE else View.GONE
         }
     }
 
@@ -221,7 +259,6 @@ class BuyTariffActivity : BaseActivity() {
         stateIcon.visibility = View.GONE
         btnRetry.visibility = View.GONE
         stateView.visibility = View.GONE
-        tariffsHeader.visibility = View.GONE
         // Reset alpha in case a prior skeleton→content cross-fade was interrupted by a reload.
         skeleton.alpha = 1f
         skeleton.visibility = View.VISIBLE
@@ -233,7 +270,6 @@ class BuyTariffActivity : BaseActivity() {
         btnRetry.visibility = View.VISIBLE
         stateView.text = getString(R.string.buy_error)
         stateView.visibility = View.VISIBLE
-        tariffsHeader.visibility = View.GONE
     }
 
     private fun showEmpty() {
@@ -242,7 +278,6 @@ class BuyTariffActivity : BaseActivity() {
         btnRetry.visibility = View.GONE
         stateView.text = getString(R.string.buy_empty)
         stateView.visibility = View.VISIBLE
-        tariffsHeader.visibility = View.GONE
     }
 
     /**
@@ -274,7 +309,6 @@ class BuyTariffActivity : BaseActivity() {
             // Same catalog, re-emitted. This is the path a payment error takes: the error is
             // combined into this render, and rebuilding here is exactly what used to reset every
             // card to neutral while the checkout card went on offering the invisible selection.
-            tariffsHeader.visibility = View.VISIBLE
             skeleton.visibility = View.GONE
             applySelection()
             return
@@ -286,12 +320,14 @@ class BuyTariffActivity : BaseActivity() {
 
         // Build the real cards FIRST so the fade reveals a fully-rendered list, not a blank frame.
         // Rebuild once; selection is then mutated in place.
-        tariffsHeader.visibility = View.VISIBLE
         tariffsContainer.removeAllViews()
         tariffsByKey.clear()
         cardViews.clear()
         optionContainers.clear()
-        checkMarks.clear()
+        carets.clear()
+        tariffNames.clear()
+        tariffPrices.clear()
+        tariffBadges.clear()
         optionRows.clear()
         val inflater = LayoutInflater.from(this)
 
@@ -313,7 +349,6 @@ class BuyTariffActivity : BaseActivity() {
             // Already on content: no animation, just make sure everything is at full opacity.
             skeleton.visibility = View.GONE
             skeleton.alpha = 1f
-            tariffsHeader.alpha = 1f
             tariffsContainer.alpha = 1f
         }
     }
@@ -328,7 +363,6 @@ class BuyTariffActivity : BaseActivity() {
         if (skeleton.reducedMotion()) {
             skeleton.visibility = View.GONE
             skeleton.alpha = 1f
-            tariffsHeader.alpha = 1f
             tariffsContainer.alpha = 1f
             return
         }
@@ -346,9 +380,7 @@ class BuyTariffActivity : BaseActivity() {
             }
             .start()
 
-        tariffsHeader.alpha = 0f
         tariffsContainer.alpha = 0f
-        tariffsHeader.animate().alpha(1f).setDuration(duration).setInterpolator(easeOut).start()
         tariffsContainer.animate().alpha(1f).setDuration(duration).setInterpolator(easeOut).start()
     }
 
@@ -363,7 +395,10 @@ class BuyTariffActivity : BaseActivity() {
         val tvEmoji = card.findViewById<TextView>(R.id.tv_group_emoji)
         val tvName = card.findViewById<TextView>(R.id.tv_tariff_name)
         val tvInfo = card.findViewById<TextView>(R.id.tv_tariff_info)
-        val ivCheck = card.findViewById<ImageView>(R.id.iv_check)
+        val ivCaret = card.findViewById<ImageView>(R.id.iv_tariff_caret)
+        val tvBadge = card.findViewById<TextView>(R.id.tv_tariff_badge)
+        val tvFrom = card.findViewById<TextView>(R.id.tv_tariff_from)
+        val tvPeriod = card.findViewById<TextView>(R.id.tv_tariff_period)
         val llOptions = card.findViewById<LinearLayout>(R.id.ll_price_options)
 
         // The design retired the emoji chrome: keep tv_group_emoji GONE in both branches so the
@@ -384,11 +419,28 @@ class BuyTariffActivity : BaseActivity() {
         tvInfo.text = getString(R.string.buy_tariff_devices, tariff.includedDevices) +
             " · " + getString(R.string.buy_tariff_traffic, trafficStr)
 
+
+        // §7: «справа цена от и "в месяц"». The rate is derived from the tariff's own price
+        // options, so a catalog that changes its terms changes this without a code change; a
+        // tariff with no options shows nothing rather than a zero.
+        val monthly = monthlyRate(tariff)
+        if (monthly == null) {
+            tvFrom.visibility = View.GONE
+            tvPeriod.visibility = View.GONE
+        } else {
+            tvFrom.visibility = View.VISIBLE
+            tvPeriod.visibility = View.VISIBLE
+            tvFrom.text = formatMoney(monthly, tariff.currency)
+        }
+
         val key = tariffKey(tariff)
         tariffsByKey[key] = tariff
         cardViews[key] = card
         optionContainers[key] = llOptions
-        checkMarks[key] = ivCheck
+        carets[key] = ivCaret
+        tariffNames[key] = tvName
+        tariffPrices[key] = tvFrom
+        tariffBadges[key] = tvBadge
 
         // Build the duration/price option rows (hidden until the tariff is selected).
         val rows = mutableListOf<Pair<PriceOptionDto, View>>()
@@ -397,8 +449,19 @@ class BuyTariffActivity : BaseActivity() {
             val row = inflater.inflate(R.layout.item_buy_option, llOptions, false)
             val tvDur = row.findViewById<TextView>(R.id.tv_option_duration)
             val tvPrice = row.findViewById<TextView>(R.id.tv_option_price)
+            val tvSaving = row.findViewById<TextView>(R.id.tv_option_saving)
             tvDur.text = getString(R.string.buy_option_duration, option.durationDays)
             tvPrice.text = formatMoney(option.price, tariff.currency)
+
+            // §7: «выгода пишется приглушённо-белым, не зелёным» — the tone is the layout's
+            // (Caption on colorOnSurfaceVariant); what belongs here is only whether there IS one.
+            val saving = savingOn(tariff, option)
+            if (saving == null) {
+                tvSaving.visibility = View.GONE
+            } else {
+                tvSaving.visibility = View.VISIBLE
+                tvSaving.text = getString(R.string.buy_saving, formatMoney(saving, tariff.currency))
+            }
             row.setOnClickListener { selectOption(tariff, option) }
             llOptions.addView(row)
             rows.add(option to row)
@@ -467,13 +530,24 @@ class BuyTariffActivity : BaseActivity() {
         val accent = resolveAttrColor(androidx.appcompat.R.attr.colorPrimary)
         val selected = selectedTariffKey
 
+        val onSurface = resolveAttrColor(com.google.android.material.R.attr.colorOnSurface)
+        val muted = resolveAttrColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
+
         for ((key, card) in cardViews) {
             val isSelected = key == selected
+            // §7: «контур и название загораются акцентом».
             card.strokeColor = if (isSelected) accent else neutral
             card.strokeWidth = if (isSelected) dp(2) else dp(1)
-            optionContainers[key]?.visibility = if (isSelected) View.VISIBLE else View.GONE
-            checkMarks[key]?.visibility = if (isSelected) View.VISIBLE else View.INVISIBLE
+            tariffNames[key]?.setTextColor(if (isSelected) accent else onSurface)
+            tariffPrices[key]?.setTextColor(if (isSelected) accent else onSurface)
+            carets[key]?.let { caret ->
+                caret.imageTintList = ColorStateList.valueOf(if (isSelected) accent else muted)
+                turnCaret(caret, isSelected)
+            }
+            optionContainers[key]?.let { reveal(it, isSelected) }
         }
+
+        paintCurrentBadges()
 
         val tariff = selectedTariff()
         val option = selectedOption()
@@ -492,17 +566,82 @@ class BuyTariffActivity : BaseActivity() {
 
     private fun highlightOption(key: String, option: PriceOptionDto) {
         optionRows[key]?.forEach { (opt, view) ->
-            val selected = optionKey(opt) == optionKey(option)
-            view.setBackgroundResource(
-                if (selected) R.drawable.bg_buy_option_selected else R.drawable.bg_buy_option
-            )
+            paintOption(view, optionKey(opt) == optionKey(option))
         }
     }
 
     private fun clearOptionHighlights(key: String) {
-        optionRows[key]?.forEach { (_, view) ->
-            view.setBackgroundResource(R.drawable.bg_buy_option)
+        optionRows[key]?.forEach { (_, view) -> paintOption(view, false) }
+    }
+
+    /**
+     * §7 marks the chosen term with a dot, not with a check at the end of the row. Both drawables
+     * are the same 22dp ring in the same place, so choosing a term changes colour and fill and
+     * moves nothing (§11 grabl 2).
+     */
+    private fun paintOption(row: View, selected: Boolean) {
+        row.setBackgroundResource(
+            if (selected) R.drawable.bg_buy_option_selected else R.drawable.bg_buy_option
+        )
+        row.findViewById<ImageView>(R.id.iv_option_dot)?.setImageResource(
+            if (selected) R.drawable.ic_option_dot_on else R.drawable.ic_option_dot_off
+        )
+        row.isSelected = selected
+    }
+
+    /**
+     * §7's disclosure: «раскрытие 340 мс», on `motion_expand`, which is that number.
+     *
+     * ALPHA AND VISIBILITY, not an animated height. 00-rules.md 8.7 and §11 grabl 10 both refuse
+     * animated layout properties, and the card's growth does not need one: the panel takes its full
+     * height immediately and the terms fade in over it, so the list arrives on a card that is
+     * already the right size instead of being revealed by a sliding edge. The caret turns over the
+     * same 340ms ([turnCaret]), which is what carries the sense of opening.
+     *
+     * Reduced motion snaps to the end state, and an in-flight animation is cancelled first — two
+     * taps on two tariffs must not leave both panels half-faded.
+     */
+    private fun reveal(panel: View, open: Boolean) {
+        panel.animate().cancel()
+        if (panel.reducedMotion()) {
+            panel.visibility = if (open) View.VISIBLE else View.GONE
+            panel.alpha = 1f
+            return
         }
+        val duration = resources.getInteger(R.integer.motion_expand).toLong()
+        val easeOut = AnimationUtils.loadInterpolator(this, R.interpolator.ease_out_quart)
+        if (open) {
+            if (panel.visibility == View.VISIBLE && panel.alpha == 1f) return
+            panel.alpha = 0f
+            panel.visibility = View.VISIBLE
+            panel.animate().alpha(1f).setDuration(duration).setInterpolator(easeOut).start()
+        } else {
+            if (panel.visibility != View.VISIBLE) return
+            panel.animate()
+                .alpha(0f)
+                .setDuration(duration)
+                .setInterpolator(easeOut)
+                .withEndAction {
+                    panel.visibility = View.GONE
+                    panel.alpha = 1f
+                }
+                .start()
+        }
+    }
+
+    /** The caret turns 180° over the same 340ms the terms take to appear (§7). */
+    private fun turnCaret(caret: ImageView, open: Boolean) {
+        val target = if (open) 180f else 0f
+        if (caret.reducedMotion()) {
+            caret.rotation = target
+            return
+        }
+        if (caret.rotation == target) return
+        caret.animate()
+            .rotation(target)
+            .setDuration(resources.getInteger(R.integer.motion_expand).toLong())
+            .setInterpolator(AnimationUtils.loadInterpolator(this, R.interpolator.ease_out_quart))
+            .start()
     }
 
     private fun setupExtraDevices(tariff: TariffDto) {
@@ -557,7 +696,14 @@ class BuyTariffActivity : BaseActivity() {
         option.price + extraDevices * tariff.pricePerExtraDevice
 
     private fun updateTotal(tariff: TariffDto, option: PriceOptionDto) {
-        tvTotal.text = formatMoney(currentTotal(tariff, option), tariff.currency)
+        val total = currentTotal(tariff, option)
+        tvTotal.text = formatMoney(total, tariff.currency)
+        // §7: «кнопка внизу подстраивается: "Оплатить 1 290 ₽"». The amount on the control is the
+        // amount it will charge, so the stepper above cannot change one without the other.
+        if (!viewModel.paymentInFlight.value) {
+            btnPay.text = getString(R.string.buy_pay_amount, formatMoney(total, tariff.currency))
+            btnPay.contentDescription = btnPay.text
+        }
     }
 
     // endregion
@@ -572,16 +718,24 @@ class BuyTariffActivity : BaseActivity() {
      */
     private fun renderPayBusy(busy: Boolean) {
         btnPay.isEnabled = !busy
-        btnPay.text = getString(if (busy) R.string.account_pay_in_progress else R.string.buy_pay)
-        btnPay.contentDescription = btnPay.text
         progressBuy.visibility = if (busy) View.VISIBLE else View.GONE
-        selectedTariff()?.let { renderExtraDevices(it) }
+        if (busy) {
+            btnPay.text = getString(R.string.account_pay_in_progress)
+            btnPay.contentDescription = btnPay.text
+        }
+        selectedTariff()?.let { tariff ->
+            renderExtraDevices(tariff)
+            // Restores «Оплатить N ₽» when the charge settles; the amount is still the truth.
+            if (!busy) selectedOption()?.let { updateTotal(tariff, it) }
+        }
     }
 
     private fun onPayClicked() {
         // Belt to the ViewModel's braces: the request itself refuses to start twice, and the CTA
         // refuses to ask.
         if (viewModel.paymentInFlight.value) return
+
+        paintCurrentBadges()
 
         val tariff = selectedTariff()
         val option = selectedOption()
@@ -751,6 +905,46 @@ class BuyTariffActivity : BaseActivity() {
         }
     }
 
+    /**
+     * The cheapest per-month rate this tariff is sold at, or null when it is sold at none.
+     *
+     * §7: «список сроков у каждого тарифа свой — приходит с сервера, не зашивать». So the figure
+     * on the collapsed card is computed from [optionsOf] rather than stored: whatever terms the
+     * catalog returns are the terms this compares. A term shorter than a month still divides by
+     * its real length, so a weekly plan is not advertised at a monthly price.
+     */
+    private fun monthlyRate(tariff: TariffDto): Double? =
+        optionsOf(tariff)
+            .filter { it.durationDays > 0 && it.price > 0.0 }
+            .minOfOrNull { it.price / (it.durationDays / DAYS_PER_MONTH) }
+
+    /**
+     * «Выгода N ₽» for [option]: what the same span would cost at the SHORTEST term's rate, minus
+     * what it costs at this one. Null when there is no shorter term to compare against or the
+     * saving rounds to nothing — a discount that does not exist is not written as «Выгода 0 ₽».
+     */
+    private fun savingOn(tariff: TariffDto, option: PriceOptionDto): Double? {
+        if (option.durationDays <= 0 || option.price <= 0.0) return null
+        val baseline = optionsOf(tariff)
+            .filter { it.durationDays > 0 && it.price > 0.0 }
+            .minByOrNull { it.durationDays }
+            ?: return null
+        if (optionKey(baseline) == optionKey(option)) return null
+        val atBaselineRate = baseline.price / baseline.durationDays * option.durationDays
+        val saving = atBaselineRate - option.price
+        return saving.takeIf { it >= 1.0 }
+    }
+
+    /**
+     * True for the tariff the account is already on (§7's «Текущий»). The catalog cannot answer
+     * this — it lists what is for sale — so it is matched against the subscriptions the account
+     * reports, by the same tariffId those subscriptions renew on.
+     */
+    private fun isCurrentTariff(tariff: TariffDto): Boolean {
+        val id = tariff.id.takeIf { it.isNotBlank() } ?: return false
+        return viewModel.subscriptions.value.any { it.tariffId == id }
+    }
+
     private fun tariffKey(tariff: TariffDto): String =
         tariff.id.ifBlank { tariff.name }
 
@@ -774,6 +968,12 @@ class BuyTariffActivity : BaseActivity() {
 
     companion object {
         private const val REQUEST_PAY_METHOD = "buy_pay_method"
+
+        /**
+         * The divisor behind «в месяц». 30.44 and not 30: over a year the round number drifts by
+         * five days, which is enough to advertise an annual plan at a rate it is not sold at.
+         */
+        private const val DAYS_PER_MONTH = 30.44
 
         private const val EXTRA_TARIFF_ID = "extra_tariff_id"
         private const val EXTRA_OPTION_ID = "extra_option_id"

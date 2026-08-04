@@ -1,27 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Buy-subscription screen. Incy design language: pure-dark surface, bright-blue
-  accent, calm premium spacing. Pick a tariff, a duration/price option and extra
-  devices, then tap "Оплатить" to choose a payment method.
+  ============================================================================
+  «Купить подписку» (BuyTariffActivity) — handoff README §7.
+  ============================================================================
+
+      кнопка назад → «Купить подписку» 24sp/700 → «Выберите тариф и срок» 13sp
+      → карточки тарифов, раскрываются в список сроков
+      → карточка оформления: устройства · Итого · «Оплатить N ₽»
+
+  §7 draws the pay button inside the open tariff, because the prototype's tariff has
+  nothing else to configure. THIS screen does (P-16): a stepper for extra devices and
+  the «Итого» they change. Splitting those from the button that charges for them
+  would put the amount in one card and the confirmation in another, so the checkout
+  card keeps all three and stays directly under the tariff list — «кнопка внизу
+  подстраивается» reads the same way, and it now says «Оплатить 1 290 ₽».
+
+  The header replaced «Выберите тариф», the section label that used to sit above the
+  cards: §7 puts that sentence under the title as the lekalo's note, and one screen
+  does not need to say «выберите тариф» twice.
 
   States (driven by BuyTariffActivity): ll_skeleton = loading; iv_state_icon +
   tv_state + btn_retry = error; iv_state_icon + tv_state = empty. progress_buy is
   NOT a screen state — it is the pay CTA's in-flight arc and lives on the button.
 -->
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?android:attr/colorBackground"
-    android:fillViewport="true">
+    android:fitsSystemWindows="true"
+    android:orientation="vertical"
+    tools:context=".ui.BuyTariffActivity">
+
+    <include
+        android:id="@+id/toolbar"
+        layout="@layout/view_sub_header" />
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/main_content"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:scrollbars="none">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingHorizontal="@dimen/screen_gutter"
-        android:paddingTop="@dimen/space_12"
+        android:paddingTop="@dimen/space_8"
         android:paddingBottom="@dimen/space_24">
 
         <!-- ============ States ============ -->
@@ -117,17 +146,6 @@
         </LinearLayout>
 
         <!-- ============ 1. Tariffs ============ -->
-        <TextView
-            android:id="@+id/tv_tariffs_header"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/space_4"
-            android:layout_marginBottom="@dimen/space_8"
-            android:text="@string/buy_pick_tariff"
-            android:textAppearance="@style/TextAppearance.App.Title"
-            android:visibility="gone"
-            tools:visibility="visible" />
-
         <LinearLayout
             android:id="@+id/ll_tariffs"
             android:layout_width="match_parent"
@@ -162,19 +180,15 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
-                    <FrameLayout
-                        android:layout_width="@dimen/tile_size"
-                        android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
-
-                        <ImageView
-                            android:layout_width="@dimen/tile_glyph"
-                            android:layout_height="@dimen/tile_glyph"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_acc_devices"
-                            app:tint="?attr/colorPrimary" />
-                    </FrameLayout>
+                    <!-- Neutral, like every other tile in the product (D-5, §9): a coloured
+                         tile encodes a category this app does not have. The fill is a THEME
+                         ATTRIBUTE and not @drawable/bg_icon_blue's colour resource, so the mono
+                         overlay can reach it — an overlay cannot restate a colour resource. -->
+                    <ImageView
+                        style="@style/Widget.Departament.Tile"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest"
+                        android:importantForAccessibility="no"
+                        app:srcCompat="@drawable/ic_acc_devices" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -212,7 +226,7 @@
                         android:minHeight="0dp"
                         android:padding="0dp"
                         android:stateListAnimator="@anim/press_scale"
-                        app:backgroundTint="?attr/iconTileBgBlue"
+                        app:backgroundTint="?attr/colorSurfaceContainerHighest"
                         app:cornerRadius="@dimen/radius_pill"
                         app:icon="@drawable/ic_remove_24dp"
                         app:iconGravity="textStart"
@@ -242,7 +256,7 @@
                         android:minHeight="0dp"
                         android:padding="0dp"
                         android:stateListAnimator="@anim/press_scale"
-                        app:backgroundTint="?attr/iconTileBgBlue"
+                        app:backgroundTint="?attr/colorSurfaceContainerHighest"
                         app:cornerRadius="@dimen/radius_pill"
                         app:icon="@drawable/ic_add_24dp"
                         app:iconGravity="textStart"
@@ -303,8 +317,7 @@
                         style="@style/Widget.Departament.Button.Primary.Tall"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="@string/buy_pay"
-                        app:icon="@drawable/ic_acc_wallet" />
+                        android:text="@string/buy_pay" />
 
                     <com.google.android.material.progressindicator.CircularProgressIndicator
                         android:id="@+id/progress_buy"
@@ -320,4 +333,5 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
     </LinearLayout>
-</androidx.core.widget.NestedScrollView>
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

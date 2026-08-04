@@ -6,6 +6,14 @@
 <resources>
     <string name="buy_title">Купить подписку</string>
 
+    <!-- README §7 «Купить подписку», из прототипа дословно. -->
+    <string name="buy_note">Выберите тариф и срок</string>
+    <string name="buy_current">Текущий</string>
+    <string name="buy_per_month">в месяц</string>
+    <string name="buy_saving">Выгода %1$s</string>
+    <string name="buy_pay_amount">Оплатить %1$s</string>
+    <string name="buy_expand_cd">Показать сроки</string>
+
     <!-- Section headers -->
     <string name="buy_pick_tariff">Выберите тариф</string>
     <string name="buy_pick_duration">Выберите срок</string>
