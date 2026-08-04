@@ -11,17 +11,21 @@
     android:orientation="horizontal"
     android:paddingStart="@dimen/space_16"
     android:paddingEnd="@dimen/space_16"
-    android:paddingVertical="@dimen/space_12"
+    android:paddingVertical="@dimen/space_10"
     android:stateListAnimator="@anim/press_row">
 
-    <!-- Neutral tile by default: blue is reserved for promoted rows (accent budget).
-         A row that wants the blue tile overrides setting_icon_bg background +
-         setting_icon tint at bind time. -->
+    <!-- Neutral tile, and neutral through a theme ATTRIBUTE rather than the drawable's own colour:
+         ?attr/colorSurfaceContainerHighest is #20242B on dark, #E3EAF4 on light, and the mono
+         overlay remaps it to greyscale on its own. A colour resource cannot be remapped, which is
+         how a "neutral" tile ends up faintly blue on the monochrome theme. D-5 closes the tile set
+         at accent / destructive / neutral; a row that wants the accent one overrides the tint at
+         bind time. -->
     <FrameLayout
         android:id="@+id/setting_icon_bg"
         android:layout_width="@dimen/tile_size"
         android:layout_height="@dimen/tile_size"
-        android:background="@drawable/bg_icon_neutral">
+        android:background="@drawable/bg_tile_neutral"
+        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
         <ImageView
             android:id="@+id/setting_icon"
@@ -30,14 +34,14 @@
             android:layout_gravity="center"
             android:importantForAccessibility="no"
             app:srcCompat="@drawable/ic_settings_24dp"
-            app:tint="@color/icon_glyph_neutral" />
+            app:tint="?attr/colorOnSurfaceVariant" />
     </FrameLayout>
 
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="@dimen/space_16"
-        android:layout_marginEnd="@dimen/space_8"
+        android:layout_marginEnd="@dimen/space_12"
         android:layout_weight="1"
         android:orientation="vertical">
 
@@ -52,8 +56,10 @@
             android:id="@+id/setting_subtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_4"
-            android:textAppearance="@style/TextAppearance.App.Subtitle"
+            android:layout_marginTop="@dimen/space_2"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textAppearance="@style/TextAppearance.App.Caption"
             android:visibility="gone"
             tools:text="Показывать на главном экране"
             tools:visibility="visible" />
