@@ -939,10 +939,22 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         val duration: Long,
         val delayMs: Long,
     ) {
+        /**
+         * Where this element's opacity BELONGS when the assemble is over, which is not always 1.
+         *
+         * The connect object dims to DISABLED_ALPHA when there is nothing to connect to — gated, no
+         * server, disconnecting — and that is written on the same property the entrance fades. An
+         * assemble that ended at a flat 1f would light the disabled object up and leave it lit,
+         * because paintConnect only rewrites the alpha the next time the state changes. On the
+         * first-run path, where there IS no server, that is every launch.
+         */
+        val restingAlpha: Float
+            get() = if (view.isEnabled) 1f else DISABLED_ALPHA
+
         fun animators(): List<Animator> {
             val from = fromDp * resources.displayMetrics.density
             val moves = mutableListOf<Animator>(
-                ObjectAnimator.ofFloat(view, View.ALPHA, 0f, 1f),
+                ObjectAnimator.ofFloat(view, View.ALPHA, 0f, restingAlpha),
             )
             if (from != 0f) moves += ObjectAnimator.ofFloat(view, View.TRANSLATION_Y, from, 0f)
             if (fromScale != 1f) {
@@ -1024,7 +1036,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private fun clearEntrance() {
         if (!isBindingInitialized) return
         entranceSteps().forEach { step ->
-            step.view.alpha = 1f
+            step.view.alpha = step.restingAlpha
             step.view.translationY = 0f
             step.view.scaleX = 1f
             step.view.scaleY = 1f
