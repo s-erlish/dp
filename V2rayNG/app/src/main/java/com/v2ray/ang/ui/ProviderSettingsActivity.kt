@@ -16,6 +16,9 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
+import com.v2ray.ang.ui.component.SelectPopup
+import com.v2ray.ang.ui.component.SubPage
+import com.v2ray.ang.ui.component.ToolbarBinder
 import com.v2ray.ang.util.HttpUtil
 
 /**
@@ -74,8 +77,19 @@ class ProviderSettingsActivity : BaseActivity() {
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
-        setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = getString(R.string.ps_title))
+        // Handoff README §7: the sub-page lekalo draws the title at 24sp/700 UNDER a 44dp
+        // back control, which activity_base's 16sp MaterialToolbar cannot do, so the header
+        // is @layout/view_sub_header inside this screen's own layout. Nothing else moves —
+        // the screen never used the base layout's progress bar.
+        setContentView(binding.root)
+        ToolbarBinder.bind(
+            root = binding.toolbar.root,
+            title = getString(R.string.ps_title),
+            activity = this,
+        )
+        ToolbarBinder.attachTo(binding.toolbar.root, binding.mainContent)
 
         // ОБНОВЛЕНИЕ
         binding.rowAutoUpdate.setOnClickListener { toggleAutoUpdate() }
@@ -194,24 +208,26 @@ class ProviderSettingsActivity : BaseActivity() {
      * every subscription (turning auto-update on), then reschedules the updater.
      */
     private fun pickInterval() {
-        val entries = intervalValues.map { intervalLabel(it) }.toTypedArray()
+        val entries = intervalValues.map { intervalLabel(it) }
         val idx = intervalValues.indexOf(storedIntervalMinutes()).coerceAtLeast(0)
-        AlertDialog.Builder(this)
-            .setTitle(R.string.ps_interval)
-            .setSingleChoiceItems(entries, idx) { dialog, which ->
-                val minutes = intervalValues[which]
-                MmkvManager.decodeSubscriptions().forEach { cache ->
-                    val item = cache.subscription
-                    item.autoUpdate = true
-                    item.updateInterval = minutes
-                    MmkvManager.encodeSubscription(cache.guid, item)
-                }
-                SubscriptionUpdater.sync(forceReschedule = true)
-                bindState()
-                dialog.dismiss()
+        SelectPopup.show(
+            anchor = binding.rowInterval,
+            options = entries,
+            selectedIndex = idx,
+            widthRes = R.dimen.select_popup_w_interval,
+            valueView = binding.valueInterval,
+            caret = binding.caretInterval,
+        ) { which ->
+            val minutes = intervalValues[which]
+            MmkvManager.decodeSubscriptions().forEach { cache ->
+                val item = cache.subscription
+                item.autoUpdate = true
+                item.updateInterval = minutes
+                MmkvManager.encodeSubscription(cache.guid, item)
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            SubscriptionUpdater.sync(forceReschedule = true)
+            bindState()
+        }
     }
 
     // ---------------- СЕТЬ ----------------
@@ -306,22 +322,23 @@ class ProviderSettingsActivity : BaseActivity() {
     }
 
     private fun pickSortOrder() {
-        val entries = sortValues.map { getString(sortLabelRes(it)) }.toTypedArray()
+        val entries = sortValues.map { getString(sortLabelRes(it)) }
         val idx = sortValues.indexOf(currentSortOrder()).coerceAtLeast(0)
-        AlertDialog.Builder(this)
-            .setTitle(R.string.ps_sort_order)
-            .setSingleChoiceItems(entries, idx) { dialog, which ->
-                MmkvManager.encodeSettings(AppConfig.PREF_SERVER_SORT_ORDER, sortValues[which])
-                // Order lives in storage, so reorder now — the servers list renders what is stored
-                // and never re-sorts on its own. It also holds its rows from before this screen was
-                // opened, so ask it to rebuild; otherwise the new order only shows after a restart.
-                SettingsManager.applyServerSortOrder()
-                SettingsChangeManager.makeSetupGroupTab()
-                bindState()
-                dialog.dismiss()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        SelectPopup.show(
+            anchor = binding.rowSortOrder,
+            options = entries,
+            selectedIndex = idx,
+            valueView = binding.valueSortOrder,
+            caret = binding.caretSortOrder,
+        ) { which ->
+            MmkvManager.encodeSettings(AppConfig.PREF_SERVER_SORT_ORDER, sortValues[which])
+            // Order lives in storage, so reorder now — the servers list renders what is stored
+            // and never re-sorts on its own. It also holds its rows from before this screen was
+            // opened, so ask it to rebuild; otherwise the new order only shows after a restart.
+            SettingsManager.applyServerSortOrder()
+            SettingsChangeManager.makeSetupGroupTab()
+            bindState()
+        }
     }
 
     // ---------------- helpers ----------------

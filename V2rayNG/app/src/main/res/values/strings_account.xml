@@ -72,6 +72,18 @@
          figure belongs is what reads as unfinished. -->
     <string name="account_meter_traffic_none">Нет данных</string>
 
+    <!-- THE TRAFFIC RING's caption, under the 28sp figure in the middle of the disc
+         (handoff README §5.2: «в центре «2,0 ТБ» и «без ограничений»» / «"1,9 ТБ" и "из 5 ТБ"»).
+
+         Both are transcribed verbatim from the prototype, and neither duplicates the meter
+         strings above: those state a figure AND its ceiling in one line («1,9 ТБ из 5 ТБ»,
+         «1,9 ТБ · безлимит») because the meter is a bar with a label beside it. The ring
+         splits the two — the figure is the hero line, the ceiling is the caption under it —
+         so the ceiling has to be sayable on its own. Reusing the meter strings here would
+         print the figure twice inside a 172dp disc. -->
+    <string name="account_ring_unlimited">без ограничений</string>
+    <string name="account_ring_of">из %1$s</string>
+
     <!-- «Способы входа»: what this account can be signed in with. Today that is Telegram, and
          the row names the account it is actually linked to rather than only the method. -->
     <string name="account_login_methods">Способы входа</string>

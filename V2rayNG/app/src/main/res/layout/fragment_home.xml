@@ -28,8 +28,9 @@
       [  1 ] hairline, alpha 0 until the content scrolls
       [ 48 ] the status strip, only when a condition applies
       [ 24 ]
-      [224 ] the connect object: three concentric rings, one disc, one glyph
+      [214 ] the connect object: three concentric rings, one disc, one glyph
       [ 16 ]
+      [ 28 ] the status pill: Не подключено / Подключаемся… / Подключено
       [ 24 ] the ledger: ↑ 1,0 KB/s   00:11:52   ↓ 1,2 KB/s   - one line, no captions
       [ 22 ] the flag and the server, ONE centred line in the accent, bold
       [ 24 ]
@@ -70,6 +71,15 @@
   ZERO RAW VALUES. No dp, no sp, no hex, no fontFamily, no textSize anywhere in
   this file - every number is a token and every text element carries only a
   textAppearance.
+
+  FOUR EXCEPTIONS, ALL OF THEM THE CONNECT OBJECT, ALL OF THEM PENDING A TOKEN.
+  The 2026-08 handoff §4 re-measures the object: 214dp overall, 150dp disc, the
+  active ring at inset 22 (so the sweep travels a 170dp circle) and a 68dp shield.
+  `@dimen/connect_disc` still reads 176 and `@dimen/shield_glyph` 80, and
+  `res/values/` belongs to the foundation wave, so these four numbers are written
+  out here with this note rather than silently forked into a second set of names.
+  The port report carries the request: connect_object 214, connect_disc 176 -> 150,
+  connect_sweep 170, shield_glyph 80 -> 68. Four edits in this file when they land.
 
   clipChildren / clipToPadding are false the whole way down because the confirm
   ring scales past its own frame.
@@ -252,13 +262,20 @@
           idle grey, negotiating amber-blue, connected accent, failed red, on a
           geometry that never changes size.
 
-          THE WHOLE ASSEMBLY IS THE CONTROL. connect_frame is 176 + 24 either side =
-          224dp of touch target and @anim/press_scale scales rings, disc and shield
-          together, because they are one object. The ring colours, the ripple and the
-          2dp focus ring are built in HomeFragment from theme attributes - a drawable
-          file cannot carry a runtime-tinted stroke without the raw hex the old
+          THE WHOLE ASSEMBLY IS THE CONTROL. connect_frame is a flat 214dp box of touch
+          target - handoff §4, down from 224 - and @anim/press_connect scales rings, disc
+          and shield together at 0.97, because they are one object. The ring colours, the
+          ripple and the 2dp focus ring are built in HomeFragment from theme attributes -
+          a drawable file cannot carry a runtime-tinted stroke without the raw hex the old
           bg_connect_ring.xml shipped, and two of that file's six hex literals
           measured 2.33:1 and 1.29:1 against the ground.
+
+          IT IS AN EXPLICIT SQUARE AND NOT wrap_content + padding, and the sweep is why.
+          §4 puts the active ring at inset 22, i.e. on a 170dp circle, and the disc at
+          150 - so the arc has to be WIDER than the disc it used to ride. A wrap_content
+          frame would have grown to fit that child (170 + padding = 234) and the object
+          would have come out 20dp too big. A fixed 214 box holds every part at the size
+          the handoff measured and cannot be dragged out of shape by any child.
 
           The banned parts of the old hero did NOT come back with the rings: there is
           no accent glow bleeding out behind the shield and no page gradient under
@@ -283,24 +300,29 @@
         -->
         <FrameLayout
             android:id="@+id/connect_frame"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="214dp"
+            android:layout_height="214dp"
             android:layout_gravity="center_horizontal"
             android:clickable="true"
             android:clipChildren="false"
             android:clipToPadding="false"
             android:focusable="true"
-            android:padding="@dimen/space_24"
-            android:stateListAnimator="@anim/press_scale"
+            android:stateListAnimator="@anim/press_connect"
             tools:ignore="ContentDescription">
 
-            <!-- Rings 3 and 2 of 3 are two layers of THIS view's background, inset
-                 12dp apart, because a child of a padded FrameLayout can never be
-                 wider than the padded box and the outer rings have to be. Ring 1 is
-                 the disc's own. All three are built in HomeFragment.
+            <!-- ALL THREE RINGS ARE LAYERS OF THIS VIEW'S BACKGROUND, at §4's insets:
+                 outer 0 / 1.5dp, middle 10dp / 1.5dp, inner 22dp / 2dp - the inner one
+                 being the ACTIVE ring, the one the negotiating arc rides and the one
+                 that carries the connected hue at full strength. They are layers rather
+                 than views because three empty views would cost three measure passes to
+                 draw three ovals, and because a LayerDrawable's insets are exactly the
+                 language §4 states the geometry in.
 
-                 The disc. Its fill and its own ring - the innermost and brightest of
-                 the three - are built there too. -->
+                 The inner ring used to be the DISC's own edge, which was right while the
+                 disc was 176 inside a 224 box and wrong now: at 150 inside 214 the disc
+                 sits 10dp inboard of the active ring, so the ring cannot be its border.
+                 The disc keeps its fill and nothing else. All of it is built in
+                 HomeFragment.buildConnectObject. -->
             <!--
               THE AMBIENT WAVE, and it is the layer this object was missing.
 
@@ -348,16 +370,43 @@
             -->
             <View
                 android:id="@+id/connect_ring_ambient"
-                android:layout_width="@dimen/connect_disc"
-                android:layout_height="@dimen/connect_disc"
+                android:layout_width="150dp"
+                android:layout_height="150dp"
                 android:layout_gravity="center"
                 android:alpha="0"
                 android:importantForAccessibility="no" />
 
+            <!-- THE NEGOTIATING SWEEP, AND IT RIDES THE ACTIVE RING (§4, code_reference
+                 «Кнопка подключения»: `circle r=85 stroke-width=2` in a 214 box, i.e. the
+                 inner ring at inset 22). ONE arc, never a train of segments - §11 grabl 7 -
+                 which `indeterminateAnimationType=disjoint` gives, and 1100ms per turn,
+                 which is @integer/motion_spin, applied in HomeFragment.
+
+                 It is a child of the FRAME and no longer of the disc: at 170dp it is
+                 20dp wider than the disc, so inside it there was nowhere for it to be.
+                 The static inner ring underneath IS its track, which is why trackColor
+                 is transparent. -->
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:id="@+id/connect_sweep"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:indeterminate="true"
+                android:visibility="gone"
+                app:hideAnimationBehavior="inward"
+                app:indeterminateAnimationType="disjoint"
+                app:indicatorColor="?attr/colorAccentFigure"
+                app:indicatorSize="170dp"
+                app:showAnimationBehavior="inward"
+                app:trackColor="@android:color/transparent"
+                app:trackCornerRadius="@dimen/stroke_emphasis"
+                app:trackThickness="@dimen/stroke_emphasis" />
+
             <FrameLayout
                 android:id="@+id/connect_disc"
-                android:layout_width="@dimen/connect_disc"
-                android:layout_height="@dimen/connect_disc"
+                android:layout_width="150dp"
+                android:layout_height="150dp"
                 android:layout_gravity="center"
                 android:clipChildren="false"
                 android:duplicateParentState="true"
@@ -404,29 +453,6 @@
                     android:importantForAccessibility="no"
                     android:visibility="invisible" />
 
-                <!-- The negotiating sweep. indicatorSize == the disc, so the arc
-                     travels the disc's own ring instead of orbiting outside it, at
-                     that ring's stroke width; the static ring underneath IS the
-                     track. It runs while the core is negotiating and while a
-                     subscription is being fetched - the two states this screen has
-                     ever spun it for. -->
-                <com.google.android.material.progressindicator.CircularProgressIndicator
-                    android:id="@+id/connect_sweep"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:importantForAccessibility="no"
-                    android:indeterminate="true"
-                    android:visibility="gone"
-                    app:hideAnimationBehavior="inward"
-                    app:indeterminateAnimationType="disjoint"
-                    app:indicatorColor="?attr/colorAccentFigure"
-                    app:indicatorSize="@dimen/connect_disc"
-                    app:showAnimationBehavior="inward"
-                    app:trackColor="@android:color/transparent"
-                    app:trackCornerRadius="@dimen/stroke_emphasis"
-                    app:trackThickness="@dimen/stroke_ring" />
-
                 <!-- Two shields, crossfaded. Never tint-animated: the filled shield
                      is accent from frame zero and only its alpha moves.
 
@@ -440,8 +466,8 @@
                      through the disc. -->
                 <ImageView
                     android:id="@+id/shield_outline"
-                    android:layout_width="@dimen/shield_glyph"
-                    android:layout_height="@dimen/shield_glyph"
+                    android:layout_width="68dp"
+                    android:layout_height="68dp"
                     android:layout_gravity="center"
                     android:duplicateParentState="true"
                     android:importantForAccessibility="no"
@@ -451,8 +477,8 @@
 
                 <ImageView
                     android:id="@+id/shield_filled"
-                    android:layout_width="@dimen/shield_glyph"
-                    android:layout_height="@dimen/shield_glyph"
+                    android:layout_width="68dp"
+                    android:layout_height="68dp"
                     android:layout_gravity="center"
                     android:alpha="0"
                     android:duplicateParentState="true"
@@ -468,28 +494,31 @@
             android:layout_height="@dimen/space_16" />
 
         <!--
-          THE «ПОДКЛЮЧЕНО» PILL. The confirmation the screen was missing:
-          «нету плашки подключено когда подключаешься к серверу, нету этого
-          состояния типа».
+          THE STATUS PILL. Outlined, 14sp/500, and ON SCREEN IN EVERY STATE.
 
-          IT IS ONE STATE AND ONLY ONE. The pill exists when the tunnel is UP and at no
-          other moment — it is not a status field that cycles through
-          «Отключено»/«Подключение…»/«Подключено», because the owner removed exactly that
-          word from exactly this region («No «Отключено» word above it») and the object
-          200dp above already says idle / negotiating / failed in colour. A confirmation
-          is a different thing from a status readout: it is the payoff for an action, so
-          it appears when the action succeeds and is absent the rest of the time.
+          THREE STATES, AND THAT IS AN OWNER DECISION OF 2026-08-04 that reverses his own
+          earlier one. This pill shipped as a one-state CONFIRMATION — present only while
+          the tunnel was up — because on 2026-08-03 he had the word «Отключено» taken out
+          of this region («No «Отключено» word above it»). The 2026-08 handoff §4 asks for
+          a field instead: «Пилюля статуса — контурная, 14sp/500. Не подключено /
+          Подключаемся… / Подключено», and asked directly, he chose the handoff. So the
+          pill is a status readout again, it never leaves, and HomeFragment.paintStatusPill
+          resolves the three words.
 
-          IT IS NOT ON THE IDENTITY LINE, and that is the other half of the instruction.
-          The line below the ledger keeps naming the server and nothing else; the state
-          lives HERE, in its own place, above the ledger — which is also where the desktop
-          puts it (ConnectHeroView.axaml StatusText: the state under the shield, the stats
-          row under that, the server name last).
+          IT NO LONGER MOVES THE SCREEN. As a confirmation it was GONE at rest and the
+          ledger under it slid 28dp on every connect and disconnect — acceptable for a
+          badge that is usually absent, wrong for a field that is always there. Always
+          laid out means the block below it is nailed down in every state, which is the
+          same rule the identity line under it already follows.
 
-          GONE, not INVISIBLE: it occupies no height at rest, so the ledger and the server
-          line sit where they always have and the screen does not carry a reserved gap for
-          a badge that is usually absent. It is the only thing on this screen that moves
-          the block below it, and it moves it exactly once per connection.
+          IT IS NOT ON THE IDENTITY LINE, and that half of the instruction stands. The line
+          below the ledger keeps naming the server; the state lives HERE, above the ledger,
+          which is also where the desktop puts it (ConnectHeroView.axaml StatusText: the
+          state under the shield, the stats row under that, the server name last).
+
+          The outline and the label are tinted together, per state, in Kotlin — the shape
+          is @drawable/bg_status_pill with its stroke tinted through backgroundTintList,
+          so there is one description of the pill and not three drawables.
         -->
         <TextView
             android:id="@+id/tv_connected_pill"
@@ -503,11 +532,11 @@
             android:paddingTop="@dimen/space_4"
             android:paddingEnd="@dimen/space_12"
             android:paddingBottom="@dimen/space_4"
-            android:text="@string/home_status_connected"
-            android:textAppearance="@style/TextAppearance.App.Chip.Ui"
-            android:textColor="?attr/colorAccentFigure"
-            android:visibility="gone"
-            tools:visibility="visible" />
+            android:text="@string/home_not_connected"
+            android:textAppearance="@style/TextAppearance.App.Body"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textFontWeight="500"
+            tools:ignore="UnusedAttribute" />
 
         <!--
           THE STATUS LINE, AND IT IS TWO LINES AND NEVER THREE: the ledger, then the

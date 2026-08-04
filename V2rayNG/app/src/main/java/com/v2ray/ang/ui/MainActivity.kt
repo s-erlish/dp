@@ -244,9 +244,22 @@ class MainActivity : HelperBaseActivity(), MainHost {
     private val shareMethod: Array<out String> by lazy { resources.getStringArray(R.array.share_method) }
     private val shareMethodMore: Array<out String> by lazy { resources.getStringArray(R.array.share_method_more) }
 
-    // Cached easing curve (loaded once) so the imperative nav motion rides the same ease-out tempo
+    // Cached easing curves (loaded once) so the imperative nav motion rides the same ease-out tempo
     // as the declarative res/interpolator + res/anim resources. No bounce.
-    private val easeStandard by lazy { AnimationUtils.loadInterpolator(this, R.interpolator.ease_standard) }
+    /**
+     * §8 «Полоска навигации» and «Смена цвета» both ride ease-out-quart — the curve every 220–340ms
+     * state change in the product uses. This replaced ease_standard here: the bar had a curve of
+     * its own for no reason, and the shell has no other imperative animation to keep it alive.
+     */
+    private val easeOutQuart by lazy { AnimationUtils.loadInterpolator(this, R.interpolator.ease_out_quart) }
+
+    /**
+     * Where the travelling nav bar is headed, in px. Held because a tab switch lays the shell out
+     * again mid-flight (the fragment container shows one child and hides another), and the layout
+     * listener that keeps the bar glued would otherwise cancel the travel and snap it home on the
+     * very frame it started. Same destination == nothing to do. NaN until the first placement.
+     */
+    private var navIndicatorTarget = Float.NaN
 
     private companion object {
         // Remembers which bottom-nav tab was selected so it survives an activity
@@ -380,6 +393,9 @@ class MainActivity : HelperBaseActivity(), MainHost {
         // path (no haptic) and lands on the restored tab in one transaction.
         selectedNavId = start
         updateNavSelection(start)
+        // The single travelling indicator has to be placed once the columns have been measured,
+        // and re-placed whenever they are measured again — Аккаунт appearing halves them.
+        trackNavIndicator()
         showTab(start, start)
     }
 
@@ -502,6 +518,9 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * real tab change (animations enabled) the two involved items TWEEN their icon+label colour
      * grey↔blue over motion_state; everything else (initial paint, reduced motion, unchanged items)
      * sets the colour instantly.
+     *
+     * The third axis — the 28x3 accent bar — is no longer per item. It is ONE view that slides to
+     * the selected column; see [positionNavIndicator].
      */
     private fun updateNavSelection(previousNavId: Int = selectedNavId) {
         val active = themeColor(androidx.appcompat.R.attr.colorPrimary)
@@ -524,22 +543,78 @@ class MainActivity : HelperBaseActivity(), MainHost {
                 icon.setColorFilter(target)
                 label.setTextColor(target)
             }
-            // Second active-state axis (beyond the colour tween): a heavier label and a
-            // short blue pill under the selected item, so the active tab reads on weight
-            // + accent, not tint alone.
+            // Second active-state axis (beyond the colour tween): a heavier label, so the
+            // active tab reads on weight + accent, not tint alone.
             applyNavLabelWeight(label, selected)
-            // INVISIBLE (not GONE) for inactive items so every column keeps the 3dp pill
-            // slot and nothing shifts vertically as the selection moves.
-            navDot(id)?.visibility = if (selected) View.VISIBLE else View.INVISIBLE
         }
+        positionNavIndicator(animate)
     }
 
-    /** The active-tab indicator pill under a nav item (null for an unknown id). */
-    private fun navDot(navId: Int): View? = when (navId) {
-        R.id.nav_home -> binding.navHomeDot
-        R.id.nav_account -> binding.navAccountDot
-        R.id.nav_settings -> binding.navSettingsDot
+    /** The nav column a tab id belongs to (null for an unknown id). */
+    private fun navItem(navId: Int): View? = when (navId) {
+        R.id.nav_home -> binding.navHome
+        R.id.nav_account -> binding.navAccount
+        R.id.nav_settings -> binding.navSettings
         else -> null
+    }
+
+    /**
+     * Slides the ONE active-tab bar to the selected column (handoff README §4).
+     *
+     * The prototype states the three resting positions as 46 / 166 / 286dp, which are that
+     * mock-up's own 360dp-wide, always-three-tabs arithmetic. This bar is neither: Аккаунт is a
+     * weighted item that collapses to nothing while signed out, so the columns are 1/2 the bar
+     * wide as often as they are 1/3. The centre is therefore READ off the column that is actually
+     * on screen — the same number the prototype's constants encode, computed instead of copied,
+     * so a two-tab bar and a 412dp phone are both right.
+     *
+     * Travel is @integer/motion_nav_indicator (280ms) on ease_out_quart, and only on a real tab
+     * change: the first paint, a recreate and reduced motion all place it without animating,
+     * because a bar that flies in from x=0 on launch is a transition to nothing.
+     */
+    private fun positionNavIndicator(animate: Boolean) {
+        val indicator = binding.navIndicator
+        val target = navItem(selectedNavId)
+        if (target == null || !target.isVisible) {
+            indicator.visibility = View.INVISIBLE
+            return
+        }
+        // Pre-layout (first paint, or the frame in which Аккаунт appears): nothing has a width
+        // yet, so there is no centre to compute. Come back once the row has been measured.
+        if (target.width == 0 || indicator.width == 0) {
+            binding.navItems.post { positionNavIndicator(false) }
+            return
+        }
+        val x = target.left + (target.width - indicator.width) / 2f
+        indicator.visibility = View.VISIBLE
+        // Already going there. See [navIndicatorTarget]: this is the guard that lets the layout
+        // listener run on every pass without ever interrupting a travel in progress.
+        if (x == navIndicatorTarget) return
+        navIndicatorTarget = x
+        indicator.animate().cancel()
+        if (!animate || !animationsEnabled()) {
+            indicator.translationX = x
+            return
+        }
+        indicator.animate()
+            .translationX(x)
+            .setDuration(resources.getInteger(R.integer.motion_nav_indicator).toLong())
+            .setInterpolator(easeOutQuart)
+            .start()
+    }
+
+    /**
+     * Keeps the bar glued to its column across every layout the bar can go through without a tab
+     * change: the Аккаунт item arriving or leaving (two columns become three and every centre
+     * moves), a rotation, a font-scale change, the window being resized. None of those is a
+     * transition, so none of them animates — and a pass that changes nothing is a no-op, because
+     * [positionNavIndicator] compares against [navIndicatorTarget] before it touches the view.
+     */
+    private fun trackNavIndicator() {
+        binding.navItems.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            positionNavIndicator(animate = false)
+        }
+        binding.navItems.post { positionNavIndicator(animate = false) }
     }
 
     /** Steps a nav label to 700 when selected and 500 otherwise (real numeric weight on
@@ -556,7 +631,13 @@ class MainActivity : HelperBaseActivity(), MainHost {
         }
     }
 
-    /** Tweens one nav item's icon tint + label colour from -> to over motion_state (ease-out). */
+    /**
+     * Tweens one nav item's icon tint + label colour from -> to.
+     *
+     * @integer/motion_state and ease_out_quart, which is §8's «Смена цвета 220 мс» — the same
+     * clock and curve the indicator's travel and every switch in the product run on. It was a
+     * hard-coded 200 on ease_standard, i.e. the one place in the bar that had its own tempo.
+     */
     private fun tweenNavItemColor(
         icon: android.widget.ImageView,
         label: android.widget.TextView,
@@ -564,8 +645,8 @@ class MainActivity : HelperBaseActivity(), MainHost {
         to: Int,
     ) {
         ValueAnimator.ofObject(ArgbEvaluator(), from, to).apply {
-            duration = 200
-            interpolator = easeStandard
+            duration = resources.getInteger(R.integer.motion_state).toLong()
+            interpolator = easeOutQuart
             addUpdateListener {
                 val c = it.animatedValue as Int
                 icon.setColorFilter(c)

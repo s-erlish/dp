@@ -1,43 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  ============================================================================
+  ONE DEVICE — handoff README §7, «Устройства».
+  ============================================================================
+
+      плитка 40dp → 16dp → имя 14sp + «Активно: … · ID: …» 12.5sp
+      → справа «Удалить» красным
+
+  It was a MaterialCardView with an 8dp gap under it, i.e. one card per device in a
+  vertical grid. §7 draws the devices as ROWS inside ONE card, and CLAUDE.md's «no
+  nested cards» said the same thing from the other direction — the card now belongs
+  to @id/rv_devices in activity_devices.xml, and this file is a row again.
+
+  THE DELETE AFFORDANCE IS A NAMED ACTION, not a trash glyph. §7 writes «Удалить»
+  in the destructive tone on the right of the row, which is what the prototype
+  draws; @id/btn_device_delete keeps its id and stays a MaterialButton, so
+  DeviceAdapter's `b.btnDeviceDelete.setOnClickListener` is untouched. It is also
+  still the ONLY target on the row, at the 48dp minimum, because what it does is
+  irreversible.
+
+  THE HAIRLINE IS PART OF THE ROW. A card of rows needs a rule between them and
+  the card cannot draw one; every row carries it on TOP and the adapter hides it on
+  position 0 (DeviceAdapter). Full-bleed, as §6's rows are.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="@dimen/space_8"
-    android:stateListAnimator="@anim/press_scale"
-    app:cardBackgroundColor="?attr/colorSurface"
-    app:cardCornerRadius="@dimen/radius_card"
-    app:cardElevation="0dp"
-    app:strokeColor="?attr/colorOutlineVariant"
-    app:strokeWidth="1dp">
+    android:orientation="vertical">
+
+    <com.google.android.material.divider.MaterialDivider
+        android:id="@+id/device_divider"
+        style="@style/Widget.Departament.Divider.Full"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:baselineAligned="false"
         android:gravity="center_vertical"
         android:minHeight="@dimen/row_min_height"
         android:orientation="horizontal"
-        android:padding="@dimen/space_12">
+        android:paddingStart="@dimen/screen_gutter"
+        android:paddingTop="@dimen/space_12"
+        android:paddingEnd="@dimen/space_8"
+        android:paddingBottom="@dimen/space_12">
 
-        <FrameLayout
-            android:layout_width="@dimen/tile_size"
-            android:layout_height="@dimen/tile_size"
-            android:background="@drawable/bg_icon_blue">
-
-            <ImageView
-                android:layout_width="@dimen/tile_glyph"
-                android:layout_height="@dimen/tile_glyph"
-                android:layout_gravity="center"
-                android:importantForAccessibility="no"
-                app:srcCompat="@drawable/ic_acc_devices"
-                app:tint="?attr/iconTintBlue" />
-        </FrameLayout>
+        <ImageView
+            style="@style/Widget.Departament.Tile"
+            android:layout_marginEnd="@dimen/space_16"
+            android:importantForAccessibility="no"
+            app:srcCompat="@drawable/ic_acc_devices" />
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/space_12"
+            android:layout_marginEnd="@dimen/space_12"
             android:layout_weight="1"
             android:orientation="vertical">
 
@@ -47,8 +67,7 @@
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textAppearance="@style/TextAppearance.App.Title"
-                android:textColor="?attr/colorOnSurface"
+                android:textAppearance="@style/TextAppearance.App.Body"
                 tools:text="Google Pixel 8" />
 
             <TextView
@@ -57,39 +76,27 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/space_4"
                 android:ellipsize="end"
-                android:maxLines="1"
-                android:textAppearance="@style/TextAppearance.App.Subtitle"
-                android:textColor="?attr/colorOnSurfaceVariant"
+                android:maxLines="2"
+                android:textAppearance="@style/TextAppearance.App.Caption"
                 tools:text="Активно: 09.07.2026" />
 
             <TextView
                 android:id="@+id/tv_device_hwid"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_4"
+                android:layout_marginTop="@dimen/space_2"
                 android:ellipsize="middle"
                 android:maxLines="1"
                 android:textAppearance="@style/TextAppearance.App.Caption"
-                android:textColor="?attr/colorOnSurfaceVariant"
                 tools:text="ID: a1b2c3d4e5f6" />
         </LinearLayout>
 
-        <!-- 48dp, not the 44 it shipped with: this is the only target on the row and it destroys
-             a device binding, so it may not sit under the touch minimum. -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_device_delete"
-            style="@style/Widget.Material3.Button.IconButton"
-            android:layout_width="@dimen/view_height_dp48"
-            android:layout_height="@dimen/view_height_dp48"
-            android:layout_marginStart="@dimen/space_8"
-            android:stateListAnimator="@anim/press_scale"
+            style="@style/Widget.Departament.Button.Tertiary.Destructive"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:contentDescription="@string/devices_delete_cd"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            app:icon="@drawable/ic_delete_24dp"
-            app:iconGravity="textStart"
-            app:iconPadding="0dp"
-            app:iconSize="22dp"
-            app:iconTint="?attr/iconTintRed" />
+            android:text="@string/devices_delete_confirm" />
     </LinearLayout>
-</com.google.android.material.card.MaterialCardView>
+</LinearLayout>

@@ -57,144 +57,168 @@
                  The destination set is Главная · Аккаунт · Настройки, in that order — three items,
                  with Аккаунт still hidden while signed out. There is no Серверы item: the owner
                  removed that destination on 2026-07-26 (docs/design2026/11-app-structure.md 2.0)
-                 and none of its functions were moved elsewhere. -->
-            <LinearLayout
+                 and none of its functions were moved elsewhere.
+
+                 THE BAR IS A FRAME AND NOT A ROW ANY MORE, and the reason is the indicator.
+                 Handoff README §4: «Полоска активной вкладки ОДНА на всю панель и переезжает —
+                 28x3dp, 280 мс ease-out-quart. Не три отдельные, которые гаснут и зажигаются.»
+                 A pill that lives inside its own tab column can only ever fade out over here and
+                 fade in over there; travelling needs one view whose x is free of the weighted row.
+                 So the row of destinations and the single indicator are siblings in this frame,
+                 and MainActivity.positionNavIndicator drives the indicator's translationX.
+
+                 The id `bottom_nav` is unchanged and still names the whole bar — MainActivity
+                 pads it with the system inset, shows/hides it, anchors snackbars to it and posts
+                 to it, and every one of those is a plain View call that a FrameLayout answers
+                 exactly as the LinearLayout did. -->
+            <FrameLayout
                 android:id="@+id/bottom_nav"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom"
                 android:background="@android:color/transparent"
-                android:baselineAligned="false"
-                android:gravity="center_vertical"
-                android:minHeight="56dp"
-                android:orientation="horizontal">
+                android:minHeight="56dp">
 
+                <!-- The three destinations. Equal weights, and each column hugs the bottom edge
+                     of the bar (§4: «вся группа прижата к нижнему краю, padding 6-9dp») rather
+                     than floating in the middle of it. -->
                 <LinearLayout
-                    android:id="@+id/nav_home"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:background="@null"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:stateListAnimator="@anim/nav_press">
+                    android:id="@+id/nav_items"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom"
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
 
-                    <ImageView
-                        android:id="@+id/nav_home_icon"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_nav_home"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-
-                    <TextView
-                        android:id="@+id/nav_home_label"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:id="@+id/nav_home"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:text="@string/bottom_nav_home"
-                        android:textAppearance="@style/BottomNavLabel"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
+                        android:layout_weight="1"
+                        android:background="@null"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_horizontal|bottom"
+                        android:orientation="vertical"
+                        android:paddingTop="@dimen/space_6"
+                        android:paddingBottom="9dp"
+                        android:stateListAnimator="@anim/nav_press">
 
-                    <!-- Active-tab indicator: short blue pill, shown only on the selected item
-                         (toggled in updateNavSelection). Home is the default selected tab. -->
-                    <View
-                        android:id="@+id/nav_home_dot"
-                        android:layout_width="34dp"
-                        android:layout_height="3dp"
-                        android:layout_marginTop="3dp"
-                        android:background="@drawable/bg_nav_dot"
-                        android:importantForAccessibility="no" />
+                        <!-- 23dp, §4. Not 24: the icon and the 11sp label under it are one
+                             stacked mark, and at 24 the mark outgrows the 3dp bar under it. -->
+                        <ImageView
+                            android:id="@+id/nav_home_icon"
+                            android:layout_width="23dp"
+                            android:layout_height="23dp"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_nav_home"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+
+                        <!-- Flush under the glyph (§4 «подпись вплотную, без зазора»): the
+                             -1dp pulls the 14sp line box's own leading back out, so the label
+                             sits on the icon rather than 3dp below it. -->
+                        <TextView
+                            android:id="@+id/nav_home_label"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="-1dp"
+                            android:text="@string/bottom_nav_home"
+                            android:textAppearance="@style/BottomNavLabel"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    </LinearLayout>
+
+                    <!-- 2nd item: the Account tab. Shown only when signed in (toggled at
+                         runtime); a weighted item so it collapses to zero width while GONE
+                         and the 2 remaining items keep equal halves. The indicator follows
+                         the columns' measured geometry, so it re-centres itself when this
+                         one comes and goes — see MainActivity.positionNavIndicator. -->
+                    <LinearLayout
+                        android:id="@+id/nav_account"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:background="@null"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_horizontal|bottom"
+                        android:orientation="vertical"
+                        android:paddingTop="@dimen/space_6"
+                        android:paddingBottom="9dp"
+                        android:stateListAnimator="@anim/nav_press"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:id="@+id/nav_account_icon"
+                            android:layout_width="23dp"
+                            android:layout_height="23dp"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_nav_account"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+
+                        <TextView
+                            android:id="@+id/nav_account_label"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="-1dp"
+                            android:text="@string/bottom_nav_account"
+                            android:textAppearance="@style/BottomNavLabel"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/nav_settings"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:background="@null"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_horizontal|bottom"
+                        android:orientation="vertical"
+                        android:paddingTop="@dimen/space_6"
+                        android:paddingBottom="9dp"
+                        android:stateListAnimator="@anim/nav_press">
+
+                        <ImageView
+                            android:id="@+id/nav_settings_icon"
+                            android:layout_width="23dp"
+                            android:layout_height="23dp"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_nav_settings"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+
+                        <TextView
+                            android:id="@+id/nav_settings_label"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="-1dp"
+                            android:text="@string/bottom_nav_settings"
+                            android:textAppearance="@style/BottomNavLabel"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    </LinearLayout>
 
                 </LinearLayout>
 
-                <!-- 2nd item: the Account tab. Shown only when signed in (toggled at
-                     runtime); a weighted item so it collapses to zero width while GONE
-                     and the 2 remaining items keep equal halves. -->
-                <LinearLayout
-                    android:id="@+id/nav_account"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:background="@null"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:stateListAnimator="@anim/nav_press"
-                    android:visibility="gone">
+                <!-- THE ONE INDICATOR. 28x3dp, sitting 2dp off the bar's bottom edge, moved
+                     to the selected column by translationX over @integer/motion_nav_indicator
+                     (280ms) on ease_out_quart. It is a sibling of the destinations and never a
+                     child of one, which is the whole difference between travelling and
+                     blinking. Starts INVISIBLE: the first paint places it before showing it,
+                     so it can never flash at x=0 on the way to Главная. -->
+                <View
+                    android:id="@+id/nav_indicator"
+                    android:layout_width="28dp"
+                    android:layout_height="3dp"
+                    android:layout_gravity="bottom|start"
+                    android:layout_marginBottom="@dimen/space_2"
+                    android:background="@drawable/bg_nav_dot"
+                    android:importantForAccessibility="no"
+                    android:visibility="invisible" />
 
-                    <ImageView
-                        android:id="@+id/nav_account_icon"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_nav_account"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-
-                    <TextView
-                        android:id="@+id/nav_account_label"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:text="@string/bottom_nav_account"
-                        android:textAppearance="@style/BottomNavLabel"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
-
-                    <View
-                        android:id="@+id/nav_account_dot"
-                        android:layout_width="34dp"
-                        android:layout_height="3dp"
-                        android:layout_marginTop="3dp"
-                        android:background="@drawable/bg_nav_dot"
-                        android:importantForAccessibility="no"
-                        android:visibility="invisible" />
-
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/nav_settings"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:background="@null"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:stateListAnimator="@anim/nav_press">
-
-                    <ImageView
-                        android:id="@+id/nav_settings_icon"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_nav_settings"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-
-                    <TextView
-                        android:id="@+id/nav_settings_label"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:text="@string/bottom_nav_settings"
-                        android:textAppearance="@style/BottomNavLabel"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
-
-                    <View
-                        android:id="@+id/nav_settings_dot"
-                        android:layout_width="34dp"
-                        android:layout_height="3dp"
-                        android:layout_marginTop="3dp"
-                        android:background="@drawable/bg_nav_dot"
-                        android:importantForAccessibility="no"
-                        android:visibility="invisible" />
-
-                </LinearLayout>
-
-            </LinearLayout>
+            </FrameLayout>
 
         </FrameLayout>
 

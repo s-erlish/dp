@@ -26,6 +26,19 @@
   screen used to show nothing at all while it worked), and the empty state, which
   carries either «Ничего не найдено» for a search that matched nothing or the load
   failure with «Повторить».
+
+  2026-08 REDESIGN (handoff README §7): the sub-page lekalo header, @layout/view_sub_header.
+
+  THE APP LIST IS NOT PUT IN A CARD, and that is a considered departure. §7 draws
+  «список приложений с чекбоксами» inside one card, which is right for the five
+  demo apps the prototype holds; this list is 128 rows long, scrolls the rest of the
+  screen and shares its frame with a skeleton and an empty state. A card around a
+  full-height scrolling list either clips its own corners away at the fold or draws
+  a boundary that never closes. The mode group above it is the card §7 asks for.
+
+  «Российские приложения» (@id/row_ru_preset) STAYS. It is not in §7's table
+  because handler/RussianAppsPreset.kt did not exist when the handoff was drawn; the
+  owner has named it explicitly as a feature that keeps working.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -38,7 +51,7 @@
 
     <include
         android:id="@+id/toolbar"
-        layout="@layout/view_toolbar" />
+        layout="@layout/view_sub_header" />
 
     <!-- The mode sits in a card, as the two switches it replaced did at 5e8cd54
          (container_per_app_proxy / container_bypass_apps lived inside one bordered

@@ -1,8 +1,10 @@
 package com.v2ray.ang.ui
 
+import android.animation.ValueAnimator
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.AnimationUtils
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.color.MaterialColors
@@ -14,35 +16,38 @@ import com.v2ray.ang.databinding.ItemSubscriptionCardBinding
 import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.dto.entities.usedTraffic
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.util.reducedMotion
 import java.util.Locale
 
 /**
- * One subscription per ViewPager2 page. Ports the active-sub rendering that used to live inline in
- * [AccountFragment]'s updateActiveSubUi: the subscription name, the expiry line (via the shared date
- * formatter), the "n / m" device figure (∞ when the plan is unlimited), and the Base/Plus tariff
- * badge.
+ * ONE ПОДПИСКА = ONE PAGE, AND THE PAGE IS THE TRAFFIC RING (handoff README §5.2).
  *
- * The badge text is resolved by the fragment (which owns the tariff catalog) and passed in via
- * [resolveBadge]; a null/blank result HIDES the badge so a wrong tariff is never shown. The live
- * "used" device count (GET /client/devices) likewise lives on the fragment's ViewModel and is
- * passed in via [resolveUsedDevices], keeping this adapter free of any ViewModel dependency.
+ * This used to bind a whole subscription card — name, badge, expiry, meter, devices row,
+ * «Продлить», auto-renew — and §5 lays every one of those out on the tab's own spine instead, once,
+ * for whichever page is showing. [AccountFragment.renderSelectedSub] binds them now; what is left
+ * here is the one band worth swiping, which is how much traffic THIS подписка has used.
  *
- * [resolveUsedDevices] RETURNS NULL WHEN THE COUNT IS NOT KNOWN, and that is the whole point of its
- * signature. It used to be `() -> Int` in effect — the fragment handed back the ViewModel's single
- * `deviceCount` and ignored the подписка it was asked about — so EVERY card in the carousel printed
- * the ROOT подписка's usage as its own. There is only one live count in the product, because there
- * is only one `GET /client/devices` call and it is about the active подписка;
- * `/client/subscription/all` carries `connectedDevices = 0` for every item it returns. A secondary
- * card therefore shows its allowance and no usage, which is true, instead of a number that belongs
- * to a different подписка, which is not.
+ * The adapter is deliberately dependency-free again: it takes no callbacks and no resolvers,
+ * because a ring has nothing to tap and nothing to look up.
+ *
+ * THE FOUR STATES ARE THE METER'S FOUR STATES, unchanged in substance — the ring is the meter,
+ * redrawn:
+ *
+ *  - under quota  the arc fills to the real fraction, «1,9 ТБ» over «из 5 ТБ», accent;
+ *  - OVER quota   the arc is closed and the arc AND the figure go red, caption «Лимит исчерпан».
+ *                 An exhausted allowance has to look exhausted; a full accent ring reads as a
+ *                 healthy tank;
+ *  - unlimited    the arc is closed at the accent, «2,0 ТБ» over «без ограничений». A ring with no
+ *                 ceiling would otherwise be a fraction of nothing;
+ *  - NO DATA      no figure, caption «Нет данных», empty arc. `/client/subscription/all` carries no
+ *                 connect payload, so `raw` is null for every SECONDARY подписка; a stated absence
+ *                 is finished, a blank disc is not.
+ *
+ * Both colours are re-applied on EVERY bind, never only in the branch that needs them: this is a
+ * recycled holder, and a page that inherited the previous подписка's red arc would report a limit
+ * that is not its own.
  */
-class SubscriptionPagerAdapter(
-    private val resolveBadge: (SubInfoDto) -> String?,
-    private val resolveUsedDevices: (SubInfoDto) -> Int?,
-    private val onRenew: (SubInfoDto) -> Unit,
-    private val onOpenDevices: (SubInfoDto) -> Unit,
-    private val onAutoRenew: (SubInfoDto, Boolean) -> Unit,
-) : RecyclerView.Adapter<SubscriptionPagerAdapter.VH>() {
+class SubscriptionPagerAdapter : RecyclerView.Adapter<SubscriptionPagerAdapter.VH>() {
 
     private val items = mutableListOf<SubInfoDto>()
 
@@ -66,107 +71,46 @@ class SubscriptionPagerAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) = holder.bind(items[position])
 
+    /** A page that scrolls out mid-sweep must not keep an animator pointed at a recycled view. */
+    override fun onViewRecycled(holder: VH) {
+        super.onViewRecycled(holder)
+        holder.cancelSweep()
+    }
+
     inner class VH(private val binding: ItemSubscriptionCardBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(sub: SubInfoDto) {
-            val ctx = binding.root.context
-
-            // Name: user label, then the friendly tariff name, then the backend default, then a
-            // neutral header so the card is never blank.
-            binding.tvSubName.text = sub.displayName?.takeIf { it.isNotBlank() }
-                ?: sub.tariffDisplayName?.takeIf { it.isNotBlank() }
-                ?: sub.defaultLabel?.takeIf { it.isNotBlank() }
-                ?: ctx.getString(R.string.account_subs_header)
-
-            // Tariff badge (Base/Plus): the fragment resolves it from the catalog; hide on null/blank
-            // so a stale/unknown tariff never shows a wrong badge.
-            val badge = resolveBadge(sub)
-            if (badge.isNullOrBlank()) {
-                binding.tvTariffBadge.visibility = View.GONE
-            } else {
-                binding.tvTariffBadge.text = badge
-                binding.tvTariffBadge.visibility = View.VISIBLE
-            }
-
-            if (sub.expireAtIso.isNullOrBlank()) {
-                binding.tvSubExpiry.visibility = View.GONE
-            } else {
-                binding.tvSubExpiry.visibility = View.VISIBLE
-                binding.tvSubExpiry.text =
-                    ctx.getString(R.string.account_expires, formatIsoDate(sub.expireAtIso))
-            }
-
-            // Used = the live connected-device count, and ONLY for the подписка that actually has
-            // one; limit = total slots, or ∞ when the plan is unlimited. A card with no live count
-            // says what the plan allows and stops there — «Устройства: до 3» — rather than
-            // borrowing the active подписка's figure, which is what every secondary card did.
-            val unlimitedDevices = sub.subscription?.raw()?.isUnlimitedDevices() == true
-            val totalDevicesStr = if (unlimitedDevices) {
-                ctx.getString(R.string.account_unlimited)
-            } else {
-                sub.totalDevices.toString()
-            }
-            val usedDevices = resolveUsedDevices(sub)
-            binding.tvSubDevices.text = if (usedDevices == null) {
-                ctx.getString(R.string.account_devices_limit, totalDevicesStr)
-            } else {
-                ctx.getString(R.string.account_devices, usedDevices.toString(), totalDevicesStr)
-            }
-            binding.rowSubDevices.setOnClickListener { onOpenDevices(sub) }
-
-            bindTrafficMeter(sub)
-
-            // «Продлить» is ALWAYS offered, including on a perpetual подписка — «она должна быть и
-            // при бессрочной подписке». There is nothing about an open-ended plan that makes
-            // extending it meaningless, and a card with no action reads as a dead end.
-            binding.btnSubRenew.setOnClickListener { onRenew(sub) }
-
-            bindAutoRenew(sub)
-        }
+        private var sweep: ValueAnimator? = null
 
         /**
-         * THE TRAFFIC PILL, FINISHED. `view_meter.xml` has always described four states; this bound
-         * two of them, and the owner read the result as unfinished — «пилюля не сделана, надо
-         * дорабатывать чтобы было нормальное отображение и понятное для пользователя». All four are
-         * bound now, and every one of them leaves a figure on the card:
-         *
-         *  - under quota  bar at the real fraction, «12,4 из 50 ГБ», the accent fill;
-         *  - OVER quota   bar full, «Лимит исчерпан», AND THE FILL AND THE FIGURE GO RED. This is
-         *                 what view_meter.xml documents («over quota (>= 100%) fill ->
-         *                 ?attr/colorError and the value says «Лимит исчерпан»») and what nothing
-         *                 implemented: the value changed, the bar stayed accent-blue and read as a
-         *                 healthy full tank. An exhausted allowance now looks exhausted;
-         *  - unlimited    no bar — a bar with no ceiling is a lie — and «1,9 ТБ · безлимит»;
-         *  - NO DATA      the label and «Нет данных», with no bar. It used to hide the whole meter,
-         *                 which on a SECONDARY подписка is every single card: /client/subscription/all
-         *                 carries no connect payload at all, so `raw` is null for anything that is not
-         *                 the root, and the card simply had a hole where the pill belongs. A stated
-         *                 absence is finished; a silent gap is the thing he was looking at.
-         *
-         * Both colours are re-applied on EVERY bind, never only in the branch that needs them: this
-         * is a recycled holder, and a card that inherited the previous подписка's red fill would
-         * report a limit that is not its own.
+         * Identity of the подписка this holder last drew. §5's «переход 500 мс» is about a figure
+         * that CHANGED — a refresh landing new bytes for the подписка already on screen — and not
+         * about a holder being pointed at a different подписка by the recycler. The second case
+         * lands instantly, because a sweep there would animate a value that was never true.
          */
-        private fun bindTrafficMeter(sub: SubInfoDto) {
+        private var boundKey: String? = null
+
+        fun bind(sub: SubInfoDto) {
+            val key = identityOf(sub)
+            val sameSub = key == boundKey
+            boundKey = key
+            bindTrafficRing(sub, animate = sameSub)
+        }
+
+        fun cancelSweep() {
+            sweep?.cancel()
+            sweep = null
+        }
+
+        private fun bindTrafficRing(sub: SubInfoDto, animate: Boolean) {
             val ctx = binding.root.context
-            val meter = binding.meterTraffic
             val raw = sub.subscription?.raw()
-            // THE SAME METER AS ГЛАВНАЯ, AND NOW THE SAME NUMBERS, which is the whole of «во вкладке
-            // аккаунт где тулбар с сабкой, там пилюли трафика нету, сделай такую же как на основной
-            // странице».
-            //
-            // The component was already here and already bound — it just had nothing to draw. It read
-            // ONLY the backend's raw remnawave record, and `/client/subscription/all` carries no
-            // connect payload at all, so `raw` is null for every SECONDARY подписка and the card fell
-            // through to «Нет данных» on each one. Главная never had that problem because it meters
-            // from the `subscription-userinfo` HEADER, which arrives on every single fetch of every
-            // подписка and is already persisted on the local [SubscriptionItem].
-            //
-            // So: the backend record first (it is the account's own answer), and the header figures
-            // as the fallback. Same component, same four states, same figures the user sees one tab
-            // over — a подписка can no longer report its allowance on one screen and «Нет данных» on
-            // the other.
+
+            // THE SAME FIGURES THE METER READ, and for the same reason: the backend's own record
+            // first, the `subscription-userinfo` header persisted on the local [SubscriptionItem]
+            // as the fallback. `/client/subscription/all` carries no connect payload, so without
+            // the fallback every SECONDARY подписка reports «Нет данных» here while Главная — which
+            // meters from the header — shows real bytes for the same подписка.
             val local = localSubscription(sub)
             val used: Long = raw?.trafficUsed
                 ?: raw?.userTraffic?.usedTrafficBytes
@@ -175,61 +119,75 @@ class SubscriptionPagerAdapter(
             val limit: Long? = raw?.trafficLimitBytes
                 ?: local?.totalTraffic?.takeIf { it > 0L }
 
-            meter.meter.visibility = View.VISIBLE
-            meter.meterLabel.setText(R.string.account_meter_traffic)
-
-            val accent = MaterialColors.getColor(meter.meterBar, androidx.appcompat.R.attr.colorPrimary)
+            val accent = MaterialColors.getColor(binding.ringTraffic, androidx.appcompat.R.attr.colorPrimary)
             val onSurface = MaterialColors.getColor(
-                meter.meterValue, com.google.android.material.R.attr.colorOnSurface
+                binding.tvRingValue, com.google.android.material.R.attr.colorOnSurface
             )
             val danger = ContextCompat.getColor(ctx, R.color.color_destructive_text)
 
             if (used <= 0L && limit == null) {
-                meter.meterBar.visibility = View.GONE
-                meter.meterValue.setText(R.string.account_meter_traffic_none)
-                meter.meterValue.setTextColor(onSurface)
+                binding.tvRingValue.visibility = View.GONE
+                binding.tvRingCaption.setText(R.string.account_meter_traffic_none)
+                binding.ringTraffic.setIndicatorColor(accent)
+                setSweep(0, animate)
                 return
             }
+
+            binding.tvRingValue.visibility = View.VISIBLE
+            binding.tvRingValue.text = formatBytes(used)
 
             if (limit == null || limit <= 0L) {
-                meter.meterBar.visibility = View.GONE
-                meter.meterValue.text =
-                    ctx.getString(R.string.account_meter_traffic_unlimited, formatBytes(used))
-                meter.meterValue.setTextColor(onSurface)
+                binding.tvRingValue.setTextColor(onSurface)
+                binding.tvRingCaption.setText(R.string.account_ring_unlimited)
+                binding.ringTraffic.setIndicatorColor(accent)
+                setSweep(RING_MAX, animate)
                 return
             }
 
-            meter.meterBar.visibility = View.VISIBLE
-            val pct = ((used.toDouble() / limit.toDouble()) * 100).toInt().coerceIn(0, 100)
-            meter.meterBar.setProgressCompat(pct, false)
             val exhausted = used >= limit
-            meter.meterBar.setIndicatorColor(if (exhausted) danger else accent)
-            meter.meterValue.setTextColor(if (exhausted) danger else onSurface)
-            meter.meterValue.text = if (exhausted) {
+            binding.ringTraffic.setIndicatorColor(if (exhausted) danger else accent)
+            binding.tvRingValue.setTextColor(if (exhausted) danger else onSurface)
+            binding.tvRingCaption.text = if (exhausted) {
                 ctx.getString(R.string.account_meter_traffic_over)
             } else {
-                ctx.getString(
-                    R.string.account_meter_traffic_of,
-                    formatBytes(used),
-                    formatBytes(limit),
-                )
+                ctx.getString(R.string.account_ring_of, formatBytes(limit))
+            }
+            val fraction = (used.toDouble() / limit.toDouble()).coerceIn(0.0, 1.0)
+            setSweep(Math.round(fraction * RING_MAX).toInt(), animate)
+        }
+
+        /**
+         * Moves the arc to [target].
+         *
+         * §5 asks for a 500ms transition on §8's ease-out-quart, and CircularProgressIndicator's own
+         * `setProgressCompat(_, true)` runs on the library's clock instead — so the sweep is driven
+         * frame by frame here and the indicator is only ever asked for instant values. Reduced
+         * motion (and a first paint) land on the number with no travel at all.
+         */
+        private fun setSweep(target: Int, animate: Boolean) {
+            cancelSweep()
+            val ring = binding.ringTraffic
+            val from = ring.progress
+            if (!animate || from == target || ring.reducedMotion()) {
+                ring.setProgressCompat(target, false)
+                return
+            }
+            sweep = ValueAnimator.ofInt(from, target).apply {
+                duration = RING_SWEEP_MS
+                interpolator = AnimationUtils.loadInterpolator(ring.context, R.interpolator.ease_out_quart)
+                addUpdateListener { ring.setProgressCompat(it.animatedValue as Int, false) }
+                start()
             }
         }
 
         /**
          * The LOCAL подписка this account record was imported as, or null when it has not been
-         * imported (or the map cannot be read).
-         *
-         * Keyed exactly the way `SubscriptionSyncManager.identityOf` writes the map, because a
-         * mismatch here is silently a null rather than a wrong card: the root подписка by its
-         * constant, a secondary by its remnawave uuid falling back to its id.
+         * imported (or the map cannot be read). Keyed exactly the way
+         * `SubscriptionSyncManager.identityOf` writes the map, because a mismatch here is silently a
+         * null rather than a wrong page.
          */
         private fun localSubscription(sub: SubInfoDto): SubscriptionItem? {
-            val identity = if (sub.type.equals(SubscriptionSyncManager.TYPE_ROOT, ignoreCase = true)) {
-                SubscriptionSyncManager.TYPE_ROOT
-            } else {
-                sub.remnawaveUuid.ifBlank { sub.id }
-            }
+            val identity = identityOf(sub)
             if (identity.isBlank()) return null
             return runCatching {
                 AuthTokenStore.getManagedGuids()[identity]
@@ -237,53 +195,36 @@ class SubscriptionPagerAdapter(
                     ?.let { MmkvManager.decodeSubscription(it) }
             }.getOrNull()
         }
+    }
 
+    private companion object {
         /**
-         * The auto-renew switch and the line that says what it will do next.
-         *
-         * The listener is detached before the state is written and re-attached after, because a
-         * recycled holder is re-bound with `setChecked` and an attached listener would report that
-         * as a user decision — firing a PATCH nobody asked for, on whichever подписка the holder
-         * has just been pointed at.
+         * The indicator's `android:max`, mirrored from item_subscription_card.xml. 1000 and not 100
+         * so a percent-and-a-bit of a terabyte plan still moves the arc: at max=100 every change
+         * under 1% quantised to no movement at all, which is a sweep that never runs.
          */
-        private fun bindAutoRenew(sub: SubInfoDto) {
-            val ctx = binding.root.context
-            // THE ROW IS HIDDEN WHEN THE TOGGLE CANNOT BE HONOURED, which is what
-            // item_subscription_card.xml has always said and what nothing implemented: `id` is the
-            // path segment the secondary endpoint needs, and with it blank the switch flipped
-            // under the finger and then reported a failure it could have known about before it was
-            // ever offered. The ROOT подписка is addressed by its own id-less endpoint, so it
-            // never needs one. A control that cannot act is not disabled, it is absent — a
-            // disabled switch still claims the feature exists for this подписка.
-            val actionable =
-                sub.type.equals(SubscriptionSyncManager.TYPE_ROOT, ignoreCase = true) || sub.id.isNotBlank()
-            binding.rowSubAutorenew.visibility = if (actionable) View.VISIBLE else View.GONE
-            if (!actionable) {
-                binding.switchSubAutorenew.setOnCheckedChangeListener(null)
-                return
-            }
-            binding.switchSubAutorenew.setOnCheckedChangeListener(null)
-            binding.switchSubAutorenew.isChecked = sub.autoRenewEnabled
-            binding.tvSubAutorenew.text = when {
-                !sub.autoRenewEnabled -> ctx.getString(R.string.account_sub_autorenew_off)
-                sub.renewalPrice != null && !sub.expireAtIso.isNullOrBlank() -> ctx.getString(
-                    R.string.account_sub_autorenew_next,
-                    formatIsoDate(sub.expireAtIso),
-                    formatMoney(sub.renewalPrice, sub.tariffCurrency),
-                )
+        const val RING_MAX = 1000
 
-                else -> ctx.getString(R.string.account_sub_autorenew_on)
-            }
-            binding.switchSubAutorenew.setOnCheckedChangeListener { _, checked ->
-                onAutoRenew(sub, checked)
-            }
-        }
+        /** §5 «переход 500 мс». Not in motion.xml — see the report's token request. */
+        const val RING_SWEEP_MS = 500L
     }
 }
 
 /**
+ * The key a подписка is stored under, root by its constant and anything else by its remnawave uuid
+ * falling back to its id — the same rule `SubscriptionSyncManager.identityOf` writes the managed-guid
+ * map with, so a lookup either hits the right local record or misses cleanly.
+ */
+private fun identityOf(sub: SubInfoDto): String =
+    if (sub.type.equals(SubscriptionSyncManager.TYPE_ROOT, ignoreCase = true)) {
+        SubscriptionSyncManager.TYPE_ROOT
+    } else {
+        sub.remnawaveUuid.ifBlank { sub.id }
+    }
+
+/**
  * Bytes as the product writes them: Russian units, one decimal past kilobytes. A file-private copy
- * for the same reason [formatIsoDate] is one — this adapter depends on no screen.
+ * for the same reason [identityOf] is one — this adapter depends on no screen.
  */
 private fun formatBytes(bytes: Long): String {
     if (bytes <= 0L) return "0 Б"
@@ -297,29 +238,4 @@ private fun formatBytes(bytes: Long): String {
     val formatted = if (idx == 0) value.toLong().toString()
     else String.format(Locale.US, "%.1f", value).replace('.', ',')
     return "$formatted ${units[idx]}"
-}
-
-/** ₽ by default — the product's currency (owner ruling); anything else prints its own code. */
-private fun formatMoney(amount: Double, currency: String?): String {
-    val symbol = when (currency?.uppercase()) {
-        null, "", "RUB", "RUR" -> "₽"
-        "USD" -> "$"
-        "EUR" -> "€"
-        else -> currency
-    }
-    val whole = amount.toLong()
-    val text = if (amount == whole.toDouble()) whole.toString()
-    else String.format(Locale.US, "%.2f", amount).replace('.', ',')
-    return "$text $symbol"
-}
-
-/**
- * Formats an ISO-8601 timestamp as dd.MM.yyyy (a file-private copy of the fragment's helper so this
- * adapter carries no dependency on it). Returns "" for blank/unparseable input.
- */
-private fun formatIsoDate(iso: String?): String {
-    if (iso.isNullOrBlank()) return ""
-    val datePart = iso.substringBefore('T')
-    val parts = datePart.split('-')
-    return if (parts.size == 3) "${parts[2]}.${parts[1]}.${parts[0]}" else datePart
 }

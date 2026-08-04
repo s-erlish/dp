@@ -88,6 +88,7 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 /**
  * Главная — the screen the app opens on.
@@ -295,9 +296,29 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      */
     private var sweepRunning = false
 
+    /**
+     * The status pill's current colour and the tween moving it, so a repaint that resolves to the
+     * same state costs nothing and two state changes in a row do not run two animators at the
+     * pill at once. Null until the first paint, which lands instantly rather than fading in from
+     * an arbitrary colour.
+     */
+    private var pillColor: Int? = null
+    private var pillTint: ValueAnimator? = null
+
+    /**
+     * THE ENTRANCE (handoff §3, «Сборка главной»). Held so it can be cancelled with the view: it
+     * is one AnimatorSet with per-element start delays out to 580ms and NOT a chain of postDelayed
+     * runnables, because a chain outlives the screen and fires at views that are already gone.
+     */
+    private var entranceAnimator: android.animation.AnimatorSet? = null
+
+    /** The entrance plays once per attached view, never on a repaint. @see playHomeEntrance */
+    private var entrancePlayed = false
+
     // Cached easing curves (loaded once) so the imperative hero motion rides the same ease-out tempo
     // as res/interpolator and res/anim. No bounce.
     private val easeOutQuint by lazy { AnimationUtils.loadInterpolator(requireContext(), R.interpolator.ease_out_quint) }
+    private val easeOutQuart by lazy { AnimationUtils.loadInterpolator(requireContext(), R.interpolator.ease_out_quart) }
     private val easeStandard by lazy { AnimationUtils.loadInterpolator(requireContext(), R.interpolator.ease_standard) }
 
     private val durWindUp get() = resources.getInteger(R.integer.motion_windup).toLong()
@@ -305,6 +326,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private val durStateExit get() = resources.getInteger(R.integer.motion_state_exit).toLong()
     private val durReveal get() = resources.getInteger(R.integer.motion_reveal).toLong()
     private val durRevealExit get() = resources.getInteger(R.integer.motion_reveal_exit).toLong()
+    private val durAppear get() = resources.getInteger(R.integer.motion_appear).toLong()
+    private val durAppearSlow get() = resources.getInteger(R.integer.motion_appear_slow).toLong()
 
     // ---- The session clock ----
 
@@ -679,31 +702,38 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * colour is resolved through `?attr` and is therefore correct in blue, light and the mono
      * overlay at once, with no file to keep in three copies.
      *
-     * THE FRAME IS THE CONTROL: 224dp of touch target, and @anim/press_scale scales the rings, the
-     * disc and the shield together, because they are one object.
+     * THE FRAME IS THE CONTROL: 214dp of touch target, and @anim/press_connect scales the rings,
+     * the disc and the shield together at 0.97, because they are one object.
      */
     private fun buildConnectObject() {
         val frame = binding.connectFrame
-        val stroke = resources.getDimensionPixelSize(R.dimen.stroke_ring)
-        val step = resources.getDimensionPixelSize(R.dimen.space_12)
         ringColor = idleRingColor()
 
-        // Rings 3 and 2 are two layers of the frame's background — 224dp and, inset
-        // by one @dimen/space_12 all round, 200dp. They are layers rather than child views
-        // because a child of a FrameLayout is measured inside the PADDED box, so no child of this
-        // frame can be wider than the 176dp disc, and these two have to be wider than it.
-        ringOuter = ovalStroke(stroke)
-        ringMid = ovalStroke(stroke)
-        frame.background = LayerDrawable(arrayOf(ringOuter, ringMid)).apply {
-            setLayerInset(1, step, step, step, step)
+        // THE THREE RINGS, at handoff §4's own insets: outer 0 / 1.5dp, middle 10dp / 1.5dp,
+        // inner 22dp / 2dp. All three are layers of the frame's background — three empty views
+        // would cost three measure passes to draw three ovals, and LayerDrawable insets are
+        // exactly the language §4 states the geometry in.
+        //
+        // The inner one is the ACTIVE ring: it carries the state hue at full strength and it is
+        // the circle the negotiating arc rides (connect_sweep, indicatorSize 170 = 214 - 2x22).
+        // It used to be the DISC's own edge, which was right at 176-in-224 and wrong at 150-in-214
+        // — the disc now sits 10dp inboard of that ring and cannot be its border.
+        val frameStroke = ringStroke()
+        val activeStroke = resources.getDimensionPixelSize(R.dimen.stroke_emphasis)
+        val insetMid = dp(10)
+        val insetInner = dp(22)
+        ringOuter = ovalStroke(frameStroke)
+        ringMid = ovalStroke(frameStroke)
+        ringInner = ovalStroke(activeStroke)
+        frame.background = LayerDrawable(arrayOf(ringOuter, ringMid, ringInner)).apply {
+            setLayerInset(1, insetMid, insetMid, insetMid, insetMid)
+            setLayerInset(2, insetInner, insetInner, insetInner, insetInner)
         }
-        // Ring 1 of 3, the disc's own, over the disc's fill.
-        val fill = GradientDrawable().apply {
+        // The disc: its fill, and nothing else.
+        binding.connectDisc.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(themeColor(com.google.android.material.R.attr.colorSurfaceContainerHighest))
         }
-        ringInner = ovalStroke(stroke)
-        binding.connectDisc.background = LayerDrawable(arrayOf(fill, ringInner))
         applyRingColor(ringColor)
 
         // THE PRESS IS DEPRESSION AND NOTHING ELSE — no ripple, no lightening, no highlight, and
@@ -752,15 +782,16 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // owner photographed. `colorAccentFigure` carries the WEIGHT the accent has (5.99:1 in
         // mono light against the blue accent's 5.97:1) instead of the accent's job. See attrs.xml.
         val accent = themeColor(R.attr.colorAccentFigure)
+        val confirmStroke = resources.getDimensionPixelSize(R.dimen.stroke_emphasis)
         binding.connectRingPulse.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.TRANSPARENT)
-            setStroke(stroke, accent)
+            setStroke(confirmStroke, accent)
         }
         binding.connectRingPulseEcho.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.TRANSPARENT)
-            setStroke((stroke - 1).coerceAtLeast(1), accent)
+            setStroke((confirmStroke - 1).coerceAtLeast(1), accent)
         }
 
         // The ambient wave: the same silhouette again, thinner still, because it is the quietest
@@ -793,12 +824,27 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     /** The ambient wave's weight: one hairline, at every density. @see buildConnectObject */
     private fun ambientStroke() = resources.getDimensionPixelSize(R.dimen.stroke_hairline)
 
+    /**
+     * The two outer rings' weight: 1.5dp (handoff §4).
+     *
+     * The stroke scale has no rung for it — stroke_hairline and stroke_control are 1,
+     * stroke_focus and stroke_emphasis 2, stroke_ring 3 — so it is computed from the display
+     * density here and requested as a token in the port report. `1` is the floor: at ldpi a
+     * rounded 1.5dp would come out 1px anyway, and a 0px stroke is an invisible ring.
+     */
+    private fun ringStroke(): Int =
+        (resources.displayMetrics.density * 1.5f).roundToInt().coerceAtLeast(1)
+
+    /** dp -> px, for the two ring insets §4 states in dp and no token names. */
+    private fun dp(value: Int): Int = (resources.displayMetrics.density * value).roundToInt()
+
     /** One hue, three opacities. The geometry never changes; only this does. */
     private fun applyRingColor(colour: Int) {
-        val stroke = resources.getDimensionPixelSize(R.dimen.stroke_ring)
-        ringOuter?.setStroke(stroke, ColorUtils.setAlphaComponent(colour, RING_ALPHA_OUTER))
-        ringMid?.setStroke(stroke, ColorUtils.setAlphaComponent(colour, RING_ALPHA_MID))
-        ringInner?.setStroke(stroke, colour)
+        val frameStroke = ringStroke()
+        val activeStroke = resources.getDimensionPixelSize(R.dimen.stroke_emphasis)
+        ringOuter?.setStroke(frameStroke, ColorUtils.setAlphaComponent(colour, RING_ALPHA_OUTER))
+        ringMid?.setStroke(frameStroke, ColorUtils.setAlphaComponent(colour, RING_ALPHA_MID))
+        ringInner?.setStroke(activeStroke, colour)
         // The ambient wave rides the same channel: it is the object exhaling, so it is the object's
         // colour. Guarded because this runs from buildConnectObject before the wave has a drawable.
         (binding.connectRingAmbient.background as? GradientDrawable)
@@ -2173,34 +2219,63 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // Always laid out, so the block below it never moves when the line changes what it says.
         binding.serverIdentity.visibility = View.VISIBLE
 
-        // THE CONFIRMATION, and only on the one state that earns it. See the pill's own note in
-        // fragment_home.xml: it is not a status field, so it does not spell out «Отключено» or
-        // «Подключение…» — those belong to the object's colour and to the line above.
-        paintConnectedPill(state.conn == Conn.CONNECTED)
+        // THE STATUS PILL, in whichever of its three states applies. See the pill's own note in
+        // fragment_home.xml: as of 2026-08-04 it is a field again, not a confirmation.
+        paintStatusPill(state.conn)
     }
 
     /**
-     * Reveals or removes the «Подключено» pill.
+     * Paints the status pill: «Не подключено» / «Подключаемся…» / «Подключено» (handoff §4).
      *
-     * It fades rather than appearing whole, and it takes its height with it when it goes, so the
-     * ledger under it settles once instead of the screen keeping a permanent gap for a badge that
-     * is absent most of the time. Reduced motion snaps, like every other transition here.
+     * THREE WORDS FOR SEVEN STATES, and the mapping is the honest one rather than the tidy one.
+     * The prototype knows three connection states; this build has seven, and two of the extra
+     * five are real things the user is looking at while they happen. DISCONNECTING keeps its own
+     * word, because a pill reading «Подключено» while the tunnel is coming down is a lie and one
+     * reading «Не подключено» while it is still up is a different lie. ERROR, GATED and NO_SERVER
+     * all land on «Не подключено», which is exactly what they are — the object above says WHY in
+     * its colour, and the identity line under the ledger says it in words.
+     *
+     * The outline and the label are one colour, tinted together: the pill shape is transparent
+     * inside, so backgroundTintList reaches its stroke and nothing else (SRC_IN keeps transparent
+     * pixels transparent). The tint TWEENS over motion_state — §8's «Смена цвета 220 мс» — while
+     * the word is swapped instantly, because a crossfaded label is unreadable for its duration and
+     * this is a string the user is waiting on.
      */
-    private fun paintConnectedPill(connected: Boolean) {
+    private fun paintStatusPill(conn: Conn) {
         val pill = binding.tvConnectedPill
-        if (pill.isVisible == connected) return
-        pill.animate().cancel()
-        if (!connected) {
-            pill.isVisible = false
+        val label = when (conn) {
+            Conn.CONNECTED -> R.string.home_status_connected
+            Conn.CONNECTING -> R.string.home_pill_connecting
+            Conn.DISCONNECTING -> R.string.home_status_disconnecting
+            else -> R.string.home_not_connected
+        }
+        val colour = when (conn) {
+            Conn.CONNECTED -> themeColor(R.attr.colorAccentFigure)
+            Conn.CONNECTING -> themeColor(R.attr.connectActiveColor)
+            else -> themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
+        }
+        pill.setText(label)
+        if (colour == pillColor) return
+        val from = pillColor
+        pillColor = colour
+        if (from == null || pill.reducedMotion()) {
+            applyPillColor(colour)
             return
         }
-        pill.isVisible = true
-        if (pill.reducedMotion()) {
-            pill.alpha = 1f
-            return
+        pillTint?.cancel()
+        pillTint = ValueAnimator.ofObject(ArgbEvaluator(), from, colour).apply {
+            duration = durState
+            interpolator = easeOutQuart
+            addUpdateListener { applyPillColor(it.animatedValue as Int) }
+            start()
         }
-        pill.alpha = 0f
-        pill.animate().alpha(1f).setDuration(durReveal).setInterpolator(easeOutQuint).start()
+    }
+
+    /** One colour for the pill's outline and its label. @see paintStatusPill */
+    private fun applyPillColor(colour: Int) {
+        val pill = binding.tvConnectedPill
+        pill.backgroundTintList = ColorStateList.valueOf(colour)
+        pill.setTextColor(colour)
     }
 
     private fun gateStatusWord(state: HomeState): Int = when {

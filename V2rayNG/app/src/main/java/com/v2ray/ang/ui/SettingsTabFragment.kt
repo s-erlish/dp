@@ -23,6 +23,8 @@ import com.v2ray.ang.handler.SubscriptionUpdater
 import com.v2ray.ang.tv.TvReceiveActivity
 import com.v2ray.ang.tv.TvSendActivity
 import com.v2ray.ang.ui.component.SelectPopup
+import com.v2ray.ang.ui.component.onSingleClick
+import com.v2ray.ang.ui.component.pressFeedback
 import com.v2ray.ang.util.LogUtil
 
 /**
@@ -74,77 +76,88 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
     /**
      * Wires every row. Click handlers only — nothing here reads state, so the wiring runs once per
      * view and [bindSettingsState] stays the single place that paints values.
+     *
+     * Every row goes through [onSingleClick] rather than `setOnClickListener`, which is the repo's
+     * own R9 rule («double-press is impossible by construction», П-31): two taps 80ms apart on
+     * «Журнал» used to push two LogcatActivity instances, and the guard costs one word per row.
      */
     private fun setupSettings() {
         val s = binding
 
+        rows().forEach { it.pressFeedback(R.anim.press_row) }
+
         // ПОДКЛЮЧЕНИЕ
-        s.rowMode.setOnClickListener { pickMode() }
-        s.rowPerApp.setOnClickListener {
+        s.rowMode.onSingleClick { pickMode() }
+        s.rowPerApp.onSingleClick {
             mainHost.launchSettingsScreen(Intent(requireContext(), PerAppProxyActivity::class.java))
         }
-        s.rowBypassLan.setOnClickListener { toggleBypassLan() }
-        s.rowIpv6.setOnClickListener { toggleIpv6() }
-        s.rowDns.setOnClickListener { editDns() }
-        s.rowPingMethod.setOnClickListener { pickPingMethod() }
+        s.rowBypassLan.onSingleClick { toggleBypassLan() }
+        s.rowIpv6.onSingleClick { toggleIpv6() }
+        s.rowDns.onSingleClick { editDns() }
+        s.rowPingMethod.onSingleClick { pickPingMethod() }
         // «Локальный прокси» пишет ключи, которые читает конфиг ядра (инбаунды socks/http, их
         // порт, UDP, системный HTTP-прокси, доступ по сети). Открывать его обычным
         // startActivity нельзя: флаг SettingsChangeManager.restartService, который экран
         // выставляет, потребляет только launchSettingsScreen — иначе выключенный локальный
         // прокси остаётся поднятым до следующего ручного переподключения.
-        s.rowLocalProxy.setOnClickListener {
+        s.rowLocalProxy.onSingleClick {
             mainHost.launchSettingsScreen(Intent(requireContext(), LocalProxyActivity::class.java))
         }
-        s.rowAlwaysOn.setOnClickListener { openAlwaysOnSettings() }
+        s.rowAlwaysOn.onSingleClick { openAlwaysOnSettings() }
 
         // ОБХОД БЛОКИРОВОК
-        s.rowMux.setOnClickListener { toggleMux() }
-        s.rowMuxConcurrency.setOnClickListener { editMuxConcurrency() }
-        s.rowFragment.setOnClickListener { toggleFragment() }
+        s.rowMux.onSingleClick { toggleMux() }
+        s.rowMuxConcurrency.onSingleClick { editMuxConcurrency() }
+        s.rowFragment.onSingleClick { toggleFragment() }
 
         // ИНТЕРФЕЙС
-        s.rowAppearance.setOnClickListener { pickAppearance() }
-        s.rowLanguage.setOnClickListener { pickLanguage() }
-        s.rowBoot.setOnClickListener { toggleStartOnBoot() }
+        s.rowAppearance.onSingleClick { pickAppearance() }
+        s.rowLanguage.onSingleClick { pickLanguage() }
+        s.rowBoot.onSingleClick { toggleStartOnBoot() }
 
         // ПОДПИСКА
         // «Список подписок» (SubSettingActivity) и «Другие способы добавления»
         // (MainHost.showAdvancedAddMethods) убраны отсюда по прямому указанию владельца
         // (2026-08-02). Что при этом стало недостижимо — записано в комментарии на их месте в
         // fragment_settings_tab.xml; ни один экран и ни одна функция не удалены.
-        s.rowSubAutoUpdate.setOnClickListener { pickSubAutoUpdate() }
-        s.rowRouting.setOnClickListener {
+        s.rowSubAutoUpdate.onSingleClick { pickSubAutoUpdate() }
+        s.rowRouting.onSingleClick {
             mainHost.launchSettingsScreen(Intent(requireContext(), RoutingSettingActivity::class.java))
         }
-        s.rowAssets.setOnClickListener {
+        s.rowAssets.onSingleClick {
             mainHost.launchSettingsScreen(Intent(requireContext(), UserAssetActivity::class.java))
         }
         // «Настройки подписок» меняет порядок списка серверов и просит оболочку перестроить его
         // (SettingsChangeManager.setupGroupTab). Этот флаг тоже потребляет только
         // launchSettingsScreen, поэтому через startActivity новый порядок не доезжал до
         // Главной до следующего перезапуска.
-        s.rowProvider.setOnClickListener {
+        s.rowProvider.onSingleClick {
             mainHost.launchSettingsScreen(Intent(requireContext(), ProviderSettingsActivity::class.java))
         }
 
         // УСТРОЙСТВА
-        s.rowTvSend.setOnClickListener { startActivity(Intent(requireContext(), TvSendActivity::class.java)) }
+        s.rowTvSend.onSingleClick { startActivity(Intent(requireContext(), TvSendActivity::class.java)) }
         // "Принять подписку" only makes sense on an Android TV device.
         val isTv = requireContext().packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
         s.rowTvReceive.isVisible = isTv
         s.dividerTvReceive.isVisible = isTv
-        s.rowTvReceive.setOnClickListener { startActivity(Intent(requireContext(), TvReceiveActivity::class.java)) }
+        s.rowTvReceive.onSingleClick { startActivity(Intent(requireContext(), TvReceiveActivity::class.java)) }
+        // The section card no longer clips its children (README §11 grabl 4), so its first and last
+        // row carry the card's corner themselves. On a phone «Устройства» has one visible row, and a
+        // row that is both first and last needs all four — @drawable/bg_row_top would leave the
+        // card's bottom edge square.
+        if (!isTv) s.rowTvSend.setBackgroundResource(R.drawable.bg_row_only)
 
         // О ПРИЛОЖЕНИИ
         // CheckUpdateActivity and LogcatActivity were declared in the manifest and referenced from
         // nowhere; a screen with no launch site is not a feature, so each one keeps its row here.
         // «Дополнительно» (SettingsActivity) was removed by the owner on 2026-08-02 — see
         // fragment_settings_tab.xml for the record of what that takes off the map.
-        s.rowLogs.setOnClickListener { startActivity(Intent(requireContext(), LogcatActivity::class.java)) }
-        s.rowCheckUpdate.setOnClickListener { startActivity(Intent(requireContext(), CheckUpdateActivity::class.java)) }
-        s.rowAbout.setOnClickListener { startActivity(Intent(requireContext(), AboutActivity::class.java)) }
-        s.rowUrlScheme.setOnClickListener { startActivity(Intent(requireContext(), UrlSchemeListActivity::class.java)) }
-        s.rowBackup.setOnClickListener {
+        s.rowLogs.onSingleClick { startActivity(Intent(requireContext(), LogcatActivity::class.java)) }
+        s.rowCheckUpdate.onSingleClick { startActivity(Intent(requireContext(), CheckUpdateActivity::class.java)) }
+        s.rowAbout.onSingleClick { startActivity(Intent(requireContext(), AboutActivity::class.java)) }
+        s.rowUrlScheme.onSingleClick { startActivity(Intent(requireContext(), UrlSchemeListActivity::class.java)) }
+        s.rowBackup.onSingleClick {
             mainHost.launchSettingsScreen(Intent(requireContext(), BackupActivity::class.java))
         }
         s.valueAbout.text = BuildConfig.VERSION_NAME
@@ -152,18 +165,39 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         bindSettingsState()
     }
 
+    /**
+     * All 25 rows, in screen order.
+     *
+     * They are listed once so the press response cannot be attached to twenty-four of them. XML
+     * already carries `@anim/press_row` on each — [pressFeedback] re-attaches the same animator and
+     * adds the hardware layer that keeps a Russian label from twitching when the 2% rebound lands
+     * (README §11 grabl 1), which is the one part of the press that cannot be declared.
+     */
+    private fun rows(): List<View> = with(binding) {
+        listOf(
+            rowMode, rowPerApp, rowBypassLan, rowIpv6, rowDns, rowPingMethod, rowLocalProxy,
+            rowAlwaysOn,
+            rowMux, rowMuxConcurrency, rowFragment,
+            rowAppearance, rowLanguage, rowBoot,
+            rowSubAutoUpdate, rowRouting, rowAssets, rowProvider,
+            rowTvSend, rowTvReceive,
+            rowLogs, rowCheckUpdate, rowAbout, rowBackup, rowUrlScheme,
+        )
+    }
+
     /** Reflects all persisted settings values/toggle states into the settings tab. */
     private fun bindSettingsState() {
         if (!isBindingInitialized) return
         val s = binding
 
-        val mode = MmkvManager.decodeSettingsString(AppConfig.PREF_MODE, AppConfig.VPN)
-        val proxySharing = MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING, false)
+        // The row states the mode that is actually in force, including the one the picker no longer
+        // offers. Reporting «TUN» for a TUN + Proxy tunnel would be the screen lying about the
+        // machine to keep its own list tidy.
         s.valueMode.text = getString(
-            when {
-                mode != AppConfig.VPN -> R.string.settings_mode_value_proxy      // Proxy
-                proxySharing -> R.string.settings_mode_value_tun_proxy           // TUN + Proxy
-                else -> R.string.settings_mode_value_tun                         // TUN
+            when (currentMode()) {
+                Mode.PROXY -> R.string.hub_mode_proxy
+                Mode.TUN_PROXY -> R.string.settings_mode_value_tun_proxy
+                Mode.TUN -> R.string.settings_mode_value_tun
             }
         )
 
@@ -191,13 +225,7 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         s.dividerConcurrency.isVisible = muxOn
 
         s.switchFragment.isChecked = MmkvManager.decodeSettingsBool(AppConfig.PREF_FRAGMENT_ENABLED, false)
-        s.valueAppearance.text = getString(
-            when (currentAppearanceIndex()) {
-                0 -> R.string.settings_appearance_light
-                2 -> R.string.settings_appearance_mono
-                else -> R.string.settings_appearance_dark
-            }
-        )
+        s.valueAppearance.text = getString(appearanceLabelRes(currentAppearanceIndex()))
         s.switchBoot.isChecked = MmkvManager.decodeStartOnBoot()
     }
 
@@ -213,95 +241,109 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
     }
 
     /**
-     * Three connection modes, all expressed with existing prefs (core config untouched). The
-     * names and their order are the owner's: «TUN», «Proxy», «TUN + Proxy», and the row value
-     * uses the same three strings as the picker, so a mode never reads one way in the list and
-     * another way in the dialog.
-     *   0 TUN         = VPN(tun) mode, local-proxy sharing OFF
-     *   1 Proxy       = proxy-only mode (isVpnMode() == false)
-     *   2 TUN + Proxy = VPN(tun) mode, local-proxy sharing ON (PREF_PROXY_SHARING)
+     * «Режим» — the first of six select popups (handoff README §6). The dialog this replaced dimmed
+     * the whole screen to ask a two-word question; the flyout opens where the value already is.
+     *
+     * THE LIST IS THE DESIGN'S TWO, and the app's third mode is still here. The prototype's
+     * `MODES = ['TUN', 'Только прокси']`, and the owner confirmed on 2026-08-04 that the list shows
+     * exactly that — «интерфейс и формулировки по дизайну, возможности по репозиторию». So:
+     *
+     *   0 TUN         = VPN(tun) mode, local-proxy sharing OFF          — offered
+     *   1 Только прокси = proxy-only mode (isVpnMode() == false)         — offered
+     *     TUN + Proxy = VPN(tun) mode, local-proxy sharing ON            — NOT offered, still works
+     *
+     * TUN + Proxy is written by nothing on this screen any more, but it is read by everything:
+     * PREF_PROXY_SHARING is a live key, the core config honours it, and a user who chose the mode
+     * before today still has it. [bindSettingsState] keeps showing them «TUN + Proxy» rather than
+     * lying about which tunnel is up.
+     *
+     * That is also why the picker opens with NOTHING selected for them ([selectedIndex] -1) instead
+     * of pre-selecting TUN. SelectPopup does not fire `onPick` when the current value is re-picked,
+     * so a checkmark on TUN would leave the third mode with no way out of itself — tapping the row
+     * that appears to be selected would do nothing at all. With no selection, either option applies
+     * and lands them on one of the design's two.
      */
     private fun pickMode() {
         val entries = listOf(
             getString(R.string.settings_mode_value_tun),
-            getString(R.string.settings_mode_value_proxy),
-            getString(R.string.settings_mode_value_tun_proxy),
+            getString(R.string.hub_mode_proxy),
         )
-        val mode = MmkvManager.decodeSettingsString(AppConfig.PREF_MODE, AppConfig.VPN)
-        val proxySharing = MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING, false)
-        val idx = when {
-            mode != AppConfig.VPN -> 1
-            proxySharing -> 2
-            else -> 0
+        val idx = when (currentMode()) {
+            Mode.PROXY -> 1
+            Mode.TUN -> 0
+            Mode.TUN_PROXY -> -1 // legacy: offer both, pre-select neither
         }
-        // THE FIRST ROW ON THE SELECT POPUP (handoff README §6). The dialog this
-        // replaces dimmed the whole screen to ask a two-word question; the flyout opens
-        // where the value already is. The three modes, the keys they write and the
-        // tunnel restart are byte-for-byte what the dialog did — only the surface moved.
-        //
-        // `caret` is not passed yet: the row's trailing glyph is still the navigation
-        // chevron, and §6 gives a select row a CARET (@drawable/ic_arrow_drop_down)
-        // instead. Rotating a right-pointing chevron by 180° would point it at the
-        // screen edge. The Настройки wave swaps the glyph and passes it here; the
-        // popup works either way.
         SelectPopup.show(
             anchor = binding.rowMode,
             options = entries,
             selectedIndex = idx,
             widthRes = R.dimen.select_popup_w_mode,
             valueView = binding.valueMode,
+            caret = binding.caretMode,
         ) { which ->
-            when (which) {
-                0 -> { // TUN
-                    MmkvManager.encodeSettings(AppConfig.PREF_MODE, AppConfig.VPN)
-                    MmkvManager.encodeSettings(AppConfig.PREF_PROXY_SHARING, false)
-                }
-                1 -> { // Proxy only
-                    MmkvManager.encodeSettings(AppConfig.PREF_MODE, "Proxy only")
-                }
-                else -> { // TUN + Proxy
-                    MmkvManager.encodeSettings(AppConfig.PREF_MODE, AppConfig.VPN)
-                    MmkvManager.encodeSettings(AppConfig.PREF_PROXY_SHARING, true)
-                }
+            if (which == 0) { // TUN
+                MmkvManager.encodeSettings(AppConfig.PREF_MODE, AppConfig.VPN)
+                MmkvManager.encodeSettings(AppConfig.PREF_PROXY_SHARING, false)
+            } else { // Только прокси
+                MmkvManager.encodeSettings(AppConfig.PREF_MODE, "Proxy only")
             }
             bindSettingsState()
             restartIfRunning()
         }
     }
 
-    /** Maps a ping method to its short Russian label shown on the settings row. */
-    private fun pingMethodLabelRes(method: PingMethod): Int = when (method) {
-        PingMethod.PROXIED_REAL_DELAY -> R.string.settings_ping_method_real
-        PingMethod.TCP_CONNECT -> R.string.settings_ping_method_tcp
-        PingMethod.HTTP_URL -> R.string.settings_ping_method_http
-        PingMethod.ICMP -> R.string.settings_ping_method_icmp
+    /** The three modes the prefs can be in, including the one the picker no longer offers. */
+    private enum class Mode { TUN, PROXY, TUN_PROXY }
+
+    private fun currentMode(): Mode {
+        val mode = MmkvManager.decodeSettingsString(AppConfig.PREF_MODE, AppConfig.VPN)
+        val proxySharing = MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING, false)
+        return when {
+            mode != AppConfig.VPN -> Mode.PROXY
+            proxySharing -> Mode.TUN_PROXY
+            else -> Mode.TUN
+        }
     }
 
     /**
-     * Single-choice picker for the connection-test (ping) method. Writes the same
-     * [AppConfig.PREF_PING_METHOD] key the "test all" logic reads via
-     * [SettingsManager.getPingMethod], so the choice changes ping behavior immediately.
+     * The ping methods in the order the design lists them: `PINGS = ['Реальная задержка',
+     * 'HTTP-запрос', 'TCP-соединение', 'ICMP (ping)']`. All four stay (П-26) — the list reordered
+     * and two labels got shorter, the methods did not change.
+     */
+    private val pingMethods = listOf(
+        PingMethod.PROXIED_REAL_DELAY,
+        PingMethod.HTTP_URL,
+        PingMethod.TCP_CONNECT,
+        PingMethod.ICMP,
+    )
+
+    /** Maps a ping method to its short Russian label shown on the settings row. */
+    private fun pingMethodLabelRes(method: PingMethod): Int = when (method) {
+        PingMethod.PROXIED_REAL_DELAY -> R.string.hub_ping_real
+        PingMethod.TCP_CONNECT -> R.string.settings_ping_method_tcp
+        PingMethod.HTTP_URL -> R.string.settings_ping_method_http
+        PingMethod.ICMP -> R.string.hub_ping_icmp
+    }
+
+    /**
+     * «Пинг». Writes the same [AppConfig.PREF_PING_METHOD] key the "test all" logic reads via
+     * [SettingsManager.getPingMethod], so the choice changes ping behaviour immediately — including
+     * the per-row spinner on Главная, which is the same measurement seen from the other end.
      */
     private fun pickPingMethod() {
-        // Order shown to the user; index maps 1:1 to `values`.
-        val values = arrayOf(
-            PingMethod.PROXIED_REAL_DELAY,
-            PingMethod.TCP_CONNECT,
-            PingMethod.HTTP_URL,
-            PingMethod.ICMP,
-        )
-        val entries = values.map { getString(pingMethodLabelRes(it)) }.toTypedArray()
-        val current = SettingsManager.getPingMethod()
-        val idx = values.indexOf(current).coerceAtLeast(0)
-        AlertDialog.Builder(requireContext())
-            .setTitle(R.string.settings_ping_method)
-            .setSingleChoiceItems(entries, idx) { dialog, which ->
-                MmkvManager.encodeSettings(AppConfig.PREF_PING_METHOD, values[which].prefValue)
-                bindSettingsState()
-                dialog.dismiss()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        val entries = pingMethods.map { getString(pingMethodLabelRes(it)) }
+        val idx = pingMethods.indexOf(SettingsManager.getPingMethod()).coerceAtLeast(0)
+        SelectPopup.show(
+            anchor = binding.rowPingMethod,
+            options = entries,
+            selectedIndex = idx,
+            widthRes = R.dimen.select_popup_w_ping,
+            valueView = binding.valuePingMethod,
+            caret = binding.caretPingMethod,
+        ) { which ->
+            MmkvManager.encodeSettings(AppConfig.PREF_PING_METHOD, pingMethods[which].prefValue)
+            bindSettingsState()
+        }
     }
 
     private fun toggleBypassLan() {
@@ -345,35 +387,47 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
     }
 
     /**
-     * Single-choice DNS picker offering ready-made presets plus a "Свой…" option that
-     * opens the free-text editor. Writes the selected server(s) into
-     * [AppConfig.PREF_VPN_DNS] as a comma-separated list (same key/format as before).
+     * «DNS» — five presets plus «Свой…». The presets are a select popup; «Свой…» is the one option
+     * that cannot be, because it asks for a value rather than offering one, and §6 puts free text in
+     * a field. It hands off to [editDnsCustom] after the flyout has closed itself.
+     *
+     * Writes the selected server(s) into [AppConfig.PREF_VPN_DNS] as a comma-separated list (same
+     * key and format as before).
      */
     private fun editDns() {
-        val names = resources.getStringArray(R.array.dns_preset_names)
+        val names = resources.getStringArray(R.array.dns_preset_names).toList()
         val values = resources.getStringArray(R.array.dns_preset_values)
         val current = MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_DNS, AppConfig.DNS_VPN).orEmpty()
-        // The last entry is the custom option (empty value); it's the fallback selection.
+        // The last entry is the custom option (empty value).
         val customIdx = values.size - 1
-        val idx = values.indexOfFirst { it.isNotEmpty() && it == current }.let { if (it >= 0) it else customIdx }
-        AlertDialog.Builder(requireContext())
-            .setTitle(R.string.settings_dns)
-            .setSingleChoiceItems(names, idx) { dialog, which ->
-                dialog.dismiss()
-                if (which == customIdx) {
-                    editDnsCustom(current)
-                } else {
-                    // Write both the tun DNS (PREF_VPN_DNS) and the proxied-lookup DNS
-                    // (PREF_REMOTE_DNS, read by SettingsManager.getRemoteDnsServers), so
-                    // picking a preset like Cloudflare applies to proxied resolution too.
-                    MmkvManager.encodeSettings(AppConfig.PREF_VPN_DNS, values[which])
-                    MmkvManager.encodeSettings(AppConfig.PREF_REMOTE_DNS, values[which])
-                    bindSettingsState()
-                    restartIfRunning()
-                }
+        val preset = values.indexOfFirst { it.isNotEmpty() && it == current }
+        // A custom DNS marks NOTHING in the list, and that is deliberate. SelectPopup does not fire
+        // `onPick` when the current selection is re-picked — correct for a value, wrong for a door:
+        // with «Свой…» checked, the one tap that reopens the editor would be the one tap the popup
+        // swallows, and a user who had typed their own resolver could never change it again. No
+        // checkmark also states the truth — the active value is none of these presets — and the row
+        // itself is already showing what it is.
+        val idx = preset
+        SelectPopup.show(
+            anchor = binding.rowDns,
+            options = names,
+            selectedIndex = idx,
+            widthRes = R.dimen.select_popup_w_dns,
+            valueView = binding.valueDns,
+            caret = binding.caretDns,
+        ) { which ->
+            if (which == customIdx) {
+                editDnsCustom(current)
+            } else {
+                // Write both the tun DNS (PREF_VPN_DNS) and the proxied-lookup DNS
+                // (PREF_REMOTE_DNS, read by SettingsManager.getRemoteDnsServers), so
+                // picking a preset like Cloudflare applies to proxied resolution too.
+                MmkvManager.encodeSettings(AppConfig.PREF_VPN_DNS, values[which])
+                MmkvManager.encodeSettings(AppConfig.PREF_REMOTE_DNS, values[which])
+                bindSettingsState()
+                restartIfRunning()
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        }
     }
 
     /** Free-text DNS editor, reached via the "Свой…" preset option. */
@@ -434,80 +488,101 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
     }
 
     /**
-     * Current "Оформление" selection as a picker index:
-     *   0 = Светлая (light day theme, blue accent)
-     *   1 = Тёмная (dark theme, blue accent)
-     *   2 = Чёрно-белая (monochrome overlay over the current night mode)
-     * Mono wins regardless of night mode; otherwise the light/dark split follows
-     * PREF_UI_MODE_NIGHT ("1" = day, "2" = night; default is Incy dark).
+     * «Оформление» — four choices, in the order the prototype lists them
+     * (`THEMES_OPTS = ['Тёмная', 'Светлая', 'Чёрно-белая', 'Как в системе']`):
+     *   0 = Тёмная       -> MODE_NIGHT_YES ("2") + blue accent (night resources)
+     *   1 = Светлая      -> MODE_NIGHT_NO  ("1") + blue accent (day resources, dark bar icons)
+     *   2 = Чёрно-белая  -> monochrome overlay, keeping the current night mode as-is
+     *   3 = Как в системе -> MODE_NIGHT_FOLLOW_SYSTEM ("0") + blue accent
+     *
+     * «Как в системе» is the one the list did not offer, and it is not new machinery:
+     * [SettingsManager.setNightMode] has always mapped PREF_UI_MODE_NIGHT "0" to
+     * MODE_NIGHT_FOLLOW_SYSTEM, and `arrays.xml`'s `ui_mode_night_value` has always declared it.
+     * The picker simply never let anyone reach it.
+     *
+     * Mono wins regardless of night mode, which is why it is a separate axis (PREF_COLOR_THEME)
+     * and why choosing it leaves PREF_UI_MODE_NIGHT alone. Light/dark/system are applied through
+     * AppCompatDelegate; the mono overlay is applied in BaseActivity.onCreate. Either path is
+     * picked up with recreate().
      */
     private fun currentAppearanceIndex(): Int = when {
         isMonoOn() -> 2
-        MmkvManager.decodeSettingsString(AppConfig.PREF_UI_MODE_NIGHT, "2") == "1" -> 0
-        else -> 1
+        else -> when (MmkvManager.decodeSettingsString(AppConfig.PREF_UI_MODE_NIGHT, "2")) {
+            "1" -> 1 // Светлая
+            "0" -> 3 // Как в системе
+            else -> 0 // Тёмная — the Incy default
+        }
+    }
+
+    /** The label for an appearance index, used by both the row value and the popup. */
+    private fun appearanceLabelRes(index: Int): Int = when (index) {
+        1 -> R.string.settings_appearance_light
+        2 -> R.string.settings_appearance_mono
+        3 -> R.string.hub_appearance_system
+        else -> R.string.settings_appearance_dark
+    }
+
+    private fun pickAppearance() {
+        val entries = (0..3).map { getString(appearanceLabelRes(it)) }
+        SelectPopup.show(
+            anchor = binding.rowAppearance,
+            options = entries,
+            selectedIndex = currentAppearanceIndex(),
+            widthRes = R.dimen.select_popup_w_appearance,
+            valueView = binding.valueAppearance,
+            caret = binding.caretAppearance,
+        ) { which ->
+            when (which) {
+                1 -> {
+                    MmkvManager.encodeSettings(AppConfig.PREF_UI_MODE_NIGHT, "1")
+                    MmkvManager.encodeSettings(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_BLUE)
+                    SettingsManager.setNightMode()
+                }
+                2 -> {
+                    // Чёрно-белая: mono overlay, keep the current night mode.
+                    MmkvManager.encodeSettings(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_MONO)
+                }
+                3 -> {
+                    MmkvManager.encodeSettings(AppConfig.PREF_UI_MODE_NIGHT, "0")
+                    MmkvManager.encodeSettings(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_BLUE)
+                    SettingsManager.setNightMode()
+                }
+                else -> {
+                    MmkvManager.encodeSettings(AppConfig.PREF_UI_MODE_NIGHT, "2")
+                    MmkvManager.encodeSettings(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_BLUE)
+                    SettingsManager.setNightMode()
+                }
+            }
+            // The night mode and mono overlay are applied at activity creation, so recreate.
+            requireActivity().recreate()
+        }
     }
 
     /**
-     * "Оформление" picker. Incy is primarily dark, but light is a first-class choice:
-     *   Светлая      -> MODE_NIGHT_NO  ("1") + blue accent  (day resources, dark bar icons)
-     *   Тёмная       -> MODE_NIGHT_YES ("2") + blue accent  (night resources)
-     *   Чёрно-белая  -> monochrome overlay, keeping the current night mode as-is.
-     * Light/dark are applied via AppCompatDelegate (SettingsManager.setNightMode reads
-     * PREF_UI_MODE_NIGHT and calls setDefaultNightMode); the mono overlay is applied in
-     * BaseActivity.onCreate. Either path is picked up with recreate().
+     * «Язык». The list is `language_select` — «Системный» and «Русский».
+     *
+     * The prototype's `LANGS` has a third, «English», and it is NOT added here: there is no
+     * `values-en/`, so the option would switch a Russian app to a Russian app and call it English.
+     * That is the exact defect `docs/agents/state/DECISION-localisation.md` records removing. The
+     * row is design-shaped either way; the missing locale is an owner decision, not a layout one.
      */
-    private fun pickAppearance() {
-        val entries = arrayOf(
-            getString(R.string.settings_appearance_light),
-            getString(R.string.settings_appearance_dark),
-            getString(R.string.settings_appearance_mono),
-        )
-        val idx = currentAppearanceIndex()
-        AlertDialog.Builder(requireContext())
-            .setTitle(R.string.settings_appearance)
-            .setSingleChoiceItems(entries, idx) { dialog, which ->
-                dialog.dismiss()
-                if (which == idx) return@setSingleChoiceItems
-                when (which) {
-                    0 -> {
-                        // Светлая: light day theme + blue accent.
-                        MmkvManager.encodeSettings(AppConfig.PREF_UI_MODE_NIGHT, "1")
-                        MmkvManager.encodeSettings(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_BLUE)
-                        SettingsManager.setNightMode()
-                    }
-                    1 -> {
-                        // Тёмная: dark theme + blue accent.
-                        MmkvManager.encodeSettings(AppConfig.PREF_UI_MODE_NIGHT, "2")
-                        MmkvManager.encodeSettings(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_BLUE)
-                        SettingsManager.setNightMode()
-                    }
-                    else -> {
-                        // Чёрно-белая: mono overlay, keep the current night mode.
-                        MmkvManager.encodeSettings(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_MONO)
-                    }
-                }
-                // The night mode and mono overlay are applied at activity creation, so recreate.
-                requireActivity().recreate()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
     private fun pickLanguage() {
-        val entries = resources.getStringArray(R.array.language_select)
+        val entries = resources.getStringArray(R.array.language_select).toList()
         val values = resources.getStringArray(R.array.language_select_value)
         val current = MmkvManager.decodeSettingsString(AppConfig.PREF_LANGUAGE, values.firstOrNull() ?: "auto").orEmpty()
         val idx = values.indexOf(current).coerceAtLeast(0)
-        AlertDialog.Builder(requireContext())
-            .setTitle(R.string.settings_language)
-            .setSingleChoiceItems(entries, idx) { dialog, which ->
-                MmkvManager.encodeSettings(AppConfig.PREF_LANGUAGE, values[which])
-                dialog.dismiss()
-                // Locale is applied via BaseActivity.attachBaseContext on recreate.
-                requireActivity().recreate()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        SelectPopup.show(
+            anchor = binding.rowLanguage,
+            options = entries,
+            selectedIndex = idx,
+            widthRes = R.dimen.select_popup_w_language,
+            valueView = binding.valueLanguage,
+            caret = binding.caretLanguage,
+        ) { which ->
+            MmkvManager.encodeSettings(AppConfig.PREF_LANGUAGE, values[which])
+            // Locale is applied via BaseActivity.attachBaseContext on recreate.
+            requireActivity().recreate()
+        }
     }
 
     private fun toggleStartOnBoot() {
@@ -516,16 +591,25 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         binding.switchBoot.isChecked = enabled
     }
 
-    /** Interval options (minutes) offered by the subscription auto-update picker; 0 == off. */
-    private val subAutoUpdateValues = longArrayOf(0L, 60L, 360L, 720L, 1440L)
+    /**
+     * Interval options (minutes) offered by the subscription auto-update picker, in the design's
+     * order: `AUTOUP = ['1 час', '3 часа', '6 часов', '12 часов', 'Раз в сутки', 'Выключено']`.
+     *
+     * Two changes from before, both the prototype's: «3 часа» is offered, and «Выключено» moved
+     * from the head of the list to its foot — a list of intervals that opens with "no interval"
+     * reads as if off were the recommendation. Off itself stays, because it is a capability and not
+     * a wording (П-27): without it a подписка cannot be taken off the schedule at all.
+     */
+    private val subAutoUpdateValues = longArrayOf(60L, 180L, 360L, 720L, 1440L, 0L)
 
     /** Short Russian label for a subscription auto-update interval in minutes (0 == off). */
     private fun subAutoUpdateLabel(minutes: Long): String = when (minutes) {
-        0L -> getString(R.string.settings_value_off)
+        0L -> getString(R.string.hub_sub_auto_update_off)
         60L -> getString(R.string.settings_sub_auto_update_1h)
+        180L -> getString(R.string.hub_sub_auto_update_3h)
         360L -> getString(R.string.settings_sub_auto_update_6h)
         720L -> getString(R.string.settings_sub_auto_update_12h)
-        1440L -> getString(R.string.settings_sub_auto_update_24h)
+        1440L -> getString(R.string.hub_sub_auto_update_daily)
         else -> getString(R.string.settings_sub_auto_update_minutes, minutes)
     }
 
@@ -541,7 +625,7 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         val subs = MmkvManager.decodeSubscriptions()
         if (subs.isEmpty()) return getString(R.string.settings_sub_auto_update_none)
         val active = subs.firstOrNull { it.subscription.autoUpdate }
-            ?: return getString(R.string.settings_value_off)
+            ?: return subAutoUpdateLabel(0L)
         return subAutoUpdateLabel(active.subscription.updateInterval)
     }
 
@@ -559,30 +643,34 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
             toast(R.string.settings_sub_auto_update_empty)
             return
         }
-        val entries = subAutoUpdateValues.map { subAutoUpdateLabel(it) }.toTypedArray()
+        val entries = subAutoUpdateValues.map { subAutoUpdateLabel(it) }
         val active = MmkvManager.decodeSubscriptions().firstOrNull { it.subscription.autoUpdate }
         val currentMinutes = if (active == null) 0L else active.subscription.updateInterval
-        val idx = subAutoUpdateValues.indexOf(currentMinutes).coerceAtLeast(0)
-        AlertDialog.Builder(requireContext())
-            .setTitle(R.string.settings_sub_auto_update)
-            .setSingleChoiceItems(entries, idx) { dialog, which ->
-                val minutes = subAutoUpdateValues[which]
-                MmkvManager.decodeSubscriptions().forEach { cache ->
-                    val item = cache.subscription
-                    if (minutes <= 0L) {
-                        item.autoUpdate = false
-                    } else {
-                        item.autoUpdate = true
-                        item.updateInterval = minutes
-                    }
-                    MmkvManager.encodeSubscription(cache.guid, item)
+        // An interval stored by «Настройки подписок» that this list does not offer (2 ч, say) marks
+        // nothing rather than snapping the checkmark onto a value the user never chose.
+        val idx = subAutoUpdateValues.indexOf(currentMinutes)
+        SelectPopup.show(
+            anchor = binding.rowSubAutoUpdate,
+            options = entries,
+            selectedIndex = idx,
+            widthRes = R.dimen.select_popup_w_interval,
+            valueView = binding.valueSubAutoUpdate,
+            caret = binding.caretSubAutoUpdate,
+        ) { which ->
+            val minutes = subAutoUpdateValues[which]
+            MmkvManager.decodeSubscriptions().forEach { cache ->
+                val item = cache.subscription
+                if (minutes <= 0L) {
+                    item.autoUpdate = false
+                } else {
+                    item.autoUpdate = true
+                    item.updateInterval = minutes
                 }
-                // Recalculate the next run time from the freshly persisted state.
-                SubscriptionUpdater.sync(forceReschedule = true)
-                bindSettingsState()
-                dialog.dismiss()
+                MmkvManager.encodeSubscription(cache.guid, item)
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            // Recalculate the next run time from the freshly persisted state.
+            SubscriptionUpdater.sync(forceReschedule = true)
+            bindSettingsState()
+        }
     }
 }

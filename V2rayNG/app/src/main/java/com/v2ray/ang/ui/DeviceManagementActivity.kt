@@ -3,6 +3,7 @@ package com.v2ray.ang.ui
 import android.os.Bundle
 import android.view.View
 import androidx.activity.viewModels
+import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -17,6 +18,8 @@ import com.v2ray.ang.databinding.ActivityDevicesBinding
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.ui.adapter.DeviceAdapter
+import com.v2ray.ang.ui.component.SubPage
+import com.v2ray.ang.ui.component.ToolbarBinder
 import com.v2ray.ang.viewmodel.AccountViewModel
 import kotlinx.coroutines.launch
 
@@ -45,8 +48,21 @@ class DeviceManagementActivity : BaseActivity() {
     private var expectedCount: Int = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
-        setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = getString(R.string.devices_title))
+        // Handoff README §7: the sub-page lekalo draws «Устройства» at 24sp/700 under a
+        // 44dp back control with the explanation as the header's note — none of which
+        // activity_base's 16sp MaterialToolbar can do, so the header lives in this
+        // screen's own layout and the progress bar came with it.
+        setContentView(binding.root)
+        ToolbarBinder.bind(
+            root = binding.toolbar.root,
+            title = getString(R.string.devices_title),
+            activity = this,
+        )
+        ToolbarBinder.attachTo(binding.toolbar.root, binding.mainContent)
+        binding.toolbar.toolbarNote.text = getString(R.string.devices_subtitle)
+        binding.toolbar.toolbarNote.isVisible = true
 
         binding.rvDevices.layoutManager = LinearLayoutManager(this)
         binding.rvDevices.adapter = adapter
@@ -216,6 +232,12 @@ class DeviceManagementActivity : BaseActivity() {
         }
     }
 
+    // The progress bar moved into activity_devices.xml with the §7 header, so the base
+    // layout's cached one is never inflated and showLoading/hideLoading drive this one.
+    override fun showLoading() = runOnUiThread { binding.progressBar.isVisible = true }
+
+    override fun hideLoading() = runOnUiThread { binding.progressBar.isVisible = false }
+
     /** Shows the empty/error panel with [message], hiding the list. */
     private fun showEmptyState(message: String, isError: Boolean) {
         binding.tvDevicesEmptyTitle.text = message
@@ -226,9 +248,10 @@ class DeviceManagementActivity : BaseActivity() {
     private fun showEmpty(show: Boolean) {
         binding.layoutDevicesEmpty.visibility = if (show) View.VISIBLE else View.GONE
         binding.rvDevices.visibility = if (show) View.GONE else View.VISIBLE
-        // Hide the "devices connected to your subscription" subtitle while the empty/error
-        // overlay is up — it contradicts "no devices" / "subscription not found".
-        binding.tvDevicesSubtitle.visibility = if (show) View.GONE else View.VISIBLE
+        // Hide the "devices connected to your subscription" note while the empty/error
+        // overlay is up — it contradicts "no devices" / "subscription not found". §7 moved
+        // that sentence into the header, so this is the header's note now.
+        binding.toolbar.toolbarNote.visibility = if (show) View.GONE else View.VISIBLE
     }
 
     companion object {

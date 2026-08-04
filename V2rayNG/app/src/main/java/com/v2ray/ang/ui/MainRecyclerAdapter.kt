@@ -26,6 +26,7 @@ import com.v2ray.ang.handler.SubscriptionNaming
 import com.v2ray.ang.helper.ItemTouchHelperAdapter
 import com.v2ray.ang.helper.ItemTouchHelperViewHolder
 import com.v2ray.ang.template.TemplateManager
+import com.v2ray.ang.ui.component.pressFeedback
 import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.viewmodel.MainViewModel
 
@@ -184,8 +185,17 @@ class MainRecyclerAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): BaseViewHolder {
         val inflater = LayoutInflater.from(parent.context)
         return when (viewType) {
-            VIEW_TYPE_HEADER -> HeaderViewHolder(ItemSectionHeaderBinding.inflate(inflater, parent, false))
-            VIEW_TYPE_ITEM -> MainViewHolder(ItemRecyclerMainBinding.inflate(inflater, parent, false))
+            VIEW_TYPE_HEADER -> HeaderViewHolder(ItemSectionHeaderBinding.inflate(inflater, parent, false)).also {
+                it.binding.sectionHeaderRoot.pressFeedback(R.anim.press_row)
+            }
+            VIEW_TYPE_ITEM -> MainViewHolder(ItemRecyclerMainBinding.inflate(inflater, parent, false)).also {
+                // The press response, attached ONCE per view holder rather than on every bind.
+                // The rung is the same @anim/press_row the layout names; what this adds is the
+                // hardware layer for the duration of the rebound, which is README §11 grabl 1 —
+                // a server row is nothing but text (the name, the chips, the transport, the
+                // latency) and text re-rasterises on the 2% overshoot unless it is composited.
+                it.itemMainBinding.infoContainer.pressFeedback(R.anim.press_row)
+            }
             else -> FooterViewHolder(ItemRecyclerFooterBinding.inflate(inflater, parent, false))
         }
     }
@@ -262,6 +272,18 @@ class MainRecyclerAdapter(
             if (selected) MaterialColors.getColor(binding.layoutIndicator, R.attr.indicatorColor)
             else Color.TRANSPARENT
         )
+
+        // THE SEPARATOR, and it is carried on `activated` rather than drawn as a view (handoff
+        // README §4, §11 grabl 3). @drawable/bg_server_row paints it as the top layer of the row's
+        // own background — an inner shadow, never a border — so it costs no layout and cannot open
+        // a gap in the selected row's outline.
+        //
+        // Two rows go without one: the SELECTED row, whose accent frame is already its edge, and
+        // the first row under any heading — the very first of the list, and the first of each
+        // provider section, because a section header is itself the break and a hairline right
+        // under it would draw the same line twice.
+        val followsAServer = position > 0 && rows[position - 1] is Row.Server
+        binding.infoContainer.isActivated = !selected && followsAServer
 
         binding.infoContainer.setOnClickListener {
             adapterListener?.onSelectServer(guid)

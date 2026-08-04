@@ -1,24 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Account HUB, hosted in-place as the Account bottom-nav tab.
-  Two zones only: a cohesive HERO (profile card + subscription carousel, read as one
-  unit) and a single "Управление" management list. Incy language: pure dark, ONE blue
-  accent, brand type, token spacing/radii/tiles, sentence-case Russian, 0 elevation,
-  1dp colorOutlineVariant stroke, no nested cards, no gradients. Every state present:
-  skeleton (loading), empty, carousel (active), error.
 
-  THE VERTICAL RHYTHM IS TIGHT AND IT IS TIGHT ON PURPOSE — «слишком много места
-  занимается, там можно же все приуменьшить». Every band on this screen is one step of
-  the scale, never two:
+  THE SPINE IS HANDOFF README §5, TOP TO BOTTOM, AND NOTHING SITS BETWEEN ITS BANDS:
 
-      section header      16 above, 4 below      (was 24 / 8)
-      inside a card       12 between blocks      (was 16)
-      row height          row_min_height 56, unchanged — that is the touch floor and
-                          it is not a spacing decision
+      строка профиля      аватар 32 · ник · контурный чип баланса с «+»
+      кольцо трафика      172dp, стенка 6dp, старт −90°   (the ViewPager2 page)
+      название тарифа     18/700 по центру
+      бейдж и срок        одной строкой под названием
+      две кнопки          равной ширины, 48dp, r24, ОБЕ контурные 1.5dp
+      автопродление       обычная строка карточки, тапается целиком
+      Управление          Купить подписку · Устройства · История платежей
+      Выйти               отдельной карточкой внизу
 
-  Nothing was taken off the screen to buy that; it is the same content on a denser
-  grid. Do not "restore" the wider bands: a screen that needs three swipes to reach
-  «Выйти» is the defect, not the fix.
+  WHAT MOVED IN FROM item_subscription_card.xml AND WHY. The old carousel page was
+  a whole subscription card — name, badge, expiry, meter, devices, «Продлить»,
+  auto-renew — and §5 puts every one of those on the tab's single spine instead. So
+  the page kept the ONE band that is genuinely worth swiping (the traffic ring) and
+  everything else is stated once here, re-bound for the visible page by
+  AccountFragment.renderSelectedSub. The ids came with the views: `tv_sub_name`,
+  `tv_tariff_badge`, `btn_sub_renew`, `row_sub_autorenew`, `switch_sub_autorenew`,
+  `tv_sub_autorenew` are the same names the adapter used, now resolved against
+  ActivityAccountBinding.
+
+  WHAT IS HERE THAT §5 DOES NOT MENTION, AND STAYS. The handoff was written without
+  knowing what the tab already does, so its silence is a gap and never an order:
+    · `row_referral`   — the referral code, whole-row copy;
+    · `tv_pending`     — the "payment is being processed" hint after a checkout;
+    · `group_sub_*`    — skeleton / empty / error, the three states beside the ring;
+    · `ll_sub_dots`    — page dots, shown from two подписки up;
+    · «Способы входа»  — which account the sign-in is tied to;
+    · `img_avatar_edit`— the avatar picker's affordance;
+    · `pb_logout`      — the sign-out's in-flight spinner.
+
+  ONE GUTTER, AND IT IS CARRIED PER BLOCK, not by the scroll column: the profile row
+  needs its avatar's 48dp hit box to overhang the 16dp gutter by the 8dp of padding
+  that centres a 32dp circle inside it. Every other block sets
+  layout_marginHorizontal="@dimen/screen_gutter" and lines up on the same 16.
 -->
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -34,262 +52,173 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingHorizontal="@dimen/screen_gutter"
-        android:paddingTop="@dimen/space_12"
-        android:paddingBottom="@dimen/space_24">
+        android:paddingTop="@dimen/space_6"
+        android:paddingBottom="@dimen/space_16">
 
-        <!-- ============ HERO zone: profile card + subscription state ============ -->
-
-        <!-- Profile card -->
-        <com.google.android.material.card.MaterialCardView
+        <!-- ============ 1. Строка профиля ============
+             §5.1: «аватар 32dp, ник, справа контурный чип баланса с «+»». The card
+             the profile used to live in is gone — a bordered box round three inline
+             objects was the heaviest thing above the fold, and the ring is supposed
+             to be that. -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="@dimen/radius_card"
-            app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            android:layout_marginHorizontal="@dimen/space_8"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-            <LinearLayout
-                android:layout_width="match_parent"
+            <!-- 48dp hit box, 32dp circle. The avatar is 32 by §5 and 32 is under the
+                 touch floor, so the container carries space_8 of padding and the row
+                 is inset by space_8 instead of the full gutter: the circle's own edge
+                 still lands on 16, and the target the finger gets is 48. -->
+            <FrameLayout
+                android:id="@+id/avatar_container"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:clickable="true"
+                android:contentDescription="@string/account_change_avatar"
+                android:focusable="true"
+                android:padding="@dimen/space_8"
+                android:stateListAnimator="@anim/press_icon">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/bg_avatar_circle" />
+
+                <TextView
+                    android:id="@+id/tv_avatar_initial"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:text="?"
+                    android:textAppearance="@style/TextAppearance.App.Chip"
+                    android:textColor="?attr/iconTintBlue"
+                    tools:ignore="HardcodedText" />
+
+                <ImageView
+                    android:id="@+id/img_avatar"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:importantForAccessibility="no"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone" />
+
+                <!-- The picker's affordance, sized to the smaller avatar. It is not the
+                     only way in — the whole container opens the same sheet — so it may
+                     sit under the touch floor. -->
+                <ImageView
+                    android:id="@+id/img_avatar_edit"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:layout_gravity="bottom|end"
+                    android:background="@drawable/bg_avatar_edit"
+                    android:importantForAccessibility="no"
+                    android:padding="@dimen/space_2"
+                    app:srcCompat="@drawable/ic_acc_camera" />
+            </FrameLayout>
+
+            <!-- space_2 and not space_8: the avatar container already contributes its
+                 own space_8 of padding, so the gap the eye reads is 10 — §8's step. -->
+            <TextView
+                android:id="@+id/tv_username"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="@dimen/space_16">
+                android:layout_marginStart="@dimen/space_2"
+                android:layout_marginEnd="@dimen/space_8"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textAppearance="@style/TextAppearance.App.Body"
+                android:textColor="?attr/colorOnSurface"
+                tools:text="\@serumfx" />
 
-                <!-- Row 1: avatar + handle + top-up pill -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+            <!-- THE BALANCE CHIP IS THE BALANCE ROW. It keeps `row_balance` and
+                 `tv_balance` so renderProfile still reveals it with its figure and
+                 hides it without one; what it drops is the standalone «Баланс» label,
+                 which a chip beside a «+» does not need. Tapping it opens the same
+                 top-up as the button below, so the 30dp lozenge is never the only way
+                 to reach the action — the 48dp «Пополнить» is. -->
+            <LinearLayout
+                android:id="@+id/row_balance"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="@dimen/space_8"
+                android:background="@drawable/bg_acc_pill"
+                android:clickable="true"
+                android:contentDescription="@string/account_top_up"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="@dimen/space_12"
+                android:paddingVertical="@dimen/space_6"
+                android:stateListAnimator="@anim/press_button"
+                android:visibility="gone"
+                tools:visibility="visible">
 
-                    <FrameLayout
-                        android:id="@+id/avatar_container"
-                        android:layout_width="52dp"
-                        android:layout_height="52dp"
-                        android:clickable="true"
-                        android:contentDescription="@string/account_change_avatar"
-                        android:focusable="true"
-                        android:foreground="?attr/selectableItemBackgroundBorderless">
-
-                        <View
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
-                            android:layout_gravity="center"
-                            android:background="@drawable/bg_avatar_circle" />
-
-                        <TextView
-                            android:id="@+id/tv_avatar_initial"
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
-                            android:layout_gravity="center"
-                            android:gravity="center"
-                            android:text="?"
-                            android:textColor="?attr/iconTintBlue"
-                            android:textSize="20sp"
-                            android:textStyle="bold"
-                            tools:ignore="HardcodedText" />
-
-                        <ImageView
-                            android:id="@+id/img_avatar"
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            android:scaleType="centerCrop"
-                            android:visibility="gone" />
-
-                        <ImageView
-                            android:id="@+id/img_avatar_edit"
-                            android:layout_width="18dp"
-                            android:layout_height="18dp"
-                            android:layout_gravity="bottom|end"
-                            android:background="@drawable/bg_avatar_edit"
-                            android:importantForAccessibility="no"
-                            android:padding="@dimen/space_4"
-                            app:srcCompat="@drawable/ic_acc_camera" />
-                    </FrameLayout>
-
-                    <TextView
-                        android:id="@+id/tv_username"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_12"
-                        android:layout_weight="1"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textAppearance="@style/TextAppearance.App.Title"
-                        tools:text="Erlish" />
-
-                    <!-- No style attribute on purpose: themes.xml binds materialButtonStyle to
-                         Widget.Departament.Button.Primary, so this control inherits the modelled
-                         fill and the press motion the owner asked for (OWNER-FEEDBACK D1) instead
-                         of a flat slab, plus btn_height 48, radius_button 16, Title type and
-                         glyph_20 — every one of which was previously overridden inline.
-                         android:minHeight="0dp" with 8dp vertical padding made this a ~36dp
-                         target, under the 48dp floor; only the horizontal padding is trimmed now,
-                         which keeps it compact beside the account name without shrinking the hit
-                         box. -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_top_up"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_12"
-                        android:minWidth="0dp"
-                        android:paddingStart="@dimen/space_16"
-                        android:paddingEnd="@dimen/space_16"
-                        android:text="@string/account_top_up"
-                        app:icon="@drawable/ic_add_24dp" />
-                </LinearLayout>
-
-                <!-- ============ The hero figure is TIME, not money ============
-                     23-account-rework.md 1.2: the user opens this tab because the подписка is
-                     running out, not because of the wallet. So the ONE Display figure on the
-                     screen is the expiry, and its silhouette is CONSTANT — label, figure + word,
-                     optional detail — with colour carrying health (onSurface / amber / red), so
-                     the card never changes shape as the account's state changes.
-
-                     Perpetual and unknown-expiry have no date to set: the figure hides and
-                     tv_time_word carries the Title line with tv_time_detail beneath it. Those are
-                     the only two states in which this tab shows zero Display figures. -->
-                <LinearLayout
-                    android:id="@+id/ll_time_block"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_12"
-                    android:orientation="vertical"
-                    android:visibility="gone"
-                    tools:visibility="visible">
-
-                    <TextView
-                        android:id="@+id/tv_time_label"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textAppearance="@style/TextAppearance.App.Subtitle"
-                        tools:text="Активна до" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_4"
-                        android:baselineAligned="true"
-                        android:orientation="horizontal">
-
-                        <!-- THE GAP BELONGS TO THE FIGURE, NOT TO THE WORD, and that is the fix
-                             for «слово бессрочная подписка уехала вправо». In the perpetual and
-                             unknown states `renderTimeLines` hides the figure and the word carries
-                             the Title line alone — but the word used to own the 8dp gap, so with
-                             the figure gone it still started 8dp in, while «Баланс» and the
-                             ref-code below it sat on the card's gutter. Hanging the gap off the
-                             figure's END makes it disappear with the figure, so the word lands on
-                             the same gutter as every other line in this card. -->
-                        <TextView
-                            android:id="@+id/tv_time_figure"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginEnd="@dimen/space_8"
-                            android:textAppearance="@style/TextAppearance.App.Numeric.Display"
-                            tools:text="3" />
-
-                        <TextView
-                            android:id="@+id/tv_time_word"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:textAppearance="@style/TextAppearance.App.Title"
-                            tools:text="августа" />
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/tv_time_detail"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_4"
-                        android:textAppearance="@style/TextAppearance.App.Subtitle"
-                        android:visibility="gone"
-                        tools:text="Осталось 24 дня"
-                        tools:visibility="visible" />
-                </LinearLayout>
-
-                <!-- Balance: demoted from the 34sp hero to a labelled value (1.2, 1.3). It is
-                     still the count-up figure it always was — «Пополнить» above it is the action,
-                     so this line states and does not duplicate the CTA.
-
-                     Starts gone and is revealed by renderProfile: a label with no figure beside it
-                     reads as a broken value, so the row appears with its number or not at all. -->
-                <LinearLayout
-                    android:id="@+id/row_balance"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_12"
-                    android:baselineAligned="true"
-                    android:orientation="horizontal"
-                    android:visibility="gone"
-                    tools:visibility="visible">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:text="@string/account_balance"
-                        android:textAppearance="@style/TextAppearance.App.Subtitle" />
-
-                    <TextView
-                        android:id="@+id/tv_balance"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_12"
-                        android:maxLines="1"
-                        android:textAppearance="@style/TextAppearance.App.Numeric.Money"
-                        android:textSize="16sp"
-                        tools:text="1 500 ₽" />
-                </LinearLayout>
-
-                <!-- Referral: whole row taps to copy; code reads on a quiet chip, copy is the trailing glyph -->
-                <LinearLayout
-                    android:id="@+id/row_referral"
+                <TextView
+                    android:id="@+id/tv_balance"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_12"
-                    android:clickable="true"
-                    android:contentDescription="@string/account_copy_referral"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:maxLines="1"
+                    android:textAppearance="@style/TextAppearance.App.Numeric.Money"
+                    tools:text="1 500 ₽" />
 
-                    <TextView
-                        android:id="@+id/tv_referral"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="@drawable/bg_acc_chip"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:paddingHorizontal="@dimen/space_12"
-                        android:paddingVertical="@dimen/space_8"
-                        android:textAppearance="@style/TextAppearance.App.Caption"
-                        tools:text="Реф-код ABC123" />
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_marginStart="@dimen/space_8"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_copy"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-                </LinearLayout>
+                <ImageView
+                    android:layout_width="@dimen/glyph_16"
+                    android:layout_height="@dimen/glyph_16"
+                    android:layout_marginStart="@dimen/space_6"
+                    android:importantForAccessibility="no"
+                    app:srcCompat="@drawable/ic_add_24dp"
+                    app:tint="?attr/colorOnSurfaceVariant" />
             </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
 
-        <!-- Payment-processing hint (shown while re-polling after a checkout) -->
+        <!-- Referral: whole row taps to copy; the code reads on a quiet chip and the
+             copy glyph trails it. Not in §5 — kept, and kept beside the identity it
+             belongs to rather than exiled to the bottom of the tab. -->
+        <LinearLayout
+            android:id="@+id/row_referral"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/screen_gutter"
+            android:layout_marginTop="@dimen/space_8"
+            android:clickable="true"
+            android:contentDescription="@string/account_copy_referral"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:stateListAnimator="@anim/press_button"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <TextView
+                android:id="@+id/tv_referral"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_acc_chip"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:paddingHorizontal="@dimen/space_10"
+                android:paddingVertical="@dimen/space_6"
+                android:textAppearance="@style/TextAppearance.App.Caption"
+                tools:text="Реф-код ABC123" />
+
+            <ImageView
+                android:layout_width="@dimen/glyph_16"
+                android:layout_height="@dimen/glyph_16"
+                android:layout_marginStart="@dimen/space_8"
+                android:importantForAccessibility="no"
+                app:srcCompat="@drawable/ic_copy"
+                app:tint="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+
+        <!-- Payment-processing hint (shown while re-polling after a checkout). -->
         <TextView
             android:id="@+id/tv_pending"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/screen_gutter"
             android:layout_marginTop="@dimen/space_12"
             android:background="@drawable/bg_acc_chip"
             android:padding="@dimen/space_12"
@@ -297,51 +226,56 @@
             android:textAppearance="@style/TextAppearance.App.Body"
             android:visibility="gone" />
 
-        <!-- Subscription state slot: four mutually-exclusive children, toggled by the Kotlin WP.
-             Tight space_12 gap keeps it reading as one unit with the profile card above. -->
+        <!-- ============ 2. Кольцо трафика ============
+             Four mutually-exclusive children, toggled by AccountFragment.renderHeroState:
+             the ring carousel when there are подписки, and the skeleton / empty / error
+             states beside it. Only the carousel is §5; the other three are the states
+             the tab already had and they keep the ring's slot so nothing reflows. -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_12">
+            android:layout_marginTop="@dimen/space_20">
 
-            <!-- (a) Loading skeleton: a sub-card-shaped silhouette; Kotlin pulses its alpha -->
+            <!-- (a) Loading skeleton: a disc-shaped silhouette the size of the ring,
+                     so the tab does not resize when the real figures land. Kotlin
+                     pulses its alpha. -->
             <LinearLayout
                 android:id="@+id/group_sub_skeleton"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/sub_card_height"
-                android:background="@drawable/bg_skeleton"
-                android:orientation="vertical"
-                android:padding="@dimen/space_16">
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
 
                 <View
-                    android:layout_width="140dp"
+                    android:layout_width="172dp"
+                    android:layout_height="172dp"
+                    android:background="@drawable/bg_acc_skeleton_ring" />
+
+                <View
+                    android:layout_width="160dp"
                     android:layout_height="18dp"
-                    android:background="?attr/colorOutlineVariant" />
+                    android:layout_marginTop="@dimen/space_16"
+                    android:background="@drawable/bg_skeleton" />
 
                 <View
                     android:layout_width="200dp"
                     android:layout_height="14dp"
-                    android:layout_marginTop="@dimen/space_16"
-                    android:background="?attr/colorOutlineVariant" />
-
-                <View
-                    android:layout_width="120dp"
-                    android:layout_height="14dp"
                     android:layout_marginTop="@dimen/space_8"
-                    android:background="?attr/colorOutlineVariant" />
+                    android:background="@drawable/bg_skeleton" />
             </LinearLayout>
 
-            <!-- (b) Empty state: card-shaped onboarding block (sibling card, not nested) -->
+            <!-- (b) Empty state: card-shaped onboarding block (sibling card, not nested). -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/group_sub_empty"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/screen_gutter"
                 android:visibility="gone"
                 app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="@dimen/radius_card"
                 app:cardElevation="0dp"
                 app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp"
+                app:strokeWidth="@dimen/stroke_hairline"
                 tools:visibility="visible">
 
                 <LinearLayout
@@ -366,10 +300,6 @@
                         android:textAppearance="@style/TextAppearance.App.Body"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
-                    <!-- Theme default = Widget.Departament.Button.Primary. The inline overrides it
-                         used to carry (textAllCaps, textStyle, cornerRadius, iconSize, iconGravity)
-                         restated the style's own tokens at a different icon size; dropped so the
-                         empty-state CTA is the same object as every other primary in the app. -->
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_buy_first"
                         android:layout_width="wrap_content"
@@ -380,7 +310,7 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- (c) Active state: subscription carousel + page dots -->
+            <!-- (c) Active state: one ring per подписка + page dots. -->
             <LinearLayout
                 android:id="@+id/group_sub_carousel"
                 android:layout_width="match_parent"
@@ -392,7 +322,7 @@
                 <androidx.viewpager2.widget.ViewPager2
                     android:id="@+id/vp_subscriptions"
                     android:layout_width="match_parent"
-                    android:layout_height="@dimen/sub_card_height"
+                    android:layout_height="172dp"
                     android:clipToPadding="false" />
 
                 <LinearLayout
@@ -407,17 +337,18 @@
                     tools:visibility="visible" />
             </LinearLayout>
 
-            <!-- (d) Error state: card-shaped block with retry -->
+            <!-- (d) Error state: card-shaped block with retry. -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/group_account_error"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/screen_gutter"
                 android:visibility="gone"
                 app:cardBackgroundColor="?attr/colorSurface"
                 app:cardCornerRadius="@dimen/radius_card"
                 app:cardElevation="0dp"
                 app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="1dp"
+                app:strokeWidth="@dimen/stroke_hairline"
                 tools:visibility="visible">
 
                 <LinearLayout
@@ -441,9 +372,6 @@
                         android:textAppearance="@style/TextAppearance.App.Body"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
-                    <!-- Secondary, not a raw M3 tonal button: the app's own tier carries the bevel,
-                         the press motion, the focus ring and btn_height 48 that a bare
-                         Widget.Material3.Button.TonalButton has none of (OWNER-FEEDBACK D1). -->
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_retry_load"
                         style="@style/Widget.Departament.Button.Secondary"
@@ -455,48 +383,281 @@
             </com.google.android.material.card.MaterialCardView>
         </FrameLayout>
 
-        <!-- ============ Management zone: the ONE section header on the screen ============ -->
+        <!-- ============ 3. Название тарифа ============
+             §5.3, «18sp/700 по центру». TextAppearance.App.Title.Tariff is §8's
+             «18/700 тариф» and this is its second consumer — the same role, on the
+             screen the plan is being read from rather than bought on. -->
+        <TextView
+            android:id="@+id/tv_sub_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/screen_gutter"
+            android:layout_marginTop="@dimen/space_16"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.App.Title.Tariff"
+            android:visibility="gone"
+            tools:text="departament vpn"
+            tools:visibility="visible" />
+
+        <!-- ============ 4. Бейдж тарифа и срок ============
+             §5.3's «ниже строкой бейдж тарифа и срок», and the срок is rendered by the
+             block the tab already had. `ll_time_block` used to be a three-line hero —
+             label above a Display figure above a detail — and §5 gives that slot to the
+             ring, so the same four views now set ONE centred sentence: «Активна до 4
+             июня 2099», «Осталось 5 дней», «Бессрочная подписка». Nothing about
+             AccountFragment.renderTimeBlock changed: it still writes the same four
+             views and still carries health in their COLOUR, which is the one thing the
+             prototype's flat «Действует до …» line cannot do.
+
+             `tv_time_detail` stays INSIDE this block on purpose — renderTimeBlock hides
+             the block wholesale when there is no подписка, and a detail line parked
+             outside it would survive that. -->
+        <LinearLayout
+            android:id="@+id/ll_time_block"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/screen_gutter"
+            android:layout_marginTop="@dimen/space_8"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:baselineAligned="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tv_tariff_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="@dimen/space_8"
+                    android:background="@drawable/bg_acc_badge"
+                    android:paddingHorizontal="@dimen/space_8"
+                    android:paddingVertical="@dimen/space_2"
+                    android:textAppearance="@style/TextAppearance.App.Chip"
+                    android:textColor="?attr/colorPrimary"
+                    android:visibility="gone"
+                    tools:ignore="HardcodedText"
+                    tools:text="Base"
+                    tools:visibility="visible" />
+
+                <TextView
+                    android:id="@+id/tv_time_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="@dimen/space_4"
+                    android:textAppearance="@style/TextAppearance.App.Subtitle"
+                    tools:text="Активна до" />
+
+                <!-- THE GAP BELONGS TO THE FIGURE, NOT TO THE WORD: in the perpetual
+                     and unknown states renderTimeLines hides the figure, and a gap
+                     hung off the word would leave the sentence starting one space in. -->
+                <TextView
+                    android:id="@+id/tv_time_figure"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="@dimen/space_4"
+                    android:textAppearance="@style/TextAppearance.App.Numeric"
+                    tools:text="4" />
+
+                <TextView
+                    android:id="@+id/tv_time_word"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textAppearance="@style/TextAppearance.App.Subtitle"
+                    tools:text="июня 2099" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_time_detail"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_4"
+                android:gravity="center"
+                android:textAppearance="@style/TextAppearance.App.Caption"
+                android:visibility="gone"
+                tools:text="Осталось 24 дня"
+                tools:visibility="visible" />
+        </LinearLayout>
+
+        <!-- ============ 5. Две кнопки ============
+             §5.4: equal width, 48dp, radius 24, BOTH outlined at 1.5dp, neither
+             filled. There is no primary here on purpose — «Пополнить» and «Продлить»
+             are two ways of spending money on the same account and the screen refuses
+             to rank them; the ring above is what carries the weight.
+
+             Built on Button.Tertiary, which is the app's only transparent-container
+             button and already owns the press scale, the 48dp floor and the
+             ripple-free feedback. What each instance adds is §5's constant contour
+             (Tertiary's own stroke is a focus ring — transparent at rest) and
+             TextAppearance.App.Button, §8's «15/700 кнопка», which TOKENS.md leaves
+             for the owner of each screen to attach. -->
+        <LinearLayout
+            android:id="@+id/ll_sub_actions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/screen_gutter"
+            android:layout_marginTop="@dimen/space_20"
+            android:baselineAligned="false"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_top_up"
+                style="@style/Widget.Departament.Button.Tertiary"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/btn_height"
+                android:layout_weight="1"
+                android:minWidth="0dp"
+                android:paddingStart="@dimen/space_8"
+                android:paddingEnd="@dimen/space_8"
+                android:text="@string/account_top_up"
+                android:textAppearance="@style/TextAppearance.App.Button"
+                app:cornerRadius="@dimen/radius_button"
+                app:icon="@drawable/ic_add_24dp"
+                app:iconGravity="textStart"
+                app:iconPadding="@dimen/space_8"
+                app:iconSize="18dp"
+                app:strokeColor="?attr/colorPrimary"
+                app:strokeWidth="1.5dp" />
+
+            <!-- «Продлить» carries the light label, not the accent one: two accent
+                 labels side by side would make the pair read as one wide control. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_sub_renew"
+                style="@style/Widget.Departament.Button.Tertiary"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/btn_height"
+                android:layout_marginStart="@dimen/space_8"
+                android:layout_weight="1"
+                android:minWidth="0dp"
+                android:paddingStart="@dimen/space_8"
+                android:paddingEnd="@dimen/space_8"
+                android:text="@string/account_sub_renew"
+                android:textAppearance="@style/TextAppearance.App.Button"
+                android:textColor="?attr/colorOnSurface"
+                app:cornerRadius="@dimen/radius_button"
+                app:strokeColor="?attr/colorPrimary"
+                app:strokeWidth="1.5dp" />
+        </LinearLayout>
+
+        <!-- ============ 6. Строка автопродления ============
+             §5.5: «обычная строка карточки (не голый переключатель): заголовок,
+             подпись с датой и суммой, переключатель справа. Нажимается вся строка.»
+             The switch is therefore clickable=false / focusable=false — the row is the
+             one hit target, which is the discipline Widget.Departament.Row.Toggle
+             documents and which the old card broke by handing the switch its own. -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_autorenew"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/screen_gutter"
+            android:layout_marginTop="@dimen/space_12"
+            android:visibility="gone"
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="@dimen/radius_popup"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorOutlineVariant"
+            app:strokeWidth="@dimen/stroke_hairline"
+            tools:visibility="visible">
+
+            <LinearLayout
+                android:id="@+id/row_sub_autorenew"
+                style="@style/Widget.Departament.Row.Toggle"
+                android:background="@drawable/bg_row_only"
+                android:paddingHorizontal="@dimen/space_14">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="@dimen/space_12"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/account_sub_autorenew"
+                        android:textAppearance="@style/TextAppearance.App.Body"
+                        android:textColor="?attr/colorOnSurface" />
+
+                    <TextView
+                        android:id="@+id/tv_sub_autorenew"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_2"
+                        android:maxLines="2"
+                        android:textAppearance="@style/TextAppearance.App.Caption"
+                        tools:text="Спишется 04.06.2099 · 150 ₽" />
+                </LinearLayout>
+
+                <!-- 52×32, r16, 2dp track edge, thumb 16 → 24 on 220ms: that is the M3
+                     switch's own geometry, which is why §5's spec and
+                     Widget.Departament.Switch describe the same control.
+
+                     NOT clickable and NOT focusable: §5 gives the tap to the whole row,
+                     and two independent targets on one row can disagree. It keeps its
+                     accessibility node though — TalkBack reads the row as title,
+                     subtitle and "включено/выключено", which is the state the row's
+                     own contentDescription could only restate and then go stale on.
+
+                     No duplicateParentState either: it would hand the switch the row's
+                     drawable state and throw away its own state_checked, i.e. the one
+                     thing this control exists to show. -->
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switch_sub_autorenew"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:clickable="false"
+                    android:focusable="false" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ============ 7. Управление ============ -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_16"
-            android:layout_marginBottom="@dimen/space_4"
+            android:layout_marginHorizontal="@dimen/screen_gutter"
+            android:layout_marginTop="@dimen/space_24"
+            android:layout_marginBottom="@dimen/space_8"
             android:text="@string/account_manage_title"
             android:textAppearance="@style/TextAppearance.App.Title" />
 
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/screen_gutter"
             app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            app:strokeWidth="@dimen/stroke_hairline">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- Купить подписку (promoted) -->
+                <!-- Купить подписку. The tile is NEUTRAL like its two neighbours: the
+                     accent belongs to the ring and to the two contours above, and a
+                     blue tile here would be the fourth place on one screen claiming to
+                     be the important one. -->
                 <LinearLayout
                     android:id="@+id/row_buy"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="@dimen/row_min_height"
-                    android:orientation="horizontal"
-                    android:paddingStart="@dimen/screen_gutter"
-                    android:paddingEnd="@dimen/screen_gutter"
-                    android:paddingVertical="@dimen/space_8">
+                    style="@style/Widget.Departament.Row.Navigation"
+                    android:background="@drawable/bg_row_top">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
+                        android:background="@drawable/bg_icon_neutral">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -504,23 +665,36 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_acc_upgrade"
-                            app:tint="?attr/iconTintBlue" />
+                            app:tint="@color/icon_glyph_neutral" />
                     </FrameLayout>
 
-                    <TextView
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_12"
-                        android:layout_marginEnd="@dimen/space_8"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
-                        android:text="@string/account_hub_buy"
-                        android:textAppearance="@style/TextAppearance.App.Title"
-                        android:textColor="?attr/colorPrimary" />
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/account_hub_buy"
+                            android:textAppearance="@style/TextAppearance.App.Body"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/space_2"
+                            android:maxLines="2"
+                            android:text="@string/account_hub_buy_sub"
+                            android:textAppearance="@style/TextAppearance.App.Caption" />
+                    </LinearLayout>
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -528,24 +702,14 @@
 
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
+                    android:layout_height="@dimen/stroke_hairline"
                     android:layout_marginStart="@dimen/divider_inset_start"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Устройства -->
                 <LinearLayout
                     android:id="@+id/row_devices"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="@dimen/row_min_height"
-                    android:orientation="horizontal"
-                    android:paddingStart="@dimen/screen_gutter"
-                    android:paddingEnd="@dimen/screen_gutter"
-                    android:paddingVertical="@dimen/space_8">
+                    style="@style/Widget.Departament.Row.Value">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
@@ -561,29 +725,45 @@
                             app:tint="@color/icon_glyph_neutral" />
                     </FrameLayout>
 
-                    <TextView
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_12"
-                        android:layout_marginEnd="@dimen/space_8"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
-                        android:text="@string/account_hub_devices"
-                        android:textAppearance="@style/TextAppearance.App.Title" />
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/account_hub_devices"
+                            android:textAppearance="@style/TextAppearance.App.Body"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/space_2"
+                            android:maxLines="2"
+                            android:text="@string/account_hub_devices_sub"
+                            android:textAppearance="@style/TextAppearance.App.Caption" />
+                    </LinearLayout>
 
                     <TextView
                         android:id="@+id/tv_row_value_devices"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginEnd="@dimen/space_8"
+                        android:layout_marginEnd="@dimen/space_4"
+                        android:fontFeatureSettings="&quot;tnum&quot; on"
                         android:gravity="end"
                         android:textAppearance="@style/TextAppearance.App.Subtitle"
                         android:visibility="gone"
-                        tools:text="1 / 3" />
+                        tools:text="1 / 3"
+                        tools:visibility="visible" />
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -591,24 +771,15 @@
 
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
+                    android:layout_height="@dimen/stroke_hairline"
                     android:layout_marginStart="@dimen/divider_inset_start"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- История платежей -->
                 <LinearLayout
                     android:id="@+id/row_history"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="@dimen/row_min_height"
-                    android:orientation="horizontal"
-                    android:paddingStart="@dimen/screen_gutter"
-                    android:paddingEnd="@dimen/screen_gutter"
-                    android:paddingVertical="@dimen/space_8">
+                    style="@style/Widget.Departament.Row.Value"
+                    android:background="@drawable/bg_row_bottom">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
@@ -624,29 +795,45 @@
                             app:tint="@color/icon_glyph_neutral" />
                     </FrameLayout>
 
-                    <TextView
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_12"
-                        android:layout_marginEnd="@dimen/space_8"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
-                        android:text="@string/account_hub_history"
-                        android:textAppearance="@style/TextAppearance.App.Title" />
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/account_hub_history"
+                            android:textAppearance="@style/TextAppearance.App.Body"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/space_2"
+                            android:maxLines="2"
+                            android:text="@string/account_hub_history_sub"
+                            android:textAppearance="@style/TextAppearance.App.Caption" />
+                    </LinearLayout>
 
                     <TextView
                         android:id="@+id/tv_row_value_history"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginEnd="@dimen/space_8"
+                        android:layout_marginEnd="@dimen/space_4"
+                        android:fontFeatureSettings="&quot;tnum&quot; on"
                         android:gravity="end"
                         android:textAppearance="@style/TextAppearance.App.Subtitle"
                         android:visibility="gone"
-                        tools:text="12.06.2026" />
+                        tools:text="12.06.2026"
+                        tools:visibility="visible" />
 
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_chevron_right"
                         app:tint="?attr/colorOnSurfaceVariant" />
@@ -655,39 +842,31 @@
         </com.google.android.material.card.MaterialCardView>
 
         <!-- ============ Способы входа ============
-             What this account can be signed in with, which the desktop names as its own block
-             («Способы входа», AccountView.axaml) and Android did not have at all. Today the
-             product has exactly one method, so the section states one row — and it states the
-             ACCOUNT it is linked to, not only the method, because "Telegram" alone answers a
-             question nobody asked. It is informational: there is no unlink action behind it, so
-             there is no chevron and the row is not clickable. -->
+             Not in §5 and it stays: it is the only place the app says WHICH account
+             the session is tied to. Informational — no unlink action behind it, so no
+             chevron and no press feedback. -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_16"
-            android:layout_marginBottom="@dimen/space_4"
+            android:layout_marginHorizontal="@dimen/screen_gutter"
+            android:layout_marginTop="@dimen/space_24"
+            android:layout_marginBottom="@dimen/space_8"
             android:text="@string/account_login_methods"
             android:textAppearance="@style/TextAppearance.App.Title" />
 
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/screen_gutter"
             app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            app:strokeWidth="@dimen/stroke_hairline">
 
             <LinearLayout
                 android:id="@+id/row_login_telegram"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:minHeight="@dimen/row_min_height"
-                android:orientation="horizontal"
-                android:paddingStart="@dimen/screen_gutter"
-                android:paddingEnd="@dimen/screen_gutter"
-                android:paddingVertical="@dimen/space_8">
+                style="@style/Widget.Departament.Row.Action">
 
                 <FrameLayout
                     android:layout_width="@dimen/tile_size"
@@ -706,8 +885,7 @@
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/space_12"
-                    android:layout_marginEnd="@dimen/space_8"
+                    android:layout_marginStart="@dimen/space_16"
                     android:layout_weight="1"
                     android:orientation="vertical">
 
@@ -715,63 +893,55 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/account_login_telegram"
-                        android:textAppearance="@style/TextAppearance.App.Title" />
+                        android:textAppearance="@style/TextAppearance.App.Body"
+                        android:textColor="?attr/colorOnSurface" />
 
                     <TextView
                         android:id="@+id/tv_login_telegram_state"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_4"
+                        android:layout_marginTop="@dimen/space_2"
                         android:ellipsize="end"
                         android:maxLines="1"
                         android:text="@string/account_login_telegram_unlinked"
-                        android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        android:textAppearance="@style/TextAppearance.App.Caption"
                         tools:text="Привязан · @erlish" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ============ Аккаунт и вход: the terminal action, in its own group ============
-             Its own group, not the last row of «Управление» (23-account-rework.md 2): signing
-             out is not managing a subscription, and a terminal action sitting directly under
-             «История платежей» in the same shape invites the mis-tap that costs the session.
-             Row.Destructive per 23-account-rework.md 3.1: no value, no chevron — there is no
-             destination and nothing to state. The TILE STAYS NEUTRAL (styles.xml,
-             Widget.Departament.Row.Destructive): red tile plus red title is the same signal
-             twice. The tile is present because every other row on this surface has one and a
-             surface has exactly one text origin (23-account-rework.md 2, "origin discipline");
-             the reworked tab drops tiles from all four rows at once, not from this one alone. -->
+        <!-- ============ 8. Выйти ============
+             §5.7: its own card at the bottom. The glyph and the label take
+             ?attr/iconTintRed and NOT a hard-wired red, which is the whole of «красная
+             в цветной теме, белая в моно» — ThemeOverlay.Mono remaps that one attribute
+             and the row follows without a values-night twin of this layout.
+
+             The TILE stays neutral: a red plate under a red glyph under a red label is
+             the same signal three times. -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_16"
-            android:layout_marginBottom="@dimen/space_4"
+            android:layout_marginHorizontal="@dimen/screen_gutter"
+            android:layout_marginTop="@dimen/space_24"
+            android:layout_marginBottom="@dimen/space_8"
             android:text="@string/account_group_signin"
             android:textAppearance="@style/TextAppearance.App.Title" />
 
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/screen_gutter"
             app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            app:strokeWidth="@dimen/stroke_hairline">
 
             <LinearLayout
                 android:id="@+id/row_logout"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="?attr/selectableItemBackground"
-                android:clickable="true"
-                android:contentDescription="@string/account_row_logout"
-                android:focusable="true"
-                android:gravity="center_vertical"
-                android:minHeight="@dimen/row_min_height"
-                android:orientation="horizontal"
-                android:paddingStart="@dimen/screen_gutter"
-                android:paddingEnd="@dimen/screen_gutter"
-                android:paddingVertical="@dimen/space_8">
+                style="@style/Widget.Departament.Row.Destructive"
+                android:background="@drawable/bg_row_only"
+                android:contentDescription="@string/account_row_logout">
 
                 <FrameLayout
                     android:layout_width="@dimen/tile_size"
@@ -784,20 +954,21 @@
                         android:layout_gravity="center"
                         android:importantForAccessibility="no"
                         app:srcCompat="@drawable/ic_acc_logout"
-                        app:tint="@color/icon_glyph_neutral" />
+                        app:tint="?attr/iconTintRed" />
                 </FrameLayout>
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/space_12"
-                    android:layout_marginEnd="@dimen/space_8"
+                    android:layout_marginStart="@dimen/space_16"
+                    android:layout_marginEnd="@dimen/space_12"
                     android:layout_weight="1"
                     android:text="@string/account_row_logout"
-                    android:textAppearance="@style/TextAppearance.App.Title.Destructive" />
+                    android:textAppearance="@style/TextAppearance.App.Body"
+                    android:textColor="?attr/iconTintRed" />
 
-                <!-- In-flight indicator, shown only once the wipe passes 300ms (00-rules.md 7.3).
-                     The row keeps its height, so nothing reflows when it appears. -->
+                <!-- In-flight indicator, shown only once the wipe passes 300ms. The row
+                     keeps its height, so nothing reflows when it appears. -->
                 <com.google.android.material.progressindicator.CircularProgressIndicator
                     android:id="@+id/pb_logout"
                     style="@style/Widget.Departament.Progress.Circular.Inline"
@@ -807,6 +978,5 @@
                     android:visibility="gone" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

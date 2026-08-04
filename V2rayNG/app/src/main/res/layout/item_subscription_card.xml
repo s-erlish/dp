@@ -1,159 +1,99 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  One subscription = one ViewPager2 page. It is a SIBLING of the profile card (same
-  token recipe), never nested in another card. Incy: colorSurface, radius_card, 0
-  elevation, 1dp outlineVariant stroke, space_16 padding, ONE blue accent (the tariff
-  badge tile), sentence-case Russian, name + badge in the header, then expiry / devices.
+  ONE SUBSCRIPTION = ONE VIEWPAGER2 PAGE, and after the redesign the page is the
+  TRAFFIC RING (handoff README §5.2): 172dp across, a 6dp stroke, filled from the
+  top (−90°) clockwise, with the used figure and its ceiling stacked in the middle.
 
-  THE CARD IS DENSE — «слишком много места занимается, там можно же все приуменьшить».
-  Text blocks sit 8 apart, a block against a control 12, and the two 56dp rows keep
-  their own height because that is the touch floor and not a spacing decision. Nothing
-  came off the card to buy it. The card's height is measured, not declared
-  (AccountFragment.measureSubCardHeight), so tightening a gap actually shortens the
-  carousel instead of leaving dead space inside a fixed frame.
+  WHY THE PAGE IS ONLY THE RING NOW. §5 lays the tab out as one vertical spine —
+  профиль → кольцо → тариф → кнопки → автопродление → управление — and only ONE of
+  those bands is per-подписка in a way the eye should be able to swipe: the traffic.
+  The name, the срок, the two buttons and the auto-renew row all belong to whichever
+  подписка is on screen and are stated ONCE, in activity_account.xml, re-bound by
+  AccountFragment.renderSelectedSub on every page change. Repeating «Пополнить» on
+  each page would have offered the same account-level action N times.
+
+  This replaces the card's old @layout/view_meter include. The meter is not gone —
+  it is this: the ring binds the same four states the meter documented (under quota,
+  over quota, unlimited, no data), from the same figures, in SubscriptionPagerAdapter.
+
+  The ring is a determinate CircularProgressIndicator and not a custom View on
+  purpose. M3's indicator already starts its sweep at the top and runs clockwise,
+  already rounds its cap (trackCornerRadius = half the 6dp stroke), and already
+  draws the unfilled remainder as a track — which is the second circle in the
+  prototype's SVG. What it does NOT do is §5's «переход 500 мс»: its own progress
+  animation runs on the library's clock, so the adapter drives the sweep with a
+  ValueAnimator on @interpolator/ease_out_quart instead (§8 «ease-out-quart»).
+
+  indicatorTrackGapSize is pinned to 0: Material ≥1.11 opens a gap between the
+  indicator and the track by default, and §11 grabl 7 («кольцо с двумя полосками»)
+  is precisely that defect — one arc, never a segmented one.
+
+  No MaterialCardView: §5 floats the ring on the page. A card around it would put a
+  hairline box round the one object on this tab that is supposed to read as weight.
 -->
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    app:cardBackgroundColor="?attr/colorSurface"
-    app:cardCornerRadius="@dimen/radius_card"
-    app:cardElevation="0dp"
-    app:strokeColor="?attr/colorOutlineVariant"
-    app:strokeWidth="@dimen/stroke_hairline">
+    android:layout_height="wrap_content">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:padding="@dimen/space_16">
+    <FrameLayout
+        android:layout_width="172dp"
+        android:layout_height="172dp"
+        android:layout_gravity="center_horizontal">
 
-        <!-- Header: subscription name (left, truncates) + tariff badge (right) -->
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:id="@+id/ring_traffic"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:indeterminate="false"
+            android:max="1000"
+            android:progress="1000"
+            app:indicatorColor="?attr/colorPrimary"
+            app:indicatorDirectionCircular="clockwise"
+            app:indicatorInset="0dp"
+            app:indicatorSize="172dp"
+            app:indicatorTrackGapSize="0dp"
+            app:trackColor="?attr/colorSurfaceContainerHighest"
+            app:trackCornerRadius="3dp"
+            app:trackThickness="6dp" />
+
+        <!-- The two centre lines. gravity=center on the column and on each line so a
+             long figure («999,9 ГБ») stays optically centred in the disc instead of
+             hanging off its own start edge. -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingHorizontal="@dimen/space_20">
 
+            <!-- §5: «Цифра 28sp/700, letter-spacing −0.02em, моноширинная (tnum)» —
+                 TextAppearance.App.Numeric.Ring is that token (§8 «28/700 цифра
+                 кольца»), tabular figures included. -->
             <TextView
-                android:id="@+id/tv_sub_name"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textAppearance="@style/TextAppearance.App.Title"
-                tools:text="Premium" />
-
-            <TextView
-                android:id="@+id/tv_tariff_badge"
+                android:id="@+id/tv_ring_value"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/space_8"
-                android:background="@drawable/bg_acc_badge"
-                android:paddingHorizontal="@dimen/space_8"
-                android:paddingVertical="@dimen/space_4"
-                android:textAppearance="@style/TextAppearance.App.Chip"
-                android:textColor="?attr/colorPrimary"
-                android:visibility="gone"
-                tools:ignore="HardcodedText"
-                tools:text="Base"
-                tools:visibility="visible" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/tv_sub_expiry"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_8"
-            android:textAppearance="@style/TextAppearance.App.Subtitle"
-            tools:text="Действует до 31.12.2026" />
-
-        <!-- THE TRAFFIC METER. The desktop's TrafficPill, expressed as this app's own meter
-             component: label beside the bar, never printed on it. On an unlimited plan the bar
-             is hidden and the value reads «1,9 ТБ · безлимит» — a bar with no ceiling is a lie
-             — and with no usage figure at all the whole meter goes rather than drawing 0 of 0. -->
-        <include
-            android:id="@+id/meter_traffic"
-            layout="@layout/view_meter"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_12" />
-
-        <!-- DEVICES, INSIDE THE CARD, AND TAPPABLE. The desktop makes the whole «Устройства»
-             measure a tap target onto the devices screen (MeterRow, «ВСЯ строка»); Android had
-             the figure as dead text and the only route to the screen was the hub row further
-             down. Both stay: this is a second door on the card that owns the allowance. -->
-        <LinearLayout
-            android:id="@+id/row_sub_devices"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_8"
-            android:background="?attr/selectableItemBackground"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:minHeight="@dimen/row_min_height"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/tv_sub_devices"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:ellipsize="end"
-                android:fontFeatureSettings="&quot;tnum&quot; on"
+                android:gravity="center"
                 android:maxLines="1"
-                android:textAppearance="@style/TextAppearance.App.Subtitle"
-                tools:text="Устройства: 1 / 3" />
+                android:textAppearance="@style/TextAppearance.App.Numeric.Ring"
+                tools:text="2,0 ТБ" />
 
-            <ImageView
-                android:layout_width="18dp"
-                android:layout_height="18dp"
-                android:layout_marginStart="@dimen/space_8"
-                android:importantForAccessibility="no"
-                app:srcCompat="@drawable/ic_chevron_right"
-                app:tint="?attr/colorOnSurfaceVariant" />
-        </LinearLayout>
-
-        <!-- «ПРОДЛИТЬ» — the card's ONE primary action, full width, and it is shown on a
-             perpetual подписка too. The owner is explicit: «она должна быть и при бессрочной
-             подписке». A perpetual plan is the one a user is most likely to extend deliberately,
-             and hiding the control tells him the account cannot be topped up at all. -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_sub_renew"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_12"
-            android:text="@string/account_sub_renew" />
-
-        <!-- AUTO-RENEW: the toggle and the line that says what it will do next. Mirrors the
-             desktop's ShowAutoRenew block. Hidden only when the backend gives us no subscription
-             id to act on — a switch that cannot be honoured must not be offered. -->
-        <LinearLayout
-            android:id="@+id/row_sub_autorenew"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_4"
-            android:gravity="center_vertical"
-            android:minHeight="@dimen/row_min_height"
-            android:orientation="horizontal">
-
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/switch_sub_autorenew"
+            <!-- «без ограничений» / «из 5 ТБ». Two lines allowed: «Лимит исчерпан»
+                 and «Нет данных» both fit on one, but the ceiling of a long unit
+                 must be able to wrap rather than ellipsize inside the disc. -->
+            <TextView
+                android:id="@+id/tv_ring_caption"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:contentDescription="@string/account_sub_autorenew" />
-
-            <TextView
-                android:id="@+id/tv_sub_autorenew"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/space_12"
-                android:layout_weight="1"
-                android:text="@string/account_sub_autorenew"
-                android:textAppearance="@style/TextAppearance.App.Subtitle" />
+                android:layout_marginTop="@dimen/space_4"
+                android:gravity="center"
+                android:maxLines="2"
+                android:textAppearance="@style/TextAppearance.App.Caption"
+                tools:text="без ограничений" />
         </LinearLayout>
-    </LinearLayout>
-</com.google.android.material.card.MaterialCardView>
+    </FrameLayout>
+</FrameLayout>

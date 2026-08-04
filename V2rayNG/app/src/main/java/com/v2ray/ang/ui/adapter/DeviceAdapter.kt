@@ -55,6 +55,11 @@ class DeviceAdapter(
         b.tvDeviceHwid.text = ctx.getString(R.string.devices_hwid, item.hwid)
         b.tvDeviceHwid.visibility = if (item.hwid.isBlank()) View.GONE else View.VISIBLE
 
+        // Handoff README §7 draws the devices as rows in ONE card, so the rule between
+        // two rows belongs to the row below it — and never above the first, which would
+        // draw a line across the card's own top edge.
+        b.deviceDivider.visibility = if (position == 0) View.GONE else View.VISIBLE
+
         b.btnDeviceDelete.setOnClickListener { onDelete(item) }
     }
 

@@ -34,7 +34,7 @@
 
     <include
         android:id="@+id/toolbar"
-        layout="@layout/view_toolbar" />
+        layout="@layout/view_sub_header" />
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/main_content"
@@ -69,10 +69,18 @@
                 android:layout_height="wrap_content"
                 android:text="@string/routing_section_rules" />
 
+            <!-- §7 «Настройки правил» is a card of rows. The card is the LIST's own
+                 background rather than a MaterialCardView around it, because the screen
+                 hides @id/recycler_view when there are no rules and a wrapper would leave
+                 an empty outlined box above the empty state. -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/recycler_view"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/screen_gutter"
+                android:layout_marginEnd="@dimen/screen_gutter"
+                android:background="@drawable/bg_card_inert"
+                android:clipToOutline="true"
                 android:nestedScrollingEnabled="false"
                 tools:listitem="@layout/view_row" />
 

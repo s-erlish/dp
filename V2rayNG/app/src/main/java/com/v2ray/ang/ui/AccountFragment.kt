@@ -48,6 +48,7 @@ import com.v2ray.ang.databinding.ItemSubscriptionCardBinding
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
+import com.v2ray.ang.ui.component.pressFeedback
 import com.v2ray.ang.util.AvatarManager
 import com.v2ray.ang.util.reducedMotion
 import com.v2ray.ang.viewmodel.AccountViewModel
@@ -180,45 +181,17 @@ class AccountFragment : Fragment() {
     }
 
     /**
-     * Wires the subscription carousel: one page per sub, a space_12 gap between pages, and a page-
-     * change callback that moves the dot selection. Neighbour-peek padding and the dots themselves
-     * are (re)applied per list in [renderSubscriptions] since they depend on the page count.
+     * Wires the traffic-ring carousel: one page per подписка, a space_12 gap between pages, and a
+     * page-change callback that moves the dot selection. Neighbour-peek padding and the dots
+     * themselves are (re)applied per list in [renderSubscriptions] since they depend on the page
+     * count.
+     *
+     * The adapter takes no callbacks any more. After the §5 redesign a page draws only the traffic
+     * ring; the name, the badge, the срок, «Пополнить»/«Продлить» and the auto-renew row are stated
+     * once on the tab and re-bound for the visible page by [renderSelectedSub].
      */
     private fun setupPager() {
-        subAdapter = SubscriptionPagerAdapter(
-            // Badge resolution order: catalog by tariffId, then catalog by the renewing price-option
-            // id (correct after a Base→Plus upgrade), then the sub's own non-generic display name.
-            // Null/blank hides the badge so a WRONG tariff is never shown.
-            resolveBadge = { sub ->
-                viewModel.tariffNameFor(sub.tariffId)
-                    ?: viewModel.tariffNameForPriceOptionId(sub.tariffPriceOptionId)
-                    ?: sub.tariffBadgeName()
-            },
-            // THE LIVE COUNT BELONGS TO ONE ПОДПИСКА AND IS OFFERED TO ONE CARD.
-            //
-            // `viewModel.deviceCount` is the result of GET /client/devices, and that endpoint
-            // answers about the ACTIVE подписка — there is no per-подписка device call in this API.
-            // This lambda used to ignore the `SubInfoDto` it is handed and return that one figure
-            // for every page, so a user with two подписки read the root's «Устройства: 2 / 3» on
-            // both cards. `/client/subscription/all` cannot rescue it either: it returns
-            // `connectedDevices = 0` for every item by design (SubscriptionDtos).
-            //
-            // So: the ROOT card gets the real figure, and any other card gets null, which prints
-            // the allowance alone. Showing nothing where nothing is known beats showing a number
-            // that is right about a different подписка.
-            resolveUsedDevices = { sub ->
-                if (sub.type.equals(SubscriptionSyncManager.TYPE_ROOT, ignoreCase = true)) {
-                    viewModel.deviceCount.value
-                } else {
-                    null
-                }
-            },
-            // «Продлить» goes where buying goes — the tariff screen owns duration, extra devices
-            // and the payment method, so the card hands off rather than growing a second checkout.
-            onRenew = { openSubScreen(BuyTariffActivity::class.java) },
-            onOpenDevices = { openSubScreen(DeviceManagementActivity::class.java) },
-            onAutoRenew = { sub, enabled -> setAutoRenew(sub, enabled) },
-        )
+        subAdapter = SubscriptionPagerAdapter()
         binding.vpSubscriptions.apply {
             adapter = subAdapter
             offscreenPageLimit = 1
@@ -232,9 +205,10 @@ class AccountFragment : Fragment() {
                 override fun onPageSelected(position: Int) {
                     selectedSubIndex = position
                     updateDotSelection(position)
-                    // The hero figure belongs to the subscription the user is looking at, not to
-                    // whichever one happens to be first.
-                    renderTimeBlock()
+                    // Everything below the ring describes the подписка the user is looking at, not
+                    // whichever one happens to be first: the name, the badge, the срок and the
+                    // auto-renew row all move with the page.
+                    renderSelectedSub()
                 }
             })
         }
@@ -242,6 +216,15 @@ class AccountFragment : Fragment() {
 
     private fun wireActions() {
         binding.btnTopUp.setOnClickListener { showTopUpDialog() }
+        // The balance chip is the same action as «Пополнить»: a figure sitting next to a «+» has
+        // promised the tap, and refusing it there would make the glyph decoration.
+        binding.rowBalance.setOnClickListener { showTopUpDialog() }
+        // «Продлить» goes where buying goes — the tariff screen owns duration, extra devices and
+        // the payment method, so the tab hands off rather than growing a second checkout.
+        binding.btnSubRenew.setOnClickListener { openSubScreen(BuyTariffActivity::class.java) }
+        // §5: «нажимается вся строка», not the switch. The switch is not clickable and not
+        // focusable in the layout, so this is the ONE hit target the row has.
+        binding.rowSubAutorenew.setOnClickListener { toggleAutoRenew() }
         // The whole referral row copies the code (the trailing glyph is decorative).
         binding.rowReferral.setOnClickListener { copyReferralCode() }
         binding.avatarContainer.setOnClickListener { showAvatarOptions() }
@@ -259,6 +242,20 @@ class AccountFragment : Fragment() {
             renderHeroState()
             loadAll()
         }
+
+        // THE PRESS RESPONSE ON EVERYTHING THAT CARRIES TEXT (handoff README §11 grabl 1). The
+        // scale rung is already on these views from their Row styles; what only Kotlin can add is
+        // the hardware layer that keeps a label from re-rasterising on the 200ms rebound. The
+        // background step down the ramp stays where it belongs — @drawable/bg_row.
+        listOf(
+            binding.rowBuy,
+            binding.rowDevices,
+            binding.rowHistory,
+            binding.rowLogout,
+            binding.rowSubAutorenew,
+        ).forEach { it.pressFeedback(R.anim.press_row) }
+        binding.rowBalance.pressFeedback(R.anim.press_button)
+        binding.rowReferral.pressFeedback(R.anim.press_button)
     }
 
     private fun openSubScreen(target: Class<*>) {
@@ -278,11 +275,26 @@ class AccountFragment : Fragment() {
      * than one that says it did not work. The list is reloaded on success so the caption's next
      * charge line comes from the backend rather than from an optimistic guess.
      */
+    /**
+     * The auto-renew row's tap. §5 makes the whole row the target, so the switch is a read-out
+     * rather than a control: it is flipped here optimistically, the request follows, and either the
+     * reload repaints it from the backend's answer or [setAutoRenew]'s error branch puts it back.
+     */
+    private fun toggleAutoRenew() {
+        val b = _binding ?: return
+        val sub = currentSubs.getOrNull(selectedSubIndex) ?: currentSubs.firstOrNull() ?: return
+        val next = !b.switchSubAutorenew.isChecked
+        b.switchSubAutorenew.isChecked = next
+        setAutoRenew(sub, next)
+    }
+
     private fun setAutoRenew(sub: SubInfoDto, enabled: Boolean) {
         val onError: (ApiError) -> Unit = {
             if (_binding != null) {
                 toast(R.string.account_sub_autorenew_failed)
-                subAdapter.notifyDataSetChanged()
+                // Put the switch back where it was: a control that silently reverts on the next
+                // refresh is worse than one that says it did not work.
+                renderSelectedSub()
             }
         }
         // The reload is the view model's now — and it refreshes the PROFILE too, which is where the
@@ -318,20 +330,11 @@ class AccountFragment : Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.profile.collect { renderProfile(it); renderHeroState() } }
                 launch { viewModel.subscriptions.collect { renderSubscriptions(it) } }
-                // Re-render the cards when the tariff catalog arrives so the badge resolves.
-                launch {
-                    viewModel.tariffs.collect {
-                        subAdapter.notifyDataSetChanged()
-                        renderHeroState()
-                    }
-                }
+                // Re-render when the tariff catalog arrives so the badge resolves. The ring pages
+                // do not read the catalog, so the carousel is left alone.
+                launch { viewModel.tariffs.collect { renderHeroState() } }
                 // Refresh the device figures when the real connected-device count resolves.
-                launch {
-                    viewModel.deviceCount.collect {
-                        subAdapter.notifyDataSetChanged()
-                        renderDevicesRowValue()
-                    }
-                }
+                launch { viewModel.deviceCount.collect { renderDevicesRowValue() } }
                 launch { viewModel.payments.collect { renderHistoryValue(it) } }
                 // A top-up in flight owns the «Пополнить» control until the provider answers, so
                 // a slow connection cannot be mistaken for a dead button and paid for twice (D10).
@@ -662,7 +665,89 @@ class AccountFragment : Fragment() {
         binding.groupSubCarousel.isVisible = state == Hero.CAROUSEL
         binding.groupAccountError.isVisible = state == Hero.ERROR
         if (state == Hero.SKELETON) startSkeletonPulse() else stopSkeletonPulse()
+        renderSelectedSub()
+    }
+
+    /**
+     * EVERYTHING BELOW THE RING, FOR THE PAGE THAT IS SHOWING (handoff README §5.3–§5.5).
+     *
+     * The redesign lays the tab out as one vertical spine and the carousel keeps only the traffic
+     * ring, so the подписка's name, its tariff badge, its срок and its auto-renew row are single
+     * views on this screen that follow the visible page. This is what [SubscriptionPagerAdapter]
+     * used to do per page, and doing it once is the point: «Пополнить» is an account-level action
+     * and repeating it on every page offered the same thing N times.
+     *
+     * The two buttons are NOT hidden when there is no подписка. «Пополнить» tops up a balance that
+     * exists either way, and «Продлить» opens the same tariff screen the empty state's CTA does —
+     * a row of controls that disappears is how a user concludes the account cannot be paid for.
+     */
+    private fun renderSelectedSub() {
+        val b = _binding ?: return
+        val sub = (currentSubs.getOrNull(selectedSubIndex) ?: currentSubs.firstOrNull())
+            ?.takeIf { b.groupSubCarousel.isVisible }
+        if (sub == null) {
+            b.tvSubName.isVisible = false
+            b.tvTariffBadge.isVisible = false
+            b.cardAutorenew.isVisible = false
+            renderTimeBlock()
+            return
+        }
+
+        // Name: user label, then the friendly tariff name, then the backend default, then a neutral
+        // header so the line is never blank.
+        b.tvSubName.isVisible = true
+        b.tvSubName.text = sub.displayName?.takeIf { it.isNotBlank() }
+            ?: sub.tariffDisplayName?.takeIf { it.isNotBlank() }
+            ?: sub.defaultLabel?.takeIf { it.isNotBlank() }
+            ?: getString(R.string.account_subs_header)
+
+        // Badge resolution order: catalog by tariffId, then catalog by the renewing price-option id
+        // (correct after a Base→Plus upgrade), then the sub's own non-generic display name.
+        // Null/blank HIDES the badge so a WRONG tariff is never shown.
+        val badge = viewModel.tariffNameFor(sub.tariffId)
+            ?: viewModel.tariffNameForPriceOptionId(sub.tariffPriceOptionId)
+            ?: sub.tariffBadgeName()
+        if (badge.isNullOrBlank()) {
+            b.tvTariffBadge.isVisible = false
+        } else {
+            b.tvTariffBadge.text = badge
+            b.tvTariffBadge.isVisible = true
+        }
+
+        renderAutoRenew(sub)
         renderTimeBlock()
+    }
+
+    /**
+     * The auto-renew row: the switch's position and the line that says what it will do next.
+     *
+     * THE ROW IS HIDDEN WHEN THE TOGGLE CANNOT BE HONOURED. `id` is the path segment the secondary
+     * endpoint needs, and with it blank the switch would flip under the finger and then report a
+     * failure it could have known about before it was ever offered. The ROOT подписка is addressed
+     * by its own id-less endpoint and never needs one. A control that cannot act is not disabled,
+     * it is absent — a disabled switch still claims the feature exists for this подписка.
+     *
+     * No listener juggling here, and that is the payoff of §5's «нажимается вся строка»: the switch
+     * has no listener at all, so writing its state can never be mistaken for a user decision the
+     * way a re-bound `setChecked` on a recycled holder could.
+     */
+    private fun renderAutoRenew(sub: SubInfoDto) {
+        val b = _binding ?: return
+        val actionable =
+            sub.type.equals(SubscriptionSyncManager.TYPE_ROOT, ignoreCase = true) || sub.id.isNotBlank()
+        b.cardAutorenew.isVisible = actionable
+        if (!actionable) return
+        b.switchSubAutorenew.isChecked = sub.autoRenewEnabled
+        b.tvSubAutorenew.text = when {
+            !sub.autoRenewEnabled -> getString(R.string.account_sub_autorenew_off)
+            sub.renewalPrice != null && !sub.expireAtIso.isNullOrBlank() -> getString(
+                R.string.account_sub_autorenew_next,
+                formatIsoDate(sub.expireAtIso),
+                formatMoney(sub.renewalPrice, sub.tariffCurrency.orEmpty()),
+            )
+
+            else -> getString(R.string.account_sub_autorenew_on)
+        }
     }
 
     /**
