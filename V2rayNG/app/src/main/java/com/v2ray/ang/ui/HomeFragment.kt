@@ -75,6 +75,7 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionNaming
 import com.v2ray.ang.ui.component.Haptic
+import com.v2ray.ang.ui.component.HomeHandoff
 import com.v2ray.ang.ui.component.SkeletonBinder
 import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.util.AvatarManager
@@ -505,10 +506,24 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         observeNetwork()
         applyListInsets()
         render()
+        // THE OVERLAY HAND-OFF (§11 grabl 6), on the contract the flow wave published in
+        // ui/component/HomeHandoff.kt: Главная supplies the two callbacks, the flow calls them.
+        // prime() parks this screen in its pre-entrance state under the opaque overlay; assemble()
+        // is called in the very frame the overlay removes itself, so the teardown and the first
+        // frame of the table land in one traversal. Cleared in onDestroyView — HomeHandoff is a
+        // singleton and a live lambda in it is a strong reference to this fragment.
+        HomeHandoff.onPrime = { holdEntrance() }
+        HomeHandoff.onAssemble = { playEntrance() }
+
         // THE ASSEMBLE, unless somebody is holding it. A flow overlay is up over Главная on exactly
         // one path — first run — and on that path the shell has already armed the hold, so the
-        // screen waits in its pre-entrance state until the overlay's owner releases it in one
-        // transaction. Every other launch assembles itself here. @see playEntrance
+        // screen waits in its pre-entrance state until it is released. Every other launch assembles
+        // itself here.
+        //
+        // The shell's flag and HomeHandoff.prime() are BOTH honoured, and they cover different
+        // instants: the flag answers for a flow that started before this fragment had a view (the
+        // usual order at first run), prime() for one that starts after. Either way holdEntrance()
+        // re-arms an entrance that already played, so a late prime is not too late. @see playEntrance
         if (mainHost.homeEntranceHeld) holdEntrance() else playEntrance()
     }
 
@@ -554,6 +569,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // The assemble is the one animation here with start delays measured in whole seconds, so it
         // is the one most likely to still be pending when the screen goes.
         cancelEntrance()
+        HomeHandoff.onPrime = null
+        HomeHandoff.onAssemble = null
         // The ambient loops are INFINITE, so they are the two that would outlive the view and keep
         // driving the compositor from a destroyed hierarchy if they were ever forgotten here.
         stopAmbient()
@@ -2602,6 +2619,30 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
                 block.btnGatePrimary.onSingleClick { requestServerSync() }
                 block.btnGateSecondary.isVisible = false
             }
+        }
+
+        // НАЧАЛЬНЫЙ ЭКРАН (README §2). In the SIGN_IN shape this block IS the onboarding screen —
+        // shield, clipboard card, the two contour pills and «Другие способы» — and everything it
+        // does lives in GateView next to its own layout. Called LAST on purpose: it has the final
+        // word on what is visible, so the `when` above cannot leave a generic button on a screen
+        // that has its own. Every other shape gets the plain heading + caption + two buttons back.
+        block.gate.bindOnboarding(gate == Gate.SIGN_IN, gateHost)
+    }
+
+    /**
+     * The four errands the start screen cannot run itself: the shell owns the auth launcher (a
+     * login that changes the theme or the server groups is applied on the way back through it), the
+     * QR scanner and the server list.
+     */
+    private val gateHost by lazy {
+        object : GateView.Host {
+            override fun openAuth(intent: Intent) = mainHost.launchAuthScreen(intent)
+
+            override fun addByQr(anchor: View) = mainHost.showAddMenu(anchor)
+
+            override fun onSubscriptionAdded() = mainViewModel.reloadServerList()
+
+            override fun refreshSubscriptions() = mainHost.refreshSubscriptions()
         }
     }
 
