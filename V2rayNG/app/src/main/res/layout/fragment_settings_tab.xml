@@ -910,7 +910,7 @@
                 android:clipToPadding="false"
                 android:orientation="vertical">
 
-                <!-- Оформление — select popup: Светлая / Тёмная / Чёрно-белая (П-24) -->
+                <!-- Оформление — select popup: Тёмная / Светлая / Чёрно-белая / Как в системе (П-24) -->
                 <LinearLayout
                     android:id="@+id/row_appearance"
                     android:layout_width="match_parent"
