@@ -48,11 +48,19 @@
         android:paddingEnd="@dimen/space_8"
         android:paddingBottom="@dimen/space_12">
 
+        <!-- Neutral, and both halves of it come from ATTRIBUTES: Widget.Departament.Tile
+             fills from @color/icon_tile_neutral and tints its glyph from
+             @color/icon_glyph_neutral, and ThemeOverlay.Mono can restate neither, so the
+             tile and the glyph both stayed faintly blue there. Identical pixels in the two
+             themes that already worked — icon_tile_neutral is #E3EAF4 / #20242B against
+             surfaceContainerHighest #E3EAF4 / #20242B, the glyph pair #54607A / #9BA1AD
+             both sides. -->
         <ImageView
             style="@style/Widget.Departament.Tile"
-            android:backgroundTint="?attr/colorSurfaceContainerHighest"
             android:layout_marginEnd="@dimen/space_16"
+            android:backgroundTint="?attr/colorSurfaceContainerHighest"
             android:importantForAccessibility="no"
+            android:tint="?attr/colorOnSurfaceVariant"
             app:srcCompat="@drawable/ic_acc_devices" />
 
         <LinearLayout

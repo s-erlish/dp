@@ -1,11 +1,10 @@
 package com.v2ray.ang.ui.adapter
 
-import android.content.res.ColorStateList
 import android.util.TypedValue
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.RecyclerView
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.dto.PaymentDto
@@ -13,8 +12,18 @@ import com.v2ray.ang.databinding.ItemPaymentBinding
 import java.util.Locale
 
 /**
- * Renders the account payment/order history. Read-only list; each row shows the
- * description, date, amount and a coloured status chip.
+ * Renders the account payment/order history as rows inside ONE card (handoff README §7).
+ *
+ * THE STATUS IS PART OF THE SENTENCE. The prototype writes «03.08.2026 · Оплачено» on the row's
+ * second line and dims the AMOUNT of anything that has not settled; this used to be a coloured chip
+ * in a second right-hand column, which made every row three lines tall and gave a read-only ledger
+ * four accent colours. Nothing about the status is lost:
+ *
+ *  - all four states are still NAMED, which is what the user reads;
+ *  - a FAILED one is still coloured, because a payment that did not go through is the only thing on
+ *    this screen worth interrupting for, and destructive red is the app's word for it;
+ *  - anything not yet settled still dims its sum, which is the design's own signal that the figure
+ *    is provisional.
  */
 class PaymentsAdapter : RecyclerView.Adapter<PaymentsAdapter.VH>() {
 
@@ -38,50 +47,69 @@ class PaymentsAdapter : RecyclerView.Adapter<PaymentsAdapter.VH>() {
         val b = holder.binding
 
         b.tvPaymentDesc.text = item.description.ifBlank { item.kind.ifBlank { item.orderId } }
-        b.tvPaymentDate.text = formatIsoDate(item.createdAt)
-        b.tvPaymentAmount.text = formatMoney(item.amount, item.currency)
 
-        val (labelRes, colorRes) = statusStyle(item.status)
-        if (labelRes != 0) {
-            b.tvPaymentStatus.setText(labelRes)
-        } else {
-            b.tvPaymentStatus.text = item.status
-        }
-        // Subtle status chip: full-strength text over a faint tint of the same hue. Unmapped
-        // statuses fall back to the neutral surface-variant chip.
-        if (colorRes != 0) {
-            val color = ContextCompat.getColor(ctx, colorRes)
-            b.tvPaymentStatus.setTextColor(color)
-            b.tvPaymentStatus.backgroundTintList =
-                ColorStateList.valueOf(ColorUtils.setAlphaComponent(color, 0x24))
-        } else {
-            b.tvPaymentStatus.setTextColor(
-                resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant),
-            )
-            b.tvPaymentStatus.backgroundTintList = ColorStateList.valueOf(
-                resolveThemeColor(ctx, com.google.android.material.R.attr.colorSurfaceVariant),
-            )
-        }
+        // «03.08.2026 · Оплачено» — one muted line, and either half may be missing without
+        // leaving a stray separator behind.
+        val state = statusStyle(item.status)
+        val statusText = if (state.labelRes != 0) ctx.getString(state.labelRes) else item.status
+        b.tvPaymentDate.text = listOf(formatIsoDate(item.createdAt), statusText)
+            .filter { it.isNotBlank() }
+            .joinToString(" · ")
+        b.tvPaymentDate.setTextColor(
+            if (state.failed) {
+                ContextCompat.getColor(ctx, R.color.color_destructive_text)
+            } else {
+                resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant)
+            },
+        )
+
+        b.tvPaymentAmount.text = formatMoney(item.amount, item.currency)
+        // An unsettled sum is provisional, and the design says so by dimming it rather than by
+        // adding a fifth colour to a ledger.
+        b.tvPaymentAmount.setTextColor(
+            resolveThemeColor(
+                ctx,
+                if (state.settled) {
+                    com.google.android.material.R.attr.colorOnSurface
+                } else {
+                    com.google.android.material.R.attr.colorOnSurfaceVariant
+                },
+            ),
+        )
+
+        // A card of rows needs a rule between them and the card cannot draw one; never above
+        // the first row, which would cut a line across the card's own top edge.
+        b.paymentDivider.visibility = if (position == 0) View.GONE else View.VISIBLE
     }
 
     class VH(val binding: ItemPaymentBinding) : RecyclerView.ViewHolder(binding.root)
 }
 
-/** Maps a raw payment status to a (string res, colour res) pair. 0 means "no mapping". */
-private fun statusStyle(status: String): Pair<Int, Int> = when (status.lowercase(Locale.US)) {
+/**
+ * What a raw backend status means to this row: the word to print, whether the money is actually
+ * gone (a settled sum is stated at full strength) and whether it went wrong (the one case that
+ * still earns a colour).
+ *
+ * [labelRes] 0 means the backend sent something this build does not know; the raw value is printed
+ * rather than swallowed, and it is treated as unsettled, which is the safe direction — a sum shown
+ * at full strength is a claim that it was charged.
+ */
+private data class PaymentState(val labelRes: Int, val settled: Boolean, val failed: Boolean)
+
+private fun statusStyle(status: String): PaymentState = when (status.lowercase(Locale.US)) {
     "paid", "success", "succeeded", "completed", "confirmed" ->
-        R.string.account_status_paid to R.color.icon_green
+        PaymentState(R.string.account_status_paid, settled = true, failed = false)
 
     "pending", "processing", "new", "created", "waiting", "in_progress" ->
-        R.string.account_status_pending to R.color.icon_orange
+        PaymentState(R.string.account_status_pending, settled = false, failed = false)
 
     "failed", "error", "declined", "rejected" ->
-        R.string.account_status_failed to R.color.icon_red
+        PaymentState(R.string.account_status_failed, settled = false, failed = true)
 
     "canceled", "cancelled", "expired" ->
-        R.string.account_status_canceled to R.color.icon_yellow
+        PaymentState(R.string.account_status_canceled, settled = false, failed = false)
 
-    else -> 0 to 0
+    else -> PaymentState(0, settled = false, failed = false)
 }
 
 private fun formatMoney(amount: Double, currency: String): String {

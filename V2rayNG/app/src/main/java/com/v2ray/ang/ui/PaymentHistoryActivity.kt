@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.util.TypedValue
 import android.view.View
 import androidx.activity.viewModels
+import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -55,7 +56,11 @@ class PaymentHistoryActivity : BaseActivity() {
             title = getString(R.string.history_title),
             activity = this,
         )
-        ToolbarBinder.attachTo(binding.toolbar.root, binding.rvPayments)
+        // The PAGE scrolls now, not the list (§7 wants the card to end where the operations
+        // do), so the hairline listens to the NestedScrollView the rows sit in.
+        ToolbarBinder.attachTo(binding.toolbar.root, binding.mainContent)
+        binding.toolbar.toolbarNote.setText(R.string.account_hub_history_sub)
+        binding.toolbar.toolbarNote.isVisible = true
 
         binding.rvPayments.layoutManager = LinearLayoutManager(this)
         binding.rvPayments.adapter = paymentsAdapter

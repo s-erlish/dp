@@ -14,9 +14,11 @@
   wrapper around it, because the screen hides @id/rv_devices whenever it shows the
   empty or error state and a wrapper would leave an outlined box floating above it.
 
-  @id/tv_devices_subtitle moved from the body into the header's note slot, which is
-  where §7 puts a screen's one sentence of explanation. The id stays: the screen
-  hides that line while the empty state is up.
+  The screen's one sentence of explanation moved from a body TextView into the
+  header's own note slot (@id/toolbar_note in view_sub_header), which is where §7
+  puts it. DeviceManagementActivity writes it and hides it while the empty state is
+  up, because «Устройства, подключённые к вашей подписке» contradicts «Устройств
+  пока нет».
 
   §7's TWO BEHAVIOURS NOW LAND, and they live in DeviceAdapter rather than here:
   the device you are holding is marked «Это устройство» in the accent and offers no
@@ -109,11 +111,12 @@
 
             <ImageView
                 style="@style/Widget.Departament.Tile"
-                android:backgroundTint="?attr/colorSurfaceContainerHighest"
                 android:layout_width="@dimen/empty_icon"
                 android:layout_height="@dimen/empty_icon"
+                android:backgroundTint="?attr/colorSurfaceContainerHighest"
                 android:importantForAccessibility="no"
                 android:padding="@dimen/space_16"
+                android:tint="?attr/colorOnSurfaceVariant"
                 app:srcCompat="@drawable/ic_acc_devices" />
 
             <TextView
