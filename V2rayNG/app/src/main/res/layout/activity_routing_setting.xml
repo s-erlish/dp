@@ -41,6 +41,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:clipChildren="false"
         android:clipToPadding="false"
         android:paddingBottom="@dimen/space_32"
         android:scrollbars="none">
@@ -48,11 +49,22 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:clipChildren="false"
             android:orientation="vertical">
 
-            <com.google.android.material.card.MaterialCardView style="@style/Widget.Departament.CardSection">
+            <!-- «Стратегия доменов» opens §6's select popup, so this card must NOT clip its
+                 children — a popup anchored on the row would be sliced off at the card's bottom
+                 edge (§11 grabl 4). The row rounds itself instead: it is the card's only one, so
+                 RoutingSettingActivity gives it @drawable/bg_row_only via RowBinder.edge. -->
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Departament.CardSection"
+                android:clipChildren="false"
+                android:clipToPadding="false">
 
-                <LinearLayout style="@style/Widget.Departament.CardSection.Body">
+                <LinearLayout
+                    style="@style/Widget.Departament.CardSection.Body"
+                    android:clipChildren="false"
+                    android:clipToPadding="false">
 
                     <include
                         android:id="@+id/row_domain_strategy"

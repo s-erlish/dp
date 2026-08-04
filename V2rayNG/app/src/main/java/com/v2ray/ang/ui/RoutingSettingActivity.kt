@@ -135,6 +135,9 @@ class RoutingSettingActivity : HelperBaseActivity() {
                 }
             },
         )
+        // Its card cannot clip (the popup would be sliced off at the bottom edge), so the row
+        // carries the card's corner itself. One row in the card: all four corners.
+        RowBinder.edge(binding.rowDomainStrategy.root, RowBinder.Edge.ONLY)
     }
 
     // ------------------------------------------------------------- actions

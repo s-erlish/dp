@@ -80,10 +80,14 @@
                     android:clipChildren="false"
                     android:clipToPadding="false">
 
-                    <!-- Автообновление -->
+                    <!-- Автообновление. THE EDGE ROWS OF THIS CARD ROUND THEMSELVES: the card
+                         hosts «Интервал обновления»'s select popup and therefore cannot clip its
+                         children (§11 grabl 4), so it no longer trims its first and last row to
+                         its own corner. 19dp, one pixel inside the card's 20dp stroke. -->
                     <LinearLayout
                         android:id="@+id/row_auto_update"
                         style="@style/Widget.Departament.Row"
+                        android:background="@drawable/bg_row_top"
                         android:baselineAligned="false">
 
                         <ImageView
@@ -177,6 +181,7 @@
                     <LinearLayout
                         android:id="@+id/row_notify"
                         style="@style/Widget.Departament.Row"
+                        android:background="@drawable/bg_row_bottom"
                         android:baselineAligned="false">
 
                         <ImageView
@@ -457,9 +462,11 @@
                     android:clipToPadding="false">
 
                     <!-- Сортировка серверов — §6 «окошко у значения» -->
+                    <!-- The card's only row, and the card cannot clip: all four corners here. -->
                     <LinearLayout
                         android:id="@+id/row_sort_order"
                         style="@style/Widget.Departament.Row"
+                        android:background="@drawable/bg_row_only"
                         android:baselineAligned="false">
 
                         <ImageView

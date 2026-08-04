@@ -9,6 +9,8 @@ import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityTvReceiveBinding
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.ui.BaseActivity
+import com.v2ray.ang.ui.component.SubPage
+import com.v2ray.ang.ui.component.ToolbarBinder
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.QRCodeDecoder
 import com.v2ray.ang.util.Utils
@@ -36,10 +38,21 @@ class TvReceiveActivity : BaseActivity() {
     private var localIp: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
-        setContentViewWithToolbar(binding.root, title = getString(R.string.tv_receive_title))
+        // README §7's lekalo draws the title at 24sp/700 UNDER a back control, which
+        // activity_base's 16sp MaterialToolbar cannot do — so the header is @layout/view_sub_header
+        // inside this screen's own layout, and the instruction paragraph is its note slot, which is
+        // where §7 puts one sentence of explanation. The screen never used the base progress bar.
+        setContentView(binding.root)
+        ToolbarBinder.bind(
+            root = binding.toolbar.root,
+            title = getString(R.string.tv_receive_title),
+            activity = this,
+            note = getString(R.string.tv_receive_instructions),
+        )
+        ToolbarBinder.attachTo(binding.toolbar.root, binding.mainContent)
 
-        binding.tvInstructions.text = getString(R.string.tv_receive_instructions)
         binding.btnRegenerate.setOnClickListener { startPairing() }
         binding.btnRegenerate.visibility = View.GONE
     }

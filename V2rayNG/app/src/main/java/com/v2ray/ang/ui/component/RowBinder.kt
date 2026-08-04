@@ -66,6 +66,42 @@ object RowBinder {
     enum class RowTone { DEFAULT, DESTRUCTIVE }
 
     /**
+     * Where a row sits in a section card that does NOT clip its children - see [edge].
+     *
+     * [MIDDLE] is the default and the only one a clipping card ever needs, because there the card's
+     * own 20dp corner does the trimming.
+     */
+    enum class Edge { MIDDLE, TOP, BOTTOM, ONLY }
+
+    /**
+     * Rounds a row to its section card's corner, for the cards that host a [SelectPopup].
+     *
+     * README §6 and §11 grabl 4: a card whose row can open the popup must carry `clipChildren` and
+     * `clipToPadding` false, or the popup is sliced off at the card's bottom edge. With the clip
+     * gone the card also stops trimming its first and last row to its own radius, so those two rows
+     * carry the corner themselves — 19dp, one pixel tighter than the card's 20 because the card
+     * paints its hairline stroke inside the radius.
+     *
+     * Padding is restored by hand: `setBackgroundResource` re-derives padding from the new drawable
+     * and would otherwise drop the `Widget.Departament.Row` insets that put the tile on the 16dp
+     * gutter — the same trap [bindTile] guards against.
+     */
+    fun edge(root: View, edge: Edge) {
+        val background = when (edge) {
+            Edge.MIDDLE -> R.drawable.bg_row
+            Edge.TOP -> R.drawable.bg_row_top
+            Edge.BOTTOM -> R.drawable.bg_row_bottom
+            Edge.ONLY -> R.drawable.bg_row_only
+        }
+        val left = root.paddingLeft
+        val top = root.paddingTop
+        val right = root.paddingRight
+        val bottom = root.paddingBottom
+        root.setBackgroundResource(background)
+        root.setPadding(left, top, right, bottom)
+    }
+
+    /**
      * The trailing affordance and the promise it makes to the user (32-master-plan-android.md 8.1).
      * Exactly one per row; the type is what enforces that.
      */

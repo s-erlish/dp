@@ -54,6 +54,10 @@ object ToolbarBinder {
      *   through [SubPage.close], so the exit transition matches the entrance. Pass null on a TAB
      *   screen, which has no back affordance: the leading gap then takes over and the title still
      *   starts at the 16dp gutter.
+     * @param note handoff README §7's optional 13sp explanation under the title - ONE sentence
+     *   saying what the screen is for. A note that restates the title is deleted, not written, so
+     *   null (the default) hides the slot. `view_toolbar.xml` has no such slot and simply ignores
+     *   it; only `view_sub_header.xml` draws it.
      * @param actionIcon the one trailing action's glyph, or `0` for none.
      * @param actionDescription the action's name, stating the ACTION and not the object -
      *   «Добавить сервер», not «Сервер». Required whenever [actionIcon] is set: an icon-only
@@ -64,6 +68,7 @@ object ToolbarBinder {
         root: View,
         title: CharSequence,
         activity: Activity? = null,
+        note: CharSequence? = null,
         @DrawableRes actionIcon: Int = 0,
         actionDescription: CharSequence? = null,
         onAction: ((View) -> Unit)? = null,
@@ -75,6 +80,14 @@ object ToolbarBinder {
 
         val slots = ToolbarSlots.of(root)
         slots.title.text = title
+
+        // §7's «необязательное пояснение». Resolved leniently rather than through RowSlots.slot():
+        // the same binder serves view_toolbar.xml, which has no note to find, and a missing
+        // optional slot is not a wiring mistake there.
+        slots.note?.let { view ->
+            view.text = note
+            view.visibility = if (note.isNullOrBlank()) View.GONE else View.VISIBLE
+        }
 
         if (activity == null) {
             slots.back.clearClick()
@@ -152,6 +165,7 @@ class ToolbarSlots private constructor(
     val back: MaterialButton,
     val leadingGap: View,
     val title: TextView,
+    val note: TextView?,
     val action: MaterialButton,
     val hairline: View,
 ) {
@@ -165,6 +179,9 @@ class ToolbarSlots private constructor(
             back = root.slot(R.id.toolbar_back, LAYOUT, "toolbar_back"),
             leadingGap = root.slot(R.id.toolbar_leading_gap, LAYOUT, "toolbar_leading_gap"),
             title = root.slot(R.id.toolbar_title, LAYOUT, "toolbar_title"),
+            // The ONE optional slot, and the only one resolved with findViewById: it exists in
+            // view_sub_header.xml and not in view_toolbar.xml, and both are bound through here.
+            note = root.findViewById(R.id.toolbar_note),
             action = root.slot(R.id.toolbar_action, LAYOUT, "toolbar_action"),
             hairline = root.slot(R.id.toolbar_hairline, LAYOUT, "toolbar_hairline"),
         )
