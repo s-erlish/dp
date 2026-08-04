@@ -325,7 +325,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
     private val durWindUp get() = resources.getInteger(R.integer.motion_windup).toLong()
     private val durState get() = resources.getInteger(R.integer.motion_state).toLong()
-    private val durStateExit get() = resources.getInteger(R.integer.motion_state_exit).toLong()
     private val durReveal get() = resources.getInteger(R.integer.motion_reveal).toLong()
     private val durRevealExit get() = resources.getInteger(R.integer.motion_reveal_exit).toLong()
     private val durAppear get() = resources.getInteger(R.integer.motion_appear).toLong()
@@ -2677,10 +2676,15 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             return
         }
 
+        // §4: «Щит 68dp: контурный когда отключено, залитый когда подключено, ПЕРЕХОД ПО
+        // ПРОЗРАЧНОСТИ 300 МС». @integer/motion_reveal is that 300. It is longer than the ring's
+        // own colour change (motion_state, 220) on purpose — the ring is one property crossing,
+        // the shield is one glyph becoming another, and the slower of the two is the one the eye
+        // is actually on.
         binding.shieldFilled.animate().cancel()
-        binding.shieldFilled.animate().alpha(1f).setDuration(durState).setInterpolator(easeStandard).start()
+        binding.shieldFilled.animate().alpha(1f).setDuration(durReveal).setInterpolator(easeStandard).start()
         binding.shieldOutline.animate().cancel()
-        binding.shieldOutline.animate().alpha(0f).setDuration(durState).setInterpolator(easeStandard).start()
+        binding.shieldOutline.animate().alpha(0f).setDuration(durReveal).setInterpolator(easeStandard).start()
 
         // The choreography itself lives in @anim/connect_confirm and its echo — one file each, so
         // the rings' scale, fade and tempo cannot drift away from the tokens they are written in.
@@ -2752,9 +2756,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             return
         }
         binding.shieldFilled.animate().cancel()
-        binding.shieldFilled.animate().alpha(0f).setDuration(durStateExit).setInterpolator(easeStandard).start()
+        binding.shieldFilled.animate().alpha(0f).setDuration(durReveal).setInterpolator(easeStandard).start()
         binding.shieldOutline.animate().cancel()
-        binding.shieldOutline.animate().alpha(1f).setDuration(durStateExit).setInterpolator(easeStandard).start()
+        binding.shieldOutline.animate().alpha(1f).setDuration(durReveal).setInterpolator(easeStandard).start()
     }
 
     /**

@@ -300,12 +300,30 @@ object RowBinder {
         tile.setBackgroundResource(background)
         tile.setPadding(left, top, right, bottom)
 
+        // THE NEUTRAL FILL COMES FROM THE THEME, NOT FROM THE DRAWABLE. bg_tile_neutral paints
+        // @color/icon_tile_neutral, and a ThemeOverlay can only override ATTRIBUTES — so the mono
+        // theme could not touch it and every «grey» tile stayed faintly blue there. The tint is a
+        // no-op in the other two themes: icon_tile_neutral is #E3EAF4 / #20242B and
+        // colorSurfaceContainerHighest is the same two values. Accent and destructive tiles keep
+        // their own drawables, which are already attribute-driven.
+        ViewCompat.setBackgroundTintList(
+            tile,
+            if (role == TileRole.NEUTRAL) {
+                ColorStateList.valueOf(tile.themeColor(com.google.android.material.R.attr.colorSurfaceContainerHighest))
+            } else {
+                null
+            },
+        )
+
         tile.setImageResource(glyph)
         ImageViewCompat.setImageTintList(tile, ColorStateList.valueOf(tile.tintFor(role)))
     }
 
+    // Same reason as the fill above: @color/icon_glyph_neutral is #54607A / #9BA1AD, which is
+    // exactly colorOnSurfaceVariant in both themes — but as a colour resource the mono overlay
+    // could not reach it, so mono glyphs stayed blue-grey. Attribute, same pixels.
     private fun View.tintFor(role: TileRole): Int = when (role) {
-        TileRole.NEUTRAL -> ContextCompat.getColor(context, R.color.icon_glyph_neutral)
+        TileRole.NEUTRAL -> themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
         TileRole.ACCENT -> themeColor(androidx.appcompat.R.attr.colorPrimary)
         TileRole.DESTRUCTIVE -> themeColor(androidx.appcompat.R.attr.colorError)
     }

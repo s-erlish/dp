@@ -103,6 +103,7 @@
 
                         <ImageView
                             style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
                             android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_hub_local_proxy" />
@@ -213,6 +214,7 @@
 
                         <ImageView
                             style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
                             android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_lp_udp" />
@@ -261,6 +263,7 @@
 
                         <ImageView
                             style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
                             android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_lp_http" />
@@ -309,6 +312,7 @@
 
                         <ImageView
                             style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
                             android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_lp_hotspot" />
@@ -550,6 +554,7 @@
 
                         <ImageView
                             style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
                             android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_lp_key" />

@@ -109,6 +109,7 @@
 
             <ImageView
                 style="@style/Widget.Departament.Tile"
+                android:backgroundTint="?attr/colorSurfaceContainerHighest"
                 android:layout_width="@dimen/empty_icon"
                 android:layout_height="@dimen/empty_icon"
                 android:importantForAccessibility="no"

@@ -92,6 +92,7 @@
 
                         <ImageView
                             style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
                             android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_refresh_24dp" />
@@ -141,6 +142,7 @@
 
                         <ImageView
                             style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
                             android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_ps_clock" />
@@ -186,6 +188,7 @@
 
                         <ImageView
                             style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
                             android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_ps_bell" />
@@ -242,6 +245,7 @@
 
                         <ImageView
                             style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
                             android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_power_settings" />
@@ -277,6 +281,7 @@
 
                         <ImageView
                             style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
                             android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_ping_24dp" />
@@ -312,6 +317,7 @@
 
                         <ImageView
                             style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
                             android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_ping_24dp" />
@@ -355,6 +361,7 @@
 
                         <ImageView
                             style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
                             android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_ps_fingerprint" />
@@ -403,14 +410,19 @@
 
                         <ImageView
                             style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
                             android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_ps_tag" />
 
+                        <!-- 4 and not 12 before the chevron: §6 gives the 12dp gap only to a row
+                             whose trailing slot holds a VALUE or a SWITCH. A bare glyph is
+                             punctuation on the row, and 12 in front of it opens a gutter down the
+                             right edge of the card. This row's value is its subtitle. -->
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginEnd="@dimen/space_12"
+                            android:layout_marginEnd="@dimen/space_4"
                             android:layout_weight="1"
                             android:orientation="vertical">
 
@@ -471,6 +483,7 @@
 
                         <ImageView
                             style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
                             android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_ps_sort" />

@@ -158,34 +158,37 @@ class GateView @JvmOverloads constructor(
      */
     fun bindOnboarding(active: Boolean, host: Host?) {
         this.host = host
-        if (onboarding == active) {
-            if (active) refreshClipboard(animate = entered)
-            return
-        }
+        val changed = onboarding != active
         onboarding = active
-
         shield.isVisible = active
         moreButton.isVisible = active
+
         if (!active) {
-            // Остальные три формы гейта: заголовок, подпись и две обычные кнопки. Глиф Telegram
-            // снимается — его ставит только форма входа.
+            if (!changed) return
+            // Остальные формы гейта: заголовок, подпись и две обычные кнопки. Глиф Telegram
+            // снимается — его ставит только форма входа. Поток, если он идёт, НЕ трогаем: он
+            // живёт на окне, а не в этом блоке, и смена формы гейта под непрозрачным слоем — это
+            // ровно то, ради чего слой и поднят.
             primary.icon = null
             cardSlot.isVisible = false
             buttonSlot.isVisible = false
-            moreList.isVisible = false
             setMore(open = false, animate = false)
-            flow?.cancel()
-            flow = null
-            flowJob?.cancel()
             return
         }
 
+        // Ставится на КАЖДОЙ отрисовке, а не только на переходе: `paintGate` перед этим вызовом
+        // написал в те же вьюхи формулировки формы «вход», и последнее слово должно остаться за
+        // начальным экраном.
         secondary.isVisible = false
         title.setText(R.string.onb_title)
         primary.setText(R.string.onb_login_telegram)
         primary.icon = ContextCompat.getDrawable(context, R.drawable.ic_telegram_24dp)
         primary.onSingleClick(Haptic.PRESS) { startTelegramFlow() }
-        refreshClipboard(animate = false)
+
+        // Буфер ЧИТАЕТСЯ только при первом включении экрана; дальше отрисовка лишь повторяет уже
+        // известное состояние. Перечитывают его два события: выход окна на передний план и
+        // нажатие на кнопку.
+        if (changed) refreshClipboard(animate = false) else applyClipState(animate = false)
         playEntrance()
     }
 
@@ -208,23 +211,25 @@ class GateView @JvmOverloads constructor(
     // ------------------------------------------------------------------ буфер обмена
 
     private fun onClipboardButton() {
-        // §2.5: нажатие перечитывает буфер. Нашлась ссылка — экран сам переедет в состояние
-        // «карточка»; не нашлась — остаётся как было, без сообщения об ошибке: пустой буфер это
-        // не отказ.
+        // §2.5: нажатие перечитывает буфер. Нашлась ссылка — кнопка сворачивается и на её месте
+        // разворачивается карточка, добавить остаётся одним нажатием. Не нашлась — экран остаётся
+        // как был, без сообщения об ошибке: пустой буфер это состояние, а не отказ.
         refreshClipboard(animate = true)
-        clipLink?.let { startClipboardFlow(it) }
     }
 
+    /** Единственное место, где содержимое буфера действительно читается. */
     private fun refreshClipboard(animate: Boolean) {
-        val link = readSubscriptionLink()
-        val changed = link != clipLink
-        clipLink = link
+        clipLink = readSubscriptionLink()
+        applyClipState(animate)
+    }
+
+    /** Отрисовка уже известного состояния буфера — без чтения. */
+    private fun applyClipState(animate: Boolean) {
+        val link = clipLink
         caption.setText(if (link != null) R.string.onb_sub_found else R.string.onb_sub_empty)
         caption.setTextColor(themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
-        if (changed || !cardSlot.isVisible && !buttonSlot.isVisible) {
-            setSlot(cardSlot, expand = link != null, animate = animate)
-            setSlot(buttonSlot, expand = link == null, animate = animate)
-        }
+        setSlot(cardSlot, expand = link != null, animate = animate)
+        setSlot(buttonSlot, expand = link == null, animate = animate)
     }
 
     /**
@@ -344,6 +349,9 @@ class GateView @JvmOverloads constructor(
      * крупном шрифте карточка выше 190dp, и жёсткое число обрезало бы ей подпись.
      */
     private fun setSlot(slot: View, expand: Boolean, animate: Boolean) {
+        // Повторная отрисовка того же состояния не должна перезапускать анимацию: слот уже там,
+        // где надо, и второй проход дал бы моргание на каждой перерисовке экрана.
+        if (slot.isVisible == expand && slot.alpha == (if (expand) 1f else 0f)) return
         RunningAnimators.cancel(slot)
         slot.animate().cancel()
         if (!animate || reducedMotion()) {
@@ -523,6 +531,17 @@ class GateView @JvmOverloads constructor(
         flow?.cancel()
         flow = null
         telegramOpened = false
+        releaseHome()
+    }
+
+    /**
+     * Отпустить Главную, если поток кончился ничем. [holdHome] оставляет её в предсборочном
+     * состоянии — с нулевой прозрачностью строки аккаунта, кнопки и списка, — и без этой строки
+     * сорвавшийся поток оставил бы под собой пустой экран.
+     */
+    private fun releaseHome() {
+        val shell = activityOrNull() as? MainActivity
+        if (shell != null) shell.revealHome { } else HomeHandoff.assemble()
     }
 
     /**
@@ -534,6 +553,7 @@ class GateView @JvmOverloads constructor(
         flow = null
         flowJob = null
         telegramOpened = false
+        releaseHome()
         caption.setText(message)
         caption.setTextColor(ContextCompat.getColor(context, R.color.color_destructive_text))
     }

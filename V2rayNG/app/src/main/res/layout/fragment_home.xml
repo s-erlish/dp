@@ -349,9 +349,19 @@
 
             <!-- THE NEGOTIATING SWEEP, AND IT RIDES THE ACTIVE RING (§4, code_reference
                  «Кнопка подключения»: `circle r=85 stroke-width=2` in a 214 box, i.e. the
-                 inner ring at inset 22). ONE arc, never a train of segments - §11 grabl 7 -
-                 which `indeterminateAnimationType=disjoint` gives, and 1100ms per turn,
-                 which is @integer/motion_spin, applied in HomeFragment.
+                 inner ring at inset 22). ONE arc, never a train of segments — §11 grabl 7 —
+                 which `indeterminateAnimationType=disjoint` gives.
+
+                 §4's «оборот 1100 мс» is the one number on this screen that did not port
+                 exactly. A Material indeterminate indicator owns its own clock: the
+                 revolution lives in IndeterminateAnimatorDelegate and there is no public
+                 attribute or setter for it, so the arc turns at Material's tempo, not
+                 @integer/motion_spin. What the handoff is protecting — ONE arc rather than
+                 a train of segments — is what `disjoint` delivers, and the entrance out of
+                 rest is ours (HomeFragment.playArcWindUp, one revolution on
+                 @integer/motion_windup). Matching 1100 to the millisecond would mean
+                 replacing the indicator with a hand-drawn arc and a rotation animator; the
+                 port report records the trade rather than making it silently.
 
                  It is a child of the FRAME and no longer of the disc: at 170dp it is
                  20dp wider than the disc, so inside it there was nowhere for it to be.

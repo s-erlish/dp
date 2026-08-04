@@ -81,6 +81,7 @@
 
                         <ImageView
                             style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
                             android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_scan_24dp" />
@@ -150,6 +151,7 @@
 
                             <ImageView
                                 style="@style/Widget.Departament.Tile"
+                                android:backgroundTint="?attr/colorSurfaceContainerHighest"
                                 android:layout_marginEnd="@dimen/space_16"
                                 android:importantForAccessibility="no"
                                 app:srcCompat="@drawable/ic_share_24dp" />
