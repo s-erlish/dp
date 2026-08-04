@@ -271,7 +271,13 @@ class FlowOverlay private constructor(
         beat?.cancel()
         back?.remove()
         back = null
-        (root.parent as? ViewGroup)?.removeView(root)
+        val content = root.parent as? ViewGroup
+        content?.removeView(root)
+        if (content != null) {
+            for (index in 0 until content.childCount) {
+                content.getChildAt(index).importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+            }
+        }
         onRemoved()
     }
 
@@ -303,6 +309,14 @@ class FlowOverlay private constructor(
             val view = LayoutInflater.from(activity)
                 .inflate(R.layout.layout_flow_overlay, content, false)
             content.addView(view)
+            // Экран под слоем закрыт для глаза — он должен быть закрыт и для TalkBack, иначе
+            // палец находит кнопки, которых зритель не видит.
+            for (index in 0 until content.childCount) {
+                val child = content.getChildAt(index)
+                if (child !== view) {
+                    child.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                }
+            }
             val overlay = FlowOverlay(view, kind)
             if (activity is ComponentActivity) {
                 overlay.back = object : OnBackPressedCallback(true) {

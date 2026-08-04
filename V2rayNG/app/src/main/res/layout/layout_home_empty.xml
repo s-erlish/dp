@@ -282,6 +282,7 @@
             android:id="@+id/gate_more_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:fontFamily="@font/golos_text_medium"
             android:text="@string/onb_more"
             android:textAppearance="@style/TextAppearance.App.Subtitle"
             android:textColor="?attr/colorOnSurfaceVariant" />
