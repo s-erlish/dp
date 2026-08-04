@@ -212,18 +212,28 @@
         </LinearLayout>
 
         <!-- The bar: a rounded muted track and a clipped flat fill in the one accent
-             (bg_traffic_gradient). No decorative gradient, and nothing printed on it. -->
+             (bg_traffic_gradient). No decorative gradient, and nothing printed on it.
+
+             3dp, HANDOFF §4 («под ними полоса 3dp»), and written out rather than taken
+             from @dimen/meter_height, which still reads 6. That token belongs to the
+             foundation wave's values/ and is read by other screens' meters; halving it
+             here from a file this wave does not own would re-draw theirs too. The port
+             report carries the request: meter_height 6 -> 3, one edit in dimens.xml and
+             this attribute goes back to the token.
+
+             The bar is a RULE, not a pill: at 6dp it read as a container with something
+             in it, at 3 it reads as the fraction itself, which is all it carries. -->
         <FrameLayout
             android:id="@+id/layout_traffic_pill"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_4">
+            android:layout_marginTop="@dimen/space_6">
 
             <ProgressBar
                 android:id="@+id/progress_traffic"
                 style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/meter_height"
+                android:layout_height="3dp"
                 android:max="1000"
                 android:progressDrawable="@drawable/bg_traffic_gradient"
                 tools:progress="430" />

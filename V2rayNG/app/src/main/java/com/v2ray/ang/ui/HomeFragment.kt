@@ -1419,10 +1419,11 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             )
         }
         meta.tvTraffic.setTextColor(onSurfaceColor)
-        // Unlimited traffic keeps an empty rounded track behind the label instead of a filled bar.
-        // A horizontal ProgressBar takes an Int against max=1000, so the fraction is unchanged.
+        // Unlimited traffic keeps an empty rounded track behind the label instead of a filled bar
+        // (§4: «безлимит — полоса не заливается»). A horizontal ProgressBar takes an Int against
+        // max=1000, so the fraction is unchanged.
         val fillFraction = if (sub.isUnlimited) 0f else sub.trafficFraction
-        meta.progressTraffic.progress = (fillFraction * 1000).toInt()
+        setMeterFill(meta.progressTraffic, (fillFraction * 1000).toInt())
 
         val expiryUnlimited = sub.expire <= 0L || sub.expire >= UNLIMITED_EXPIRE_SECONDS
         when {
@@ -1442,6 +1443,38 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             }
         }
         meta.tvExpiry.isVisible = true
+    }
+
+    /**
+     * The traffic meter's fill, and §4's «переход 500 мс» on it.
+     *
+     * IT TWEENS ONLY WHEN THE FRACTION REALLY MOVED. This runs from [bindMetaBar], which the
+     * carousel calls again on every page rebuild, every account refresh and every repaint — so a
+     * blind animation would replay the same 500ms slide at a user who did nothing, and would do it
+     * three times over on a three-подписка carousel. A meter arriving at its first value, or landing
+     * on the value it already shows, is set instantly; only a genuine change is travelled.
+     *
+     * `setProgress(v, true)` is not used: its duration is the platform's, not §8's, and it is a
+     * no-op on a view that has not been laid out yet.
+     */
+    private fun setMeterFill(meter: android.widget.ProgressBar, target: Int) {
+        (meter.getTag(R.id.progress_traffic) as? ValueAnimator)?.cancel()
+        val from = meter.progress
+        if (from == target) return
+        if (from == 0 || !meter.isLaidOut || meter.reducedMotion()) {
+            meter.progress = target
+            return
+        }
+        val animator = ValueAnimator.ofInt(from, target).apply {
+            duration = METER_FILL_MS
+            interpolator = easeOutQuart
+            addUpdateListener { meter.progress = it.animatedValue as Int }
+            start()
+        }
+        // Parked on the view, not in a field: there is one meter per carousel page and the pages
+        // are recycled, so the animator has to belong to the view it drives or two pages would
+        // share one handle and cancel each other.
+        meter.setTag(R.id.progress_traffic, animator)
     }
 
     /** The подписка the selected server belongs to, else the first one there is. */
