@@ -67,6 +67,35 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         bindSettingsState()
     }
 
+    /**
+     * A flyout must not outlive the tab that opened it.
+     *
+     * [SelectPopup] hosts itself at the ACTIVITY's content root rather than inside this fragment —
+     * that is what keeps a section card from slicing it off (README §11 grabl 4), and it is also
+     * why it cannot notice that Настройки is no longer the tab in front. The shell hides tabs
+     * instead of replacing them, so a hidden tab stays RESUMED and not one lifecycle callback fires
+     * on its own: without this, the DNS list would still be hanging over Главная.
+     *
+     * The guard asks whether the open popup is one of OUR rows' before closing it. `dismiss()` is
+     * static and would otherwise reach across screens — an activity started over this one stops the
+     * tab underneath, and closing that screen's popup from here would be this fragment reaching
+     * into a surface it does not own.
+     */
+    override fun onHiddenChanged(hidden: Boolean) {
+        super.onHiddenChanged(hidden)
+        if (hidden) dismissOwnPopup()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        dismissOwnPopup()
+    }
+
+    private fun dismissOwnPopup() {
+        if (!isBindingInitialized) return
+        if (rows().any { SelectPopup.isShowing(it) }) SelectPopup.dismiss()
+    }
+
     // Context-scoped helpers so the ported (Context.toast) call sites work from a Fragment. They
     // take a STRING ID and never built text: NoticePolicy recognises a message by its id, and a
     // CharSequence is by definition something it cannot vouch for.
