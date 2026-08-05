@@ -152,9 +152,13 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <!-- Плитка 40dp, нейтральная. Единый глиф подписки, а не эмодзи:
-                     эмодзи в интерфейсе запрещены, а имя подписки на этом экране
-                     не показывается вовсе (§3), так что и картинка родовая. -->
+                <!-- Плитка 40dp, нейтральная. Клевер — тот же знак, что и в
+                     прототипе, но НАРИСОВАННЫЙ: 🍀 запрещён как символ шрифта, а
+                     не как форма, и вектор снимает ровно то, из-за чего запрет
+                     существует — чужой шрифт, своя отрисовка на каждом
+                     устройстве и цвет, который не слушается темы. Тон отсюда,
+                     как у соседних глифов экрана; плитка остаётся нейтральной,
+                     потому что единственный акцент здесь — кнопка ниже. -->
                 <ImageView
                     android:id="@+id/gate_clip_tile"
                     android:layout_width="@dimen/tile_size"
@@ -162,7 +166,7 @@
                     android:background="@drawable/bg_ob_tile"
                     android:importantForAccessibility="no"
                     android:padding="@dimen/space_8"
-                    android:src="@drawable/ic_globe_24dp"
+                    android:src="@drawable/ic_ob_clover"
                     app:tint="?attr/colorOnSurfaceVariant" />
 
                 <LinearLayout
