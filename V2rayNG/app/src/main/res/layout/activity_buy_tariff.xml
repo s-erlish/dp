@@ -297,16 +297,26 @@
                         tools:text="299 ₽" />
                 </LinearLayout>
 
-                <!-- Pay CTA: the screen's ONE full-width primary, at the Tall tier. 52 is a
-                     MINIMUM height and never a fixed one (styles.xml, Primary.Tall) — the
-                     hardcoded android:layout_height="52dp" it used to carry clipped its own label
-                     at large font scales, and the inline textAllCaps/textStyle/cornerRadius
-                     overrides restated the style's own tokens.
+                <!-- Pay CTA — THE SAME BUTTON AS «Пополнить», because it is the same object:
+                     an accent contour, no fill, 48dp, radius_button 24, stroke_frame 1.5dp,
+                     accent label at TextAppearance.App.Button 15/700. «кнопка оплатить не
+                     соответствует стилю общему, возьми стиль с кнопки пополнить».
 
-                     progress_buy lives HERE, on the control that spends money, and not in the
-                     states block above where it was declared and then hidden in four places and
-                     shown in none. While a charge is in flight the button says «Оплата…», stops
-                     taking taps, and this arc turns beside its label (D10). -->
+                     It used to be Widget.Departament.Button.Primary.Tall — a filled accent slab
+                     at 52dp, the only filled control in the whole account flow, so it read as a
+                     different product from the tab that leads here. The prototype agrees: its own
+                     «Оплатить …» is `border: 1.5px solid acc; color: acc` over no background.
+
+                     Built on Button.Tertiary for the same reason activity_account.xml's pair is —
+                     it is the app's only transparent-container button and it already owns the
+                     press scale and the ripple-free feedback; what each instance adds is the
+                     constant contour (Tertiary's own stroke is a focus ring, transparent at rest).
+
+                     The label text is untouched: «Оплатить 1 290 ₽» is set by updateTotal.
+
+                     progress_buy lives HERE, on the control that spends money. Its indicator is
+                     the ACCENT now and not colorOnPrimary: with the fill gone, an on-accent arc
+                     would be drawn in the label colour of a plate that is no longer there. -->
                 <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -314,14 +324,18 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_pay"
-                        style="@style/Widget.Departament.Button.Primary.Tall"
+                        style="@style/Widget.Departament.Button.Tertiary"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/buy_pay" />
+                        android:layout_height="@dimen/btn_height"
+                        android:text="@string/buy_pay"
+                        android:textAppearance="@style/TextAppearance.App.Button"
+                        app:cornerRadius="@dimen/radius_button"
+                        app:strokeColor="?attr/colorPrimary"
+                        app:strokeWidth="@dimen/stroke_frame" />
 
                     <com.google.android.material.progressindicator.CircularProgressIndicator
                         android:id="@+id/progress_buy"
-                        style="@style/Widget.Departament.Progress.Circular.Inline.OnAccent"
+                        style="@style/Widget.Departament.Progress.Circular.Inline"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="end|center_vertical"
