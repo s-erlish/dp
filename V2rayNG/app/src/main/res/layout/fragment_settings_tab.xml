@@ -1368,7 +1368,9 @@
                     android:layout_height="@dimen/stroke_hairline"
                     android:background="?attr/colorOutlineVariant" />
 
-                <!-- П-05: Настройки провайдеров — the only entry into ProviderSettingsActivity -->
+                <!-- П-05: «Настройки подписок» — the only entry into ProviderSettingsActivity.
+                     A repository row, not one of §6's; see point 7 of the header for why its glyph
+                     moved to ic_subscriptions_24dp when Мультиплексирование took the `http` one. -->
                 <LinearLayout
                     android:id="@+id/row_provider"
                     android:layout_width="match_parent"
