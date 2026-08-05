@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  THE NEGOTIATING ARC of the connect object (handoff §4, «Подключаемся — одна дуга по
+  кругу, 1100 мс»), ported 1:1 from the prototype's own SVG:
+
+      <svg viewBox="0 0 214 214" style="animation:spin 1100ms linear infinite">
+        <circle cx="107" cy="107" r="85" stroke-width="2" stroke-linecap="round"
+                stroke-dasharray="104 430" />
+
+  Every number below is that line. The viewport is 214, i.e. @dimen/connect_object, so
+  one viewport unit is one dp and the arc rides the ACTIVE ring exactly — inset 22 in a
+  214 box is a circle of radius 85, which is the ring HomeFragment.buildConnectObject
+  strokes at @dimen/stroke_emphasis. The stroke is that same 2.
+
+  trimPathEnd is the dash: the circumference at r=85 is 534.07, the prototype shows 104
+  of it, and 104/534.07 = 0.195. ONE arc and never a train of segments (§11 grabl 7).
+
+  It is WHITE and tinted at the ImageView (`app:tint="?attr/colorAccentFigure"`), the
+  same way @drawable/ic_flow_arc is tinted on the прогрузка ring — a vector cannot carry
+  a theme attribute in strokeColor without forking this file per theme.
+
+  The revolution is NOT here: it is one infinite ObjectAnimator on ROTATION at
+  @integer/motion_spin, linear, started and stopped by HomeFragment. That is the route
+  FlowOverlay.startArc already takes, and it is what finally lands §4's 1100 exactly —
+  a Material CircularProgressIndicator owns its own clock and cannot be told this number.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="@dimen/connect_object"
+    android:height="@dimen/connect_object"
+    android:viewportWidth="214"
+    android:viewportHeight="214">
+    <path
+        android:pathData="M107,22 A85,85 0 0,1 107,192 A85,85 0 0,1 107,22"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="2"
+        android:trimPathEnd="0.195"
+        android:trimPathStart="0" />
+</vector>

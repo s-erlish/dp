@@ -34,6 +34,7 @@ import android.view.animation.AnimationUtils
 import android.widget.LinearLayout
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.core.animation.doOnEnd
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.children
 import androidx.core.view.doOnPreDraw
@@ -76,12 +77,12 @@ import com.v2ray.ang.handler.SubscriptionNaming
 import com.v2ray.ang.ui.component.GateView
 import com.v2ray.ang.ui.component.Haptic
 import com.v2ray.ang.ui.component.HomeHandoff
+import com.v2ray.ang.ui.component.RunningAnimators
 import com.v2ray.ang.ui.component.SkeletonBinder
 import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.ui.component.pressFeedback
 import com.v2ray.ang.util.AvatarManager
 import com.v2ray.ang.util.FlagUtil
-import com.v2ray.ang.util.SubscriptionOrigin
 import com.v2ray.ang.util.reducedMotion
 import com.v2ray.ang.util.tickHaptic
 import com.v2ray.ang.viewmodel.AccountViewModel
@@ -274,6 +275,13 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     /** The subscription card's chevron collapses the list under it. Session state, not a setting. */
     private var homeListCollapsed = false
 
+    /**
+     * Whether the list was last drawn open, so [setServerListShown] can tell a genuine open/close
+     * from the repaint that merely repeats one. Null until the first paint, which lands on the end
+     * state instantly rather than sliding a whole list open on launch.
+     */
+    private var renderedListShown: Boolean? = null
+
     // ---- The subscription card carousel ----
 
     private var homeMetaAdapter: HomeMetaPagerAdapter? = null
@@ -306,6 +314,19 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private var sweepRunning = false
 
     /**
+     * THE ARC'S REVOLUTION — §4's «одна дуга по кругу, 1100 мс», and the whole of it.
+     *
+     * ONE infinite ObjectAnimator on ROTATION at @integer/motion_spin, linear, exactly as
+     * `FlowOverlay.startArc` turns the прогрузка ring. It replaces a Material
+     * `CircularProgressIndicator`, which owned its own clock — the revolution lives inside
+     * IndeterminateAnimatorDelegate with no attribute and no setter — and whose `disjoint` arc
+     * additionally grows and shrinks as it travels, so it was visibly not the design's fixed
+     * 19.5% arc. Held so it can be stopped: it is INFINITE, and an infinite animator keeps the
+     * compositor awake from a screen nobody is looking at.
+     */
+    private var sweepSpin: ObjectAnimator? = null
+
+    /**
      * The status pill's current colour and the tween moving it, so a repaint that resolves to the
      * same state costs nothing and two state changes in a row do not run two animators at the
      * pill at once. Null until the first paint, which lands instantly rather than fading in from
@@ -324,6 +345,26 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     /** The entrance plays once per attached view, never on a repaint. @see playHomeEntrance */
     private var entrancePlayed = false
 
+    /**
+     * THE HOLD IS STICKY, and this field is the whole of that fix.
+     *
+     * [holdEntrance] used to stamp the pre-entrance state ONCE and trust it to survive until the
+     * overlay came down. It does not survive: while the flow runs, the подписка lands, the server
+     * list is rebuilt and [render] runs several times — and render writes RESTING values.
+     * `paintConnect` assigns `frame.alpha = 1f` on every repaint, `paintOnboardingShell` switches
+     * the whole connect band back on when the gate goes, `paintSlot` fades the subscription slot
+     * in, and rows bound after the prime arrive opaque. By the time the overlay left, Главная was
+     * whole underneath it.
+     *
+     * That is what the owner saw. The overlay's exit is a 520ms FADE («Проявление», §3), so those
+     * last 520ms progressively revealed a finished screen — «круг от кнопки» — and the frame that
+     * removed the overlay then snapped every element back to alpha 0 to start the table: «резко
+     * лагающе исчезает и только потом анимация». One transaction was never enough on its own; the
+     * screen has to be held in its start values for the WHOLE hold, not just at the beginning of
+     * it. So [render] re-primes while this is true, and it is cleared only by [playEntrance].
+     */
+    private var entranceHeld = false
+
     // Cached easing curves (loaded once) so the imperative hero motion rides the same ease-out tempo
     // as res/interpolator and res/anim. No bounce.
     private val easeOutQuint by lazy { AnimationUtils.loadInterpolator(requireContext(), R.interpolator.ease_out_quint) }
@@ -333,6 +374,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
     private val durWindUp get() = resources.getInteger(R.integer.motion_windup).toLong()
     private val durState get() = resources.getInteger(R.integer.motion_state).toLong()
+    private val durStateExit get() = resources.getInteger(R.integer.motion_state_exit).toLong()
+    private val durExpand get() = resources.getInteger(R.integer.motion_expand).toLong()
     private val durReveal get() = resources.getInteger(R.integer.motion_reveal).toLong()
     private val durRevealExit get() = resources.getInteger(R.integer.motion_reveal_exit).toLong()
     private val durAppear get() = resources.getInteger(R.integer.motion_appear).toLong()
@@ -405,7 +448,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     private companion object {
-        const val KEY_CONNECTION_START = "cache_connection_start_time"
+        // KEY_CONNECTION_START used to live here and the screen wrote it. It is now
+        // CoreServiceManager.KEY_SESSION_STARTED_AT — same key, written beside the core loop, read
+        // here through CoreServiceManager.sessionStartedAt(). See [startConnectionTimer].
 
         const val HEALTH_CHECK_DELAY_MS = 7000L
 
@@ -502,6 +547,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         super.onViewCreated(view, savedInstanceState)
         buildConnectObject()
         wireHeaderRow()
+        seedAccountRow()
         wireConnect()
         wireStatusStrip()
         setupServerList()
@@ -559,6 +605,11 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      */
     override fun onPause() {
         stopAmbient()
+        // The arc's revolution is the OTHER infinite animator on this screen now that it is ours
+        // rather than Material's, and the same rule applies: nothing turns while nobody can see
+        // it. [onResume]'s render() puts it back through showSweep(), which re-arms the spin
+        // without replaying the entrance.
+        stopSweepSpin()
         super.onPause()
     }
 
@@ -582,6 +633,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // The ambient loops are INFINITE, so they are the two that would outlive the view and keep
         // driving the compositor from a destroyed hierarchy if they were ever forgotten here.
         stopAmbient()
+        stopSweepSpin()
+        // The list's collapse runs on the RecyclerView's own layout height; a set still tweening
+        // it when the view goes would write layout params into a detached hierarchy.
+        RunningAnimators.cancel(binding.rvHomeServers)
         // The in-flight bar is INDEFINITE by construction, so it is the one surface that would
         // survive this screen if nothing took it down.
         Notice.clearProgress()
@@ -882,6 +937,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     fun holdEntrance() {
         if (!isBindingInitialized) return
         entrancePlayed = false
+        // AND IT STAYS HELD. Setting the start values once is not enough — see [entranceHeld]:
+        // every repaint that happens under the overlay writes resting values back over them, and
+        // the overlay's own exit is a fade, so what the fade uncovers is a finished screen.
+        entranceHeld = true
         cancelEntrance()
         primeEntrance()
     }
@@ -905,6 +964,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     fun playEntrance() {
         if (!isBindingInitialized || entrancePlayed) return
         entrancePlayed = true
+        // The hold is over the instant the table starts: from here on a repaint writes resting
+        // values because the elements are on their way to them.
+        entranceHeld = false
         if (binding.connectFrame.reducedMotion()) {
             clearEntrance()
             return
@@ -934,9 +996,26 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         EntranceStep(binding.layoutHomeAccount.root, -ENTRANCE_DROP, 1f, durAppear, 60),
         // Кнопка «+» — сверху, −22dp, 460 мс, 130 мс.
         EntranceStep(binding.btnHomeAdd, -ENTRANCE_DROP, 1f, durAppear, 130),
+        // NO STEP FOR @id/cta_link_telegram. It briefly had one — it sits in the «+»'s band and on
+        // the clipboard path it was the one thing that could show through the overlay's fade while
+        // the rest of the screen was parked — but the owner took the banner off Главная entirely
+        // on 2026-08-05 and [paintLinkCta] now writes it hidden on every repaint. An entrance for
+        // a view that is never on screen is six animators a frame budget does not owe.
         // Кольцо кнопки — из 0.7×, 720 мс, 180 мс. The one element that scales rather than travels:
         // it is the centre of the screen and it arrives by growing into its own place.
         EntranceStep(binding.connectFrame, 0f, ENTRANCE_RING_SCALE, durAppearSlow, 180),
+        // THE STATUS PILL ARRIVES WITH THE RING, and the prototype is unambiguous about it: the
+        // pill is INSIDE the block that carries `animation:{{ en.ring }}`, so `bloomIn 720ms …
+        // 180ms` is its entrance too. It had none here, which meant the one element on the screen
+        // that was already at full opacity while everything else assembled was a grey pill reading
+        // «Не подключено» — and with the hold now sticky (see [entranceHeld]) that would have been
+        // the single thing visible through the overlay's fade.
+        //
+        // Opacity only, no scale: the prototype scales the ring and the pill together about the
+        // GROUP's centre, which a sibling view cannot reproduce — scaling the pill about its own
+        // centre would re-rasterise a text label for 720ms, which is §11 грабля 1. The timing is
+        // the design's; the transform is the one the design's group geometry actually implies.
+        EntranceStep(binding.tvConnectedPill, 0f, 1f, durAppearSlow, 180),
         // Скорости — снизу, +26dp, 520 мс, 420 мс.
         EntranceStep(binding.numericStrip, ENTRANCE_RISE, 1f, ENTRANCE_MID_MS, 420),
         // Название сервера — снизу, +26dp, 520 мс, 500 мс.
@@ -1015,6 +1094,12 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         val list = binding.rvHomeServers
         list.doOnPreDraw {
             if (!isBindingInitialized) return@doOnPreDraw
+            // The LIST's own opacity is what held every row the flow bound while the entrance was
+            // parked (see [primeEntrance]): rows arrive from the adapter one at a time and there is
+            // no other moment at which all of them can be caught. It is released HERE, inside the
+            // pre-draw, in the same pass that stamps the rows' own start values — so no frame can
+            // exist in which the list is opaque and its rows have not been parked yet.
+            list.alpha = 1f
             val travel = -ENTRANCE_ROW_SLIDE * resources.displayMetrics.density
             list.children.forEachIndexed { index, row ->
                 row.animate().cancel()
@@ -1035,14 +1120,29 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         }
     }
 
-    /** Stamps every element of the assemble into its start state. */
+    /**
+     * Stamps every element of the assemble into its start state.
+     *
+     * IT ALSO CANCELS WHATEVER WAS MOVING THEM. While the entrance is held, [render] runs — the
+     * подписка lands, the gate goes, the slot crossfades — and `paintSlot` starts a
+     * ViewPropertyAnimator on the subscription slot's alpha. Stamping a value under a running
+     * animator does not stop it: it re-reads the property on its next frame and carries on to 1.
+     * So each animator is dropped before its view is parked.
+     *
+     * THE SERVER LIST IS PARKED AS ONE OBJECT, on the list's own alpha rather than on its rows'.
+     * Rows are bound by the adapter over several frames while the flow runs, so a per-row prime
+     * catches only the ones that already exist; the list's own opacity catches every row there
+     * will ever be. [playServerRowEntrance] releases it in the pre-draw pass that parks the rows.
+     */
     private fun primeEntrance() {
         entranceSteps().forEach { step ->
+            step.view.animate().cancel()
             step.view.alpha = 0f
             step.view.translationY = step.fromDp * resources.displayMetrics.density
             step.view.scaleX = step.fromScale
             step.view.scaleY = step.fromScale
         }
+        binding.rvHomeServers.alpha = 0f
         binding.rvHomeServers.children.forEach { it.alpha = 0f }
     }
 
@@ -1056,12 +1156,14 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      */
     private fun clearEntrance() {
         if (!isBindingInitialized) return
+        entranceHeld = false
         entranceSteps().forEach { step ->
             step.view.alpha = step.restingAlpha
             step.view.translationY = 0f
             step.view.scaleX = 1f
             step.view.scaleY = 1f
         }
+        binding.rvHomeServers.alpha = 1f
         binding.rvHomeServers.children.forEach {
             it.animate().cancel()
             it.alpha = 1f
@@ -1096,23 +1198,28 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
-     * Главная's «Привязать Telegram» banner, restored from 5e8cd54.
+     * Главная's «Привязать Telegram» banner — OFF, BY OWNER INSTRUCTION, 2026-08-05:
      *
-     * ONE state, and nothing else on this screen covers it: a departament подписка was PASTED and
-     * the user has never signed in. He has servers, so [resolveGate] returns null and there is no
-     * gate block; the gate's own «Привязать Telegram» secondary belongs to the
-     * signed-in-with-no-подписка shape and never reaches him.
+     *     «при обычной подписке сверху показывается привяжите телеграм, хотя убрать эту плашку
+     *      надо полностью»
      *
-     * The подписка must be a departament one — a pasted foreign link must not surface an account
-     * affordance for an account it has nothing to do with, which is the same gate
-     * [MainActivity.accountAccessAllowed] applies to the Аккаунт tab.
+     * The banner used to appear for a departament подписка that was PASTED by a user who had never
+     * signed in — `BackendConfig.isConfigured() && !isLoggedIn && !dismissed &&
+     * SubscriptionOrigin.hasDepartamentSubscription()`. That whole condition is gone, and with it
+     * the last reader of `SubscriptionOrigin` on this screen.
+     *
+     * WHAT IS REMOVED IS THE DISPLAY, NOT THE FEATURE. The block stays in `fragment_home.xml`
+     * (already `visibility="gone"` there), its tap and its ✕ stay wired in [wireHeaderRow], and
+     * [openTelegramLink] stays the live entry point it has always been — it is still what the gate
+     * block's secondary calls in its BUY shape, which is a different screen and a different case.
+     * Linking a Telegram account moves to Аккаунт, in its «подписка есть, аккаунт не привязан»
+     * state; that is another wave's file.
+     *
+     * This is still written on every repaint, in one direction, so nothing else can leave the
+     * banner on screen.
      */
     private fun paintLinkCta() {
-        val show = BackendConfig.isConfigured() &&
-            !AccountSession.isLoggedIn() &&
-            !MmkvManager.decodeSettingsBool(AppConfig.PREF_LINK_TG_CTA_DISMISSED) &&
-            SubscriptionOrigin.hasDepartamentSubscription()
-        binding.ctaLinkTelegram.isVisible = show
+        binding.ctaLinkTelegram.isVisible = false
     }
 
     /**
@@ -1697,7 +1804,15 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         (meter.getTag(R.id.progress_traffic) as? ValueAnimator)?.cancel()
         val from = meter.progress
         if (from == target) return
-        if (from == 0 || !meter.isLaidOut || meter.reducedMotion()) {
+        // `isLaidOut` IS the "first value" test, and it is the only one. `from == 0` used to be
+        // tested beside it and it is a different question: a meter reading zero is not a meter that
+        // has never been painted — it is an unlimited подписка (§4: «безлимит — полоса не
+        // заливается»), or a fresh month with nothing spent yet. Both of those DO travel when they
+        // stop being zero, and the prototype states the transition on the fill itself
+        // («transition:width 500ms cubic-bezier(.25,1,.5,1)») with no exception for leaving zero.
+        // A view that has never been laid out — including the off-screen probes
+        // measureHomeMetaHeight inflates — still lands instantly.
+        if (!meter.isLaidOut || meter.reducedMotion()) {
             meter.progress = target
             return
         }
@@ -2153,6 +2268,14 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         paintFigures()
         paintSlot(state)
         renderedConn = state.conn
+        // THE HOLD HAS THE LAST WORD, and it has to be the last line here rather than a flag the
+        // painters check. Every painter above legitimately writes resting values — that is what
+        // painting is — and while a full-screen flow overlay is up, a repaint means the подписка
+        // arrived, the gate went and the whole screen came back on. Re-stamping the start values
+        // in the SAME traversal is what keeps the screen parked underneath the overlay, so the
+        // overlay's 520ms fade uncovers a screen that has not assembled yet and the frame that
+        // removes it has nothing to snap. @see entranceHeld
+        if (entranceHeld) primeEntrance()
     }
 
     private fun paintHeader(state: HomeState) {
@@ -2188,6 +2311,46 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             header.tvAccountName.text = getString(R.string.home_account_title)
             header.tvAccountSub.text = getString(R.string.home_account_subtitle)
         }
+    }
+
+    /**
+     * THE ACCOUNT ROW IS PAINTED FROM THE ACCOUNT WE ALREADY HAVE, BEFORE THE FIRST FRAME.
+     *
+     * The owner: «при входе в приложение сверху где управление аккаунтом на главной он сначала
+     * тёмный потом возвращает свой цвет». That is this row drawing its LOADING dress and then its
+     * real one, and there was never anything to load:
+     *
+     *  - `accountResolved` starts false whenever the user is signed in, so the first [render] takes
+     *    [paintHeader]'s loading branch — the text column is hidden and a skeleton is armed at
+     *    300ms. Those skeleton bars are `colorSurfaceContainerHighest` on `bg_skeleton_bar`, i.e.
+     *    two dark blocks where the name and «Управление аккаунтом» belong;
+     *  - `account_tile` is VISIBLE in the layout by default and only [bindAccountRow] hides it, so
+     *    the 40dp slot showed @drawable/bg_tile_neutral — a dark tile — until the profile arrived
+     *    and swapped in the avatar;
+     *  - and the profile only arrives on the collector in [observeAccount], which is inside a
+     *    `repeatOnLifecycle(STARTED)` and therefore cannot run until after `onViewCreated` has
+     *    returned. So the loading dress is guaranteed to be the one that reaches the screen first.
+     *
+     * `AccountSession.state` is a `StateFlow` seeded synchronously from `AuthTokenStore` — the
+     * profile is in memory, off MMKV, with no I/O at all. Reading its CURRENT VALUE here, before
+     * the first render, is the whole fix: the row is painted with the real identity in the frame it
+     * is first drawn, and neither the tile nor the skeleton is ever shown.
+     *
+     * The skeleton machinery is untouched and still covers the case it was written for — a session
+     * whose stored profile names nobody, where the row really is waiting on `getMe`.
+     */
+    private fun seedAccountRow() {
+        val state = AccountSession.state.value as? AccountSession.AccountState.LoggedIn ?: return
+        val profile = state.profile
+        // A session with no stored profile is genuinely unresolved: it would seed the row with
+        // «Аккаунт» and a monogram, which is a second wrong answer rather than none. Let the
+        // skeleton have that one.
+        val named = !profile.telegramUsername.isNullOrBlank() ||
+            profile.email.isNotBlank() ||
+            !profile.telegramName.isNullOrBlank()
+        if (!named) return
+        accountResolved = true
+        bindAccountRow(profile)
     }
 
     /**
@@ -2352,8 +2515,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // The sweep spins for the two things this screen has always spun it for: the core
         // negotiating a tunnel, and a подписка being fetched.
         val sweeping = negotiating || backgroundLoads > 0
-        if (sweeping) binding.connectSweep.show() else binding.connectSweep.hide()
-        if (sweeping && !sweepRunning) playArcWindUp()
+        // BOTH SIDES, and both idempotent: showSweep() re-arms a revolution the background
+        // stopped without replaying the entrance, hideSweep() fades the arc out instead of
+        // dropping it mid-turn. The `sweepRunning` edge is what keeps the entrance one-shot.
+        if (sweeping) showSweep() else hideSweep()
         sweepRunning = sweeping
 
         // THE ONE BREATH LEFT. Negotiating owns the ring alphas at 850ms and says "working on it";
@@ -2646,10 +2811,93 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     private fun paintSubscriptionSlot(state: HomeState) {
-        binding.rvHomeServers.isVisible = state.serverCount > 0 && !homeListCollapsed
+        setServerListShown(state.serverCount > 0 && !homeListCollapsed)
         // Offline, or a failed refresh: the card and the rows keep their last values and the screen
         // says so, rather than emptying.
         binding.tvStaleHint.isVisible = state.stale || subsError
+    }
+
+    /**
+     * THE LIST'S OTHER HALF. It arrives by §3's table — «слева, −44dp, 560 мс, задержка 700 + 85 на
+     * строку» — and it used to LEAVE by having `isVisible` written false under it, which is the
+     * owner's «нет плавного скрытия серверов»: the card's chevron took a whole screenful of rows
+     * away between two frames and everything under it jumped up to meet the gap.
+     *
+     * Both directions are the prototype's own, and it states them on one element:
+     *
+     *     <div style="overflow:hidden;max-height:{{ srv.h }};opacity:{{ srv.op }};
+     *                 transition:max-height 340ms cubic-bezier(.25,1,.5,1),opacity 220ms">
+     *
+     * i.e. HEIGHT over @integer/motion_expand (340, §8's «Раскрытие блока») on
+     * @interpolator/ease_out_quart, and OPACITY over @integer/motion_state (220) alongside it. One
+     * description for opening and closing, so the two cannot drift apart — and both shorter than
+     * the 560ms arrival, because this is a disclosure and that is an entrance.
+     *
+     * THE HEIGHT IS MEASURED, NEVER A CONSTANT. The prototype can write `620px` because it knows
+     * its own seven rows; a real list is any length, and a fixed number would clip it or hole it.
+     * It costs nothing extra to measure: this RecyclerView is `wrap_content` inside the page's
+     * scroll view with nested scrolling off, so it already lays out every row on every pass.
+     *
+     * THE FIRST PAINT IS INSTANT. [renderedListShown] is null until the screen has drawn the list
+     * once, so a launch, a tab switch and a подписка arriving all land on the end state; only a
+     * genuine open/close is travelled. It is also skipped while the entrance is held, because the
+     * list is parked at alpha 0 there and belongs to §3's table, not to this.
+     */
+    private fun setServerListShown(shown: Boolean) {
+        val list = binding.rvHomeServers
+        val previous = renderedListShown
+        renderedListShown = shown
+        if (previous == shown) return
+        RunningAnimators.cancel(list)
+        list.animate().cancel()
+        if (previous == null || entranceHeld || list.reducedMotion()) {
+            list.isVisible = shown
+            setListHeight(list, if (shown) ViewGroup.LayoutParams.WRAP_CONTENT else 0)
+            return
+        }
+
+        val from = if (list.isVisible) list.height else 0
+        if (shown) {
+            list.visibility = View.VISIBLE
+            setListHeight(list, from)
+        }
+        val target = if (shown) measureListHeight(list) else 0
+        list.animate().alpha(if (shown) 1f else 0f)
+            .setDuration(durState)
+            .setInterpolator(easeOutQuart)
+            .start()
+        val height = ValueAnimator.ofInt(from, target).apply {
+            duration = durExpand
+            interpolator = easeOutQuart
+            addUpdateListener { setListHeight(list, it.animatedValue as Int) }
+            doOnEnd {
+                if (!isBindingInitialized) return@doOnEnd
+                if (shown) {
+                    // Back to wrap_content, never left at the measured pixel height: a list that
+                    // gains a row while it is open has to grow, and a frozen height would clip it.
+                    setListHeight(list, ViewGroup.LayoutParams.WRAP_CONTENT)
+                } else {
+                    list.isVisible = false
+                    list.alpha = 1f
+                }
+            }
+        }
+        RunningAnimators.set(list, height)
+    }
+
+    private fun setListHeight(list: View, height: Int) {
+        list.layoutParams = list.layoutParams.apply { this.height = height }
+    }
+
+    /** The list's open height, at the width it already has. @see setServerListShown */
+    private fun measureListHeight(list: View): Int {
+        val width = list.width
+        if (width <= 0) return list.height
+        list.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+        )
+        return list.measuredHeight
     }
 
     private fun paintGate(gate: Gate) {
@@ -2834,24 +3082,105 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
-     * THE WIND-UP. One revolution out of rest at the instant the sweep appears, on ease_out_quint,
-     * so the arc *runs up* to its steady spin instead of flashing on at full speed. It is the
-     * desktop's P0-3 (`ConnectHeroView.axaml`, `Ellipse.ConnectArc.arc-windup`), and 360° lands
-     * exactly where 0° was, so the steady spin underneath it is never snapped.
+     * The arc appears, and keeps turning.
      *
-     * Fires on the EDGE into negotiating only — a repaint that finds the sweep already spinning
-     * must not restart it — and never under reduced motion, where the sweep is the only signal.
+     * Idempotent on purpose, because it is called from every repaint that finds the core
+     * negotiating: the ENTRANCE plays only when the arc was not on screen, while the revolution is
+     * re-armed unconditionally — [onPause] stops the infinite animator and [onResume]'s render is
+     * what has to put it back, without replaying an entrance the user already saw.
+     */
+    private fun showSweep() {
+        val sweep = binding.connectSweep
+        if (!sweep.isVisible) {
+            sweep.isVisible = true
+            playArcWindUp()
+        }
+        startSweepSpin()
+    }
+
+    /**
+     * The arc leaves. The exit is the reverse of [playArcWindUp] at 75% of it (motion_state_exit),
+     * and the revolution stops with the last frame rather than being left running behind an
+     * invisible view — the whole point of owning the animator instead of a Material indicator.
+     */
+    private fun hideSweep() {
+        val sweep = binding.connectSweep
+        if (!sweep.isVisible) return
+        sweep.animate().cancel()
+        if (sweep.reducedMotion()) {
+            stopSweepSpin()
+            sweep.alpha = 1f
+            sweep.isVisible = false
+            return
+        }
+        sweep.animate().alpha(0f)
+            .setDuration(durStateExit)
+            .setInterpolator(easeStandard)
+            .withEndAction {
+                if (!isBindingInitialized) return@withEndAction
+                stopSweepSpin()
+                sweep.alpha = 1f
+                sweep.isVisible = false
+            }
+            .start()
+    }
+
+    /**
+     * THE REVOLUTION: §4's «оборот 1100 мс», linear, one infinite ObjectAnimator on ROTATION.
+     *
+     * @integer/motion_spin is that 1100, and this is the same construction `FlowOverlay.startArc`
+     * uses on the прогрузка ring — the route the previous wave named and could not take, because
+     * the arc was a `CircularProgressIndicator` whose revolution is private to Material and whose
+     * `disjoint` arc changes length as it goes. Frame-by-frame against the prototype that is a
+     * different animation; the design's arc is a fixed 19.5% of the circle at a steady tempo.
+     *
+     * Never restarted while it is already running: a repaint must not snap the arc back to 0°.
+     */
+    private fun startSweepSpin() {
+        if (sweepSpin?.isRunning == true) return
+        val sweep = binding.connectSweep
+        if (sweep.reducedMotion()) return
+        sweepSpin = ObjectAnimator.ofFloat(sweep, View.ROTATION, 0f, FULL_TURN_DEGREES).apply {
+            duration = resources.getInteger(R.integer.motion_spin).toLong()
+            interpolator = android.view.animation.LinearInterpolator()
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.RESTART
+            start()
+        }
+    }
+
+    /** Stops the revolution and returns the arc to 0°, so nothing infinite outlives the moment. */
+    private fun stopSweepSpin() {
+        sweepSpin?.cancel()
+        sweepSpin = null
+        if (isBindingInitialized) binding.connectSweep.rotation = 0f
+    }
+
+    /**
+     * THE WIND-UP, and it is OPACITY now rather than a revolution.
+     *
+     * It used to be one 360° turn on ease_out_quint, from the desktop's P0-3
+     * (`ConnectHeroView.axaml`, `Ellipse.ConnectArc.arc-windup`), which was safe only while the
+     * steady spin belonged to a drawable. It does not any more: [startSweepSpin] drives the same
+     * ROTATION property, and two animators on one property is how a steady spin gets snapped. So
+     * the arc still *runs up* out of rest — it fades in over @integer/motion_windup while the
+     * revolution is already turning — and the 1100ms tempo is never touched.
+     *
+     * Fires on the EDGE into negotiating only, and never under reduced motion, where the arc is
+     * the only signal there is and must simply be present.
      */
     private fun playArcWindUp() {
         val sweep = binding.connectSweep
-        if (sweep.reducedMotion()) return
+        if (sweep.reducedMotion()) {
+            sweep.alpha = 1f
+            return
+        }
         sweep.animate().cancel()
-        sweep.rotation = 0f
+        sweep.alpha = 0f
         sweep.animate()
-            .rotationBy(FULL_TURN_DEGREES)
+            .alpha(1f)
             .setDuration(durWindUp)
             .setInterpolator(easeOutQuint)
-            .withEndAction { if (isBindingInitialized) sweep.rotation = 0f }
             .start()
     }
 
@@ -3000,24 +3329,40 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     // ==================== The session clock ====================
 
     /**
-     * Starts the per-second uptime. The start instant is persisted, so the clock survives a rotation
-     * or a theme recreate instead of restarting from zero on a tunnel that never went down.
+     * Starts the per-second uptime from the instant THE TUNNEL came up.
+     *
+     * That instant belongs to [CoreServiceManager.sessionStartedAt] — it is stamped beside the core
+     * loop, in the daemon process, and this screen only reads it. It used to be stamped and cleared
+     * here, and that is the defect the owner reported: «когда закрываешь приложение и заходишь
+     * назад, время сессии сбивается». `MainViewModel.startListenBroadcast()` publishes
+     * `isRunning = false` on every activity start, before the service has answered the registration
+     * handshake; the observer below took that at face value, [stopConnectionTimer] wiped the stored
+     * instant, and the real «running» that arrived a moment later found nothing and stamped `now`.
+     * The counter was measuring how long the screen had been open, which on a tunnel that had been
+     * up for two hours is simply a wrong number.
+     *
+     * The fallback to `now` stays for the one case it is honest about: a tunnel that is running with
+     * no stamp behind it — started by a build older than the stamp, or by something that bypassed
+     * [CoreServiceManager.startCoreLoop]. Counting from now is wrong by however long that session
+     * has run, and it is the best this screen can know; it is NOT written back, so the moment the
+     * daemon stamps a real one the clock corrects itself instead of inheriting the guess.
      */
     private fun startConnectionTimer() {
-        val stored = MmkvManager.decodeSettingsLong(KEY_CONNECTION_START, 0L)
-        connectionStartTime = if (stored > 0L) {
-            stored
-        } else {
-            System.currentTimeMillis().also { MmkvManager.encodeSettings(KEY_CONNECTION_START, it) }
-        }
+        val started = CoreServiceManager.sessionStartedAt()
+        connectionStartTime = if (started > 0L) started else System.currentTimeMillis()
         timerHandler.removeCallbacks(uptimeRunnable)
         timerHandler.post(uptimeRunnable)
     }
 
+    /**
+     * Stops the ticking and blanks the readings. **It does not end the session** — that is the
+     * daemon's to end, in [CoreServiceManager.stopCoreLoop]. This runs on every optimistic
+     * `isRunning = false` too, and erasing the start instant from here is exactly what reset the
+     * clock on every app launch.
+     */
     private fun stopConnectionTimer() {
         timerHandler.removeCallbacks(uptimeRunnable)
         connectionStartTime = 0L
-        MmkvManager.encodeSettings(KEY_CONNECTION_START, 0L)
         // The session is over, so its readings go with it — and the strip returns to zeroes rather
         // than freezing on the last speed the tunnel ever saw.
         downBytesPerSec = null

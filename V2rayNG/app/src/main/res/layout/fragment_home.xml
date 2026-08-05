@@ -377,43 +377,79 @@
                  inner ring at inset 22). ONE arc, never a train of segments — §11 grabl 7 —
                  which `indeterminateAnimationType=disjoint` gives.
 
-                 §4's «оборот 1100 мс» is the one number on this screen that did not port
-                 exactly. A Material indeterminate indicator owns its own clock: the
-                 revolution lives in IndeterminateAnimatorDelegate and there is no public
-                 attribute or setter for it, so the arc turns at Material's tempo, not
-                 @integer/motion_spin. What the handoff is protecting — ONE arc rather than
-                 a train of segments — is what `disjoint` delivers, and the entrance out of
-                 rest is ours (HomeFragment.playArcWindUp, one revolution on
-                 @integer/motion_windup). The final verification wave weighed the trade
-                 again and left it: the route that WOULD land 1100 exactly is the one
-                 FlowOverlay.startArc already takes on the прогрузка ring — a static arc
-                 drawable in an ImageView, turned by one infinite ObjectAnimator on
-                 ROTATION at motion_spin, linear — but here it needs a new vector cut for
-                 r=85 at a 2dp stroke, and playArcWindUp animates the same ROTATION
-                 property it would have to share. Both want a device to judge, and no APK
-                 runs in this container. Recorded as a deliberate deviation with its route
-                 named, rather than made blind on the object the user watches longest.
+                 §4's «оборот 1100 мс» IS THE NUMBER NOW, and this view is why it finally
+                 is. It used to be a Material `CircularProgressIndicator`, which owns its
+                 own clock — the revolution lives in IndeterminateAnimatorDelegate, there
+                 is no attribute and no setter for it, and its `disjoint` arc additionally
+                 GROWS AND SHRINKS as it travels. Frame-by-frame against the prototype
+                 («Прототип departament (один файл).html», Главная, «Нажмите щит») that is
+                 plainly a different animation: the design's arc is a FIXED 19.5% of the
+                 circle turning at a steady 1100ms, and it never changes length.
 
-                 It is a child of the FRAME and no longer of the disc: at 170dp it is
-                 20dp wider than the disc, so inside it there was nowhere for it to be.
-                 The static inner ring underneath IS its track, which is why trackColor
-                 is transparent. -->
-            <com.google.android.material.progressindicator.CircularProgressIndicator
+                 So this is now what the prototype itself is: one static arc
+                 (@drawable/ic_connect_arc, cut at the prototype's own r=85 / stroke 2 /
+                 dasharray 104-of-534) turned by ONE infinite ObjectAnimator on ROTATION at
+                 @integer/motion_spin, linear — the route @id/flow_arc already takes on the
+                 прогрузка ring (FlowOverlay.startArc). One animator, stopped when the arc
+                 goes and when the app leaves the foreground; no drawable-owned clock left
+                 to disagree with the token.
+
+                 214dp AND NOT 170: the vector's viewport IS 214, so the arc's own radius
+                 of 85 places it on the active ring without this view having to know where
+                 that ring is. The static inner ring underneath IS its track, so the arc
+                 carries no track of its own.
+
+                 The entrance out of rest stays ours (HomeFragment.playArcWindUp) but it is
+                 opacity now, not rotation: rotation belongs to the 1100ms revolution and
+                 two animators on one property is how the steady spin used to be snapped. -->
+            <ImageView
                 android:id="@+id/connect_sweep"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_width="@dimen/connect_object"
+                android:layout_height="@dimen/connect_object"
                 android:layout_gravity="center"
                 android:importantForAccessibility="no"
-                android:indeterminate="true"
                 android:visibility="gone"
-                app:hideAnimationBehavior="inward"
-                app:indeterminateAnimationType="disjoint"
-                app:indicatorColor="?attr/colorAccentFigure"
-                app:indicatorSize="@dimen/connect_sweep"
-                app:showAnimationBehavior="inward"
-                app:trackColor="@android:color/transparent"
-                app:trackCornerRadius="@dimen/stroke_emphasis"
-                app:trackThickness="@dimen/stroke_emphasis" />
+                app:srcCompat="@drawable/ic_connect_arc"
+                app:tint="?attr/colorAccentFigure"
+                tools:visibility="visible" />
+
+            <!-- THE CONFIRM PAYOFF — «При подтверждении — один сонар» (§4), emitted at the
+                 instant the tunnel confirms and by no other event in the product.
+
+                 IT RIDES THE ACTIVE RING, NOT THE DISC, and that is the correction this
+                 pair needed. The prototype draws it at `inset:22px` inside the 214 box —
+                 the same 170dp circle the arc travels — and throws it out to 1.6×, i.e.
+                 272dp, well clear of the whole object. These two Views used to be children
+                 of @id/connect_disc at 150dp and travelled to 1.35×, which lands at 202dp:
+                 INSIDE the outermost ring, so the confirmation never actually left the
+                 object. Frame 2230ms of the prototype's cycle shows the ring already
+                 outside all three. So they are siblings of the arc now, at
+                 @dimen/connect_sweep, and @anim/connect_confirm carries the prototype's own
+                 1 → 1.6 at full opacity.
+
+                 They sit BEFORE the disc so the disc draws over their first frames and the
+                 ring reads as leaving the object's edge, which is the prototype's stacking
+                 order too.
+
+                 The lead ring is the prototype's sonar exactly; the echo follows it a beat
+                 later, dimmer and travelling slightly less far, which is the desktop's
+                 Sonar.pulsing + Sonar.pulsing-echo pair and its own note, «максимум ДВА
+                 кольца, не радар». Neither loops. -->
+            <View
+                android:id="@+id/connect_ring_pulse_echo"
+                android:layout_width="@dimen/connect_sweep"
+                android:layout_height="@dimen/connect_sweep"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:visibility="invisible" />
+
+            <View
+                android:id="@+id/connect_ring_pulse"
+                android:layout_width="@dimen/connect_sweep"
+                android:layout_height="@dimen/connect_sweep"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:visibility="invisible" />
 
             <FrameLayout
                 android:id="@+id/connect_disc"
@@ -441,29 +477,6 @@
                     android:duplicateParentState="true"
                     android:importantForAccessibility="no"
                     android:stateListAnimator="@anim/press_scrim" />
-
-                <!-- THE CONFIRM PAYOFF: two rings and never three, emitted at the
-                     instant the tunnel confirms and by no other event in the product.
-                     The lead ring goes first; the echo follows it a beat later, dimmer
-                     and travelling slightly less far, which is what makes the moment
-                     read as locked rather than as a blip. Neither loops. This mirrors
-                     the desktop's Sonar.pulsing + Sonar.pulsing-echo pair, whose own
-                     note is «максимум ДВА кольца, не радар». -->
-                <View
-                    android:id="@+id/connect_ring_pulse_echo"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:layout_gravity="center"
-                    android:importantForAccessibility="no"
-                    android:visibility="invisible" />
-
-                <View
-                    android:id="@+id/connect_ring_pulse"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:layout_gravity="center"
-                    android:importantForAccessibility="no"
-                    android:visibility="invisible" />
 
                 <!-- Two shields, crossfaded. Never tint-animated: the filled shield
                      is accent from frame zero and only its alpha moves.

@@ -3,10 +3,14 @@ package com.v2ray.ang.ui
 import android.annotation.SuppressLint
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.view.animation.AnimationUtils
+import android.widget.ImageView
 import androidx.recyclerview.widget.RecyclerView
+import com.v2ray.ang.R
 import com.v2ray.ang.databinding.LayoutSubscriptionMetaBarBinding
 import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.util.reducedMotion
 
 /**
  * Главная's subscription card as a swipeable carousel: one page per подписка.
@@ -124,7 +128,7 @@ class HomeMetaPagerAdapter(
         // instead would leave a recycled holder wired to the id it last showed — so the long press
         // that deletes a подписка could act on a different one from the card under the thumb.
         bindPage(meta, subId, MmkvManager.decodeSubscription(subId))
-        meta.btnCollapse.rotation = if (collapsed()) -90f else 0f
+        turnCaret(meta.btnCollapse, if (collapsed()) COLLAPSED_DEGREES else 0f)
         meta.btnCollapse.setOnClickListener { onToggleList() }
         meta.btnPing.setOnClickListener { onPingAll() }
         meta.btnRefresh.setOnClickListener { onRefreshAll() }
@@ -137,9 +141,41 @@ class HomeMetaPagerAdapter(
         meta.root.setOnLongClickListener { onDeleteSub(subId); true }
     }
 
+    /**
+     * The card's caret, and BOTH halves of the turn.
+     *
+     * The prototype states it on the glyph itself — `transform:rotate({{ srv.rot }})` with
+     * `transition:transform 300ms cubic-bezier(.25,1,.5,1)`, i.e. @integer/motion_caret on
+     * @interpolator/ease_out_quart, 0° open and −90° closed — and it is the only thing on the card
+     * that says which way the list under it is about to go. It used to be assigned, so it snapped
+     * while the list it points at travelled 340ms.
+     *
+     * It TURNS only when the value really changed and the view has been laid out at least once: a
+     * page bound for the first time, or recycled onto another подписка, arrives already pointing
+     * the right way and must not spin on arrival. Reduced motion assigns, like every other motion
+     * in the product.
+     */
+    private fun turnCaret(caret: ImageView, target: Float) {
+        if (caret.rotation == target) return
+        if (!caret.isLaidOut || caret.reducedMotion()) {
+            caret.animate().cancel()
+            caret.rotation = target
+            return
+        }
+        caret.animate().cancel()
+        caret.animate()
+            .rotation(target)
+            .setDuration(caret.resources.getInteger(R.integer.motion_caret).toLong())
+            .setInterpolator(AnimationUtils.loadInterpolator(caret.context, R.interpolator.ease_out_quart))
+            .start()
+    }
+
     class VH(val binding: LayoutSubscriptionMetaBarBinding) : RecyclerView.ViewHolder(binding.root)
 
     companion object {
+        /** §4: the caret points down when the list is open and left when it is closed. */
+        private const val COLLAPSED_DEGREES = -90f
+
         /**
          * Marks a repaint as content-only. Its VALUE is never read — what matters is that the
          * payload list is not empty, because that is the flag `canReuseUpdatedViewHolder` keys off

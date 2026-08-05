@@ -41,6 +41,14 @@ import java.net.InetSocketAddress
 
 object CoreServiceManager {
 
+    /**
+     * Wall-clock millis the running tunnel came up, or 0 when nothing is up.
+     *
+     * The key is the one the UI has always used, so a session that is live across the upgrade keeps
+     * its clock instead of restarting at zero.
+     */
+    private const val KEY_SESSION_STARTED_AT = "cache_connection_start_time"
+
     private val coreController: CoreController = CoreNativeManager.newCoreController(CoreCallback())
     private val mMsgReceive = ReceiveMessageHandler()
     private var currentConfig: ProfileItem? = null
@@ -112,6 +120,46 @@ object CoreServiceManager {
      * @return True if the service is running, false otherwise.
      */
     fun isRunning() = coreController.isRunning
+
+    /**
+     * **When the CURRENT tunnel came up**, in wall-clock millis, or 0 when none is up.
+     *
+     * The session clock on Главная counts from here, and the whole point is that here is not the
+     * UI. It used to be: `HomeFragment` stamped the instant when it first observed a running state
+     * and cleared it when it observed a stopped one — and `MainViewModel.startListenBroadcast()`
+     * publishes `isRunning = false` on every single activity start, BEFORE the service has answered
+     * the registration handshake. So closing the app and coming back cleared the stamp, the real
+     * «running» arrived a moment later, found nothing stored, and stamped `now`. The counter
+     * measured how long the screen had been open. The owner: «когда закрываешь приложение и
+     * заходишь назад, время сессии сбивается».
+     *
+     * Written by [markSessionStarted] / [markSessionStopped] on either side of the core loop, which
+     * is the only pair of moments that means anything: the tunnel is up, or it is not. The screen
+     * is a reader now, and an optimistic guess it makes about the state it has not been told yet
+     * cannot destroy the fact.
+     *
+     * MMKV in `MULTI_PROCESS_MODE`, because that matters here: the core runs in
+     * `:RunSoLibV2RayDaemon` and the UI does not.
+     */
+    fun sessionStartedAt(): Long = MmkvManager.decodeSettingsLong(KEY_SESSION_STARTED_AT, 0L)
+
+    /**
+     * Stamps the session start at the moment the core is confirmed running.
+     *
+     * Every arrival here is a NEW tunnel — [startCoreLoop] refuses outright while one is already
+     * up — so this always writes. Switching server, and the auto-fallback switching it for you,
+     * both come through here and both are new sessions, which is what the counter should say.
+     *
+     * A start that throws never reaches this line, so a failed attempt leaves no clock behind.
+     */
+    private fun markSessionStarted() {
+        MmkvManager.encodeSettings(KEY_SESSION_STARTED_AT, System.currentTimeMillis())
+    }
+
+    /** Ends the session: there is no tunnel, so there is no clock. */
+    private fun markSessionStopped() {
+        MmkvManager.encodeSettings(KEY_SESSION_STARTED_AT, 0L)
+    }
 
     /**
      * Gets the name of the currently running server.
@@ -280,6 +328,10 @@ object CoreServiceManager {
             browserDialer!!.start(service, dialerAddr)
         }
 
+        // The session clock starts HERE, before the UI is told anything — see [sessionStartedAt].
+        // The screen reads this instant; it does not decide it.
+        markSessionStarted()
+
         MessageUtil.sendMsg2UI(service, AppConfig.MSG_STATE_START_SUCCESS, "")
         NotificationManager.startSpeedNotification()
         LogUtil.i(AppConfig.TAG, "StartCore-Manager: Core started successfully")
@@ -292,6 +344,11 @@ object CoreServiceManager {
      */
     fun stopCoreLoop(): Boolean {
         val service = getService() ?: return false
+
+        // The session is over the moment the stop is asked for, whichever branch below announces
+        // it. Cleared here rather than beside MSG_STATE_STOP_SUCCESS so the coroutine branch and
+        // the immediate one cannot disagree about it.
+        markSessionStopped()
 
         // MSG_STATE_STOP_SUCCESS is what tells the UI the tunnel is down, and the UI starts the next
         // core as soon as it arrives. So it must not be sent while stopLoop() is still running — that
