@@ -50,7 +50,6 @@ class FlowOverlay private constructor(
     /** Какой из двух потоков рисуется: тексты и глиф в кольце берутся отсюда. */
     enum class Kind { TELEGRAM, CLIPBOARD }
 
-    private val ringBox: View = root.findViewById(R.id.flow_ring_box)
     private val arc: ImageView = root.findViewById(R.id.flow_arc)
     private val ringDone: View = root.findViewById(R.id.flow_ring_done)
     private val sonar: View = root.findViewById(R.id.flow_sonar)
@@ -191,6 +190,7 @@ class FlowOverlay private constructor(
         check.scaleY = CHECK_FROM
         toast.translationY = TOAST_RISE_DP * root.resources.displayMetrics.density
         sonar.alpha = 1f
+        val lifted = listOf(arc, ringDone, sonar, check, toast)
 
         beat?.cancel()
         beat = AnimatorSet().apply {
@@ -232,8 +232,15 @@ class FlowOverlay private constructor(
             )
             // Аппаратный слой только на время боя и снимается по его окончании — иначе кольцо
             // остаётся в отдельном буфере на весь экран.
-            doOnEnd { ringBox.setLayerType(View.LAYER_TYPE_NONE, null) }
-            ringBox.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            //
+            // Слои висят на СВОИХ вьюхах, а не на коробке кольца. Аппаратный слой — это буфер
+            // размером ровно с ту вьюху, которой он выдан, и всё, что нарисовано за её границами,
+            // в него не попадает: слой на коробке 132dp срезал бы сонар по квадрату ровно так же,
+            // как это делала обрезка детей, и `clipChildren="false"` в разметке остался бы без
+            // силы. Сонару буфер по-прежнему достаётся — его собственный, — и масштаб 1.6x
+            // применяется уже к готовому буферу, за пределы коробки.
+            doOnEnd { lifted.forEach { it.setLayerType(View.LAYER_TYPE_NONE, null) } }
+            lifted.forEach { it.setLayerType(View.LAYER_TYPE_HARDWARE, null) }
             start()
         }
     }

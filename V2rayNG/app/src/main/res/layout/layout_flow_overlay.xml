@@ -35,11 +35,21 @@
     android:focusable="true"
     android:importantForAccessibility="yes">
 
+    <!--
+      clipChildren/clipToPadding сняты РАДИ СОНАРА и не выше: кольцо финала
+      расходится до 1.6x, то есть до 211dp вокруг 132-точечной коробки, и любой
+      предок, который его обрезает, закрывает кольцо прямым углом. Обрезка снята
+      здесь и на самой коробке — до корня слоя она НЕ доходит: корень во весь
+      экран, места ему хватает, а снятие обрезки на нём выпускает содержимое на
+      системную панель.
+    -->
     <LinearLayout
         android:id="@+id/flow_stack"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:gravity="center_horizontal"
         android:orientation="vertical"
         android:paddingStart="@dimen/flow_gutter"
@@ -49,6 +59,7 @@
             android:id="@+id/flow_ring_box"
             android:layout_width="@dimen/flow_ring"
             android:layout_height="@dimen/flow_ring"
+            android:clipChildren="false"
             android:importantForAccessibility="no">
 
             <View
