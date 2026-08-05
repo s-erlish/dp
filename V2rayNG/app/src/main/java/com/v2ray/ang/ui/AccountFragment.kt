@@ -9,7 +9,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.AnimationUtils
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -94,9 +93,6 @@ class AccountFragment : Fragment() {
     // rather than spinning forever, while a cold open (and a retry) still shows the silhouette.
     private var pendingFirstLoad = true
 
-    // Looping alpha pulse on the loading skeleton; cancelled when the skeleton is not the shown state.
-    private var skeletonAnimator: ValueAnimator? = null
-
     private var pendingPayment = false
     private var pollJob: Job? = null
 
@@ -168,8 +164,6 @@ class AccountFragment : Fragment() {
         super.onDestroyView()
         balanceAnimator?.cancel()
         balanceAnimator = null
-        skeletonAnimator?.cancel()
-        skeletonAnimator = null
         signOutSpinnerJob?.cancel()
         signOutSpinnerJob = null
         signOutBar?.dismiss()
@@ -319,7 +313,16 @@ class AccountFragment : Fragment() {
         }
     }
 
+    /**
+     * NOTHING IS FETCHED WITHOUT A SESSION. All five of these are authenticated endpoints, and the
+     * tab is reachable signed out now — someone who added a departament подписка from the clipboard
+     * gets the Account tab too. Firing them tokenless returns 401, and a 401 on the identity call
+     * runs [AccountSession.wipe]: the tab would have signed the visitor out of an account they were
+     * never in, and taken the empty hero with it. The signed-out state renders from no data at all,
+     * so there is nothing to load for it.
+     */
     private fun loadAll() {
+        if (!AccountSession.isLoggedIn()) return
         viewModel.refreshProfile()
         viewModel.loadSubscriptions()
         viewModel.loadPublicConfig()
@@ -917,35 +920,13 @@ class AccountFragment : Fragment() {
         return tv.data
     }
 
-    /**
-     * Loops the skeleton's alpha 0.45↔1.0 (~900ms) so it reads as "loading". Reduced motion: hold a
-     * static ~0.7 alpha instead (no animation), honouring the same reducedMotion gate the rest of the
-     * screen uses.
-     */
-    private fun startSkeletonPulse() {
-        val skeleton = binding.groupSubSkeleton
-        if (skeleton.reducedMotion()) {
-            skeletonAnimator?.cancel()
-            skeletonAnimator = null
-            skeleton.alpha = 0.7f
-            return
-        }
-        if (skeletonAnimator?.isRunning == true) return
-        skeletonAnimator = ValueAnimator.ofFloat(0.45f, 1.0f).apply {
-            duration = 900L
-            repeatMode = ValueAnimator.REVERSE
-            repeatCount = ValueAnimator.INFINITE
-            interpolator = AccelerateDecelerateInterpolator()
-            addUpdateListener { skeleton.alpha = it.animatedValue as Float }
-            start()
-        }
-    }
-
-    private fun stopSkeletonPulse() {
-        skeletonAnimator?.cancel()
-        skeletonAnimator = null
-        binding.groupSubSkeleton.alpha = 1f
-    }
+    /* THE SKELETON DOES NOT PULSE ANY MORE, and that is the whole of «оно ... подрагивает».
+       It used to loop its alpha 0.45↔1.0 forever on a 900ms REVERSE animator; on a screen whose
+       loading placeholder IS the object being loaded, that reads as the ring flickering rather
+       than as progress. What it draws now — @drawable/bg_acc_skeleton_ring at the ring's exact
+       172dp — is what CircularProgressIndicator draws at progress 0, so the hand-off from
+       "loading" to "loaded" changes the arc's FILL and nothing else: no size change, no fade, no
+       animator left running on a tab the user has navigated away from. */
 
     /** Fills the history row's trailing slot with the most recent payment date, or hides it. */
     private fun renderHistoryValue(payments: List<PaymentDto>) {
