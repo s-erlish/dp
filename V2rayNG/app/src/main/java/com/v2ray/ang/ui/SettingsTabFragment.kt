@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
+import com.google.android.material.materialswitch.MaterialSwitch
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.BuildConfig
 import com.v2ray.ang.R
@@ -35,7 +36,9 @@ import com.v2ray.ang.util.LogUtil
  * write the same MMKV keys the legacy `SettingsActivity` preference tree uses, so a value changed
  * on either surface is the same value. Switches are non-focusable in XML, so the whole row drives
  * them — there are no CheckedChange listeners, which is what keeps [bindSettingsState] from
- * feeding a change back into itself.
+ * feeding a change back into itself. A switch is painted from stored state through
+ * [restoreChecked], which is the difference between a value being read back and a value being
+ * chosen: the first must appear already settled, only the second is allowed to animate.
  *
  * What the shell still owns: recreating the activity for a theme/language change, restarting a
  * running tunnel after a core-config change, and the result launcher that applies both when a
@@ -245,17 +248,56 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
 
         s.valueSubAutoUpdate.text = currentSubAutoUpdateLabel()
 
-        s.switchBypassLan.isChecked = isBypassLanOn()
-        s.switchIpv6.isChecked = MmkvManager.decodeSettingsBool(AppConfig.PREF_IPV6_ENABLED, false)
+        s.switchBypassLan.restoreChecked(isBypassLanOn())
+        s.switchIpv6.restoreChecked(MmkvManager.decodeSettingsBool(AppConfig.PREF_IPV6_ENABLED, false))
 
         val muxOn = MmkvManager.decodeSettingsBool(AppConfig.PREF_MUX_ENABLED, false)
-        s.switchMux.isChecked = muxOn
+        s.switchMux.restoreChecked(muxOn)
         s.rowMuxConcurrency.isVisible = muxOn
         s.dividerConcurrency.isVisible = muxOn
 
-        s.switchFragment.isChecked = MmkvManager.decodeSettingsBool(AppConfig.PREF_FRAGMENT_ENABLED, false)
+        s.switchFragment.restoreChecked(MmkvManager.decodeSettingsBool(AppConfig.PREF_FRAGMENT_ENABLED, false))
         s.valueAppearance.text = getString(appearanceLabelRes(currentAppearanceIndex()))
-        s.switchBoot.isChecked = MmkvManager.decodeStartOnBoot()
+        s.switchBoot.restoreChecked(MmkvManager.decodeStartOnBoot())
+    }
+
+    /**
+     * Paints a switch with a value that is being READ BACK, not chosen — and does it without a
+     * frame of animation. Every switch on this tab goes through here from [bindSettingsState]; the
+     * only calls left on `isChecked` are the five [toggleBypassLan]-style handlers, which are the
+     * user flipping the switch and must animate.
+     *
+     * THE BUG THIS FIXES: «при входе в настройки переключатели дёргаются, типа отключаются
+     * включаются очень быстро». Every switch is inflated in its DEFAULT position — off — and only
+     * then handed the stored value, and the handover was animated, so a switch that is on was drawn
+     * off first and then morphed on in front of the user. It looked like the screen was flipping
+     * its own switches.
+     *
+     * `setChecked` alone does not prevent that, and this is the part that is easy to get wrong.
+     * `SwitchCompat.setChecked` guards exactly ONE animation — the thumb's slide along the track —
+     * behind `getWindowToken() != null && isLaidOut()`, so binding before the first layout does
+     * place the thumb instantly. What it does not guard is the drawable state change it also
+     * performs: `mtrl_switch_thumb` is an `<animated-selector>` whose unchecked→checked
+     * `<transition>` is an `<animated-vector>` that morphs the thumb's path (M3
+     * `mtrl_switch_thumb_pre/post_morphing_duration`, ~250 ms end to end). An AnimatedVectorDrawable
+     * asked to start before its view has ever been drawn does not lose the animation — it parks it
+     * and flushes it on the first `draw()`. So the morph does not merely survive the bind, it is
+     * timed to begin on the tab's very first frame, which is precisely when the user is looking.
+     *
+     * [android.view.View.jumpDrawablesToCurrentState] is the answer to exactly that: `SwitchCompat`
+     * overrides it to jump the thumb and the track to the end of whatever transition is in flight
+     * and to end the position animator. The state is already correct at that point; only the
+     * theatre around it is dropped.
+     *
+     * The `isChecked == value` guard keeps this honest in the other direction. [bindSettingsState]
+     * runs from both [onViewCreated] and [onResume] — back to back on the first open — and it runs
+     * again after every picker. Without the guard the second pass would end an animation the user
+     * had just started with their own finger; with it, a bind that changes nothing touches nothing.
+     */
+    private fun MaterialSwitch.restoreChecked(value: Boolean) {
+        if (isChecked == value) return
+        isChecked = value
+        jumpDrawablesToCurrentState()
     }
 
     private fun isBypassLanOn(): Boolean =

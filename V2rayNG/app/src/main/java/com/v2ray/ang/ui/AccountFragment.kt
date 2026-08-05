@@ -2,9 +2,6 @@ package com.v2ray.ang.ui
 
 import android.animation.ValueAnimator
 import android.content.ActivityNotFoundException
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
 import android.net.Uri
@@ -61,7 +58,7 @@ import java.util.Locale
 
 /**
  * Account HUB, hosted IN-PLACE as the Account bottom-nav tab (no sliding Activity, no toolbar).
- * Mirrors the Settings tab: a compact profile card (name / balance / referral / top-up), a single
+ * Mirrors the Settings tab: a compact profile row (name / balance / top-up), a single
  * subscription summary (active sub OR "нет активной подписки", never both), and grouped entry cards
  * that open the devices / buy / history sub-screens. Purchases open a provider checkout in a Custom
  * Tab; a PAID result only ever arrives via webhook, so on return we re-poll rather than assume success.
@@ -235,8 +232,6 @@ class AccountFragment : Fragment() {
         // §5: «нажимается вся строка», not the switch. The switch is not clickable and not
         // focusable in the layout, so this is the ONE hit target the row has.
         binding.rowSubAutorenew.onSingleClick(Haptic.TICK) { toggleAutoRenew() }
-        // The whole referral row copies the code (the trailing glyph is decorative).
-        binding.rowReferral.onSingleClick { copyReferralCode() }
         binding.avatarContainer.onSingleClick { showAvatarOptions() }
         binding.imgAvatarEdit.onSingleClick { showAvatarOptions() }
         binding.rowDevices.onSingleClick { openSubScreen(DeviceManagementActivity::class.java) }
@@ -265,7 +260,6 @@ class AccountFragment : Fragment() {
             binding.rowSubAutorenew,
         ).forEach { it.pressFeedback(R.anim.press_row) }
         binding.rowBalance.pressFeedback(R.anim.press_button)
-        binding.rowReferral.pressFeedback(R.anim.press_button)
     }
 
     private fun openSubScreen(target: Class<*>) {
@@ -447,7 +441,6 @@ class AccountFragment : Fragment() {
             lastBalance = null
             binding.tvBalance.text = ""
             binding.rowBalance.isVisible = false
-            binding.rowReferral.visibility = View.GONE
             AvatarManager.setMonogram(binding.tvAvatarInitial, null)
             AvatarManager.applyAvatar(viewLifecycleOwner.lifecycleScope, requireContext(), binding.imgAvatar, binding.tvAvatarInitial, null)
             binding.tvLoginTelegramState.setText(R.string.account_login_telegram_unlinked)
@@ -489,12 +482,11 @@ class AccountFragment : Fragment() {
             animateMoney(binding.tvBalance, previousBalance, profile.balance, profile.currency)
         }
         lastBalance = profile.balance
-        if (profile.referralCode.isNotBlank()) {
-            binding.rowReferral.visibility = View.VISIBLE
-            binding.tvReferral.text = getString(R.string.account_referral, profile.referralCode)
-        } else {
-            binding.rowReferral.visibility = View.GONE
-        }
+        // THE REFERRAL CODE IS NOT DRAWN ON THIS TAB. §5's bands are профиль → кольцо → тариф →
+        // кнопки → автопродление → Управление → Выйти, and a «Реф-код …» chip wedged between the
+        // first two was the owner's complaint, twice. `profile.referralCode` still arrives, the
+        // referral endpoints are still wired (AccountRepository.getReferralStats) — the tab simply
+        // has nowhere in its layout that shows it.
     }
 
     /**
@@ -619,15 +611,23 @@ class AccountFragment : Fragment() {
         }
     }
 
-    /** The four mutually-exclusive hero children. */
-    private enum class Hero { SKELETON, EMPTY, CAROUSEL, ERROR }
+    /** The five mutually-exclusive hero children. */
+    private enum class Hero { SIGNED_OUT, SKELETON, EMPTY, CAROUSEL, ERROR }
 
     /**
-     * Shows EXACTLY ONE hero child (the other three go GONE):
+     * Shows EXACTLY ONE hero child (the other four go GONE):
+     *  - SIGNED_OUT when there is no session — checked FIRST, because every other state
+     *    describes an account and there is none;
      *  - CAROUSEL when there are subscriptions to show;
      *  - SKELETON while the FIRST load is still in flight (no profile yet);
      *  - ERROR on a cold-load failure (no profile, an error, not loading);
      *  - EMPTY otherwise (loaded, no subscriptions, no cold-load error).
+     *
+     * SIGNED_OUT also strips the bands that only mean something with a session: the profile
+     * row, the two money buttons, «Управление», «Способы входа» and «Выйти». The tab is
+     * reachable without a login now (someone who added a departament подписка from the
+     * clipboard), and offering «Купить подписку» or «Выйти из аккаунта» to a visitor with no
+     * account is offering controls that cannot work.
      */
     private fun renderHeroState() {
         val subs = currentSubs
@@ -635,17 +635,31 @@ class AccountFragment : Fragment() {
         val error = viewModel.error.value
         val loading = viewModel.loading.value
         val coldLoading = pendingFirstLoad || loading
+        val signedIn = AccountSession.isLoggedIn()
         val state = when {
+            !signedIn -> Hero.SIGNED_OUT
             subs.isNotEmpty() -> Hero.CAROUSEL
             coldLoading && profile == null -> Hero.SKELETON
             profile == null && error != null -> Hero.ERROR
             else -> Hero.EMPTY
         }
+        binding.groupSignedOut.isVisible = state == Hero.SIGNED_OUT
         binding.groupSubSkeleton.isVisible = state == Hero.SKELETON
         binding.groupSubEmpty.isVisible = state == Hero.EMPTY
         binding.groupSubCarousel.isVisible = state == Hero.CAROUSEL
         binding.groupAccountError.isVisible = state == Hero.ERROR
-        if (state == Hero.SKELETON) startSkeletonPulse() else stopSkeletonPulse()
+
+        // Everything that needs a session. GONE and not disabled: a greyed-out «Выйти из
+        // аккаунта» still claims there is an account to leave.
+        val sessionBands = state != Hero.SIGNED_OUT
+        binding.rowProfile.isVisible = sessionBands
+        binding.llSubActions.isVisible = sessionBands
+        binding.tvManageTitle.isVisible = sessionBands
+        binding.cardManage.isVisible = sessionBands
+        binding.tvLoginMethodsTitle.isVisible = sessionBands
+        binding.cardLoginMethods.isVisible = sessionBands
+        binding.cardLogout.isVisible = sessionBands
+
         renderSelectedSub()
     }
 
@@ -1086,13 +1100,6 @@ class AccountFragment : Fragment() {
         val b = _binding ?: return
         b.btnTopUp.isEnabled = !busy
         b.btnTopUp.text = getString(if (busy) R.string.account_pay_in_progress else R.string.account_top_up)
-    }
-
-    private fun copyReferralCode() {
-        val code = latestProfile?.referralCode?.takeIf { it.isNotBlank() } ?: return
-        val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
-        clipboard.setPrimaryClip(ClipData.newPlainText("referral", code))
-        toast(R.string.account_referral_copied)
     }
 
     // region sign out

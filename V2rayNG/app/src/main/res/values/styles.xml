@@ -1215,13 +1215,23 @@
     </style>
 
     <!--
-        NAV LABEL — face: GOLOS TEXT (ui), 11sp / 500, and this is deliberate.
+        NAV LABEL — face: GOLOS TEXT (ui), weight 500, and this is deliberate.
         The Chip ROLE is 11sp/500 in Space Grotesk, but «Главная» / «Серверы» /
         «Настройки» / «Аккаунт» are Russian, and Space Grotesk has no Cyrillic at all.
         So the nav label borrows the Chip's METRICS and keeps the UI FACE. It is not a
-        twelfth ramp step: same size, same weight, same leading, different script.
+        twelfth ramp step: same weight, same leading, different script.
+
+        SIZE 12sp, one step over the Chip role's 11 and a deliberate departure from
+        handoff README §4, taken with the glyph: the owner read the ported bar as too
+        small on the device, so the icon went 23 -> 26dp (activity_main.xml) and the
+        label follows it so the stacked mark grows as one thing. The Chip role itself
+        is untouched — every chip in the product is still 11sp — because this is the
+        NAV label's size and nothing else's. Leading stays at the Chip's 14sp, which
+        is still clear of 12sp, so the -1dp that pulls the label flush under the glyph
+        goes on meaning what it meant.
     -->
     <style name="BottomNavLabel" parent="BottomNavLabel.Api28">
+        <item name="android:textSize">12sp</item>
     </style>
 
     <!-- The active destination: weight 700, the second of the three axes. -->

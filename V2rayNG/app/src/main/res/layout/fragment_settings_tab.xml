@@ -56,6 +56,41 @@
        caption about it, and it dims to ?attr/colorOnSurfaceVariant only while the popup is open.
        A navigation row's value stays muted, which is what tells the two kinds of row apart at a
        glance before either is touched.
+    7. THE GLYPHS ARE THE DESIGN'S, ROW BY ROW. §9: «Все из res/drawable, в прототипе вставлены теми
+       же pathData» — so the prototype is not decorated with stand-ins, it names a drawable in this
+       repository for every row, and each one below was matched back by comparing pathData
+       character for character rather than by eye. Fourteen rows were still carrying the glyph the
+       old preference tree gave them, which is the whole of «не все функции перенесены по внешнему
+       виду» (owner, 2026-08-05). What changed and to what:
+
+         Режим, Постоянный VPN  ic_shield_outline  -> ic_shield_filled   (the design's shield is SOLID)
+         Прокси по приложениям  ic_per_apps_24dp   -> ic_hub_local_proxy (`router`, the same glyph
+                                                                          «Локальный прокси» already had)
+         DNS, О приложении      ic_privacy_24dp,   -> ic_support_24dp    (`help`)
+                                ic_about_24dp
+         Мультиплексирование    ic_qu_switch_24dp  -> ic_lp_http         (`http`)
+         Оформление             ic_palette_24dp    -> ic_settings_24dp   (`gear`)
+         Запуск при загрузке    ic_power_settings  -> ic_lock_24dp       (`lock`)
+         Маршрутизация          ic_routing_24dp    -> ic_nav_servers     (`servers`)
+         Файлы ресурсов, Журнал ic_file_24dp,      -> ic_source_code_24dp (`code`, which Фрагментация
+                                ic_logcat_24dp                            already had — three rows,
+                                                                          one glyph, on purpose)
+         Проверить обновления   ic_check_update_24dp -> ic_refresh_24dp  (`refresh`, shared with
+                                                                          «Автообновление подписки»)
+         Перенести на телевизор ic_tv_24dp         -> ic_share_24dp      (`share`)
+
+       THE REUSE IS THE POINT, not an oversight to tidy up later: the design draws twenty-five rows
+       with thirteen glyphs, because a settings row is identified by its words and the tile is there
+       to give the eye a rhythm. A per-row bespoke icon is the taxonomy D-5 already refused for the
+       tile COLOUR, arriving through the other door.
+
+       «Настройки подписок» is the one row that moved without the design asking. It is a repository
+       row (П-05, not in §6) and it was holding ic_hub_provider, which is the `http` glyph to within
+       how its two dots are drawn — the glyph Мультиплексирование has now taken. It carries
+       ic_subscriptions_24dp instead, which is also what the row is about. The other three
+       repository-only rows keep what they had: «Число соединений Mux» ic_speed_24dp, «Принять
+       подписку» ic_tv_24dp (now the only television on the screen), «Схемы URL-адресов»
+       ic_hub_url_scheme.
 
     Ids are load-bearing: SettingsTabFragment reads and writes a persisted value behind every one of
     them, and a rename is a setting that silently stops saving. Nothing here was renamed.
@@ -137,7 +172,7 @@
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_shield_outline"
+                            app:srcCompat="@drawable/ic_shield_filled"
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
@@ -204,7 +239,7 @@
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_per_apps_24dp"
+                            app:srcCompat="@drawable/ic_hub_local_proxy"
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
@@ -409,7 +444,7 @@
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_privacy_24dp"
+                            app:srcCompat="@drawable/ic_support_24dp"
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
@@ -613,7 +648,7 @@
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_shield_outline"
+                            app:srcCompat="@drawable/ic_shield_filled"
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
@@ -707,7 +742,7 @@
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_qu_switch_24dp"
+                            app:srcCompat="@drawable/ic_lp_http"
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
@@ -938,7 +973,7 @@
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_palette_24dp"
+                            app:srcCompat="@drawable/ic_settings_24dp"
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
@@ -1072,7 +1107,7 @@
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_power_settings"
+                            app:srcCompat="@drawable/ic_lock_24dp"
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
@@ -1251,7 +1286,7 @@
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_routing_24dp"
+                            app:srcCompat="@drawable/ic_nav_servers"
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
@@ -1306,7 +1341,7 @@
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_file_24dp"
+                            app:srcCompat="@drawable/ic_source_code_24dp"
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
@@ -1361,7 +1396,7 @@
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_hub_provider"
+                            app:srcCompat="@drawable/ic_subscriptions_24dp"
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
@@ -1455,7 +1490,7 @@
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_tv_24dp"
+                            app:srcCompat="@drawable/ic_share_24dp"
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
@@ -1601,7 +1636,7 @@
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_logcat_24dp"
+                            app:srcCompat="@drawable/ic_source_code_24dp"
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
@@ -1656,7 +1691,7 @@
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_check_update_24dp"
+                            app:srcCompat="@drawable/ic_refresh_24dp"
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
@@ -1711,7 +1746,7 @@
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_about_24dp"
+                            app:srcCompat="@drawable/ic_support_24dp"
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 

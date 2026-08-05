@@ -48,6 +48,7 @@ import com.v2ray.ang.template.TemplateManager
 import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.util.FlagUtil
 import com.v2ray.ang.util.LogUtil
+import com.v2ray.ang.util.SubscriptionOrigin
 import com.v2ray.ang.util.Utils
 import com.v2ray.ang.util.animationsEnabled
 import com.v2ray.ang.util.tickHaptic
@@ -130,10 +131,11 @@ interface MainHost {
     fun showStatus(text: CharSequence)
 
     /**
-     * Recomputes the bottom bar's own gates: whether the Аккаунт item exists (signed in only) and
-     * whether the whole bar exists (hidden in the pure onboarding state — signed out AND no
-     * servers). Both read shell state only, so the bar stays the shell's alone; a tab calls this
-     * after doing something that can change either input.
+     * Recomputes the bottom bar's own gates: whether the Аккаунт item exists (signed in, OR holding
+     * a departament подписка — see `MainActivity.accountTabAvailable`) and whether the whole bar
+     * exists (hidden in the pure onboarding state — signed out AND no servers). Both read shell
+     * state only, so the bar stays the shell's alone; a tab calls this after doing something that
+     * can change either input.
      */
     fun refreshNavGates()
 
@@ -291,16 +293,10 @@ class MainActivity : HelperBaseActivity(), MainHost {
     }
 
     private val requestActivityLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        // Read and cleared FIRST, before any branch that can return: a one-shot errand must not
-        // survive into the next unrelated screen this launcher is shared with.
-        val landOnAccount = awaitingAccountSignIn && accountTabHasContent()
-        awaitingAccountSignIn = false
         if (SettingsChangeManager.consumeRecreateUi()) {
             recreate()
             return@registerForActivityResult
         }
-        // The user tapped Аккаунт, was sent to sign in, and signed in. Finish the errand.
-        if (landOnAccount) selectTabWhenIdle(R.id.nav_account)
         if (SettingsChangeManager.consumeRestartService() && mainViewModel.isRunning.value == true) {
             restartConnection()
         }
@@ -408,14 +404,14 @@ class MainActivity : HelperBaseActivity(), MainHost {
         binding.navHome.onSingleClick { selectNav(R.id.nav_home) }
         binding.navSettings.onSingleClick { selectNav(R.id.nav_settings) }
         // The Account item is a real in-place content tab (AccountFragment), selected like the
-        // others; its fragment is attached lazily the first time it is opened (see syncTabFragments).
-        // Signed out it has no content to switch to, so the tap routes to sign-in — see
-        // openAccountTab, which is the ONLY place that decision is taken.
-        binding.navAccount.onSingleClick { openAccountTab() }
-        // Аккаунт can only be ENTERED while signed in, so a restored selection of it is honoured
-        // only if that is still true — otherwise the tab would be attached (and would start
-        // loading) for a user refreshNavGates is about to move off it anyway.
-        val start = if (initialNav == R.id.nav_account && !accountTabHasContent()) {
+        // others — including while signed out, where the tab renders its own "not signed in" state
+        // and is the place a clipboard-подписка user signs in from. Its fragment is attached lazily
+        // the first time it is opened (see syncTabFragments).
+        binding.navAccount.onSingleClick { selectNav(R.id.nav_account) }
+        // Аккаунт can vanish with the подписка it came in on, so a restored selection of it is
+        // honoured only if the destination still exists — otherwise the tab would be attached (and
+        // would start loading) for a user refreshNavGates is about to move off it anyway.
+        val start = if (initialNav == R.id.nav_account && !accountTabAvailable()) {
             R.id.nav_home
         } else {
             initialNav
@@ -441,8 +437,8 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * repainted up front and the transaction attempted afterwards — and [syncTabFragments]
      * legitimately refuses to commit once `onSaveInstanceState` has run, so a tap that arrived in
      * that window moved the blue pill under one tab and left another tab's content on screen, with
-     * nothing to correct it. On Аккаунт that was terminal: the item hides itself the moment the
-     * session ends, so the app sat on a tab with no way back to it.
+     * nothing to correct it. On Аккаунт that is terminal: the item can still leave the bar (the
+     * подписка it came in on is removed), and the app would sit on a tab with no way back to it.
      *
      * A re-tap of the current tab is a no-op rather than a rebuild — there is nothing to swap, and
      * a haptic with no consequence teaches the user the bar is unreliable.
@@ -1013,7 +1009,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
         if (becomingVisible) {
             val valid = when (MainTab.fromNavId(selectedNavId)) {
                 MainTab.HOME, MainTab.SETTINGS -> true
-                MainTab.ACCOUNT -> accountTabHasContent()
+                MainTab.ACCOUNT -> accountTabAvailable()
                 null -> false
             }
             if (!valid) selectTabWhenIdle(R.id.nav_home)
@@ -1036,81 +1032,49 @@ class MainActivity : HelperBaseActivity(), MainHost {
         AccountSession.isLoggedIn()
 
     /**
-     * **The Аккаунт DESTINATION exists**, which since decision A-3 is a build-time fact and not a
-     * session one: `11-app-structure.md` 2.2 and `15-account-tab.md` A-3 — «Runtime removal of a
-     * navigation destination is a defect. A build with `BackendConfig.isConfigured() == false`
-     * removes it at start-up.»
+     * **The Аккаунт destination exists.** One gate, read by [updateAccountNav], [dropAccountTab],
+     * [setupBottomNav] and [updateBottomNavVisibility] — ONE expression, because the item hiding
+     * while the fragment stays added and collecting is D12 itself, and two copies of the condition
+     * is how that comes back.
      *
-     * This used to read `BackendConfig.isConfigured() && accountAccessAllowed()`, and that is the
-     * bar the owner photographed: two items stretched to half the width each, because signing out
-     * (or never signing in — a pasted подписка shows the bar without an account) deleted the middle
-     * destination. A navigation set that changes shape teaches one structure and then replaces it,
-     * which is exactly what 2.2 stops.
+     * It used to read `BackendConfig.isConfigured() && accountAccessAllowed()`, i.e. **signed in**,
+     * and that is the bar the owner photographed: two items stretched to half the width each. He
+     * had pasted a departament подписка from the clipboard and never signed in, so the middle
+     * destination deleted itself and took the only way to sign in with it. The owner's correction:
+     * «убрать эту плашку надо полностью и оставить вкладку аккаунт, где можно зарегистрироваться
+     * там и тд … именно для подписки с буфера обмена, тоесть там можно вход сделать».
      *
-     * Whether the tab can be *entered* is a different question and has its own gate,
-     * [accountTabHasContent] — the item stays, the content behind it is what the session decides.
+     * So a departament подписка now opens the destination on its own. What it does NOT do is grant
+     * account ACCESS — that is [accountAccessAllowed], it still means a session, and widening it
+     * would send the tab after account data with no token, collect a 401 and sign the user out of
+     * a session they never had. The tab exists; whether it renders an account or a "not signed in"
+     * state is the tab's own business.
+     *
+     * A FOREIGN pasted subscription still unlocks nothing: [SubscriptionOrigin] answers only for
+     * the owner's own links, because payment and account cannot mean anything for someone else's
+     * servers. And a build with no backend has no destination at all, which is decision A-3's one
+     * sanctioned removal — it happens at start-up, not mid-session.
      */
     private fun accountTabAvailable(): Boolean =
-        BackendConfig.isConfigured()
+        BackendConfig.isConfigured() &&
+            (accountAccessAllowed() || SubscriptionOrigin.hasDepartamentSubscription())
 
     /**
-     * **The Аккаунт tab can be SHOWN**: the destination exists and there is a session behind it.
-     *
-     * ONE expression, because [updateAccountNav], [dropAccountTab] and [openAccountTab] must not be
-     * able to disagree — the item pointing at a tab whose fragment has been taken away is D12
-     * itself, and two copies of the condition is how that comes back.
-     *
-     * Signed out there is nothing to show: `AccountFragment.loadAll()` fires five authenticated
-     * calls the moment it is created, every one of them 401s, and the tab settles on «не удалось
-     * загрузить» — an error about a failure that never happened. Until the signed-out gate of
-     * `15-account-tab.md` 9.5 (`layout_account_gate.xml`) is built, the item routes to the sign-in
-     * screen instead; see [openAccountTab].
-     */
-    private fun accountTabHasContent(): Boolean =
-        accountTabAvailable() && accountAccessAllowed()
-
-    /**
-     * Recomputes the Аккаунт item from the two gates above. Called whenever the account state
-     * changes (login/logout) and whenever the subscription / server list changes.
-     *
-     * The ITEM follows [accountTabAvailable], so on a configured build it is simply always there
-     * and this call cannot take a destination out of the bar. The FRAGMENT follows
-     * [accountTabHasContent], so signing out still empties the tab behind the item (D12) — the two
-     * are separate facts and this is the one place that reads both.
+     * Recomputes the visibility of the Аккаунт nav item from that gate. Called whenever the account
+     * state changes (login/logout) and whenever the subscription / server list changes — pasting a
+     * departament подписка is now one of the things that can bring the item in, so the existing
+     * `updateListAction` call site matters as much as the account one.
      */
     private fun updateAccountNav() {
-        binding.navAccount.isVisible = accountTabAvailable()
-        // Leaving the item in place is not enough: the tab BEHIND it has to go — see dropAccountTab.
-        if (!accountTabHasContent()) dropAccountTab()
+        val available = accountTabAvailable()
+        binding.navAccount.isVisible = available
+        // Hiding the item is not enough: the tab BEHIND it has to go too — see dropAccountTab.
+        if (!available) dropAccountTab()
     }
 
     /**
-     * What the Аккаунт item does when it is tapped.
-     *
-     * Signed in it is an ordinary tab switch. Signed out the destination still exists (A-3, see
-     * [accountTabAvailable]) but has nothing behind it yet, so the tap opens the sign-in screen —
-     * the same `LoginActivity` the account row on Главная opens from the same state
-     * (`HomeFragment.openAccount`), so the two entry points to the account agree.
-     *
-     * [awaitingAccountSignIn] is what finishes the errand: a user who asked for Аккаунт and then
-     * signed in wanted Аккаунт, not the screen they left. It is a one-shot, consumed by
-     * [requestActivityLauncher] whether the sign-in succeeded or not.
-     *
-     * This is the interim shape. When `layout_account_gate.xml` (`15-account-tab.md` 9.5) exists,
-     * the signed-out tab renders that gate in place and this branch becomes a plain [selectNav].
-     */
-    private fun openAccountTab() {
-        if (accountTabHasContent()) {
-            selectNav(R.id.nav_account)
-            return
-        }
-        if (!accountTabAvailable()) return
-        awaitingAccountSignIn = true
-        launchAuthScreen(Intent(this, LoginActivity::class.java))
-    }
-
-    /**
-     * Takes the Аккаунт tab off screen and out of the FragmentManager when the session ends (D12).
+     * Takes the Аккаунт tab off screen and out of the FragmentManager when the DESTINATION goes
+     * (D12).
      *
      * Hiding the bar item used to be the whole of it, and a hidden fragment is not a stopped one:
      * tabs are `hide`/`show`n, never replaced, so [AccountFragment] stayed added and RESUMED after
@@ -1118,6 +1082,15 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * session that no longer exists. Removing it is what makes «выйти» mean it — the next sign-in
      * gets a fresh instance from [syncTabFragments], loading from a clean state rather than from
      * the previous user's rendered screen.
+     *
+     * **Signing out no longer fires this on its own**, and that is the intended consequence of
+     * [accountTabAvailable] widening: with a departament подписка still on the device the
+     * destination survives the sign-out, so the fragment survives with it and shows its
+     * "not signed in" state. What stops the dead collectors in that case is
+     * `AccountFragment.onSessionCleared`, which cancels the poll and clears the ViewModel on the
+     * same transition — the half of D12's fix that lives in the tab. This method still runs, and
+     * still removes, when the destination itself goes: the подписка is deleted, or the build has no
+     * backend.
      *
      * Posted, not inline, for the same reason [selectTabWhenIdle] is: the account state arrives on
      * a fragment's own collector, inside the FragmentManager's dispatch, where a second commit
@@ -1135,7 +1108,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
         binding.bottomNav.post {
             if (isFinishing || isDestroyed) return@post
             // Signed back in within the frame: the tab is legitimate again, leave it alone.
-            if (accountTabHasContent()) return@post
+            if (accountTabAvailable()) return@post
             val fm = supportFragmentManager
             if (fm.isStateSaved) return@post
             // Off the tab first — removing the fragment the user is looking at would empty the

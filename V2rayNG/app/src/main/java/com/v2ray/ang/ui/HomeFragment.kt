@@ -326,6 +326,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      */
     private var sweepSpin: ObjectAnimator? = null
 
+    /** True while the arc's exit is still running, so an arriving load re-shows it. @see hideSweep */
+    private var sweepHiding = false
+
     /**
      * The status pill's current colour and the tween moving it, so a repaint that resolves to the
      * same state costs nothing and two state changes in a row do not run two animators at the
@@ -2848,15 +2851,21 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         val previous = renderedListShown
         renderedListShown = shown
         if (previous == shown) return
+        // WHERE IT IS NOW, read BEFORE the running animator is dropped. A collapse that is
+        // interrupted half way — the chevron tapped twice — is cancelled below, and a cancelled
+        // ValueAnimator still runs its end action, which is what writes `isVisible = false`. Asking
+        // afterwards would answer "hidden, height 0" about a list the user can plainly still see,
+        // and the re-open would jump to zero before travelling.
+        val from = if (list.isVisible) list.height else 0
         RunningAnimators.cancel(list)
         list.animate().cancel()
         if (previous == null || entranceHeld || list.reducedMotion()) {
             list.isVisible = shown
+            list.alpha = 1f
             setListHeight(list, if (shown) ViewGroup.LayoutParams.WRAP_CONTENT else 0)
             return
         }
 
-        val from = if (list.isVisible) list.height else 0
         if (shown) {
             list.visibility = View.VISIBLE
             setListHeight(list, from)
@@ -3091,7 +3100,12 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      */
     private fun showSweep() {
         val sweep = binding.connectSweep
-        if (!sweep.isVisible) {
+        // «Visible» is not the same as «staying»: a background load that ends and a connect that
+        // starts a beat later catch the arc mid-exit, still visible and still fading to nothing.
+        // That is a fresh appearance and takes the entrance again — without this test the arc
+        // would keep the exit's alpha and then be hidden by its own end action.
+        if (!sweep.isVisible || sweepHiding) {
+            sweepHiding = false
             sweep.isVisible = true
             playArcWindUp()
         }
@@ -3105,7 +3119,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      */
     private fun hideSweep() {
         val sweep = binding.connectSweep
-        if (!sweep.isVisible) return
+        if (!sweep.isVisible || sweepHiding) return
         sweep.animate().cancel()
         if (sweep.reducedMotion()) {
             stopSweepSpin()
@@ -3113,11 +3127,16 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             sweep.isVisible = false
             return
         }
+        sweepHiding = true
         sweep.animate().alpha(0f)
             .setDuration(durStateExit)
             .setInterpolator(easeStandard)
             .withEndAction {
-                if (!isBindingInitialized) return@withEndAction
+                // The flag is also the CANCEL guard. A ViewPropertyAnimator runs its end action on
+                // cancel as well as on completion, so an exit that [showSweep] interrupted would
+                // otherwise hide the arc it had just brought back.
+                if (!isBindingInitialized || !sweepHiding) return@withEndAction
+                sweepHiding = false
                 stopSweepSpin()
                 sweep.alpha = 1f
                 sweep.isVisible = false
