@@ -14,6 +14,7 @@ import com.v2ray.ang.databinding.ItemDeviceBinding
 import com.v2ray.ang.ui.component.curve
 import com.v2ray.ang.ui.component.durationOf
 import com.v2ray.ang.util.reducedMotion
+import java.util.Locale
 
 /**
  * Renders the devices bound to a subscription (by HWID) as rows inside one card.
@@ -35,8 +36,9 @@ class DeviceAdapter(
     private val items = mutableListOf<DeviceDto>()
 
     /**
-     * This installation's own HWID, or null while it is unknown. Null marks nothing rather than
-     * guessing: a wrong «Это устройство» would hide the only control that can free a slot.
+     * This installation's own HWID, NORMALISED, or null while it is unknown. Null marks nothing
+     * rather than guessing: a wrong «Это устройство» would hide the only control that can free a
+     * slot.
      */
     private var ownHwid: String? = null
 
@@ -55,7 +57,7 @@ class DeviceAdapter(
 
     /** Sets which HWID is this device. Rebinds so an already-drawn list picks the badge up. */
     fun setOwnHwid(hwid: String?) {
-        val next = hwid?.takeIf { it.isNotBlank() }
+        val next = normalizeHwid(hwid)
         if (next == ownHwid) return
         ownHwid = next
         notifyDataSetChanged()
@@ -101,7 +103,7 @@ class DeviceAdapter(
         // draw a line across the card's own top edge.
         b.deviceDivider.visibility = if (position == 0) View.GONE else View.VISIBLE
 
-        val isOwn = ownHwid != null && item.hwid == ownHwid
+        val isOwn = ownHwid != null && normalizeHwid(item.hwid) == ownHwid
         b.tvDeviceBadge.visibility = if (isOwn) View.VISIBLE else View.GONE
         // A releasing row keeps neither: its action is already spent, and offering «Удалить» on a
         // row that says «Отключено от подписки» invites a second request for the same slot.
@@ -173,6 +175,19 @@ class DeviceAdapter(
         const val RELEASED_ALPHA = 0.38f
     }
 }
+
+/**
+ * One comparable shape for an HWID: lowercase, no dashes, trimmed; blank becomes null.
+ *
+ * The app sends 32 lowercase hex characters, but «Это устройство» was decided by `==` against
+ * whatever the panel echoed back, and Remnawave's device list is a store of strings it did not
+ * mint — a proxy that upper-cases the value, or hands it back in the dashed UUID form the id is
+ * shaped after, made the badge miss and the row read as somebody else's device. Both sides of the
+ * comparison come through here, so the badge answers the question it is asked ("is this row this
+ * phone") rather than "did the two spellings match".
+ */
+private fun normalizeHwid(hwid: String?): String? =
+    hwid?.trim()?.replace("-", "")?.lowercase(Locale.US)?.takeIf { it.isNotBlank() }
 
 /** ISO-8601 (or date-only) -> dd.MM.yyyy. Returns "" for blank/unparseable input. */
 private fun formatIsoDate(iso: String?): String {

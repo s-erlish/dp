@@ -134,15 +134,11 @@ object AuthTokenStore {
      *
      * Read this before changing it — the app has already shipped the wrong answer here once.
      *
-     * **What it is keyed on.** [Settings.Secure.ANDROID_ID], hashed to 32 lowercase hex chars so it
-     * matches the UUID-without-dashes shape the panel expects. ANDROID_ID is stored by the OS, not
-     * by the app, so wiping app data or uninstalling does not touch it: a clean reinstall on the
-     * same phone derives the SAME HWID and the subscription keeps ONE device slot. From API 26 it
-     * is scoped per (device, user, app signing key), which is precisely the property we want — and
-     * it is also the one caveat: an app signed with a DIFFERENT key is a different app to the OS
-     * and legitimately gets a different value. A debug-signed build and a release-signed build of
-     * departament therefore report two devices on one phone. That is the OS, not this function, and
-     * it stops mattering the moment every install the user receives is signed with the release key.
+     * **What it is keyed on.** The device's own hardware description ([buildFingerprint]), hashed
+     * to 32 lowercase hex chars so it matches the UUID-without-dashes shape the panel expects.
+     * Nothing the app stores takes part, so uninstalling, wiping app data, changing the signing key
+     * and updating the app all leave it identical — see [computeDeviceId] for why ANDROID_ID is no
+     * longer the source on API 26+ and what that trade costs.
      *
      * **Why the previous "stable device id" was not.** `98f5397` kept a `Utils.getUuid()` — a fresh
      * random UUID minted on first run and persisted in this store. MMKV lives in the app's private
@@ -183,30 +179,68 @@ object AuthTokenStore {
     }
 
     /**
-     * ANDROID_ID first; a hardware-attribute digest when the OS will not answer; a random uuid only
-     * when even that fails.
+     * THE DEVICE'S OWN HARDWARE DESCRIPTION IS THE IDENTITY; ANDROID_ID is used only where the OS
+     * does not scope it to the app's signing key. A random uuid remains the last resort and is
+     * still never written down.
      *
-     * The middle tier matters more than it looks. It is not unique between two identical handsets,
-     * but it IS identical across reinstalls of the same handset — and since the panel scopes device
-     * entries to one subscription, "the same phone keeps one slot" is worth far more here than
-     * "two people with the same phone model would collide", which requires them to share an account.
-     * A random uuid has neither property.
+     * **Why ANDROID_ID stopped being the primary source, which is the regression the owner keeps
+     * hitting.** From API 26 the platform scopes ANDROID_ID to the combination of *device, user
+     * and app-signing key*, and its own documentation says the value changes "if an APK signing
+     * key changes". That is not a corner case here: every build the owner installs is a DEBUG
+     * build, and `app/build.gradle.kts` states in as many words that AGP generates the debug key
+     * "per machine and per CI run". `.github/workflows/debug.yml` caches `~/.android/debug.keystore`
+     * to pin one identity, but GitHub Actions caches are scoped per branch — a cache written on one
+     * one `claude` branch cannot be restored from the next one — so each new branch's first build is
+     * signed by a new key. A new key is a new ANDROID_ID, a new ANDROID_ID was a new HWID, and a
+     * new HWID is a new device row on the panel. That is «обновил приложение … и опять
+     * показывается как новое устройство», exactly, and no amount of persistence could have saved
+     * it: Android refuses to install a differently-signed APK over an existing one, so the update
+     * IS an uninstall, and the uninstall takes the private MMKV — and the stored id — with it.
+     *
+     * **Why the hardware digest holds.** [buildFingerprint] is seven build-time constants of the
+     * ROM. They are the same on every launch, the same after `pm uninstall`, the same after a
+     * factory reset, and — the property ANDROID_ID does not have — the same no matter which key
+     * signed the APK. Nothing the app stores participates, so there is nothing for an uninstall to
+     * delete. It changes only when the user flashes a different ROM, at which point they are a
+     * different device for our purposes anyway.
+     *
+     * **What that costs, said plainly.** The digest is not unique between two IDENTICAL handsets,
+     * so two such phones signed into ONE account share a single device slot instead of taking two.
+     * That needs two people with the same model on the same subscription; the failure it replaces
+     * needs only one person installing an update. Remnawave scopes device entries per subscription,
+     * so the collision is permissive (both phones connect, one slot spent) while the old behaviour
+     * was destructive (a 3-device plan bricked after two updates). This is the same trade this file
+     * already accepted for its fallback tier — the change is that the tier now runs first.
+     *
+     * **API 24-25 keep ANDROID_ID**, because there it is a single device-wide value shared by every
+     * app: per-unit AND independent of the signing key, i.e. strictly better than the digest. The
+     * scoping the paragraphs above describe only exists from 26.
+     *
+     * **Existing installs do not move.** [deviceId] returns a stored id before this runs, so an
+     * install that already told the panel an ANDROID_ID-derived HWID keeps telling it that one. The
+     * digest is what a FRESH install derives — including the fresh installs the owner has been
+     * making, which is where it has to be right.
      */
     private fun computeDeviceId(): Candidate {
-        val androidId = try {
-            Settings.Secure.getString(
-                AngApplication.application.contentResolver,
-                Settings.Secure.ANDROID_ID,
-            )
-        } catch (e: Throwable) {
-            LogUtil.w(AppConfig.TAG, "ANDROID_ID unavailable, falling back to build attributes")
-            null
-        }
-        if (!androidId.isNullOrBlank() && androidId != BAD_ANDROID_ID) {
-            hex(ID_SALT_ANDROID + androidId)?.let { return Candidate(it, derived = true) }
+        // API < 26: ANDROID_ID is device-wide, not per-signing-key. Best of both properties there.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            val androidId = readAndroidId()
+            if (!androidId.isNullOrBlank() && androidId != BAD_ANDROID_ID) {
+                hex(ID_SALT_ANDROID + androidId)?.let { return Candidate(it, derived = true) }
+            }
         }
         hex(ID_SALT_BUILD + buildFingerprint())?.let { return Candidate(it, derived = true) }
         return Candidate(Utils.getUuid(), derived = false)
+    }
+
+    private fun readAndroidId(): String? = try {
+        Settings.Secure.getString(
+            AngApplication.application.contentResolver,
+            Settings.Secure.ANDROID_ID,
+        )
+    } catch (e: Throwable) {
+        LogUtil.w(AppConfig.TAG, "ANDROID_ID unavailable, falling back to build attributes")
+        null
     }
 
     /**
