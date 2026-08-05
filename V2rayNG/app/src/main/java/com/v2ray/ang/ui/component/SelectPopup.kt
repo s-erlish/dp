@@ -10,10 +10,13 @@ import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.view.ViewTreeObserver
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.ImageView
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.annotation.DimenRes
 import androidx.core.view.AccessibilityDelegateCompat
+import androidx.core.view.ScrollingView
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import com.v2ray.ang.R
@@ -61,7 +64,7 @@ import com.v2ray.ang.util.reducedMotion
  * | SOLID fill one step above the card | `@drawable/bg_select_popup` |
  * | radius 16, 1dp outline, shadow 20×44 | `@drawable/bg_select_popup` + `select_popup_elevation` |
  * | the open row rises above its neighbours | [liftAnchor] |
- * | the section card must not clip it | [unclipAncestors], and the popup is hosted at the content root |
+ * | the SECTION CARD must not clip it | [unclipAncestors], and the popup is hosted at the content root |
  * | reveal is a CLIP top→bottom, never a scale | [reveal] |
  * | the row's value dims while it is open | [dimValue] |
  * | the caret turns 180° over 300ms | [turnCaret] |
@@ -75,10 +78,10 @@ import com.v2ray.ang.util.reducedMotion
  *   lives in; it only changes how much of the already-drawn surface is visible.
  * - **grabl 4, «окошко срезается снизу»** — the popup is added to the window's content root, so no
  *   card, list or scroll container is in a position to trim it. [unclipAncestors] additionally
- *   turns off `clipChildren` / `clipToPadding` all the way up, so the same component still behaves
- *   if a screen later hosts it inside the card. `clipToOutline` is deliberately left alone: it is
- *   what gives a section card its rounded corner, and switching it off would square the card off
- *   for as long as the popup was open.
+ *   turns off `clipChildren` / `clipToPadding` on the SECTION CARD (and nothing above it), so the
+ *   same component still behaves if a screen later hosts the flyout inside the card.
+ *   `clipToOutline` is deliberately left alone: it is what gives a section card its rounded corner,
+ *   and switching it off would square the card off for as long as the popup was open.
  * - **grabl 5, «сквозь окошко виден текст»** — a solid fill, plus [liftAnchor] raising the open row
  *   above its siblings. Z-order among siblings follows elevation from API 21, so no `bringToFront`
  *   is needed and nothing about the view hierarchy is reordered — which matters, because reordering
@@ -278,20 +281,38 @@ object SelectPopup {
         }
 
         /**
-         * README §11 grabl 4. `clipChildren` / `clipToPadding` off from the anchor's parent up to
-         * the content root, so nothing between the row and the window can trim the flyout.
+         * README §11 grabl 4, and ONLY what it asks for: «Карточка секции не должна обрезать
+         * содержимое». `clipChildren` / `clipToPadding` go off on the row's section card — and on
+         * nothing above it.
+         *
+         * **The walk used to run to `android.R.id.content`, and that is what drew the settings
+         * screen through the status bar.** A scroll container clips *because* it scrolls: what it
+         * has scrolled past is still laid out, one viewport-height above its top edge. Switch its
+         * clip off — and every clip between it and the window with it — and all of that is painted
+         * outside the container, over the tab host's status-bar padding and over the system bar
+         * itself. The owner saw «Постоянный VPN» sitting above the clock for exactly as long as a
+         * picker was open, and it went away when the picker closed, because that is when the clips
+         * came back. So the walk stops at the first ancestor that scrolls, and touches neither it
+         * nor the window root.
+         *
+         * Nothing is given up by stopping there. The popup is a child of `android.R.id.content`,
+         * above every card in the tree, so no card was ever in a position to trim it (grabl 4), and
+         * [liftAnchor] buys Z-order rather than pixels outside the row's own bounds (grabl 5) — the
+         * card is the only ancestor either of them can need.
          *
          * `clipToOutline` is left ALONE on purpose: it is what rounds a section card's corners, and
-         * turning it off would square the card off for as long as the popup was open. The popup
-         * does not need it — it is hosted at the content root, above every card in the tree.
+         * turning it off would square the card off for as long as the popup was open.
          */
         fun unclipAncestors() {
             var parent = anchor.parent
             while (parent is ViewGroup) {
+                // The window root already hosts the popup by coordinates; unclipping it buys
+                // nothing and is what lets everything below it spill into the system bars.
+                if (parent.id == android.R.id.content) return
+                if (parent.holdsMoreThanItShows()) return
                 clipSaved += Triple(parent, parent.clipChildren, parent.clipToPadding)
                 parent.clipChildren = false
                 parent.clipToPadding = false
-                if (parent.id == android.R.id.content) break
                 parent = parent.parent
             }
         }
@@ -476,3 +497,30 @@ object SelectPopup {
         }
     }
 }
+
+/**
+ * True for a container that is laid out bigger than it is drawn — a scroller, a list, a pager.
+ *
+ * This is the boundary [SelectPopup.Session.unclipAncestors] must not cross. Such a container is
+ * the one kind of ancestor whose clip is load-bearing rather than decorative: turning it off does
+ * not reveal a few dp of a flyout, it paints an entire screen's worth of content outside the
+ * viewport, and every ancestor clip above it is then the only thing keeping that off the system
+ * bars.
+ *
+ * Asked three ways, because no single one of them covers the field. The interface and the two
+ * framework types name the containers by what they ARE (`NestedScrollView` and `RecyclerView`
+ * answer [ScrollingView]; the settings tab's scroller sets `scrollbars="none"`, which is enough to
+ * leave `isScrollContainer` false, so the flag alone would have missed the very view this exists
+ * for). `canScroll*` asks what the container is DOING, which is what catches a pager, a WebView or
+ * anything custom. A container that can scroll neither way right now has nothing outside its
+ * viewport to spill, so answering "no" for it is correct rather than lenient.
+ */
+private fun ViewGroup.holdsMoreThanItShows(): Boolean =
+    this is ScrollingView ||
+        this is ScrollView ||
+        this is HorizontalScrollView ||
+        isScrollContainer ||
+        canScrollVertically(-1) ||
+        canScrollVertically(1) ||
+        canScrollHorizontally(-1) ||
+        canScrollHorizontally(1)
