@@ -1,5 +1,10 @@
 package com.v2ray.ang.ui
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.res.ColorStateList
@@ -78,6 +83,13 @@ class BuyTariffActivity : BaseActivity() {
     private val tariffBadges = mutableMapOf<String, TextView>()
     // Per-tariff option rows, so the selected row can be highlighted without a rebuild.
     private val optionRows = mutableMapOf<String, MutableList<Pair<PriceOptionDto, View>>>()
+
+    // The disclosure animation each price-option panel is currently running. Keyed by the view so
+    // the panel that is CLOSING and the panel that is OPENING — the two halves of one tap — can be
+    // in flight at the same time without either cancelling the other, and so a third tap cancels
+    // exactly the run it replaces. ViewPropertyAnimator could not hold this: the height is driven
+    // by a ValueAnimator, which `view.animate().cancel()` knows nothing about.
+    private val panelAnimators = mutableMapOf<View, AnimatorSet>()
 
     // Shape of the catalog currently on screen. An identical re-emission is repainted, not rebuilt.
     private var renderedSignature: String? = null
@@ -321,6 +333,11 @@ class BuyTariffActivity : BaseActivity() {
         // Build the real cards FIRST so the fade reveals a fully-rendered list, not a blank frame.
         // Rebuild once; selection is then mutated in place.
         tariffsContainer.removeAllViews()
+        // Every panel about to be discarded takes its animation with it: an AnimatorSet still
+        // writing layoutParams on a detached view is work for nothing, and the map would hold the
+        // old view tree alive until the next rebuild.
+        panelAnimators.values.forEach { it.cancel() }
+        panelAnimators.clear()
         tariffsByKey.clear()
         cardViews.clear()
         optionContainers.clear()
@@ -590,46 +607,132 @@ class BuyTariffActivity : BaseActivity() {
     }
 
     /**
-     * §7's disclosure: «раскрытие 340 мс», on `motion_expand`, which is that number.
+     * §7's disclosure, and it is SYMMETRIC — «открыт всегда один тариф» means the panel that is
+     * leaving and the panel that is arriving move together, both animated.
      *
-     * ALPHA AND VISIBILITY, not an animated height. 00-rules.md 8.7 and §11 grabl 10 both refuse
-     * animated layout properties, and the card's growth does not need one: the panel takes its full
-     * height immediately and the terms fade in over it, so the list arrives on a card that is
-     * already the right size instead of being revealed by a sliding edge. The caret turns over the
-     * same 340ms ([turnCaret]), which is what carries the sense of opening.
+     * WHAT WAS WRONG. The old version animated ALPHA only. Opening set `visibility = VISIBLE`
+     * first, so the card took its full height in the tap frame; closing faded to 0 over 340ms and
+     * only then set `GONE`, so the height it was holding vanished in one frame, 340ms after the
+     * finger left. Tapping Plus while Base was open therefore played: everything jumps DOWN
+     * (Plus opens instantly) … 340ms of nothing … everything jumps UP (Base collapses instantly).
+     * That is exactly «бейс раскрытый криво закрывается с пролагом и очень резко без анимации» —
+     * the «пролаг» is the delay, the «резко» is the un-animated collapse.
      *
-     * Reduced motion snaps to the end state, and an in-flight animation is cancelled first — two
-     * taps on two tariffs must not leave both panels half-faded.
+     * WHAT THE PROTOTYPE ACTUALLY DOES, read off its own style rather than off §7's prose:
+     *
+     *     transition: max-height 340ms cubic-bezier(.25,1,.5,1), opacity 240ms cubic-bezier(...)
+     *     transform: rotate(...); transition: transform 300ms cubic-bezier(.25,1,.5,1)
+     *
+     * i.e. the HEIGHT is what animates, over `motion_expand` 340 on ease_out_quart, with opacity
+     * on a SHORTER pass and the caret on `motion_caret` 300 (the repo had the caret on 340 too).
+     * A CSS transition runs the same in both directions, so 340 is the closing duration as well —
+     * which is what «закрытие симметрично» asks for, and what makes the two panels' heights cancel
+     * each other out mid-flight instead of taking turns.
+     *
+     * The opacity leg takes `motion_popup_fade` 180 rather than the prototype's 240: there is no
+     * 240 in motion.xml, 180 is the token that already means "the fade under a longer reveal", and
+     * both numbers land well before the height does, which is the property that matters.
+     *
+     * COST. One `AnimatorSet` per panel (never a postDelayed chain), height driven by an int
+     * animator that calls `requestLayout()` on a subtree of one card. NO hardware layer: the
+     * view's bounds change every frame, so a layer would be re-allocated and re-rastered on each
+     * one — the opposite of the saving it makes on a pure alpha animation.
+     *
+     * The natural height is measured against the width the card actually has. Before the first
+     * layout that width is 0 (the very first `applySelection` after a rebuild), and there the
+     * disclosure SNAPS — an opening animation on a card the user has not seen yet is motion with
+     * nothing to explain.
      */
     private fun reveal(panel: View, open: Boolean) {
-        panel.animate().cancel()
-        if (panel.reducedMotion()) {
-            panel.visibility = if (open) View.VISIBLE else View.GONE
-            panel.alpha = 1f
+        panelAnimators.remove(panel)?.cancel()
+
+        val alreadyThere = if (open) {
+            panel.visibility == View.VISIBLE && panel.alpha == 1f
+        } else {
+            panel.visibility != View.VISIBLE
+        }
+        if (alreadyThere) return
+
+        val target = if (open) naturalHeightOf(panel) else 0
+        if (panel.reducedMotion() || (open && target <= 0)) {
+            settlePanel(panel, open)
             return
         }
-        val duration = resources.getInteger(R.integer.motion_expand).toLong()
+
+        val wasVisible = panel.visibility == View.VISIBLE
+        val from = if (wasVisible) panel.height else 0
         val easeOut = AnimationUtils.loadInterpolator(this, R.interpolator.ease_out_quart)
-        if (open) {
-            if (panel.visibility == View.VISIBLE && panel.alpha == 1f) return
-            panel.alpha = 0f
-            panel.visibility = View.VISIBLE
-            panel.animate().alpha(1f).setDuration(duration).setInterpolator(easeOut).start()
-        } else {
-            if (panel.visibility != View.VISIBLE) return
-            panel.animate()
-                .alpha(0f)
-                .setDuration(duration)
-                .setInterpolator(easeOut)
-                .withEndAction {
-                    panel.visibility = View.GONE
-                    panel.alpha = 1f
-                }
-                .start()
+        val params = panel.layoutParams
+
+        panel.visibility = View.VISIBLE
+        params.height = from
+        panel.layoutParams = params
+        // Start states, so a run that begins mid-flight picks up where the cancelled one stopped
+        // and a run that begins from rest starts at the end the other direction settled on.
+        if (open && !wasVisible) panel.alpha = 0f
+        if (!open && panel.alpha == 0f) panel.alpha = 1f
+
+        val grow = ValueAnimator.ofInt(from, target).apply {
+            duration = resources.getInteger(R.integer.motion_expand).toLong()
+            interpolator = easeOut
+            addUpdateListener {
+                val lp = panel.layoutParams
+                lp.height = it.animatedValue as Int
+                panel.layoutParams = lp
+            }
         }
+        val fade = ObjectAnimator.ofFloat(panel, View.ALPHA, panel.alpha, if (open) 1f else 0f).apply {
+            duration = resources.getInteger(R.integer.motion_popup_fade).toLong()
+            interpolator = easeOut
+        }
+
+        val set = AnimatorSet().apply {
+            playTogether(grow, fade)
+            addListener(object : AnimatorListenerAdapter() {
+                private var cancelled = false
+
+                override fun onAnimationCancel(animation: Animator) {
+                    cancelled = true
+                }
+
+                override fun onAnimationEnd(animation: Animator) {
+                    panelAnimators.remove(panel)
+                    // A cancelled run is being replaced by the next one, which sets its own start
+                    // state — settling here would fight it.
+                    if (!cancelled) settlePanel(panel, open)
+                }
+            })
+        }
+        panelAnimators[panel] = set
+        set.start()
     }
 
-    /** The caret turns 180° over the same 340ms the terms take to appear (§7). */
+    /**
+     * The end state of a disclosure, also used when motion is off. Height goes back to
+     * WRAP_CONTENT so a later price-option rebuild re-measures instead of being pinned to the
+     * pixel count this animation happened to finish on.
+     */
+    private fun settlePanel(panel: View, open: Boolean) {
+        val lp = panel.layoutParams
+        lp.height = ViewGroup.LayoutParams.WRAP_CONTENT
+        panel.layoutParams = lp
+        panel.alpha = 1f
+        panel.visibility = if (open) View.VISIBLE else View.GONE
+    }
+
+    /** What [panel] would be tall if it were laid out now, or 0 while its width is unknown. */
+    private fun naturalHeightOf(panel: View): Int {
+        val parent = panel.parent as? ViewGroup ?: return 0
+        val available = parent.width - parent.paddingStart - parent.paddingEnd
+        if (available <= 0) return 0
+        panel.measure(
+            View.MeasureSpec.makeMeasureSpec(available, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+        )
+        return panel.measuredHeight
+    }
+
+    /** The caret turns 180° over `motion_caret` 300 — the prototype's own transform duration. */
     private fun turnCaret(caret: ImageView, open: Boolean) {
         val target = if (open) 180f else 0f
         if (caret.reducedMotion()) {
@@ -639,7 +742,7 @@ class BuyTariffActivity : BaseActivity() {
         if (caret.rotation == target) return
         caret.animate()
             .rotation(target)
-            .setDuration(resources.getInteger(R.integer.motion_expand).toLong())
+            .setDuration(resources.getInteger(R.integer.motion_caret).toLong())
             .setInterpolator(AnimationUtils.loadInterpolator(this, R.interpolator.ease_out_quart))
             .start()
     }
