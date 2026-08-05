@@ -2588,6 +2588,11 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      *
      * Nothing is GONE-and-forgotten and nothing is removed from the layout: this is one visibility
      * flag per band, resolved from the one state the screen already resolved.
+     *
+     * IT RUNS LAST, from [paintSlot], and that is load-bearing: [paintHeader] writes the account
+     * row visible on every repaint and [paintStatusLine] writes the identity line visible on every
+     * repaint, both of them correctly for the screen they are painting. This has the final word on
+     * which screen that is, exactly as `bindOnboarding` does inside the block itself.
      */
     private fun paintOnboardingShell(onboarding: Boolean) {
         val chrome = !onboarding
