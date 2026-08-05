@@ -34,7 +34,6 @@ import android.view.animation.AnimationUtils
 import android.widget.LinearLayout
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.children
 import androidx.core.view.doOnPreDraw
@@ -1618,7 +1617,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
         val onSurfaceColor = MaterialColors.getColor(meta.tvTraffic, com.google.android.material.R.attr.colorOnSurface)
         val variantColor = MaterialColors.getColor(meta.tvExpiry, com.google.android.material.R.attr.colorOnSurfaceVariant)
-        val dangerColor = ContextCompat.getColor(requireContext(), R.color.color_destructive_text)
+        val dangerColor = MaterialColors.getColor(meta.tvExpiry, R.attr.colorDestructiveText)
 
         meta.tvTraffic.text = if (sub.isUnlimited) {
             getString(R.string.home_sub_traffic_unlimited, sub.usedTraffic.toTrafficString())
@@ -1648,12 +1647,25 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
                 meta.tvExpiry.setTextColor(dangerColor)
             }
 
+            // §4: «справа остаток срока («12 дн.»)». The row used to print the absolute
+            // date, which makes the reader subtract to answer the question this line is
+            // for. Counted in calendar days by the same rule as [classifyExpiry], so the
+            // readout and the status strip never disagree about what «завтра» means; the
+            // expired case is already the branch above, so a term with hours rather than
+            // days left is still a day and floors to one instead of to «0 дн.».
             else -> {
-                meta.tvExpiry.text = getString(R.string.home_sub_expires, formatDate(sub.expire * 1000L))
+                meta.tvExpiry.text = getString(R.string.home_sub_days_left, daysUntil(sub.expire * 1000L))
                 meta.tvExpiry.setTextColor(variantColor)
             }
         }
         meta.tvExpiry.isVisible = true
+    }
+
+    /** Whole calendar days from today to [untilMs], never below 1. See [classifyExpiry]. */
+    private fun daysUntil(untilMs: Long): Int {
+        val today = LocalDate.now(ZoneId.systemDefault())
+        val until = Instant.ofEpochMilli(untilMs).atZone(ZoneId.systemDefault()).toLocalDate()
+        return ChronoUnit.DAYS.between(today, until).toInt().coerceAtLeast(1)
     }
 
     /**
@@ -2206,7 +2218,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         val tint = when (condition.severity) {
             Severity.INFO -> themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
             Severity.WARN -> themeColor(R.attr.warning)
-            Severity.ERROR -> ContextCompat.getColor(requireContext(), R.color.color_destructive_text)
+            Severity.ERROR -> themeColor(R.attr.colorDestructiveText)
         }
         strip.statusStripIcon.imageTintList = ColorStateList.valueOf(tint)
 
@@ -2445,8 +2457,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         val detail: CharSequence = identity ?: fallback
         val colour = when {
             identity != null -> accent
-            state.conn == Conn.ERROR ->
-                ContextCompat.getColor(requireContext(), R.color.color_destructive_text)
+            state.conn == Conn.ERROR -> themeColor(R.attr.colorDestructiveText)
 
             else -> onSurfaceVariant
         }
@@ -2653,7 +2664,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // The failure reason IS the caption, so it carries the failure's colour.
         block.tvGateCaption.setTextColor(
             if (gate == Gate.SYNC_FAILED) {
-                ContextCompat.getColor(requireContext(), R.color.color_destructive_text)
+                themeColor(R.attr.colorDestructiveText)
             } else {
                 themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
             }

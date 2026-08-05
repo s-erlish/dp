@@ -75,7 +75,7 @@
         <item name="fontFamily">@font/space_grotesk</item>
         <item name="android:textSize">34sp</item>
         <item name="lineHeight">40sp</item>
-        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:letterSpacing">-0.02</item>
         <item name="android:fontFeatureSettings">"tnum" on, "lnum" on</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
         <item name="android:textAllCaps">false</item>
@@ -311,17 +311,25 @@
     </style>
 
     <!--
-        RING — face: SPACE GROTESK (brand). 28sp / 700 / -0.01 / lh 32.
+        RING — face: SPACE GROTESK (brand). 28sp / 700 / -0.02 / lh 32.
         Handoff §8's «28/700 цифра кольца»: the figure inside the connect ring, and
         that alone. It is smaller than Display 34 because it lives INSIDE a 176dp
         disc with a stroke around it rather than alone on a page, and tabular figures
         matter more here than anywhere else in the product — this number changes once
         a second while the user is looking straight at it.
+
+        THE TRACKING IS -0.02, which is §5's figure for this role in as many words:
+        «Цифра 28sp/700, letter-spacing −0.02em, tnum». It read -0.01 while the
+        account wave was working and values/ still belonged to another agent, so the
+        wave set the correct number on the view instead and left the token wrong.
+        The token is the number now, and item_subscription_card.xml no longer
+        restates it — a size token that disagrees with the one screen that uses it
+        is how a second, unnamed scale starts.
     -->
     <style name="TextAppearance.App.Numeric.Ring" parent="TextAppearance.App.Numeric">
         <item name="android:textSize">28sp</item>
         <item name="lineHeight">32sp</item>
-        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:letterSpacing">-0.02</item>
     </style>
 
     <!-- ========================================================================= -->

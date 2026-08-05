@@ -148,8 +148,25 @@
     <string name="home_sub_traffic_used" translatable="false">%1$s / %2$s</string>
     <string name="home_sub_traffic_unlimited" translatable="false">%1$s / ∞</string>
     <string name="home_sub_infinity" translatable="false">∞</string>
+    <!-- No reader since the traffic readout began counting the term in days
+         (home_sub_days_left). Kept, not deleted: it is the one phrasing for an
+         absolute expiry the продукт has, and the next screen that needs one should
+         find it rather than write a second. -->
     <string name="home_sub_expires">до %1$s</string>
     <string name="home_sub_expired">истекла</string>
+    <!-- §4 puts the REMAINING TERM at the right end of the traffic readout, not an
+         absolute date: «справа остаток срока («12 дн.»)», and the prototype's own
+         demo state prints exactly «12 дн.». The wording is not invented for this
+         line — «%1$d дн.» is already the product's way of saying a term in
+         account_option_duration and buy_option_duration, so the readout, the price
+         option and the renewal row all count days the same way.
+
+         Why days and not the date the row used to print: this line is a readout that
+         sits beside «4 ГБ / 10 ГБ» and answers the same question that pair does —
+         how much is left — and a date makes the reader do the subtraction. The date
+         still exists on the Аккаунт screen («Действует до …»), where the question is
+         when the subscription ends rather than how much of it is left. -->
+    <string name="home_sub_days_left">%1$d дн.</string>
 
     <string name="home_sub_cd_expand">Показать серверы</string>
     <string name="home_sub_cd_collapse">Скрыть серверы</string>
