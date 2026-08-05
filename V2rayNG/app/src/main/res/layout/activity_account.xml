@@ -542,7 +542,7 @@
                 app:iconPadding="@dimen/space_8"
                 app:iconSize="18dp"
                 app:strokeColor="?attr/colorPrimary"
-                app:strokeWidth="1.5dp" />
+                app:strokeWidth="@dimen/stroke_frame" />
 
             <!-- «Продлить» carries the light label, not the accent one: two accent
                  labels side by side would make the pair read as one wide control. -->
@@ -561,7 +561,7 @@
                 android:textColor="?attr/colorOnSurface"
                 app:cornerRadius="@dimen/radius_button"
                 app:strokeColor="?attr/colorPrimary"
-                app:strokeWidth="1.5dp" />
+                app:strokeWidth="@dimen/stroke_frame" />
         </LinearLayout>
 
         <!-- ============ 6. Строка автопродления ============

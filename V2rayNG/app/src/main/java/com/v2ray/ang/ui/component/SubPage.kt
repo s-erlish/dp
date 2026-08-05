@@ -18,8 +18,8 @@ import com.v2ray.ang.util.animationsEnabled
  *
  * | | translation | alpha | duration | curve |
  * |---|---|---|---|---|
- * | enter | 16dp to 0 | 0 to 1 | `motion_reveal` 300 | `ease_out_quint` |
- * | exit  | 0 to 16dp | 1 to 0 | `motion_reveal_exit` 225 | `ease_standard` |
+ * | enter | 16dp to 0 | 0 to 1 | `motion_subpage_enter` 260 | `ease_out_quint` |
+ * | exit  | 0 to 16dp | 1 to 0 | `motion_subpage_exit` 195 | `ease_standard` |
  *
  * Exit is 75% of enter, which is why the two numbers differ and why neither of them is 150. Only
  * transform and alpha move; 00-rules.md 8.7 forbids animating layout properties for effect. There

@@ -384,9 +384,15 @@
                  @integer/motion_spin. What the handoff is protecting — ONE arc rather than
                  a train of segments — is what `disjoint` delivers, and the entrance out of
                  rest is ours (HomeFragment.playArcWindUp, one revolution on
-                 @integer/motion_windup). Matching 1100 to the millisecond would mean
-                 replacing the indicator with a hand-drawn arc and a rotation animator; the
-                 port report records the trade rather than making it silently.
+                 @integer/motion_windup). The final verification wave weighed the trade
+                 again and left it: the route that WOULD land 1100 exactly is the one
+                 FlowOverlay.startArc already takes on the прогрузка ring — a static arc
+                 drawable in an ImageView, turned by one infinite ObjectAnimator on
+                 ROTATION at motion_spin, linear — but here it needs a new vector cut for
+                 r=85 at a 2dp stroke, and playArcWindUp animates the same ROTATION
+                 property it would have to share. Both want a device to judge, and no APK
+                 runs in this container. Recorded as a deliberate deviation with its route
+                 named, rather than made blind on the object the user watches longest.
 
                  It is a child of the FRAME and no longer of the disc: at 170dp it is
                  20dp wider than the disc, so inside it there was nowhere for it to be.
