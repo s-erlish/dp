@@ -78,6 +78,7 @@ import com.v2ray.ang.ui.component.Haptic
 import com.v2ray.ang.ui.component.HomeHandoff
 import com.v2ray.ang.ui.component.SkeletonBinder
 import com.v2ray.ang.ui.component.onSingleClick
+import com.v2ray.ang.ui.component.pressFeedback
 import com.v2ray.ang.util.AvatarManager
 import com.v2ray.ang.util.FlagUtil
 import com.v2ray.ang.util.SubscriptionOrigin
@@ -1084,6 +1085,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // The restored «Привязать Telegram» banner: the banner itself is the action, the ✕ is the
         // dismissal, and the dismissal is written to MMKV so the offer is made once.
         binding.ctaLinkTelegram.onSingleClick { openTelegramLink() }
+        // The ✕ is a TextView, so its press comes from here and not from a stateListAnimator:
+        // pressFeedback is the same @anim/press_icon plus the hardware layer that keeps a glyph
+        // from twitching as the 12% rebound lands (README §11 грабля 1).
+        binding.btnCtaDismiss.pressFeedback(R.anim.press_icon)
         binding.btnCtaDismiss.onSingleClick {
             MmkvManager.encodeSettings(AppConfig.PREF_LINK_TG_CTA_DISMISSED, true)
             binding.ctaLinkTelegram.isVisible = false
@@ -1147,7 +1152,15 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             setHasFixedSize(false)
             layoutManager = LinearLayoutManager(requireContext())
             isNestedScrollingEnabled = false
-            this@HomeFragment.addCustomDividerToRecyclerView(this, R.drawable.custom_divider)
+            // NO ItemDecoration. The list used to carry @drawable/custom_divider — a 1dp line
+            // inset 44dp, drawn between every pair of rows — and the redesign's separator is
+            // already on the row itself: @drawable/bg_server_row paints it as an inner top
+            // shadow on `state_activated`, which MainRecyclerAdapter sets everywhere except the
+            // first row and the selected one (§4: «У первой строки и у выбранной разделителя
+            // нет»). Both together drew two hairlines in the same 2dp gap and put one straight
+            // through the bottom of the selected row's accent frame, which is the exact failure
+            // §11 grabl 3 describes and the reason the separator moved into the background in
+            // the first place.
             adapter = listAdapter
         }
         refreshServerList(-1)

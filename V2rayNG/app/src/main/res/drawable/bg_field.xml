@@ -16,6 +16,6 @@
     <solid android:color="?attr/colorSurfaceContainerHighest" />
     <stroke
         android:width="@dimen/stroke_control"
-        android:color="@color/md_theme_outlineControl" />
+        android:color="?attr/colorOutlineControl" />
     <corners android:radius="@dimen/radius_control" />
 </shape>

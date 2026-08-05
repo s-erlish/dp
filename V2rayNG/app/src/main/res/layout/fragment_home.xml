@@ -148,11 +148,16 @@
             android:paddingStart="@dimen/screen_gutter"
             android:paddingEnd="@dimen/space_4">
 
+            <!-- No background at all, and @anim/press_icon for the response. The
+                 borderless ripple that used to be here has been transparent product-wide
+                 since colorControlHighlight was cleared (themes.xml), so «+» answered a
+                 tap with nothing whatever — and §1 puts an icon on the 0.88 rung. -->
             <ImageView
                 android:id="@+id/btn_home_add"
                 android:layout_width="@dimen/view_height_dp48"
                 android:layout_height="@dimen/view_height_dp48"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                android:background="@null"
+                android:stateListAnimator="@anim/press_icon"
                 android:clickable="true"
                 android:contentDescription="@string/home_add_subscription"
                 android:focusable="true"
@@ -214,11 +219,15 @@
                 android:text="@string/auth_link_telegram_cta"
                 android:textAppearance="@style/TextAppearance.App.Subtitle" />
 
+            <!-- Same as «+» above: the ripple named here draws nothing. The scale comes
+                 from Kotlin (HomeFragment.wireLinkCta) rather than from a
+                 stateListAnimator, because this one is TEXT and needs the hardware layer
+                 pressFeedback adds — грабля №1, a glyph that twitches on the rebound. -->
             <TextView
                 android:id="@+id/btn_cta_dismiss"
                 android:layout_width="@dimen/view_height_dp48"
                 android:layout_height="@dimen/view_height_dp48"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                android:background="@null"
                 android:clickable="true"
                 android:contentDescription="@string/auth_link_telegram_cta_dismiss"
                 android:focusable="true"

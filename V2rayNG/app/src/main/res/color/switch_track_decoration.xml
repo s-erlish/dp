@@ -9,7 +9,7 @@
     <item android:color="@android:color/transparent" android:state_checked="true" />
     <item
         android:alpha="0.38"
-        android:color="@color/md_theme_outlineControl"
+        android:color="?attr/colorOutlineControl"
         android:state_enabled="false" />
-    <item android:color="@color/md_theme_outlineControl" />
+    <item android:color="?attr/colorOutlineControl" />
 </selector>
