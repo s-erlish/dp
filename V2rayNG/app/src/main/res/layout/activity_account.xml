@@ -769,10 +769,14 @@
                         app:tint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- FULL BLEED, no 68dp inset. The prototype draws the rule between two
+                     rows as the lower row's own 1px `border-top` in the line colour, i.e.
+                     edge to edge inside the card, and the Настройки tab already ports it
+                     that way — this card was the one place in the product still following
+                     the Material list convention instead of the design. -->
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="@dimen/stroke_hairline"
-                    android:layout_marginStart="@dimen/divider_inset_start"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Устройства -->
@@ -842,7 +846,6 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="@dimen/stroke_hairline"
-                    android:layout_marginStart="@dimen/divider_inset_start"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- История платежей -->
