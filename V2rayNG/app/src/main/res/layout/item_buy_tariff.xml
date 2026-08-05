@@ -112,7 +112,7 @@
                         android:paddingBottom="@dimen/space_2"
                         android:text="@string/buy_current"
                         android:textAppearance="@style/TextAppearance.App.Chip"
-                        android:textColor="?attr/colorPrimary"
+                        android:textColor="?attr/colorOnPrimaryContainer"
                         android:visibility="gone"
                         tools:visibility="visible" />
                 </LinearLayout>
