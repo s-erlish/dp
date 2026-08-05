@@ -68,18 +68,19 @@
   the mono overlay's neutral variant reaches it through
   `MainActivity.applyThemeDecorations`. Do not reintroduce an opaque fill here.
 
-  ZERO RAW VALUES. No dp, no sp, no hex, no fontFamily, no textSize anywhere in
-  this file - every number is a token and every text element carries only a
-  textAppearance.
+  ZERO RAW VALUES, AND NO EXCEPTIONS LEFT. No dp, no sp, no hex, no fontFamily, no
+  textSize anywhere in this file - every number is a token and every text element
+  carries only a textAppearance.
 
-  FOUR EXCEPTIONS, ALL OF THEM THE CONNECT OBJECT, ALL OF THEM PENDING A TOKEN.
-  The 2026-08 handoff §4 re-measures the object: 214dp overall, 150dp disc, the
-  active ring at inset 22 (so the sweep travels a 170dp circle) and a 68dp shield.
-  `@dimen/connect_disc` still reads 176 and `@dimen/shield_glyph` 80, and
-  `res/values/` belongs to the foundation wave, so these four numbers are written
-  out here with this note rather than silently forked into a second set of names.
-  The port report carries the request: connect_object 214, connect_disc 176 -> 150,
-  connect_sweep 170, shield_glyph 80 -> 68. Four edits in this file when they land.
+  The connect object was the last holdout: the 2026-08 handoff §4 re-measured it at
+  214dp overall, 150dp disc, the active ring at inset 22 (so the sweep travels a
+  170dp circle) and a 68dp shield, while `res/values/` still belonged to the
+  foundation wave and `@dimen/connect_disc` still read 176. The four numbers were
+  written out here under a note asking for tokens rather than silently forked into
+  a second set of names. The foundation wave is over and they landed:
+  @dimen/connect_object, @dimen/connect_sweep, @dimen/connect_disc and
+  @dimen/shield_glyph now carry them, and dimens.xml holds the note about why the
+  four move together.
 
   clipChildren / clipToPadding are false the whole way down because the confirm
   ring scales past its own frame.
@@ -300,8 +301,8 @@
         -->
         <FrameLayout
             android:id="@+id/connect_frame"
-            android:layout_width="214dp"
-            android:layout_height="214dp"
+            android:layout_width="@dimen/connect_object"
+            android:layout_height="@dimen/connect_object"
             android:layout_gravity="center_horizontal"
             android:clickable="true"
             android:clipChildren="false"
@@ -344,8 +345,9 @@
                  whole remaining viewport and dragged the frame — and its two background
                  ovals — out with it, in both axes. That is what the owner saw as «two
                  gigantic flattened ovals» and as a first-run screen whose buttons had been
-                 pushed off the bottom. connect_sweep and connect_disc below are sized in
-                 dp for that reason and must stay that way. -->
+                 pushed off the bottom. The sweep and the disc below are sized by
+                 @dimen/connect_sweep and @dimen/connect_disc for that reason — an absolute
+                 length, never match_parent — and must stay that way. -->
 
             <!-- THE NEGOTIATING SWEEP, AND IT RIDES THE ACTIVE RING (§4, code_reference
                  «Кнопка подключения»: `circle r=85 stroke-width=2` in a 214 box, i.e. the
@@ -378,7 +380,7 @@
                 app:hideAnimationBehavior="inward"
                 app:indeterminateAnimationType="disjoint"
                 app:indicatorColor="?attr/colorAccentFigure"
-                app:indicatorSize="170dp"
+                app:indicatorSize="@dimen/connect_sweep"
                 app:showAnimationBehavior="inward"
                 app:trackColor="@android:color/transparent"
                 app:trackCornerRadius="@dimen/stroke_emphasis"
@@ -386,8 +388,8 @@
 
             <FrameLayout
                 android:id="@+id/connect_disc"
-                android:layout_width="150dp"
-                android:layout_height="150dp"
+                android:layout_width="@dimen/connect_disc"
+                android:layout_height="@dimen/connect_disc"
                 android:layout_gravity="center"
                 android:clipChildren="false"
                 android:duplicateParentState="true"
@@ -447,8 +449,8 @@
                      through the disc. -->
                 <ImageView
                     android:id="@+id/shield_outline"
-                    android:layout_width="68dp"
-                    android:layout_height="68dp"
+                    android:layout_width="@dimen/shield_glyph"
+                    android:layout_height="@dimen/shield_glyph"
                     android:layout_gravity="center"
                     android:duplicateParentState="true"
                     android:importantForAccessibility="no"
@@ -458,8 +460,8 @@
 
                 <ImageView
                     android:id="@+id/shield_filled"
-                    android:layout_width="68dp"
-                    android:layout_height="68dp"
+                    android:layout_width="@dimen/shield_glyph"
+                    android:layout_height="@dimen/shield_glyph"
                     android:layout_gravity="center"
                     android:alpha="0"
                     android:duplicateParentState="true"

@@ -37,10 +37,12 @@
   Focus (R7) keeps its 2dp accent ring — it is not press feedback, it is the only thing
   that makes this list reachable by D-pad, keyboard and switch access.
 
-  1.5dp IS WRITTEN OUT because the stroke scale has no rung for it: @dimen/stroke_hairline
-  and stroke_control are 1, stroke_focus and stroke_emphasis 2, stroke_ring 3. §2/§4 use
-  1.5 for a frame (this row, the outlined pill, the connect rings) and it wants a token of
-  its own — see the port report's token requests.
+  THE FRAME IS @dimen/stroke_frame, and it used to be six copies of `1.5dp` written out
+  here because the stroke scale had no rung for it: stroke_hairline and stroke_control are
+  1, stroke_focus and stroke_emphasis 2, stroke_ring 3. §2/§4 draw every FRAME at 1.5 —
+  this row, the start screen's outlined pills, the connect object's two outer rings — so
+  the rung was added rather than the number repeated a fourth time. All six states below
+  read it, which is what keeps the geometry identical across them.
 -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android"
     android:enterFadeDuration="@integer/motion_press_in"
@@ -65,7 +67,7 @@
             <solid android:color="?attr/colorPressBg" />
             <corners android:radius="@dimen/radius_card" />
             <stroke
-                android:width="1.5dp"
+                android:width="@dimen/stroke_frame"
                 android:color="?attr/colorPrimary" />
         </shape>
     </item>
@@ -76,7 +78,7 @@
             <solid android:color="@color/accent_fill_12" />
             <corners android:radius="@dimen/radius_card" />
             <stroke
-                android:width="1.5dp"
+                android:width="@dimen/stroke_frame"
                 android:color="?attr/colorPrimary" />
         </shape>
     </item>
@@ -91,7 +93,7 @@
                     <solid android:color="?attr/colorPressBg" />
                     <corners android:radius="@dimen/radius_card" />
                     <stroke
-                        android:width="1.5dp"
+                        android:width="@dimen/stroke_frame"
                         android:color="@android:color/transparent" />
                 </shape>
             </item>
@@ -118,7 +120,7 @@
             <solid android:color="?attr/colorPressBg" />
             <corners android:radius="@dimen/radius_card" />
             <stroke
-                android:width="1.5dp"
+                android:width="@dimen/stroke_frame"
                 android:color="@android:color/transparent" />
         </shape>
     </item>
@@ -131,7 +133,7 @@
                     <solid android:color="@android:color/transparent" />
                     <corners android:radius="@dimen/radius_card" />
                     <stroke
-                        android:width="1.5dp"
+                        android:width="@dimen/stroke_frame"
                         android:color="@android:color/transparent" />
                 </shape>
             </item>
@@ -158,7 +160,7 @@
             <solid android:color="@android:color/transparent" />
             <corners android:radius="@dimen/radius_card" />
             <stroke
-                android:width="1.5dp"
+                android:width="@dimen/stroke_frame"
                 android:color="@android:color/transparent" />
         </shape>
     </item>

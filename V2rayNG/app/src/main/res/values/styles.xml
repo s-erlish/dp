@@ -1434,7 +1434,8 @@
     <!-- ========================================================================= -->
 
     <!--
-        Determinate bar: 6 tall, round ends, SOLID accent fill — no gradient, because
+        Determinate bar: @dimen/meter_height tall (§4: 3), round ends, SOLID accent fill
+        — no gradient, because
         a gradient encodes nothing a solid fill of the same width does not. The label
         sits BESIDE the bar, never on top of it: the shipped 11sp label over a moving
         fill measures 2.9:1. At >=100% the fill turns colorError and the label says

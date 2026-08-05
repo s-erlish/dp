@@ -4,10 +4,10 @@
   (00-rules.md 3.1/3.2/3.3, 10-design-system.md 1.3/2.5/2.6/2.7/2.8).
 
   The closed number set: space 0/4/8/12/16/24/32/40/48/56/64, radius
-  12/16/20/24/100, stroke 1/2/3, component sizes from the measured list in
+  12/16/20/24/100, stroke 1/1.5/2/3, component sizes from the measured list in
   10-design-system.md 1.3. Anything not declared here is a defect; anything
   declared here is not "off-scale" even when its number is odd for a gap
-  (00-rules.md 1.4.5 names meter_height 6, btn_min_width 96 and radius_button 16
+  (00-rules.md 1.4.5 names meter_height, btn_min_width 96 and radius_button
   explicitly as legal sizes rather than off-scale spacing).
 
   ADDITIVE: the upstream padding_spacing_*/view_height_* block below is retired
@@ -152,6 +152,24 @@
          colorOutlineControl. This IS a control boundary, so 1.4.11 applies and
          the colour clears 3:1 (3.43:1 dark, 3.45:1 light). -->
     <dimen name="stroke_control">1dp</dimen>
+    <!--
+      THE FRAME WEIGHT. The handoff draws one line at 1.5 and it is always the
+      same kind of line: a frame around an object rather than a divider between
+      two — the server row's box (§4/§11 grabl 2, present in all seven states so
+      selecting a row cannot resize it), the outlined pills of the start screen
+      (§2.5/§2.6) and the connect object's two outer rings (§4).
+
+      It is the one rung the scale was missing, so each of those places minted
+      the number itself: `bg_server_row.xml` wrote `1.5dp` out six times,
+      `HomeFragment.ringStroke()` multiplied it by the display density in Kotlin,
+      and `ob_stroke` declared it a third time for the start screen. One name now,
+      and `ob_stroke` is an alias of it rather than a second number.
+
+      Like stroke_control this IS a control boundary where it carries colour, so
+      1.4.11 applies and the colours it is drawn in (colorPrimary, colorOutline)
+      clear 3:1 in every theme.
+    -->
+    <dimen name="stroke_frame">1.5dp</dimen>
     <!-- The focus ring (R7). Drawn on every focusable control. -->
     <dimen name="stroke_focus">2dp</dimen>
     <!-- Selected indicator; connect ring when connected. -->
@@ -223,14 +241,31 @@
     <dimen name="toolbar_height">56dp</dimen>
     <dimen name="nav_bar_height">64dp</dimen>
     <dimen name="empty_icon">64dp</dimen>
-    <dimen name="shield_glyph">80dp</dimen>
+    <!--
+      THE CONNECT OBJECT, re-measured by the 2026-08 handoff §4 and now stated
+      here instead of in fragment_home.xml, which carried the four numbers as raw
+      dp with a note asking for exactly this.
+
+      They are ONE geometry and have to move together: the frame is the touch
+      target, the active ring rides at inset 22 (214 - 2x22 = 170, which is the
+      sweep's indicatorSize), and the disc sits 10dp inboard of that ring. Change
+      one without the others and the arc either laps the disc or is swallowed by
+      it — see the notes in fragment_home.xml and HomeFragment.buildConnectObject.
+    -->
+    <dimen name="connect_object">214dp</dimen>
+    <dimen name="connect_sweep">170dp</dimen>
+    <dimen name="connect_disc">150dp</dimen>
+    <!-- The shield inside the disc. §4: 68, down from the 80 the pre-handoff
+         object carried at 176-in-224. -->
+    <dimen name="shield_glyph">68dp</dimen>
     <!-- Account hero: subscription carousel card. -->
     <dimen name="sub_card_height">152dp</dimen>
-    <dimen name="connect_disc">176dp</dimen>
-    <!-- Determinate progress / traffic meter bar. Uses radius_pill, which clamps
+    <!-- Determinate progress / traffic meter bar. §4 «под ними полоса 3dp»: at 6
+         the bar read as a container with something in it, at 3 it reads as the
+         fraction itself, which is all it carries. Uses radius_pill, which clamps
          to half its own height and gives true round ends without a bespoke
-         token. 00-rules.md 1.4.5 names 6 as a legal size. -->
-    <dimen name="meter_height">6dp</dimen>
+         token. 00-rules.md 1.4.5 names it a legal size, not off-scale spacing. -->
+    <dimen name="meter_height">3dp</dimen>
     <!-- Carousel page dots. -->
     <dimen name="dot_size">6dp</dimen>
     <dimen name="dot_size_active">8dp</dimen>

@@ -822,15 +822,19 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
-     * The two outer rings' weight: 1.5dp (handoff §4).
+     * The two outer rings' weight: @dimen/stroke_frame, 1.5dp (handoff §4).
      *
-     * The stroke scale has no rung for it — stroke_hairline and stroke_control are 1,
-     * stroke_focus and stroke_emphasis 2, stroke_ring 3 — so it is computed from the display
-     * density here and requested as a token in the port report. `1` is the floor: at ldpi a
-     * rounded 1.5dp would come out 1px anyway, and a 0px stroke is an invisible ring.
+     * It used to be `density * 1.5f` computed here, because the stroke scale had no rung for it —
+     * stroke_hairline and stroke_control are 1, stroke_focus and stroke_emphasis 2, stroke_ring 3 —
+     * and the same number was written out a second time in `bg_server_row.xml`. §4 gives the row's
+     * frame and these rings ONE weight, so they now read one token and cannot drift apart.
+     *
+     * `1` is still the floor: `getDimensionPixelSize` rounds, and at ldpi a rounded 1.5dp comes out
+     * 1px anyway — but a 0px stroke is an invisible ring, so the floor states it rather than
+     * trusting the rounding.
      */
     private fun ringStroke(): Int =
-        (resources.displayMetrics.density * 1.5f).roundToInt().coerceAtLeast(1)
+        resources.getDimensionPixelSize(R.dimen.stroke_frame).coerceAtLeast(1)
 
     /** dp -> px, for the two ring insets §4 states in dp and no token names. */
     private fun dp(value: Int): Int = (resources.displayMetrics.density * value).roundToInt()

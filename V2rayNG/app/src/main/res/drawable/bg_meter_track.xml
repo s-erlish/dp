@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Traffic / determinate meter track: meter_height 6, radius_pill. Pill is legal here
+  Traffic / determinate meter track: meter_height, radius_pill. Pill is legal here
   under R1's carve-out — a meter is intrinsically a track, not a wide capsule with a
-  label in it — and 100dp clamps to half the 6dp height, giving true round ends
-  without a bespoke 3dp token.
+  label in it — and 100dp clamps to half the bar's own height, giving true round ends
+  at whatever @dimen/meter_height reads (§4: 3) without a bespoke radius token.
 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
