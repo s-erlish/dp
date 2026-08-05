@@ -72,12 +72,20 @@
 
             <!-- §5: «Цифра 28sp/700, letter-spacing −0.02em, моноширинная (tnum)» —
                  TextAppearance.App.Numeric.Ring is that token (§8 «28/700 цифра
-                 кольца»), tabular figures included. -->
+                 кольца»), tabular figures included.
+
+                 THE TRACKING IS RESTATED HERE because the token carries −0.01 and §5
+                 and the prototype both write −0.02 on this one figure (the tariff name
+                 below is the −0.01 one). Correcting the style itself belongs to whoever
+                 owns values/styles.xml; overriding the single view that reads it is the
+                 change this screen is allowed to make, and it lands the design's number
+                 without touching a shared file mid-flight. -->
             <TextView
                 android:id="@+id/tv_ring_value"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:gravity="center"
+                android:letterSpacing="-0.02"
                 android:maxLines="1"
                 android:textAppearance="@style/TextAppearance.App.Numeric.Ring"
                 tools:text="2,0 ТБ" />

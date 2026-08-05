@@ -46,6 +46,8 @@ import com.v2ray.ang.databinding.DialogTopUpBinding
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
+import com.v2ray.ang.ui.component.Haptic
+import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.ui.component.pressFeedback
 import com.v2ray.ang.util.AvatarManager
 import com.v2ray.ang.util.reducedMotion
@@ -212,29 +214,39 @@ class AccountFragment : Fragment() {
         }
     }
 
+    /**
+     * EVERY TAP ON THIS TAB GOES THROUGH [onSingleClick] (П-31, R9). Not one of them was guarded
+     * before, and this is the screen where an ungated double tap costs the most: two of these open
+     * a checkout, one opens a top-up dialog twice over itself, and one signs the user out. The
+     * guard is 500ms per view and it is the ONLY sanctioned way to attach a listener under `ui`.
+     *
+     * The haptic set is closed by 00-rules.md 8.10 and this tab uses exactly two of it: PRESS on
+     * the switch flip and on the sign-out, which are the two taps that change something; nothing
+     * else here vibrates, navigation included.
+     */
     private fun wireActions() {
-        binding.btnTopUp.setOnClickListener { showTopUpDialog() }
+        binding.btnTopUp.onSingleClick { showTopUpDialog() }
         // The balance chip is the same action as «Пополнить»: a figure sitting next to a «+» has
         // promised the tap, and refusing it there would make the glyph decoration.
-        binding.rowBalance.setOnClickListener { showTopUpDialog() }
+        binding.rowBalance.onSingleClick { showTopUpDialog() }
         // «Продлить» goes where buying goes — the tariff screen owns duration, extra devices and
         // the payment method, so the tab hands off rather than growing a second checkout.
-        binding.btnSubRenew.setOnClickListener { openSubScreen(BuyTariffActivity::class.java) }
+        binding.btnSubRenew.onSingleClick { openSubScreen(BuyTariffActivity::class.java) }
         // §5: «нажимается вся строка», not the switch. The switch is not clickable and not
         // focusable in the layout, so this is the ONE hit target the row has.
-        binding.rowSubAutorenew.setOnClickListener { toggleAutoRenew() }
+        binding.rowSubAutorenew.onSingleClick(Haptic.TICK) { toggleAutoRenew() }
         // The whole referral row copies the code (the trailing glyph is decorative).
-        binding.rowReferral.setOnClickListener { copyReferralCode() }
-        binding.avatarContainer.setOnClickListener { showAvatarOptions() }
-        binding.imgAvatarEdit.setOnClickListener { showAvatarOptions() }
-        binding.rowDevices.setOnClickListener { openSubScreen(DeviceManagementActivity::class.java) }
-        binding.rowBuy.setOnClickListener { openSubScreen(BuyTariffActivity::class.java) }
-        binding.rowHistory.setOnClickListener { openSubScreen(PaymentHistoryActivity::class.java) }
-        binding.rowLogout.setOnClickListener { confirmSignOut() }
+        binding.rowReferral.onSingleClick { copyReferralCode() }
+        binding.avatarContainer.onSingleClick { showAvatarOptions() }
+        binding.imgAvatarEdit.onSingleClick { showAvatarOptions() }
+        binding.rowDevices.onSingleClick { openSubScreen(DeviceManagementActivity::class.java) }
+        binding.rowBuy.onSingleClick { openSubScreen(BuyTariffActivity::class.java) }
+        binding.rowHistory.onSingleClick { openSubScreen(PaymentHistoryActivity::class.java) }
+        binding.rowLogout.onSingleClick(Haptic.PRESS) { confirmSignOut() }
         // Empty-state CTA: same destination as the buy row.
-        binding.btnBuyFirst.setOnClickListener { openSubScreen(BuyTariffActivity::class.java) }
+        binding.btnBuyFirst.onSingleClick { openSubScreen(BuyTariffActivity::class.java) }
         // Cold-load error: re-run the initial load (and re-show the skeleton while it retries).
-        binding.btnRetryLoad.setOnClickListener {
+        binding.btnRetryLoad.onSingleClick {
             pendingFirstLoad = true
             viewModel.clearError()
             renderHeroState()
