@@ -102,6 +102,13 @@
                     android:background="@drawable/bg_avatar_circle"
                     android:backgroundTint="?attr/colorSurfaceContainerHighest" />
 
+                <!-- 14sp/700, which is what the prototype sets on the monogram
+                     (`font: 700 14px "Space Grotesk"`). TextAppearance.App.Chip brings the
+                     brand face and the neutral colour; its own 11sp/500 is the CHIP's size
+                     and reads a full step small inside a 32dp disc, so the two properties
+                     the design states are set here. textStyle=bold and not a textFontWeight:
+                     @font/space_grotesk carries a 700 entry and bold matches it from API 21,
+                     while android:textFontWeight would only take from 28. -->
                 <TextView
                     android:id="@+id/tv_avatar_initial"
                     android:layout_width="match_parent"
@@ -110,6 +117,8 @@
                     android:text="?"
                     android:textAppearance="@style/TextAppearance.App.Chip"
                     android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
                     tools:ignore="HardcodedText" />
 
                 <ImageView
@@ -216,19 +225,19 @@
              signed-out states beside it. Only the carousel is §5; the rest are states the
              tab already had (П-30) and they keep the ring's slot so nothing reflows.
 
-             THE RING'S FOOTPRINT IS A CONSTANT AND THE SLOT STATES IT (minHeight 172dp).
-             The owner watched the tab open with no ring, then a ring, then a shudder, then
-             the real one — three states where there is one object. Two things caused it and
+             THE RING'S FOOTPRINT IS A CONSTANT. The owner watched the tab open with no
+             ring, then a ring, then a shudder, then the real one — three states where there is one object. Two things caused it and
              both are gone: the skeleton was 228dp tall (a disc plus two text bars) against
              the carousel's 172, so the hand-off moved everything under it by 56dp; and the
              skeleton's alpha was pulsed 0.45↔1.0 forever, which IS the shudder. What is
              left is the ring's own empty track, at the ring's own size, held still — so the
-             hand-off changes the FILL and nothing else. -->
+             hand-off changes the FILL and nothing else. Both children measure exactly 172dp,
+             so the slot cannot resize between them; no minHeight is needed to hold it, and
+             adding one would only pad the three CARD states out to a height they do not have. -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_20"
-            android:minHeight="172dp">
+            android:layout_marginTop="@dimen/space_20">
 
             <!-- (a) Loading: the ring with nothing in it. Same 172dp, same 6dp wall, same
                      centre as the real one — @drawable/bg_acc_skeleton_ring draws exactly

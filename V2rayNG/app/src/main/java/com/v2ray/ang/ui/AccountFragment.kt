@@ -234,6 +234,11 @@ class AccountFragment : Fragment() {
         binding.rowLogout.onSingleClick(Haptic.PRESS) { confirmSignOut() }
         // Empty-state CTA: same destination as the buy row.
         binding.btnBuyFirst.onSingleClick { openSubScreen(BuyTariffActivity::class.java) }
+        // Signed-out hero. Telegram first, exactly as on the start screen — the same two doors in
+        // the same order, so someone who has seen one recognises the other. MODE_SITE's form is
+        // where registration lives («Создать аккаунт»), which is why there is no third button.
+        binding.btnSignedOutTelegram.onSingleClick { openLogin(LoginActivity.MODE_TELEGRAM) }
+        binding.btnSignedOutSite.onSingleClick { openLogin(LoginActivity.MODE_SITE) }
         // Cold-load error: re-run the initial load (and re-show the skeleton while it retries).
         binding.btnRetryLoad.onSingleClick {
             pendingFirstLoad = true
@@ -258,6 +263,14 @@ class AccountFragment : Fragment() {
 
     private fun openSubScreen(target: Class<*>) {
         startActivity(Intent(requireContext(), target))
+    }
+
+    /** Opens [LoginActivity] straight on the door the tapped button names. */
+    private fun openLogin(mode: String) {
+        startActivity(
+            Intent(requireContext(), LoginActivity::class.java)
+                .putExtra(LoginActivity.EXTRA_MODE, mode)
+        )
     }
 
     /**
@@ -367,7 +380,12 @@ class AccountFragment : Fragment() {
         renderedLoggedIn = loggedIn
         if (previous == null || previous == loggedIn) return
         if (loggedIn) {
-            if (!needsColdLoad) return
+            // EVERY signed-out → signed-in transition cold-loads, and `needsColdLoad` no longer
+            // gates it. That flag was set only by [onSessionCleared], so it described "the session
+            // dropped and came back" — and the tab is now openable while signed OUT, where the
+            // first sign-in is the transition that has never had a load behind it. The initial
+            // replay is still skipped by `previous == null`, so this cannot double up with
+            // [onViewCreated]'s load.
             needsColdLoad = false
             pendingFirstLoad = true
             renderHeroState()
@@ -1008,21 +1026,35 @@ class AccountFragment : Fragment() {
 
     // region actions
 
+    /**
+     * The ONE top-up dialog, opened from both of its entry points: the «Пополнить» button under
+     * the ring and the balance chip in the profile row. Both call this — there is no second copy,
+     * so a change to the field or the confirm lands on both by construction.
+     *
+     * THE BUTTONS ARE IN THE VIEW, not in the AlertDialog's button bar. The bar draws Material's
+     * own text buttons, which is the one place in this flow that would still look like a system
+     * dialog after «Оплатить» and «Пополнить» were brought onto the account's contour pill. Doing
+     * it here also means the amount can be VALIDATED WITHOUT CLOSING: a bad figure now says so and
+     * leaves the dialog open with the number still in it, where the old positive button dismissed
+     * first and complained afterwards, so the user had to type it all again.
+     */
     private fun showTopUpDialog() {
         val dialogBinding = DialogTopUpBinding.inflate(layoutInflater)
-        MaterialAlertDialogBuilder(requireContext())
+        val dialog = MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.account_top_up_title)
             .setView(dialogBinding.root)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                val amount = dialogBinding.etTopUp.text?.toString()?.trim()?.toDoubleOrNull()
-                if (amount != null && amount > 0.0) {
-                    showPaymentMethodSheet(amount)
-                } else {
-                    toastError(R.string.account_top_up_invalid)
-                }
+            .create()
+        dialogBinding.btnTopUpCancel.onSingleClick { dialog.dismiss() }
+        dialogBinding.btnTopUpConfirm.onSingleClick {
+            val amount = dialogBinding.etTopUp.text?.toString()?.trim()?.toDoubleOrNull()
+            if (amount != null && amount > 0.0) {
+                dialog.dismiss()
+                showPaymentMethodSheet(amount)
+            } else {
+                toastError(R.string.account_top_up_invalid)
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        }
+        dialog.show()
     }
 
     /**
