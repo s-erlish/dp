@@ -20,7 +20,7 @@
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_activated="true">
         <shape android:shape="rectangle">
-            <solid android:color="@color/accent_fill_12" />
+            <solid android:color="?attr/colorAccentFill" />
             <stroke
                 android:width="@dimen/stroke_hairline"
                 android:color="?attr/colorPrimary" />

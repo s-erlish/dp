@@ -555,7 +555,7 @@ class GateView @JvmOverloads constructor(
         telegramOpened = false
         releaseHome()
         caption.setText(message)
-        caption.setTextColor(ContextCompat.getColor(context, R.color.color_destructive_text))
+        caption.setTextColor(caption.themeColor(R.attr.colorDestructiveText))
     }
 
     // ------------------------------------------------------------------ мелочи

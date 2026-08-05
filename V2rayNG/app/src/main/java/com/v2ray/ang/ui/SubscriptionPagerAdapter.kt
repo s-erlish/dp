@@ -5,7 +5,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AnimationUtils
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.color.MaterialColors
 import com.v2ray.ang.R
@@ -123,7 +122,7 @@ class SubscriptionPagerAdapter : RecyclerView.Adapter<SubscriptionPagerAdapter.V
             val onSurface = MaterialColors.getColor(
                 binding.tvRingValue, com.google.android.material.R.attr.colorOnSurface
             )
-            val danger = ContextCompat.getColor(ctx, R.color.color_destructive_text)
+            val danger = MaterialColors.getColor(binding.tvRingValue, R.attr.colorDestructiveText)
 
             if (used <= 0L && limit == null) {
                 binding.tvRingValue.visibility = View.GONE

@@ -135,7 +135,7 @@
                 android:layout_marginBottom="@dimen/space_12"
                 android:accessibilityLiveRegion="polite"
                 android:textAppearance="@style/TextAppearance.App.Body"
-                android:textColor="@color/color_destructive_text"
+                android:textColor="?attr/colorDestructiveText"
                 android:visibility="gone"
                 tools:text="@string/auth_err_network"
                 tools:visibility="visible" />

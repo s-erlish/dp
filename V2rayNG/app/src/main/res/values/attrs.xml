@@ -130,6 +130,35 @@
          Replaces the centred spinner over a blank screen. -->
     <attr name="colorSkeleton" format="color" />
 
+    <!-- DESTRUCTIVE TEXT, which is not colorError.
+         colorError is the FILL red (#BA1A1A / #F04452); on a surface it measures
+         4.88:1 and a 14sp label sitting on it misses the body floor. The text
+         tone is a lightened red — #FF6069 dark 6.15:1, red_38 light — and that
+         is what every «Удалить» / «Выйти из аккаунта» / field-error line uses.
+
+         It is an ATTRIBUTE and not @color/color_destructive_text because
+         ThemeOverlay.Mono is applied at RUNTIME and can only remap attributes:
+         as a colour resource the red survived into the greyscale theme, which
+         §5.7 rules out in as many words — «Выйти из аккаунта» is «красная в
+         цветной теме, белая в моно». Resolves:
+           blue dark  #FF6069  6.15:1 on surface
+           blue light red_38   AA on surface
+           mono        mono_destructiveText — ink, and the word carries the
+                       meaning instead of the hue (00-rules.md 6.3). -->
+    <attr name="colorDestructiveText" format="color" />
+
+    <!-- THE 12% ACCENT WASH under a selected row, card or list item.
+         Same reason as colorDestructiveText: @color/accent_fill_12 is a colour
+         resource, so the mono overlay could not reach it and every selected row
+         — including the server row on Главная, the most prominent selected
+         surface in the product — kept a blue tint on a screen whose whole point
+         is the absence of colour (60-mono-home.png shows an ink wash there).
+         Resolves:
+           blue dark  #1F4C8DFF   12% of md_theme_primary
+           blue light #1F1E5FC7
+           mono       12% of the ink accent, per theme -->
+    <attr name="colorAccentFill" format="color" />
+
     <!-- =================================================================== -->
     <!-- THE PRESS PLANE (handoff README §1, §8 «Фон под нажатием»).          -->
     <!--                                                                      -->

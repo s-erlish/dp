@@ -363,6 +363,12 @@
          3.13:1 on mono_surfaceContainer #F4F4F5 - it clears the floor on the
          screen ground AND on a card, which is where these chips actually sit. -->
     <color name="mono_plateOutline">#8A8A8E</color>
+    <!-- ?attr/colorAccentFill in mono, LIGHT: 12% of mono_primary #111214.
+         Composites to #E4E4E5 over mono_surface #FFFFFF; mono_onSurface on that
+         measures 14.79:1. The blue theme's accent_fill_12 is a colour resource
+         and the runtime overlay cannot re-point it, which is why the selected
+         server row kept a blue cast here. -->
+    <color name="mono_accentFill">#1F111214</color>
     <!-- The connect object's ink: rings, shield, confirm rings, sweep. Matched
          to the WEIGHT of the blue accent rather than to ink, because a 3dp
          stroke is not a button fill. md_theme_primary #1E5FC7 measures 5.97:1

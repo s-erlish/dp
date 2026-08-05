@@ -40,6 +40,10 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- indicatorColor is ?attr and not @color/color_fab_active: ThemeOverlay.Mono is
+         applied at runtime and re-points attributes only, so as a colour resource this
+         bar stayed #4C8DFF blue on the greyscale theme. The attribute already exists
+         and mono already maps it (themes.xml, indicatorColor -> mono_primary). -->
     <com.google.android.material.progressindicator.LinearProgressIndicator
         android:id="@+id/progress_bar"
         android:layout_width="match_parent"
@@ -47,7 +51,7 @@
         app:layout_constraintTop_toBottomOf="@id/toolbar"
         android:indeterminate="true"
         android:visibility="gone"
-        app:indicatorColor="@color/color_fab_active" />
+        app:indicatorColor="?attr/indicatorColor" />
 
     <FrameLayout
         android:id="@+id/content_container"

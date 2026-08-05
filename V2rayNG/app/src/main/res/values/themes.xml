@@ -114,6 +114,11 @@
         <item name="colorSkeleton">@color/skeleton</item>
         <!-- The press plane (handoff README §1). A held row steps DOWN to it. -->
         <item name="colorPressBg">@color/press_bg</item>
+        <!-- Destructive TEXT (not the fill red) and the 12% selection wash.
+             Both used to be read straight off @color/…, which the runtime mono
+             overlay cannot re-point — see attrs.xml beside each. -->
+        <item name="colorDestructiveText">@color/color_destructive_text</item>
+        <item name="colorAccentFill">@color/accent_fill_12</item>
 
         <!-- ================================================================ -->
         <!-- THE RIPPLE IS OFF, PRODUCT-WIDE. Handoff README, «Главное         -->
@@ -439,6 +444,14 @@
         <item name="colorOnError">@color/mono_surface</item>
         <item name="colorErrorContainer">@color/mono_surfaceContainerHighest</item>
         <item name="colorOnErrorContainer">@color/mono_onSurface</item>
+        <!-- The fifth: destructive TEXT had no attribute at all, so «Выйти из
+             аккаунта», «Удалить», the field-error line and the expired-меter
+             marker stayed red on the greyscale screen. §5.7: «красная в цветной
+             теме, белая в моно». -->
+        <item name="colorDestructiveText">@color/mono_destructiveText</item>
+        <!-- 12% of the ink accent, so a selected row is an ink wash and not the
+             blue theme's #1F4C8DFF leaking through (60-mono-home.png). -->
+        <item name="colorAccentFill">@color/mono_accentFill</item>
 
         <item name="colorSurface">@color/mono_surface</item>
         <item name="colorOnSurface">@color/mono_onSurface</item>

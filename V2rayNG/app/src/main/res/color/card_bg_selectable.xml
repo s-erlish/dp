@@ -6,7 +6,7 @@
   Pairs with @color/row_stroke_selectable on strokeColor.
 -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:color="@color/accent_fill_12" android:state_activated="true" />
-    <item android:color="@color/accent_fill_12" android:state_checked="true" />
+    <item android:color="?attr/colorAccentFill" android:state_activated="true" />
+    <item android:color="?attr/colorAccentFill" android:state_checked="true" />
     <item android:color="?attr/colorSurface" />
 </selector>

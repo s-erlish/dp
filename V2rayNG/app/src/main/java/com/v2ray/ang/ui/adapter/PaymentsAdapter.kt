@@ -4,7 +4,6 @@ import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.dto.PaymentDto
@@ -57,7 +56,7 @@ class PaymentsAdapter : RecyclerView.Adapter<PaymentsAdapter.VH>() {
             .joinToString(" · ")
         b.tvPaymentDate.setTextColor(
             if (state.failed) {
-                ContextCompat.getColor(ctx, R.color.color_destructive_text)
+                resolveThemeColor(ctx, R.attr.colorDestructiveText)
             } else {
                 resolveThemeColor(ctx, com.google.android.material.R.attr.colorOnSurfaceVariant)
             },

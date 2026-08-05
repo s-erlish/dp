@@ -75,7 +75,7 @@
         <item name="fontFamily">@font/space_grotesk</item>
         <item name="android:textSize">34sp</item>
         <item name="lineHeight">40sp</item>
-        <item name="android:letterSpacing">-0.02</item>
+        <item name="android:letterSpacing">-0.01</item>
         <item name="android:fontFeatureSettings">"tnum" on, "lnum" on</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
         <item name="android:textAllCaps">false</item>
@@ -139,7 +139,7 @@
     <!-- Destructive row title. #FF6069 on dark (6.15:1), not #F04452 (4.88:1) —
          the fill red and the text red are different tokens for a measured reason. -->
     <style name="TextAppearance.App.Title.Destructive" parent="TextAppearance.App.Title">
-        <item name="android:textColor">@color/color_destructive_text</item>
+        <item name="android:textColor">?attr/colorDestructiveText</item>
     </style>
 
     <!--
@@ -241,7 +241,7 @@
 
     <!-- Field error line. Cause plus fix, never a code (00-rules.md 9.4). -->
     <style name="TextAppearance.App.Caption.Error" parent="TextAppearance.App.Caption">
-        <item name="android:textColor">@color/color_destructive_text</item>
+        <item name="android:textColor">?attr/colorDestructiveText</item>
     </style>
 
     <!--
@@ -600,8 +600,8 @@
          Its press plate is destructive-toned too: an accent-blue plate under a red
          label says two different things about one tap. -->
     <style name="Widget.Departament.Button.Tertiary.Destructive" parent="Widget.Departament.Button.Tertiary">
-        <item name="android:textColor">@color/color_destructive_text</item>
-        <item name="iconTint">@color/color_destructive_text</item>
+        <item name="android:textColor">?attr/colorDestructiveText</item>
+        <item name="iconTint">?attr/colorDestructiveText</item>
         <item name="backgroundTint">@color/btn_quiet_container_danger</item>
     </style>
 
@@ -808,7 +808,7 @@
         <item name="boxStrokeColor">@color/field_stroke_selector</item>
         <item name="boxStrokeWidth">@dimen/stroke_control</item>
         <item name="boxStrokeWidthFocused">@dimen/stroke_focus</item>
-        <item name="boxStrokeErrorColor">@color/color_destructive_text</item>
+        <item name="boxStrokeErrorColor">?attr/colorDestructiveText</item>
         <item name="hintEnabled">false</item>
         <item name="errorEnabled">true</item>
         <item name="errorTextAppearance">@style/TextAppearance.App.Caption.Error</item>
@@ -972,14 +972,24 @@
     <style name="Widget.Departament.Row.Destructive" parent="Widget.Departament.Row" />
 
     <!-- The 40dp leading tile and its 22dp glyph. Three tile colours exist and no
-         fourth (D-5); most rows are neutral. -->
+         fourth (D-5); most rows are neutral.
+
+         BOTH COLOURS ARE ATTRIBUTES. They used to be @color/icon_tile_neutral and
+         @color/icon_glyph_neutral, and ThemeOverlay.Mono is a RUNTIME overlay that
+         can re-point attributes but not colour resources — so all 22 tiles that
+         take this style stayed blue-grey on the greyscale screen. Same pixels in
+         the two themes that already worked: icon_tile_neutral is #E3EAF4 / #20242B
+         and so is colorSurfaceContainerHighest; icon_glyph_neutral is #54607A /
+         #9BA1AD and so is colorOnSurfaceVariant. The .Accent and .Destructive
+         children override the background with their own attribute-driven drawables
+         and their own tint, so neither inherits this fill. -->
     <style name="Widget.Departament.Tile" parent="">
         <item name="android:layout_width">@dimen/tile_size</item>
         <item name="android:layout_height">@dimen/tile_size</item>
         <item name="android:background">@drawable/bg_tile_neutral</item>
         <item name="android:padding">9dp</item>
         <item name="android:scaleType">fitCenter</item>
-        <item name="android:tint">@color/icon_glyph_neutral</item>
+        <item name="android:tint">?attr/colorOnSurfaceVariant</item>
     </style>
 
     <style name="Widget.Departament.Tile.Accent" parent="Widget.Departament.Tile">
@@ -1116,8 +1126,8 @@
     <!-- «Ошибка», «Истекла». -->
     <style name="Widget.Departament.Chip.Status.Error" parent="Widget.Departament.Chip">
         <item name="chipBackgroundColor">?attr/colorErrorContainer</item>
-        <item name="android:textColor">@color/color_destructive_text</item>
-        <item name="chipIconTint">@color/color_destructive_text</item>
+        <item name="android:textColor">?attr/colorDestructiveText</item>
+        <item name="chipIconTint">?attr/colorDestructiveText</item>
     </style>
 
     <!-- ========================================================================= -->
@@ -1324,8 +1334,8 @@
          away here. So the whole control goes destructive: label, glyph and the plate
          that appears under the finger. -->
     <style name="Departament.Dialog.Button.Destructive" parent="Departament.Dialog.Button">
-        <item name="android:textColor">@color/color_destructive_text</item>
-        <item name="iconTint">@color/color_destructive_text</item>
+        <item name="android:textColor">?attr/colorDestructiveText</item>
+        <item name="iconTint">?attr/colorDestructiveText</item>
         <item name="backgroundTint">@color/btn_quiet_container_danger</item>
     </style>
 
@@ -1512,7 +1522,7 @@
          4.88:1 fill red (00-rules.md 3.5) — the arc replaces a label and has to
          carry a label's contrast. -->
     <style name="Widget.Departament.Progress.Circular.Inline.Destructive" parent="Widget.Departament.Progress.Circular.Inline">
-        <item name="indicatorColor">@color/color_destructive_text</item>
+        <item name="indicatorColor">?attr/colorDestructiveText</item>
     </style>
 
     <!-- ========================================================================= -->

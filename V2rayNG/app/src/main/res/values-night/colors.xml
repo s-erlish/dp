@@ -240,6 +240,11 @@
     <color name="mono_plateContainer">@color/mono_primaryContainer</color>
     <color name="mono_plateOutline">@android:color/transparent</color>
     <color name="mono_accentFigure">@color/mono_primary</color>
+    <!-- ?attr/colorAccentFill in mono, DARK: 12% of mono_primary #FFFFFF.
+         Composites to #2B2B2D over mono_surface #121214; mono_onSurface on that
+         measures 12.79:1. Same reason as the light rung — a colour resource is
+         out of the runtime overlay's reach, so the selected row stayed blue. -->
+    <color name="mono_accentFill">#1FFFFFFF</color>
 
     <!-- =====================================================================
          BUTTON BEVEL — the depth tokens, DARK. See values/colors.xml for what the

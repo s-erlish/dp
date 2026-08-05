@@ -29,7 +29,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.viewpager2.widget.CompositePageTransformer
 import androidx.viewpager2.widget.MarginPageTransformer
 import androidx.viewpager2.widget.ViewPager2
-import androidx.core.content.ContextCompat
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import com.v2ray.ang.R
@@ -756,7 +756,7 @@ class AccountFragment : Fragment() {
 
         val onSurface = resolveThemeColor(com.google.android.material.R.attr.colorOnSurface)
         val amber = resolveThemeColor(R.attr.warning)
-        val red = ContextCompat.getColor(requireContext(), R.color.color_destructive_text)
+        val red = resolveThemeColor(R.attr.colorDestructiveText)
 
         val date = parseYmd(sub.expireAtIso)
         val daysLeft = date?.let { daysUntil(it) }
@@ -1127,7 +1127,7 @@ class AccountFragment : Fragment() {
         // overlay, so applying the one delta here beats replacing the button bar with a custom
         // view to get a per-button style.
         dialog.getButton(DialogInterface.BUTTON_POSITIVE)?.apply {
-            setTextColor(ContextCompat.getColor(context, R.color.color_destructive_text))
+            setTextColor(MaterialColors.getColor(this, R.attr.colorDestructiveText))
         }
         dialog.getButton(DialogInterface.BUTTON_NEGATIVE)?.requestFocus()
     }
