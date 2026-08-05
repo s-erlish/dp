@@ -30,6 +30,7 @@ import com.v2ray.ang.auth.BackendConfig
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.ui.LoginActivity
 import com.v2ray.ang.ui.MainActivity
+import com.v2ray.ang.ui.MainHost
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.reducedMotion
 import com.v2ray.ang.viewmodel.AuthViewModel
@@ -77,7 +78,13 @@ class GateView @JvmOverloads constructor(
         /** Открыть `LoginActivity` через лаунчер оболочки, который применит изменения на возврате. */
         fun openAuth(intent: Intent)
 
-        /** «Добавить по QR-коду» — сканер живёт в оболочке. */
+        /**
+         * «Добавить по QR-коду» для хозяина, который не является оболочкой приложения.
+         *
+         * Обычный путь строки — [MainHost.importByQr], то есть сканер напрямую; сюда
+         * [openQrScanner] сворачивает только тогда, когда над экраном не `MainActivity` и спросить
+         * про сканер некого.
+         */
         fun addByQr(anchor: View)
 
         /** Подписка добавлена: перечитать список серверов. */
@@ -144,7 +151,7 @@ class GateView @JvmOverloads constructor(
         cardCta.onSingleClick(Haptic.PRESS) { clipLink?.let { link -> startClipboardFlow(link) } }
         clipboardButton.onSingleClick { onClipboardButton() }
         moreButton.onSingleClick { toggleMore() }
-        findViewById<View>(R.id.row_gate_qr).onSingleClick { host?.addByQr(it) }
+        findViewById<View>(R.id.row_gate_qr).onSingleClick { openQrScanner(it) }
         findViewById<View>(R.id.row_gate_site).onSingleClick { openSite() }
     }
 
@@ -559,6 +566,20 @@ class GateView @JvmOverloads constructor(
     }
 
     // ------------------------------------------------------------------ мелочи
+
+    /**
+     * §2.7, строка «Добавить по QR-коду»: камера, и ничего между ней и нажатием.
+     *
+     * Строка ведёт в [MainHost.importByQr], а не в окошко добавления: способ уже назван в самой
+     * строке, и всплывашка из двух пунктов переспрашивала ровно то, на что пользователь ответил
+     * (замечание владельца, 2026-08-05). Сканер живёт в оболочке — вью его не открывает само, — но
+     * спросить о нём можно напрямую, как этот же экран уже спрашивает оболочку про удержание
+     * Главной. [Host.addByQr] остаётся для хозяина, который оболочкой не является.
+     */
+    private fun openQrScanner(anchor: View) {
+        val shell = activityOrNull() as? MainHost
+        if (shell != null) shell.importByQr() else host?.addByQr(anchor)
+    }
 
     private fun openSite() {
         val intent = Intent(context, LoginActivity::class.java)
