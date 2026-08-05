@@ -2354,6 +2354,13 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         if (!named) return
         accountResolved = true
         bindAccountRow(profile)
+        // AND THE DRAWABLE JUMPS WITH IT. @drawable/bg_row is a <selector> carrying
+        // enterFadeDuration / exitFadeDuration, so a state written before the first draw is not
+        // simply applied — DrawableContainer parks the crossfade and spills it into the first
+        // onDraw, which is the same «сначала одно, потом на глазах становится другим» the settings
+        // wave found under its switches. The rule is one line and it is the same everywhere: the
+        // FIRST state is instant, and only a state the user changes is animated.
+        binding.layoutHomeAccount.rowAccount.jumpDrawablesToCurrentState()
     }
 
     /**
@@ -3017,9 +3024,69 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         }
     }
 
+    /**
+     * «Загрузить сервера», and the two different loads that hide behind one button.
+     *
+     * The owner: «если удалить свою подписку при вошедшем аккаунте, то пишет типа загрузить сервера
+     * … и не работает кнопка, пишет не удалось загрузить, хотя должно работать».
+     *
+     * He is in a state this button had no branch for. Deleting the подписка from the card removes
+     * the LOCAL copy — `MmkvManager.removeSubscription` drops it from the store and takes its
+     * серверы with it — while the ACCOUNT still holds the подписка, which is exactly why the gate
+     * correctly reads «Подписка активна, сервера ещё не загружены». But the button called
+     * `refreshSubscriptions()`, i.e. the shell's `updateConfigViaSubAll()`, which walks the LOCAL
+     * подписки and refetches each one. There were none. It returned `successCount == 0` without a
+     * single request going out, the shell reported «Не удалось обновить», and this screen then
+     * resolved [Gate.SYNC_FAILED] — a verdict about a network failure that never happened. The
+     * instant appearance of the message was the tell.
+     *
+     * So the button asks the right source: with no local подписка to refresh and a live account,
+     * the servers can only come from a RE-IMPORT, which is the same `autoImportSubscriptions()`
+     * that runs after a sign-in. `SubscriptionSyncManager.importAll` keys each подписка by its
+     * account identity through `AuthTokenStore.getManagedGuids()`, so the deleted one is recreated
+     * under the guid it had rather than duplicated.
+     *
+     * Anything else keeps the refresh it always had: a pasted подписка, or an account подписка that
+     * is still on the device and merely out of date, is a refresh and not an import.
+     */
     private fun requestServerSync() {
         syncRequested = true
-        mainHost.refreshSubscriptions()
+        val nothingLocalToRefresh = MmkvManager.decodeSubsList().isEmpty()
+        val accountCanSupply = BackendConfig.isConfigured() && AccountSession.isLoggedIn()
+        if (nothingLocalToRefresh && accountCanSupply) importAccountSubscriptions() else mainHost.refreshSubscriptions()
+    }
+
+    /**
+     * Re-imports the account's подписки, and reports on the surfaces this screen already has.
+     *
+     * [showConnectArc] / [hideConnectArc] are the SAME in-flight signal the shell raises for its own
+     * refresh — the connect object's sweep plus the bottom «Обновляем данные…» — so an import
+     * started here is indistinguishable from one started anywhere else, and `backgroundLoads` is
+     * what holds the gate's button disabled while it runs (see [paintGate]) and what keeps
+     * [resolveGate] on «Подписка активна» rather than jumping to a failure that has not happened
+     * yet. Balanced on every exit, including the failure one.
+     */
+    private fun importAccountSubscriptions() {
+        showConnectArc()
+        viewLifecycleOwner.lifecycleScope.launch {
+            val result = runCatching { AccountRepository().autoImportSubscriptions() }
+                .getOrElse { Result.failure(it) }
+            if (!isBindingInitialized) return@launch
+            hideConnectArc()
+            result
+                .onSuccess {
+                    // The cache is what the list and the carousel are painted from, and the account
+                    // list is what names the cards; a подписка that has just come back needs both.
+                    mainViewModel.reloadServerList()
+                    accountViewModel.loadSubscriptions()
+                }
+                .onFailure {
+                    // A REAL failure this time, so the gate is allowed to say so: `syncRequested`
+                    // is still set and `backgroundLoads` is back to zero, which is precisely the
+                    // pair [resolveGate] turns into SYNC_FAILED.
+                    render()
+                }
+        }
     }
 
     // ==================== Motion ====================

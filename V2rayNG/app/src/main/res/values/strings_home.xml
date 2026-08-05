@@ -86,21 +86,21 @@
     <string name="home_gate_sync_title">Подписка активна</string>
     <string name="home_gate_sync_failed_title">Не получилось</string>
 
-    <string name="home_gate_signin_caption">Войдите, чтобы получить серверы departament.</string>
+    <string name="home_gate_signin_caption">Войдите, чтобы получить сервера departament.</string>
     <string name="home_gate_signin">Войти</string>
     <string name="home_gate_add_subscription">Добавить подписку</string>
     <!-- The build with no backend configured: signing in is meaningless there, so
          adding a подписка is the primary and there is no secondary. -->
-    <string name="home_gate_subscription_caption">Добавьте подписку, чтобы получить серверы.</string>
+    <string name="home_gate_subscription_caption">Добавьте подписку, чтобы получить сервера.</string>
     <string name="home_gate_buy_caption">Осталось выбрать тариф.</string>
     <string name="home_gate_buy">Купить подписку</string>
     <!-- Offered under the buy CTA while the account has no Telegram attached. It
          is the only live entry point to linking Telegram on this screen, and it
          went missing when the onboarding card was replaced; it is back. -->
     <string name="home_gate_link_telegram">Привязать Telegram</string>
-    <string name="home_gate_sync_caption">Подписка активна, серверы ещё не загружены.</string>
-    <string name="home_gate_sync">Загрузить серверы</string>
-    <string name="home_gate_sync_failed_caption">Не удалось загрузить серверы. Проверьте соединение.</string>
+    <string name="home_gate_sync_caption">Подписка активна, сервера ещё не загружены.</string>
+    <string name="home_gate_sync">Загрузить сервера</string>
+    <string name="home_gate_sync_failed_caption">Не удалось загрузить сервера. Проверьте соединение.</string>
     <string name="home_gate_retry">Повторить</string>
 
     <!-- ===================================================================== -->
@@ -168,8 +168,8 @@
          when the subscription ends rather than how much of it is left. -->
     <string name="home_sub_days_left">%1$d дн.</string>
 
-    <string name="home_sub_cd_expand">Показать серверы</string>
-    <string name="home_sub_cd_collapse">Скрыть серверы</string>
+    <string name="home_sub_cd_expand">Показать сервера</string>
+    <string name="home_sub_cd_collapse">Скрыть сервера</string>
     <string name="home_sub_cd_ping">Проверить задержку серверов</string>
     <string name="home_sub_cd_refresh">Обновить подписку</string>
     <string name="home_sub_cd_pin">Закрепить подписку</string>
@@ -178,7 +178,7 @@
     <string name="home_sub_cd_telegram">Открыть Telegram</string>
 
     <string name="home_sub_delete_title">Удалить подписку?</string>
-    <string name="home_sub_delete_message">Подписка и её серверы будут удалены с этого устройства.</string>
+    <string name="home_sub_delete_message">Подписка и её сервера будут удалены с этого устройства.</string>
     <string name="home_sub_delete_confirm">Удалить</string>
     <string name="home_sub_deleted">Подписка удалена</string>
     <!-- The card's support / Telegram links, when the device has no app that can open one.
