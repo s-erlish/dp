@@ -230,6 +230,14 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     /** Which of the slot's two occupants is drawn, so the swap can be crossfaded once. */
     private var renderedGateVisible: Boolean? = null
 
+    /**
+     * True while the screen is the START SCREEN and not Главная — the gate's SIGN_IN shape, where
+     * everything but the gate block is switched off. Kept as a field because [applyListInsets] is
+     * driven by the window's insets rather than by [render] and has to read the same fact.
+     * @see paintOnboardingShell
+     */
+    private var onboardingShell = false
+
     // The live figures. Null means "no reading yet", which prints a zero rather than an empty box:
     // this strip is the screen's ledger and it is on screen at rest.
     private var downBytesPerSec: Long? = null
@@ -606,11 +614,20 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * the overlaid bottom bar belongs to the scroll CONTENT. Never smaller than the layout's own
      * bottom breathing room, so a zero inset (before the shell has measured the window) cannot
      * leave the last row flush against the edge.
+     *
+     * ON THE START SCREEN THERE IS NO BAR TO CLEAR. `listBottomInset` is the system inset plus the
+     * 56dp bar plus 16dp of breathing room — around 96dp — and the shell hides the bar outright in
+     * exactly the state [paintOnboardingShell] paints (MainActivity.updateBottomNavVisibility).
+     * Reserving it anyway would hold 96dp of nothing under a block that is centred against what is
+     * left of the viewport, and push the whole composition half that far up the screen. The 24dp
+     * floor still stands, and the gate's own trailing spacer is what actually keeps it off the
+     * gesture area.
      */
     fun applyListInsets() {
         if (!isBindingInitialized) return
         val floor = resources.getDimensionPixelSize(R.dimen.space_24)
-        binding.homeContent.updatePadding(bottom = maxOf(mainHost.listBottomInset, floor))
+        val inset = if (onboardingShell) 0 else mainHost.listBottomInset
+        binding.homeContent.updatePadding(bottom = maxOf(inset, floor))
     }
 
     /** Repaints after the shell changed which server is selected. */
@@ -2528,6 +2545,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private fun paintSlot(state: HomeState) {
         val gate = state.gate
         val gateVisible = gate != null
+        // ONE of the gate's four shapes is not this screen. See paintOnboardingShell.
+        paintOnboardingShell(gate == Gate.SIGN_IN)
         binding.subscriptionSlot.isVisible = !gateVisible
         binding.layoutGate.gate.isVisible = gateVisible
         if (gate != null) paintGate(gate) else paintSubscriptionSlot(state)
@@ -2545,6 +2564,56 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             }
         }
         renderedGateVisible = gateVisible
+    }
+
+    /**
+     * НАЧАЛЬНЫЙ ЭКРАН (README §2): in the SIGN_IN shape the gate block IS the screen, so Главная
+     * takes itself off it.
+     *
+     * THE GATE HAS FOUR SHAPES AND ONLY THIS ONE IS THE START SCREEN (PORT-DELTA П-01). SIGN_IN is
+     * signed out with not one server: there is no account to name, no subscription to add to, no
+     * server to connect to and no session to meter, so the account row, the «+», the connect object,
+     * the status pill and the ledger line were all six of them stating «нет» at a user who has not
+     * been asked for anything yet. The shell reads the same condition and takes the whole bottom
+     * navigation away (MainActivity.updateBottomNavVisibility), which is what left the rest of this
+     * screen looking like the remains of a page rather than a first run.
+     *
+     * BUY, ADD_SUBSCRIPTION, SYNC_SERVERS and SYNC_FAILED KEEP EVERY ONE OF THEM. Those three
+     * shapes belong to a user who is signed in or already has servers: the account row is his way
+     * back to the account, the connect object is live the moment a server lands, and BUY's own
+     * «Привязать Telegram» secondary is the only entry point to linking on this screen. They are
+     * ordinary Главная with the gate block in the subscription slot's place, and nothing here
+     * touches them — every property below is written in BOTH directions on every repaint, so a
+     * screen that leaves SIGN_IN gets all of it back in the same frame.
+     *
+     * Nothing is GONE-and-forgotten and nothing is removed from the layout: this is one visibility
+     * flag per band, resolved from the one state the screen already resolved.
+     */
+    private fun paintOnboardingShell(onboarding: Boolean) {
+        val chrome = !onboarding
+        binding.layoutHomeAccount.root.isVisible = chrome
+        binding.btnHomeAdd.isVisible = chrome
+        binding.connectFrame.isVisible = chrome
+        binding.tvConnectedPill.isVisible = chrome
+        // The ledger and the identity line together — hiding their column takes both, and leaves
+        // paintStatusLine's own per-state writes inside it untouched for when the column returns.
+        binding.statusLine.isVisible = chrome
+        // The rhythm between the bands goes with the bands. 64dp of gap between things that are not
+        // there would push the centred block down by half of it.
+        binding.gapBeforeConnect.isVisible = chrome
+        binding.gapAfterConnect.isVisible = chrome
+        binding.gapBeforeSlot.isVisible = chrome
+        // The pair that floats the gate block; see fragment_home.xml for the 3:4.
+        binding.onboardLead.isVisible = onboarding
+        binding.onboardTrail.isVisible = onboarding
+        // «Привязать Telegram» is offered to the pasted-подписка user, who by definition HAS servers
+        // and therefore never sees a gate. The two overlap only if his подписка produced none, and
+        // on that screen the gate's own primary already says «Войти через Telegram» — a better
+        // offer, in the composition's own slot. paintLinkCta owns the flag in every other state.
+        if (onboarding) binding.ctaLinkTelegram.isVisible = false
+        if (onboardingShell == onboarding) return
+        onboardingShell = onboarding
+        applyListInsets()
     }
 
     private fun paintSubscriptionSlot(state: HomeState) {

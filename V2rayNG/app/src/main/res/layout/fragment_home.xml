@@ -51,6 +51,14 @@
   or, when there is not one server to connect to, the gate block in place of the
   card and the list (layout_home_empty.xml). Never both.
 
+  ONE OF THE GATE'S FOUR SHAPES IS NOT THIS SCREEN AT ALL. In SIGN_IN — signed out,
+  no servers — README §2 asks for НАЧАЛЬНЫЙ ЭКРАН: the gate block alone, centred
+  vertically, and the shell has already taken the bottom navigation away
+  (MainActivity.updateBottomNavVisibility) on that same condition. Every band listed
+  above is switched off for it by HomeFragment.paintSlot and the block is floated by
+  @id/onboard_lead / @id/onboard_trail at the bottom of this file. The other three
+  shapes are ordinary Главная with a gate in the slot, and keep all of it.
+
   THE RINGS ARE BACK AND THEY ARE NOT DECORATION. The connect object's own three
   concentric rings are its state channel - one hue at three opacities, a geometry
   that never changes size - and they are the reason the owner recognised the screen.
@@ -249,7 +257,13 @@
             android:layout_marginTop="@dimen/space_12"
             android:layout_marginEnd="@dimen/screen_gutter" />
 
+        <!-- The three rhythm gaps of the connect block carry ids for ONE reason: the
+             начальный экран takes the block away (see @id/onboard_lead below) and
+             64dp of spacing between things that are no longer there is 64dp the
+             centred gate block would be pushed down by. They are ordinary spacers
+             in every other state. -->
         <Space
+            android:id="@+id/gap_before_connect"
             android:layout_width="match_parent"
             android:layout_height="@dimen/space_24" />
 
@@ -473,6 +487,7 @@
         </FrameLayout>
 
         <Space
+            android:id="@+id/gap_after_connect"
             android:layout_width="match_parent"
             android:layout_height="@dimen/space_16" />
 
@@ -720,6 +735,7 @@
         </LinearLayout>
 
         <Space
+            android:id="@+id/gap_before_slot"
             android:layout_width="match_parent"
             android:layout_height="@dimen/space_24" />
 
@@ -813,8 +829,49 @@
                 tools:visibility="visible" />
         </LinearLayout>
 
+        <!--
+          НАЧАЛЬНЫЙ ЭКРАН (README §2): THE GATE IS THE WHOLE SCREEN, AND IT IS
+          FLOATED, NOT STACKED.
+
+          The gate block has four shapes (PORT-DELTA П-01) and only ONE of them is
+          the start screen. In SIGN_IN — signed out, not one server — README §2
+          asks for the gate block ALONE and centred vertically, and the shell
+          agrees: MainActivity.updateBottomNavVisibility takes the whole bottom
+          navigation off screen on exactly that condition. Everything above this
+          include is switched off for it by HomeFragment.paintSlot, and these two
+          spacers are what put what is left in the middle.
+
+          In BUY, ADD_SUBSCRIPTION, SYNC_SERVERS and SYNC_FAILED the user is signed
+          in or has servers: the screen stays ordinary Главная — account row, «+»,
+          connect object, pill, ledger, server name — with the gate block sitting in
+          the subscription slot's place. These spacers are GONE in all four, and a
+          GONE child contributes neither height nor weight, so they cannot move a
+          single pixel of that screen.
+
+          3 ABOVE, 4 BELOW, which is layout_auth_gate.xml's composition and for the
+          same reason: an even split parks the block on the mathematical centre,
+          while 3:4 puts it a touch above the optical one — where the eye lands, and
+          where the thumb already is. They are the composition and not left-over
+          room: this scroll view is fillViewport, so a short viewport (landscape,
+          split screen, font scale 200%) collapses both to nothing and the column
+          scrolls instead. Nothing is ever clipped.
+        -->
+        <Space
+            android:id="@+id/onboard_lead"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="3"
+            android:visibility="gone" />
+
         <include
             android:id="@+id/layout_gate"
             layout="@layout/layout_home_empty" />
+
+        <Space
+            android:id="@+id/onboard_trail"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="4"
+            android:visibility="gone" />
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
