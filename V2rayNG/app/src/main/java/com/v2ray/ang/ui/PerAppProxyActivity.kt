@@ -150,7 +150,10 @@ class PerAppProxyActivity : BaseActivity() {
             root = binding.rowMode.root,
             title = getString(R.string.perapp_mode_row),
             subtitle = getString(mode.hintRes),
-            glyph = R.drawable.ic_per_apps_24dp,
+            // The prototype's «Режим обхода» carries the globe and the row under it a different
+            // glyph: §5.3 makes a group tiled only when its glyphs DIFFER, and two identical
+            // tiles down the left edge is the generated-settings tell.
+            glyph = R.drawable.ic_globe_24dp,
             value = getString(mode.labelRes),
             // The unfold glyph is the promise that the value changes HERE - no screen, no dialog
             // (22-components 8.1). Three options is exactly the count that grammar is for.

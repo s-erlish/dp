@@ -956,8 +956,11 @@
         <item name="android:minHeight">@dimen/row_min_height</item>
         <item name="android:paddingStart">@dimen/screen_gutter</item>
         <item name="android:paddingEnd">@dimen/screen_gutter</item>
-        <item name="android:paddingTop">@dimen/space_12</item>
-        <item name="android:paddingBottom">@dimen/space_12</item>
+        <!-- 10 and not 12 - handoff §6, measured off the prototype: 10 + 40 (плитка) + 10 is
+             its 61dp row, and 12 made every row in every card 3dp taller than the design. The
+             MINIMUM is still row_min_height 56, so a row with no tile does not shrink. -->
+        <item name="android:paddingTop">@dimen/space_10</item>
+        <item name="android:paddingBottom">@dimen/space_10</item>
         <item name="android:gravity">center_vertical</item>
         <item name="android:orientation">horizontal</item>
         <item name="android:background">@drawable/bg_row</item>

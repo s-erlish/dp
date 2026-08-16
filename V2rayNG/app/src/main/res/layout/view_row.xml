@@ -15,9 +15,8 @@
       [ 16 gutter ][ 40 tile r12, 22 glyph ][ 16 ][ text column ][ 12 ][ trailing ][ 16 ]
   Text origin 72 = 16 + 40 + 16 on a TILED row; 16 on a PLAIN row (5.3), which is
   what hiding @id/row_tile gives you for free — its end margin goes with it.
-  Vertical padding is 10, not the 12 of @style/Widget.Departament.Row, and that is
-  the one thing this file overrides: 10 + 40 + 10 is the prototype's 61dp row and
-  12 would make every row in every sub-screen 3dp tall.
+  Vertical padding is 10 (from @style/Widget.Departament.Row): 10 + 40 + 10 is the
+  prototype's 61dp row.
   minHeight 56, height wrap_content: a two-line subtitle GROWS the row, and at font
   scale 200% every text box grows with it. There is not one fixed height in this file.
 
@@ -80,9 +79,7 @@
     style="@style/Widget.Departament.Row"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:baselineAligned="false"
-    android:paddingTop="@dimen/space_10"
-    android:paddingBottom="@dimen/space_10">
+    android:baselineAligned="false">
 
     <!-- TILED groups only. Gone = a plain row at the 16dp origin (5.3). The glyph is
          the caller's; the 40/12/22 geometry and the neutral fill are the style's. -->

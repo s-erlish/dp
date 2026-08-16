@@ -6,7 +6,7 @@
          Владелец называет эту сущность подпиской, а не провайдером: слово
          заменено во всех строках экрана. Ключи (ps_*) оставлены прежними, чтобы
          не трогать разметку чужой волны. -->
-    <string name="ps_title">Настройки подписок</string>
+    <string name="ps_title">Настройки провайдеров</string>
 
     <!-- Разделы -->
     <string name="ps_section_update">Обновление</string>
@@ -39,8 +39,8 @@
     <string name="ps_ping_on_update">Пинг при обновлении</string>
 
     <!-- Сеть -->
-    <string name="ps_send_hwid">Отправлять идентификатор устройства</string>
-    <string name="ps_send_hwid_sub">Передавать идентификатор при обновлении подписки</string>
+    <string name="ps_send_hwid">Отправлять HWID</string>
+    <string name="ps_send_hwid_sub">Отправлять идентификатор устройства при обновлении подписки</string>
     <string name="ps_user_agent">User-Agent</string>
     <string name="ps_user_agent_hint">User-Agent для запросов подписки</string>
     <string name="ps_user_agent_error">В заголовке нельзя передать кириллицу и другие не-ASCII символы. Оставьте латиницу, цифры и знаки.</string>

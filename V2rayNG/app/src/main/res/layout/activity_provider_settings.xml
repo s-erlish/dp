@@ -166,8 +166,8 @@
 
                         <ImageView
                             android:id="@+id/caret_interval"
-                            android:layout_width="@dimen/glyph_20"
-                            android:layout_height="@dimen/glyph_20"
+                            android:layout_width="@dimen/glyph_18"
+                            android:layout_height="@dimen/glyph_18"
                             android:layout_marginStart="@dimen/space_4"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_arrow_drop_down"
@@ -447,8 +447,8 @@
                         </LinearLayout>
 
                         <ImageView
-                            android:layout_width="@dimen/glyph_20"
-                            android:layout_height="@dimen/glyph_20"
+                            android:layout_width="@dimen/glyph_18"
+                            android:layout_height="@dimen/glyph_18"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_chevron_right"
                             app:tint="?attr/colorOnSurfaceVariant" />
@@ -507,8 +507,8 @@
 
                         <ImageView
                             android:id="@+id/caret_sort_order"
-                            android:layout_width="@dimen/glyph_20"
-                            android:layout_height="@dimen/glyph_20"
+                            android:layout_width="@dimen/glyph_18"
+                            android:layout_height="@dimen/glyph_18"
                             android:layout_marginStart="@dimen/space_4"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_arrow_drop_down"
