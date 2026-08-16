@@ -44,6 +44,7 @@ object SettingsManager {
 
     fun initApp(context: Context) {
         ensureDefaultSettings()
+        retireAutoFallback()
         // «Российские приложения» mimo VPN, on out of the box — but only on an install whose
         // per-app routing nobody has touched. See RussianAppsPreset.seedOnFirstRun.
         RussianAppsPreset.seedOnFirstRun()
@@ -750,6 +751,30 @@ object SettingsManager {
         if (MmkvManager.decodeSettingsString(key).isNullOrEmpty()) {
             MmkvManager.encodeSettings(key, default)
         }
+    }
+
+    /**
+     * SWITCHING THE SERVER BY ITSELF IS NOT A FEATURE OF THIS PRODUCT ANY MORE.
+     *
+     * > «нужно убрать функцию, что если сервер недоступен, то появляется уведомление что идёт поиск
+     * > быстрейшего сервера, надо убрать в целом эту функцию о переключении на более быстрый сервер»
+     *
+     * What it was: seven seconds after a connect, the app probed the tunnel; two consecutive
+     * failures and it announced «Подключение не отвечает. Переключаемся на самый быстрый рабочий
+     * сервер…», measured every сервер and restarted the tunnel on whichever answered fastest. The
+     * user's own choice was overridden, and the first they knew of it was the sentence.
+     *
+     * How it is off: the switch that armed it is gone from the settings screen, and this writes its
+     * key `false` on every start — so an install that already stored `true`, or one restored from a
+     * backup that carried it, is switched off too, and the health check is never armed at all. Not
+     * a one-shot migration on purpose: the value must not be able to come back from anywhere.
+     *
+     * What is NOT touched, because the owner asked for the switching to go and nothing else
+     * (`PORT-DELTA.md` П-26): the latency measurement itself, all four check methods, «обновить»,
+     * the 30-second probe that draws the «мс» figure on Главная, and picking a сервер by hand.
+     */
+    private fun retireAutoFallback() {
+        MmkvManager.encodeSettings(AppConfig.PREF_AUTO_FALLBACK, false)
     }
 
     /**

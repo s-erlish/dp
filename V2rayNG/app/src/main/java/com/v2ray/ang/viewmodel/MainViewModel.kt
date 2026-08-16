@@ -580,14 +580,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Runs a real-ping test across the current server list and, once finished,
-     * automatically selects the lowest-latency server and signals the UI to connect.
-     * Used by the "fast connect" action.
+     * RETIRED, AND INERT. Kept as a method because the screen still names it; it does nothing.
+     *
+     * > «надо убрать в целом эту функцию о переключении на более быстрый сервер»
+     *
+     * This was the acting half of the auto-fallback: measure every сервер, pick the fastest and
+     * hand it to Главная to restart the tunnel on. The deciding half — the post-connect health
+     * check that called it — is disarmed at the source, because
+     * [SettingsManager.retireAutoFallback] writes its key `false` on every app start, so nothing
+     * reaches this line any more. It refuses here as well rather than trusting that: two gates for
+     * a feature whose failure mode is taking the user off the сервер they chose.
+     *
+     * It publishes nothing. Emitting a null result would drive the screen's "no candidate" branch,
+     * which paints a connection error over a tunnel that is working perfectly.
+     *
+     * The measurement it used to drive is untouched — [testAllServers] and the four methods behind
+     * it are the manual check, and they are a live feature (`PORT-DELTA.md` П-26).
      */
     fun fastConnect(excludeGuid: String? = null) {
-        pendingFastConnect = true
-        fastConnectExcludeGuid = excludeGuid
-        testAllRealPing()
+        LogUtil.i(
+            AppConfig.TAG,
+            "Automatic server switching is retired; ignoring a fast-connect request" +
+                (excludeGuid?.let { " (excluding $it)" } ?: "")
+        )
     }
 
     /**
