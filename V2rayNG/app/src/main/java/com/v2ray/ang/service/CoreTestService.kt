@@ -75,6 +75,15 @@ class CoreTestService : Service() {
         return START_NOT_STICKY
     }
 
+    /**
+     * THE SHADE LEARNS NOTHING FROM THIS SERVICE, and the notification below is the smallest thing
+     * Android will accept in place of one.
+     *
+     * The owner, on the counter this used to push there: «переделать уведомления в шторке, этого
+     * так быть не должно, там просто должно быть обновление подписки и все». So the title is the
+     * app's name and the body is empty — see [NotificationChannelType.CORE_TEST] for why a
+     * notification has to exist at all, and what has been done to keep it out of sight.
+     */
     private fun handleMeasureStart(message: TestServiceMessage, startId: Int) {
         LogUtil.i(AppConfig.TAG, "CoreTestService starting worker   subscription ${message.subscriptionId}")
 
@@ -82,7 +91,7 @@ class CoreTestService : Service() {
             this,
             NotificationChannelType.CORE_TEST,
             getString(R.string.app_name),
-            getString(R.string.title_real_ping_all_server)
+            ""
         )
 
         val guidsList = when {
@@ -109,11 +118,12 @@ class CoreTestService : Service() {
     private fun handleWorkerEvent(event: RealPingEvent, onWorkerDone: () -> Unit) {
         when (event) {
             is RealPingEvent.Progress -> {
-                NotificationHelper.updateNotification(
-                    channelType = NotificationChannelType.CORE_TEST,
-                    context = this,
-                    content = getString(R.string.connection_runing_task_left, event.text)
-                )
+                // PROGRESS GOES TO THE APP, NEVER TO THE SHADE. It used to be written into the
+                // foreground notification as «Запущено проверок: 10 / 10» — the batch's own
+                // bookkeeping, several times a second, on the lock screen of a user who had not
+                // asked for a check at all (the провайдер refresh runs one unattended). The
+                // broadcast below is unchanged, so the list still repaints as results land; only
+                // the shade stopped being told.
                 MessageUtil.sendMsg2UI(this, AppConfig.MSG_MEASURE_CONFIG_NOTIFY, event.text)
             }
 

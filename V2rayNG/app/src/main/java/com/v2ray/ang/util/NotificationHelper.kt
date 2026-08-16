@@ -89,12 +89,17 @@ object NotificationHelper {
     }
 
     /**
-     * Stop the foreground notification for a service.
+     * Stop the foreground notification for a service, and forget the builder that drove it.
+     *
+     * The cache used to outlive the notification: a second batch reused the builder the first one
+     * left behind, so whatever text was last written stayed on the row until something overwrote
+     * it. Dropping it here means the next start builds a fresh, empty one.
      *
      * @param service The service to stop foreground on
      */
     fun stopForeground(service: Service) {
         service.stopForeground(Service.STOP_FOREGROUND_REMOVE)
+        builderCache.clear()
     }
 
     /**
@@ -120,22 +125,46 @@ object NotificationHelper {
         return cachedNotificationManager!!
     }
 
+    /**
+     * Creates the channel if it is missing, and clears away the id this type used to have.
+     *
+     * A channel's importance is fixed the moment it is created — `createNotificationChannel` will
+     * not lower it later — so a type that has to become quieter has to move to a new id, and the
+     * old one has to go with it or the user is left reading two rows for one thing in the system's
+     * notification settings. See [NotificationChannelType.CORE_TEST].
+     */
     private fun ensureChannelCreated(channelType: NotificationChannelType, context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        channelType.legacyChannelId?.let { old ->
+            if (notificationManager.getNotificationChannel(old) != null) {
+                notificationManager.deleteNotificationChannel(old)
+            }
+        }
         if (notificationManager.getNotificationChannel(channelType.channelId) != null) return
 
         val channel = NotificationChannel(
             channelType.channelId,
             context.getString(channelType.channelNameRes),
-            NotificationManager.IMPORTANCE_LOW
+            channelType.importance
         ).apply {
             lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+            setShowBadge(false)
         }
         notificationManager.createNotificationChannel(channel)
     }
 
+    /**
+     * A BLANK [content] LEAVES THE LINE OUT, rather than printing an empty one — the same
+     * distinction `NotificationManager.stopSpeedNotification` had to learn about the ongoing VPN
+     * notification. It matters here because the latency check now has nothing to say: its
+     * notification exists to satisfy the foreground-service requirement and carries the app's name
+     * and nothing else.
+     *
+     * The priority follows the channel rather than being one figure for every channel, so a
+     * min-importance channel is also min-priority on the versions that read that instead.
+     */
     private fun buildNotificationBuilder(
         channelType: NotificationChannelType,
         context: Context,
@@ -149,14 +178,25 @@ object NotificationHelper {
         }
 
         val displayTitle = title.ifEmpty { context.getString(R.string.app_name) }
-        return NotificationCompat.Builder(context, channelId)
+        val priority = if (channelType.importance <= NotificationManager.IMPORTANCE_MIN) {
+            NotificationCompat.PRIORITY_MIN
+        } else {
+            NotificationCompat.PRIORITY_LOW
+        }
+        val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_name)
             .setContentTitle(displayTitle)
-            .setContentText(content)
             .setOngoing(false)
             .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setSilent(true)
+            .setPriority(priority)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            // Android 12+ holds a foreground-service notification back for ten seconds when it is
+            // not marked immediate — longer than most latency batches run for, so the shade often
+            // never shows this one at all.
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_DEFERRED)
+        if (content.isNotEmpty()) builder.setContentText(content)
+        return builder
     }
 }
 

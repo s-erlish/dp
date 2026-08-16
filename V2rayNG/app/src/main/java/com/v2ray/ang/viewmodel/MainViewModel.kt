@@ -959,9 +959,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 AppConfig.MSG_MEASURE_CONFIG_NOTIFY -> {
-                    val content = intent.getStringExtra("content")
-                    updateTestResultAction.value =
-                        getApplication<AngApplication>().getString(R.string.connection_runing_task_left, content)
+                    // The batch's own progress figure, and it is a SIGNAL, not a sentence: the one
+                    // observer repaints the list and never reads the text. It used to be formatted
+                    // into «Запущено проверок: 10 / 10» here — the same internal tally the shade
+                    // was showing — so a string a person could read was being built for nobody.
+                    updateTestResultAction.value = intent.getStringExtra("content").orEmpty()
                 }
 
                 AppConfig.MSG_MEASURE_CONFIG_FINISH -> {
