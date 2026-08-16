@@ -279,11 +279,22 @@ object SubscriptionUpdater {
                     }
                 )
             }
-            AngConfigManager.updateConfigViaSub(sub)
+            val outcome = AngConfigManager.updateConfigViaSub(sub)
 
             // Clear notification — unconditional, so one posted before the switch was turned off
             // still goes away.
             NotificationHelper.cancel(NotificationChannelType.SUBSCRIPTION_UPDATE, applicationContext)
+
+            // THE UI IS TOLD, and it has to be: a refresh deletes every profile of this провайдер
+            // and mints a new guid for each replacement, while the screen keeps a cache of the old
+            // ones. Tapping a row from that stale cache stored a guid that no longer exists as the
+            // selection, and Главная then said «Выберите сервер в списке ниже» over a full list
+            // with the connect object disabled. This worker runs in its own process, so a broadcast
+            // is the only way to reach the Activity — and it is sent only when servers actually
+            // moved, so a refresh that changed nothing costs nothing.
+            if (outcome.configCount > 0) {
+                MessageUtil.sendMsg2UI(applicationContext, AppConfig.MSG_STATE_SERVERS_CHANGED, "")
+            }
 
             // The refresh rewrote this subscription's server list in the provider's order.
             SettingsManager.applyServerSortOrder()

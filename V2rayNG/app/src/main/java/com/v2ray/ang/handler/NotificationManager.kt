@@ -95,7 +95,18 @@ object NotificationManager {
             }
 
         val notification = try {
-            buildRichNotification(service, channelId, currentConfig)
+            // A START THAT ARRIVES WHILE A SESSION IS UP MUST NOT BLANK THE ROW IN THE SHADE.
+            // `CoreVpnService` promotes itself to the foreground with `null` before it knows which
+            // server it is about to run — the 5-second deadline does not wait for that — and with a
+            // live tunnel underneath, building from `null` would replace «🇵🇱 Poland  00:11:52» with
+            // a title-less notification for as long as the duplicate start took to be refused. When
+            // there is nothing new to say and something already said, re-post that.
+            val existing = mBuilder
+            if (currentConfig == null && existing != null) {
+                existing.build()
+            } else {
+                buildRichNotification(service, channelId, currentConfig)
+            }
         } catch (e: Exception) {
             // Any failure while assembling the rich notification must not prevent the mandatory
             // startForeground() call. Fall back to a minimal, always-valid notification.

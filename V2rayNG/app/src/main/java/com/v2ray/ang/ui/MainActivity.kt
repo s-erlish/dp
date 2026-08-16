@@ -1283,6 +1283,22 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * looking selected at once.
      */
     private fun setSelectServer(guid: String) {
+        // A ROW CAN NAME A SERVER THAT NO LONGER EXISTS, and storing that guid is what broke the
+        // screen. The list on screen is a cache of guids; a подписка refresh — including the
+        // unattended one, which runs in a worker while this Activity is in front — deletes every
+        // profile of that провайдер and mints new guids for the replacements. Until the cache is
+        // rebuilt, every row addresses a deleted profile, and this write used to accept one: from
+        // that moment the selection named nothing, Главная drew «Выберите сервер в списке ниже»
+        // over a full list, and the connect object was disabled. The answer is not a message, it is
+        // the list: rebuild it from the store so the rows address real servers again, and let the
+        // user's next tap land on one. (`MainViewModel.reloadServerList` also repairs the
+        // selection, so the screen is never left with servers and nothing selected.)
+        if (MmkvManager.decodeServerConfig(guid) == null) {
+            mainViewModel.reloadServerList()
+            homeFragment?.refreshSelectedServer()
+            return
+        }
+
         val selected = MmkvManager.getSelectServer()
         if (guid != selected) {
             MmkvManager.setSelectServer(guid)
@@ -1382,6 +1398,17 @@ class MainActivity : HelperBaseActivity(), MainHost {
 
     override fun onResume() {
         super.onResume()
+        // THE CACHE IS CHECKED AGAINST THE STORE FIRST, and only re-read when the two disagree.
+        // A подписка refresh replaces a провайдер's servers with new guids from a worker that owns
+        // no list; it announces itself now (MSG_STATE_SERVERS_CHANGED), but an app that was not
+        // running when it landed hears nothing. Every tab paints from `serversCache`, so a stale
+        // one means every row on screen addresses a profile that has been deleted — and the first
+        // tap on one of them left the app with no selection and a disabled connect object. The
+        // comparison is guid list against guid list; nothing is parsed and nothing repaints unless
+        // something actually moved.
+        if (mainViewModel.reloadServerListIfStale()) {
+            homeFragment?.refreshSelectedServer()
+        }
         // Главная re-reads the selected server, and its account chip, in HomeFragment.onResume — a
         // hidden tab is still RESUMED, so every tab refreshes itself without the shell reaching
         // into it. (Other entry points change the selection without owning a list: the URL-scheme

@@ -193,7 +193,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * whether or not a registration was needed.
      */
     fun startListenBroadcast() {
-        isRunning.value = false
+        // «NOT RUNNING» IS ONLY PUBLISHED WHEN NOTHING IS KNOWN YET. This is called again on every
+        // Activity recreate — a rotation, a theme change, a language change — and this ViewModel
+        // OUTLIVES all three, so it already holds the answer at that point. Overwriting it with
+        // `false` threw that answer away for the few hundred milliseconds until the daemon replied
+        // to the handshake below, and in that window the screen showed a live tunnel as
+        // disconnected: the session clock stopped and restarted, the hero played its exit, and the
+        // connect object offered to CONNECT something that was already connected — a press there
+        // used to arrive at the daemon as a duplicate start and tear the tunnel down (see
+        // `CoreVpnService.onStartCommand`).
+        //
+        // A cold start still seeds `false`, because then it is true: nothing is running that this
+        // process knows of, and the screen has to paint something while the handshake is in flight.
+        if (isRunning.value == null) isRunning.value = false
         if (!broadcastRegistered) {
             val mFilter = IntentFilter(AppConfig.BROADCAST_ACTION_ACTIVITY)
             ContextCompat.registerReceiver(getApplication(), mMsgReceiver, mFilter, Utils.receiverFlags())
@@ -219,8 +231,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Reloads the server list based on current subscription filter.
+     *
+     * THE SELECTION IS REPAIRED FIRST, and this is the one place in the app that does it. Every
+     * path that can invalidate the selection ends here — an import, a delete, a subscription
+     * refresh (including the unattended one, see [AppConfig.MSG_STATE_SERVERS_CHANGED]), a finished
+     * check — so a list that has servers is a list with one of them selected, by construction. See
+     * [MmkvManager.ensureSelectedServer].
      */
     fun reloadServerList() {
+        MmkvManager.ensureSelectedServer()
+
         serverList = if (subscriptionId.isEmpty()) {
             MmkvManager.decodeAllServerList()
         } else {
@@ -229,6 +249,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         updateCache()
         updateListAction.value = -1
+    }
+
+    /**
+     * Re-reads the store ONLY when it no longer agrees with what this cache holds.
+     *
+     * The cache is a snapshot of guids, and a subscription refresh mints new ones for every server
+     * it replaces — so after one has run, every row on screen addresses a profile that has been
+     * deleted. Tapping such a row stored a dead guid as the selection, and from that moment Главная
+     * said «Выберите сервер в списке ниже» over a full list and the connect object was disabled.
+     *
+     * The refresh announces itself now, but an announcement can be missed (the app was not running,
+     * the broadcast was dropped), so the shell also asks this on every resume. The comparison is a
+     * list of strings against a list of strings — no profile is parsed unless something actually
+     * changed, which is what keeps it off the "лишняя нагрузка" list.
+     *
+     * @return true when the list was stale and has been reloaded.
+     */
+    fun reloadServerListIfStale(): Boolean {
+        val stored = if (subscriptionId.isEmpty()) {
+            MmkvManager.decodeAllServerList()
+        } else {
+            MmkvManager.decodeServerList(subscriptionId)
+        }
+        val listMatches = stored == serverList
+        val selectionHealthy = stored.isEmpty() || MmkvManager.getSelectServer() != null
+        if (listMatches && selectionHealthy) return false
+        reloadServerList()
+        return true
     }
 
     /**
@@ -877,6 +925,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 AppConfig.MSG_STATE_STOP_SUCCESS -> {
                     isRunning.value = false
                     runningGuid = null
+                }
+
+                AppConfig.MSG_STATE_SERVERS_CHANGED -> {
+                    // A подписка refresh replaced this провайдер's servers, in a worker that owns no
+                    // list. Everything on screen is addressing guids that no longer exist, so the
+                    // cache is rebuilt from the store — which also repairs the selection
+                    // (reloadServerList). Receivers run on the main thread, so the LiveData set
+                    // inside is on the right one.
+                    reloadServerList()
                 }
 
                 AppConfig.MSG_MEASURE_DELAY_SUCCESS -> {

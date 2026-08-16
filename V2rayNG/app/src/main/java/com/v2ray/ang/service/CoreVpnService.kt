@@ -18,6 +18,7 @@ import androidx.annotation.RequiresApi
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.LOOPBACK
 import com.v2ray.ang.BuildConfig
+import com.v2ray.ang.R
 import com.v2ray.ang.contracts.ServiceControl
 import com.v2ray.ang.contracts.Tun2SocksControl
 import com.v2ray.ang.core.CoreServiceManager
@@ -123,7 +124,46 @@ class CoreVpnService : VpnService(), ServiceControl {
                 stopAllService()
                 return START_NOT_STICKY
             }
-            setupVpnService()
+            // A START THAT ARRIVES ON A LIVE TUNNEL IS A DUPLICATE, NOT A NEW SESSION — and until
+            // this guard it was the fastest way to lose a working connection.
+            //
+            // The shell decides whether to start or stop from `MainViewModel.isRunning`, and that
+            // value is OPTIMISTIC: `startListenBroadcast()` publishes `false` on every Activity
+            // start, before the daemon has answered the registration handshake. Press the connect
+            // object in that window — the app has just been opened, on a phone where the tunnel
+            // has been up since yesterday — and a start is issued against a core that is already
+            // running. What followed was: `configureVpnService()` closed the live interface and
+            // established a new one, `startCoreLoop` then refused because the core was up, and the
+            // refusal was handled by `stopAllService()`. The tunnel went down and the screen said
+            // «Не удалось подключиться».
+            //
+            // Nothing here has anything to do: the tunnel the caller wants IS the tunnel that is
+            // running. So say so, and leave it alone. Checked after the foreground promotion (which
+            // now re-posts the live notification rather than blanking it) because the promotion is
+            // what the 5-second `startForegroundService` deadline demands, whatever comes next.
+            if (CoreServiceManager.isRunning()) {
+                LogUtil.w(AppConfig.TAG, "StartCore-VPN: A core is already running; keeping the live tunnel")
+                MessageUtil.sendMsg2UI(this, AppConfig.MSG_STATE_RUNNING, "")
+                return START_STICKY
+            }
+
+            // THE SETUP'S ANSWER IS HONOURED, and both halves of that matter.
+            //
+            // It used to be ignored, so a setup that bailed still fell into startService() — and
+            // that guard is `::mInterface.isInitialized`, which stays true for the rest of the
+            // process once a session has ever been established. So the second connect after a
+            // revoked VPN permission handed the core the PREVIOUS session's file descriptor, which
+            // stopAllService had already closed.
+            //
+            // The other half is that a refusal announced nothing. `prepare() != null` — the system
+            // permission has been withdrawn — called stopSelf() and stopped, with no state
+            // broadcast at all, so the screen sat on «Подключение…» until the 20-second watchdog
+            // gave up on it. A start that cannot happen says so now, in the same breath as every
+            // other failed start.
+            if (!setupVpnService()) {
+                LogUtil.e(AppConfig.TAG, "StartCore-VPN: Setup failed; not starting the core")
+                return START_NOT_STICKY
+            }
             startService()
         } catch (e: Exception) {
             // Any uncaught failure here would kill the :RunSoLibV2RayDaemon process, leaving the
@@ -182,22 +222,29 @@ class CoreVpnService : VpnService(), ServiceControl {
     /**
      * Sets up the VPN service.
      * Prepares the VPN and configures it if preparation is successful.
+     *
+     * @return true when the tunnel interface is up and the core may be started.
      */
-    private fun setupVpnService() {
+    private fun setupVpnService(): Boolean {
         val prepare = prepare(this)
         if (prepare != null) {
             LogUtil.e(AppConfig.TAG, "StartCore-VPN: Permission not granted")
+            // The user revoked the VPN permission (or another app took it). Nothing here can ask
+            // for it back — only an Activity can — so the honest thing is to report the start as
+            // failed and let the screen offer the retry, rather than leaving it negotiating.
+            reportStartFailure(getString(R.string.toast_permission_denied))
             stopSelf()
-            return
+            return false
         }
 
         if (configureVpnService() != true) {
             LogUtil.e(AppConfig.TAG, "StartCore-VPN: Configuration failed")
             stopSelf()
-            return
+            return false
         }
 
         runTun2socks()
+        return true
     }
 
     /**

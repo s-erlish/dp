@@ -270,6 +270,18 @@ object AppConfig {
     const val MSG_MEASURE_CONFIG_NOTIFY = 73
     const val MSG_MEASURE_CONFIG_FINISH = 74
 
+    /**
+     * A подписка refresh replaced servers, so anything holding a server list must re-read it.
+     *
+     * IT CROSSES PROCESSES ON PURPOSE. The periodic refresh runs in a WorkManager worker while the
+     * app is in the foreground, and it deletes every profile of the провайдер it refreshes and
+     * mints a new guid for each replacement. Until this existed nothing told the UI: the rows on
+     * screen went on addressing profiles that had been deleted, and a tap on one of them stored a
+     * dead guid as the selection — after which Главная said «Выберите сервер в списке ниже» over a
+     * full list and the connect object was disabled.
+     */
+    const val MSG_STATE_SERVERS_CHANGED = 81
+
     /** Notification channel IDs and names. */
     const val RAY_NG_CHANNEL_ID = "DEPARTAMENT_VPN_CH_ID"
     const val RAY_NG_CHANNEL_NAME = "departament VPN"

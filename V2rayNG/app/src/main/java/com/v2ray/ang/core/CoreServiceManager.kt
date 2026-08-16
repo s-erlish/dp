@@ -94,8 +94,19 @@ object CoreServiceManager {
     fun startVService(context: Context, guid: String? = null) {
         LogUtil.i(AppConfig.TAG, "StartCore-Manager: startVService from ${context::class.java.simpleName}")
 
+        // A CALLER'S GUID IS ACCEPTED ONLY IF IT NAMES A SERVER THAT EXISTS. The one caller that
+        // passes one is Tasker, which stores the guid in a task the user built weeks ago — and
+        // every подписка refresh since has deleted the profile and minted a new guid in its place.
+        // Writing that dead guid replaced a perfectly good selection with nothing, so the automation
+        // failed AND left the app unable to connect afterwards until the user re-picked a server.
+        // A guid we cannot honour changes nothing; the start below then runs on the selection the
+        // user already has, which is the closest thing to what was asked for.
         if (guid != null) {
-            MmkvManager.setSelectServer(guid)
+            if (MmkvManager.decodeServerConfig(guid) != null) {
+                MmkvManager.setSelectServer(guid)
+            } else {
+                LogUtil.w(AppConfig.TAG, "StartCore-Manager: requested server no longer exists, keeping the current selection")
+            }
         }
 
         try {

@@ -61,8 +61,16 @@ object RowBinder {
      */
     enum class TileRole { NEUTRAL, ACCENT, DESTRUCTIVE }
 
-    /** The title's ramp role. [DESTRUCTIVE] is `TextAppearance.App.Title.Destructive`. */
-    enum class RowTone { DEFAULT, DESTRUCTIVE }
+    /**
+     * The title's tone. The SIZE never changes with it - handoff §6 gives every row title
+     * 14sp/400 (`TextAppearance.App.Body`) and the tone only moves its colour.
+     *
+     * [ACCENT] is §7's action row: «Проверить обновление», «Копировать», «Очистить»,
+     * «Сканировать код телевизора», «Добавить правило». The prototype draws those as a normal
+     * row whose NAME is accent-coloured, with no chevron and no button - the accent is the
+     * affordance. At most one such group per screen, or the screen turns blue.
+     */
+    enum class RowTone { DEFAULT, DESTRUCTIVE, ACCENT }
 
     /**
      * Where a row sits in a section card that does NOT clip its children - see [edge].
@@ -146,6 +154,20 @@ object RowBinder {
          * checkable node rather than only drawn. Fires `tickHaptic()` per 00-rules.md 8.10.
          */
         data class Toggle(
+            val checked: Boolean,
+            val onCheckedChange: (Boolean) -> Unit,
+        ) : Trailing
+
+        /**
+         * MEMBERSHIP of a set, which is not the same promise as [Toggle] (handoff §7, «список
+         * приложений с чекбоксами»). A switch says «this is on now»; a box says «this one is in
+         * the set some other control acts on». «Прокси по приложениям» marks 128 apps, and a
+         * column of switches down its right edge claims to be turning 128 things on one at a time.
+         *
+         * The ROW still owns the tap and the box is neither clickable nor focusable, exactly as
+         * with [Toggle], so nothing about the touch target or the announcement changes.
+         */
+        data class Checkbox(
             val checked: Boolean,
             val onCheckedChange: (Boolean) -> Unit,
         ) : Trailing
@@ -237,6 +259,10 @@ object RowBinder {
         require(trailing !is Trailing.Toggle || value == null) {
             "Departament row: a toggle row is a title, an optional subtitle and the switch " +
                 "(22-components 8.5). A value beside a switch is two trailing elements."
+        }
+        require(trailing !is Trailing.Checkbox || value == null) {
+            "Departament row: a checkbox row is a title, an optional subtitle and the box. " +
+                "A value beside it is two trailing elements."
         }
 
         val slots = RowSlots.of(root)
@@ -333,11 +359,17 @@ object RowBinder {
         subtitle: CharSequence?,
         tone: RowTone,
     ) {
+        // ONE SIZE FOR EVERY ROW TITLE — handoff §6: «заголовок 14sp/400». The tone moves the
+        // colour and nothing else, so a red «Удалить» and an accent «Копировать» sit on the same
+        // baseline grid as the row above them. The colour is an ATTRIBUTE rather than a second
+        // TextAppearance because the mono overlay redefines attributes and cannot reach a style.
         slots.title.text = title
-        slots.title.setTextAppearance(
+        slots.title.setTextAppearance(R.style.TextAppearance_App_Body)
+        slots.title.setTextColor(
             when (tone) {
-                RowTone.DEFAULT -> R.style.TextAppearance_App_Title
-                RowTone.DESTRUCTIVE -> R.style.TextAppearance_App_Title_Destructive
+                RowTone.DEFAULT -> slots.title.themeColor(com.google.android.material.R.attr.colorOnSurface)
+                RowTone.DESTRUCTIVE -> slots.title.themeColor(R.attr.colorDestructiveText)
+                RowTone.ACCENT -> slots.title.themeColor(androidx.appcompat.R.attr.colorPrimary)
             }
         )
         slots.subtitle.text = subtitle ?: ""
@@ -364,6 +396,7 @@ object RowBinder {
         slots.marker.visibility = View.GONE
         slots.toggle.setOnCheckedChangeListener(null)
         slots.toggle.visibility = View.GONE
+        slots.checkBox.visibility = View.GONE
         slots.iconAction.clearClick()
         slots.iconAction.visibility = View.GONE
         slots.actionButton.clearClick()
@@ -401,20 +434,22 @@ object RowBinder {
                 setOnCheckedChangeListener { _, checked -> trailing.onCheckedChange(checked) }
             }
 
+            is Trailing.Checkbox -> with(slots.checkBox) {
+                visibility = View.VISIBLE
+                // The fill and the tick both hang off this one state, so a recycled row cannot
+                // keep the previous item's tick. Jump to it: an animated state change queued
+                // before the first draw parks and then spills out into it (the switch defect).
+                isActivated = trailing.checked
+                jumpDrawablesToCurrentState()
+            }
+
             is Trailing.Marker -> {
                 // The slot stays VISIBLE and moves its alpha, so selection changes nothing about
-                // the layout - no reflow, no geometry shift (22-components 18.1).
+                // the layout - no reflow, no geometry shift (22-components 18.1). The title does
+                // NOT change weight with it: §6 gives every row title one size and one weight,
+                // and the marker plus the activated background are already two channels.
                 slots.marker.visibility = View.VISIBLE
                 slots.marker.alpha = if (trailing.selected) 1f else 0f
-                // The fourth selection axis: title weight 700 selected, 500 not. Both are ramp
-                // roles, so the weight is never set inline.
-                slots.title.setTextAppearance(
-                    if (trailing.selected) {
-                        R.style.TextAppearance_App_Title
-                    } else {
-                        R.style.TextAppearance_App_Title_Medium
-                    }
-                )
             }
 
             is Trailing.IconAction -> with(slots.iconAction) {
@@ -445,6 +480,7 @@ object RowBinder {
         // lives in the trailing slot would stay tappable. Disable the three interactive slots by
         // hand; the other trailing elements are glyphs and have nothing to disable.
         slots.toggle.isEnabled = enabled
+        slots.checkBox.isEnabled = enabled
         slots.iconAction.isEnabled = enabled
         slots.actionButton.isEnabled = enabled
         // R6: disabled is 0.38 on the WHOLE control, on both platforms.
@@ -461,6 +497,12 @@ object RowBinder {
                 slots.toggle.isChecked = !slots.toggle.isChecked
             }
 
+            trailing is Trailing.Checkbox -> root.onSingleClick(Haptic.TICK) {
+                val next = !slots.checkBox.isActivated
+                slots.checkBox.isActivated = next
+                trailing.onCheckedChange(next)
+            }
+
             onClick != null -> {
                 root.onSingleClick(haptic, onClick)
                 root.isFocusable = true
@@ -471,9 +513,11 @@ object RowBinder {
 
         applySemantics(
             root = root,
-            checkable = trailing is Trailing.Toggle,
-            checked = trailing is Trailing.Toggle && trailing.checked,
+            checkable = trailing is Trailing.Toggle || trailing is Trailing.Checkbox,
+            checked = (trailing is Trailing.Toggle && trailing.checked) ||
+                (trailing is Trailing.Checkbox && trailing.checked),
             selected = trailing is Trailing.Marker && trailing.selected,
+            checkboxClass = trailing is Trailing.Checkbox,
         )
     }
 
@@ -487,6 +531,7 @@ object RowBinder {
         checkable: Boolean,
         checked: Boolean,
         selected: Boolean,
+        checkboxClass: Boolean = false,
     ) {
         ViewCompat.setAccessibilityDelegate(root, object : AccessibilityDelegateCompat() {
             override fun onInitializeAccessibilityNodeInfo(
@@ -505,7 +550,9 @@ object RowBinder {
                 @Suppress("DEPRECATION")
                 info.isChecked = checked
                 info.isSelected = selected
-                if (checkable) info.className = SWITCH_CLASS
+                if (checkable) {
+                    info.className = if (checkboxClass) CHECKBOX_CLASS else SWITCH_CLASS
+                }
             }
         })
     }
@@ -513,6 +560,7 @@ object RowBinder {
     private const val DISABLED_ALPHA = 0.38f
     private const val EXPANDED_DEGREES = 90f
     private const val SWITCH_CLASS = "android.widget.Switch"
+    private const val CHECKBOX_CLASS = "android.widget.CheckBox"
 }
 
 /**
@@ -531,6 +579,7 @@ class RowSlots private constructor(
     val marker: ImageView,
     val trailingGlyph: ImageView,
     val toggle: MaterialSwitch,
+    val checkBox: ImageView,
     val iconAction: MaterialButton,
     val actionButton: MaterialButton,
 ) {
@@ -550,6 +599,7 @@ class RowSlots private constructor(
             marker = root.slot(R.id.row_marker, LAYOUT, "row_marker"),
             trailingGlyph = root.slot(R.id.row_trailing_glyph, LAYOUT, "row_trailing_glyph"),
             toggle = root.slot(R.id.row_switch, LAYOUT, "row_switch"),
+            checkBox = root.slot(R.id.row_check_box, LAYOUT, "row_check_box"),
             iconAction = root.slot(R.id.row_icon_action, LAYOUT, "row_icon_action"),
             actionButton = root.slot(R.id.row_action, LAYOUT, "row_action"),
         )

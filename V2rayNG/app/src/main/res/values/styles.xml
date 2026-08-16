@@ -212,6 +212,23 @@
         popup's own colour to the full-strength ink token and lets every option
         inherit it.
     -->
+    <!--
+        MONO — face: the platform monospace. 11sp / 400 / lh 18.7 (1.7).
+        Handoff §7's «моноширинный блок лога» and nothing else. It is the one place
+        in the product where the SHAPE of the text carries meaning: a log lines up in
+        columns only if every glyph is the same width, and 11 is the size at which a
+        real 100-character line fits the slab without wrapping into porridge.
+        colorOnSurfaceVariant, because the slab is a reference the user scans and not
+        prose they read.
+    -->
+    <style name="TextAppearance.App.Mono" parent="TextAppearance.App.Caption">
+        <item name="android:fontFamily">monospace</item>
+        <item name="fontFamily">monospace</item>
+        <item name="android:textSize">11sp</item>
+        <item name="lineHeight">19sp</item>
+        <item name="android:letterSpacing">0.0</item>
+    </style>
+
     <style name="TextAppearance.App.SelectOption" parent="TextAppearance.App.Subtitle">
         <item name="android:textColor">?attr/colorOnSurface</item>
     </style>

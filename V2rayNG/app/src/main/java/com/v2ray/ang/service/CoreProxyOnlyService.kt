@@ -9,6 +9,7 @@ import com.v2ray.ang.contracts.ServiceControl
 import com.v2ray.ang.core.CoreServiceManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.util.LogUtil
+import com.v2ray.ang.util.MessageUtil
 import com.v2ray.ang.util.MyContextWrapper
 import java.lang.ref.SoftReference
 
@@ -31,10 +32,24 @@ class CoreProxyOnlyService : Service(), ServiceControl {
      */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         LogUtil.i(AppConfig.TAG, "StartCore-Proxy: Service command received")
-        // Honour the result. startCoreLoop() returns false when a core is already running, and
-        // ignoring that meant a failed start left the PREVIOUS server's core alive while the UI
-        // reported the newly selected one — a silent lie about where the traffic is going.
-        // CoreVpnService already stops itself in that case; this service must do the same.
+
+        // A DUPLICATE START IS NOT A FAILED ONE, and telling them apart is what keeps a live
+        // connection alive. `startCoreLoop` answers false to both — "a core is already running" and
+        // "the core would not start" — and the branch below treats false as failure and stops the
+        // service, which tears down the very core that was already serving traffic. The shell can
+        // issue such a start honestly: `MainViewModel.isRunning` is published as false on every
+        // Activity start and only corrected when the daemon answers the handshake, so a connect
+        // pressed in that window arrives on a running core. Answer it with the truth — the tunnel
+        // is up — and change nothing.
+        if (CoreServiceManager.isRunning()) {
+            LogUtil.w(AppConfig.TAG, "StartCore-Proxy: A core is already running; keeping it")
+            MessageUtil.sendMsg2UI(this, AppConfig.MSG_STATE_RUNNING, "")
+            return START_STICKY
+        }
+
+        // Honour the result. A genuine refusal must not leave a half-started service behind: it
+        // used to be ignored, and a failed start then left the PREVIOUS server's core alive while
+        // the UI reported the newly selected one — a silent lie about where the traffic is going.
         if (!CoreServiceManager.startCoreLoop(null)) {
             LogUtil.e(AppConfig.TAG, "StartCore-Proxy: Failed to start core loop")
             // stopSelf() alone — onDestroy() performs the single stopCoreLoop() teardown.

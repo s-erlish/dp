@@ -72,12 +72,61 @@ object MmkvManager {
 
 
     /**
-     * Gets the selected server GUID.
+     * The selected server — **and only when that server still exists.**
      *
-     * @return The selected server GUID.
+     * A STORED GUID IS NOT A SERVER, and that gap is the whole defect this guard closes. Every
+     * subscription refresh deletes each of a провайдер's profiles and mints new guids for the
+     * replacements ([removeServerViaSubid] + `AngConfigManager.parseCustomConfigServer`), and the
+     * refresh runs unattended — the periodic worker fires while the app is in the foreground. What
+     * it leaves behind, whenever the re-selection above it does not land, is this key pointing at a
+     * profile that no longer exists.
+     *
+     * Nothing downstream could tell that apart from a real selection. `HomeFragment.resolveState`
+     * read it, failed to decode the profile, and drew «Выберите сервер в списке ниже» with the
+     * connect object disabled — a screen full of servers and no way to use any of them.
+     * `CoreServiceManager.startContextService` read it and answered «Неправильный профиль».
+     *
+     * So a dangling guid reads as NO SELECTION, which is what it is. The value is not deleted here:
+     * a getter that writes would race every caller, and [ensureSelectedServer] is the one place that
+     * repairs the store.
+     *
+     * @return The selected server GUID, or null when nothing is selected or the selection is dead.
      */
     fun getSelectServer(): String? {
-        return mainStorage.decodeString(KEY_SELECTED_SERVER)
+        val guid = mainStorage.decodeString(KEY_SELECTED_SERVER)
+        if (guid.isNullOrBlank()) return null
+        // containsKey, not decodeServerConfig: this is read on every render and every row rebuild,
+        // and the question is whether the profile EXISTS, not what is in it.
+        if (!profileFullStorage.containsKey(guid)) return null
+        return guid
+    }
+
+    /**
+     * Repairs the stored selection, and returns what is selected afterwards.
+     *
+     * Called wherever the server list is (re)read, so that "there are servers but none is selected"
+     * cannot survive a single list rebuild. Three outcomes:
+     *
+     *  - the selection names a live server → nothing is written, that guid is returned;
+     *  - the selection is dead or absent and there IS a server → the first server in the stored
+     *    order is promoted, which is the same server a fresh import would have selected
+     *    (`AngConfigManager.resolveSelectedKey`: "fresh add selects the first subscription server");
+     *  - there is no server at all → the dead key is removed and null is returned, so the screen
+     *    shows its empty state rather than naming a server nobody has.
+     *
+     * @return The GUID now selected, or null when the app has no servers.
+     */
+    fun ensureSelectedServer(): String? {
+        val stored = mainStorage.decodeString(KEY_SELECTED_SERVER)
+        if (!stored.isNullOrBlank() && profileFullStorage.containsKey(stored)) return stored
+
+        val replacement = decodeAllServerList().firstOrNull { profileFullStorage.containsKey(it) }
+        if (replacement == null) {
+            if (!stored.isNullOrBlank()) mainStorage.remove(KEY_SELECTED_SERVER)
+            return null
+        }
+        mainStorage.encode(KEY_SELECTED_SERVER, replacement)
+        return replacement
     }
 
     /**

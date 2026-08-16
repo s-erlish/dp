@@ -401,29 +401,43 @@ class MainRecyclerAdapter(
     /**
      * Repaints selection to match [guid] (defaults to whatever MMKV holds).
      *
-     * Refreshing only the two affected rows is the cheap path, but it is only correct when BOTH
-     * rows are currently in [rows]. The old row can be missing — it may sit inside a collapsed
-     * section, or the list may have been rebuilt by a subscription update since it was selected —
-     * and a missed refresh leaves it painted as selected next to the new one, which is the
-     * "two servers selected at once" defect. So: fall back to a full refresh whenever either row
-     * cannot be located.
+     * Refreshing only the affected rows is the cheap path, but it is only correct when every one of
+     * them is currently in [rows]. A row can be missing — it may sit inside a collapsed section, or
+     * the list may have been rebuilt by a subscription update since it was selected — and a missed
+     * refresh leaves it painted as selected next to the new one, which is the "two servers selected
+     * at once" defect. So: fall back to a full refresh whenever a row cannot be located.
+     *
+     * THE MIRROR IS REPAINTED TOO, NOT ONLY THE CALLER'S `previous`, and that is what closes the
+     * last hole in this file. [previous] is what the SHELL read out of MMKV before it wrote; the
+     * mirror is what THIS adapter actually painted blue, and the two are not the same thing —
+     * anything that writes the selection without owning a list (an import, the service starting
+     * with an explicit guid) moves the stored value while the painted row stays where it was. When
+     * they disagree and both are on screen, refreshing the caller's row alone left the mirror's row
+     * blue beside the new one: the same defect, arrived at from the other side. The union of the
+     * three is the only set that is always right, and repainting a row that was already correct
+     * costs one bind.
      */
     @SuppressLint("NotifyDataSetChanged")
     fun syncSelection(guid: String? = MmkvManager.getSelectServer(), previous: String? = selectedGuid) {
-        if (guid == selectedGuid && previous == selectedGuid) return
+        val painted = selectedGuid
+        if (guid == painted && previous == painted) return
         selectedGuid = guid
 
-        val fromPos = previous?.let { flatPositionOf(it) } ?: -1
-        val toPos = guid?.let { flatPositionOf(it) } ?: -1
-
-        val fromResolved = previous == null || fromPos >= 0
-        val toResolved = guid == null || toPos >= 0
-        if (!fromResolved || !toResolved) {
-            notifyDataSetChanged()
-            return
+        // Every row whose look can be wrong now: the one the shell moved away from, the one this
+        // adapter actually painted, and the new one.
+        val affected = listOfNotNull(previous, painted, guid).distinct()
+        val positions = ArrayList<Int>(affected.size)
+        for (candidate in affected) {
+            val position = flatPositionOf(candidate)
+            if (position < 0) {
+                // A row that has to change and cannot be addressed — collapsed, filtered away, or
+                // gone with a refresh. Nothing targeted can reach it, so repaint everything.
+                notifyDataSetChanged()
+                return
+            }
+            positions.add(position)
         }
-        if (fromPos >= 0) notifyItemChanged(fromPos)
-        if (toPos >= 0 && toPos != fromPos) notifyItemChanged(toPos)
+        positions.distinct().forEach { notifyItemChanged(it) }
     }
 
     /** Flat adapter position of a server guid, or -1. */

@@ -10,12 +10,22 @@
   a slot a caller either shows or leaves hidden, and the archetype is decided by
   WHICH ONE TRAILING SLOT is shown, never by a second layout file.
 
-  GEOMETRY (from @style/Widget.Departament.Row, never restated inline):
-      [ 16 gutter ][ 40 tile r12, 22 glyph ][ 12 ][ text column ][ 12 ][ trailing ][ 16 ]
-  Text origin 68 = 16 + 40 + 12 on a TILED row; 16 on a PLAIN row (5.3), which is
-  what hiding @id/row_tile gives you for free — its 12dp end margin goes with it.
+  GEOMETRY — handoff README §6 «Строка», measured off the prototype rather than
+  guessed (docs/design2026/port-shots-2/43-routing.geo.json):
+      [ 16 gutter ][ 40 tile r12, 22 glyph ][ 16 ][ text column ][ 12 ][ trailing ][ 16 ]
+  Text origin 72 = 16 + 40 + 16 on a TILED row; 16 on a PLAIN row (5.3), which is
+  what hiding @id/row_tile gives you for free — its end margin goes with it.
+  Vertical padding is 10, not the 12 of @style/Widget.Departament.Row, and that is
+  the one thing this file overrides: 10 + 40 + 10 is the prototype's 61dp row and
+  12 would make every row in every sub-screen 3dp tall.
   minHeight 56, height wrap_content: a two-line subtitle GROWS the row, and at font
   scale 200% every text box grows with it. There is not one fixed height in this file.
+
+  THE TYPE IS §6's, NOT THE CARD'S. Заголовок 14sp/400 (Body) and подпись 12.5sp
+  (Caption) — a row title is a LABEL the eye sweeps past, not a heading, and the
+  16sp/700 this file used to carry made every settings list shout. RowBinder applies
+  both roles on every bind, so the appearances below are the resting state a
+  tools-preview shows and never the last word.
 
   THE TWO ROW SPECIES ARE DERIVED, NOT CHOSEN (5.3): a group is tiled if and only if
   its rows carry a leading glyph that DIFFERS between rows. If every row would carry
@@ -70,7 +80,9 @@
     style="@style/Widget.Departament.Row"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:baselineAligned="false">
+    android:baselineAligned="false"
+    android:paddingTop="@dimen/space_10"
+    android:paddingBottom="@dimen/space_10">
 
     <!-- TILED groups only. Gone = a plain row at the 16dp origin (5.3). The glyph is
          the caller's; the 40/12/22 geometry and the neutral fill are the style's. -->
@@ -80,7 +92,7 @@
         android:backgroundTint="?attr/colorSurfaceContainerHighest"
         android:layout_width="@dimen/tile_size"
         android:layout_height="@dimen/tile_size"
-        android:layout_marginEnd="@dimen/space_12"
+        android:layout_marginEnd="@dimen/space_16"
         android:importantForAccessibility="no"
         android:visibility="gone"
         tools:src="@drawable/ic_settings_24dp"
@@ -101,7 +113,7 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="2"
-            android:textAppearance="@style/TextAppearance.App.Title"
+            android:textAppearance="@style/TextAppearance.App.Body"
             tools:text="Маршрутизация" />
 
         <!-- A subtitle that restates its title is deleted, not written (8.1). -->
@@ -112,7 +124,7 @@
             android:layout_marginTop="@dimen/space_4"
             android:ellipsize="end"
             android:maxLines="2"
-            android:textAppearance="@style/TextAppearance.App.Subtitle"
+            android:textAppearance="@style/TextAppearance.App.Caption"
             android:visibility="gone"
             tools:text="Правила для доменов и приложений"
             tools:visibility="visible" />
@@ -151,8 +163,8 @@
          reflows the list (22-components 18.1). -->
     <ImageView
         android:id="@+id/row_marker"
-        android:layout_width="@dimen/glyph_20"
-        android:layout_height="@dimen/glyph_20"
+        android:layout_width="@dimen/glyph_18"
+        android:layout_height="@dimen/glyph_18"
         android:layout_marginStart="@dimen/space_4"
         android:importantForAccessibility="no"
         android:src="@drawable/ic_action_done"
@@ -164,8 +176,8 @@
          promise changes (8.1); the size and the tone stay. -->
     <ImageView
         android:id="@+id/row_chevron"
-        android:layout_width="@dimen/glyph_20"
-        android:layout_height="@dimen/glyph_20"
+        android:layout_width="@dimen/glyph_18"
+        android:layout_height="@dimen/glyph_18"
         android:layout_marginStart="@dimen/space_4"
         android:importantForAccessibility="no"
         android:src="@drawable/ic_chevron_right"
@@ -178,13 +190,33 @@
          carry yet), so there is no src here to be wrong. -->
     <ImageView
         android:id="@+id/row_trailing_glyph"
-        android:layout_width="@dimen/glyph_20"
-        android:layout_height="@dimen/glyph_20"
+        android:layout_width="@dimen/glyph_18"
+        android:layout_height="@dimen/glyph_18"
         android:layout_marginStart="@dimen/space_4"
         android:importantForAccessibility="no"
         android:tint="?attr/colorOnSurfaceVariant"
         android:visibility="gone"
         tools:src="@drawable/ic_arrow_drop_down" />
+
+    <!-- MEMBERSHIP OF A SET, not a boolean applied now (§7's «список приложений с
+         чекбоксами»). 22dp box, 2dp border, radius 7, a 16dp tick that exists only
+         when the box is filled — @drawable/bg_checkbox and @color/checkbox_tick do
+         both halves off one state, so the row cannot draw a filled box with no tick.
+         Not focusable and not clickable for the same reason the switch is not: the
+         WHOLE row is the target. -->
+    <ImageView
+        android:id="@+id/row_check_box"
+        android:layout_width="@dimen/checkbox_size"
+        android:layout_height="@dimen/checkbox_size"
+        android:layout_marginStart="@dimen/space_12"
+        android:background="@drawable/bg_checkbox"
+        android:importantForAccessibility="no"
+        android:padding="@dimen/space_2"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_action_done"
+        android:tint="@color/checkbox_tick"
+        android:visibility="gone"
+        tools:visibility="visible" />
 
     <!-- The row owns the toggle; the switch is decoration that reports state. -->
     <com.google.android.material.materialswitch.MaterialSwitch

@@ -188,7 +188,16 @@
     <!-- defect by 00-rules.md 14.5.                                     -->
     <!-- ============================================================= -->
     <dimen name="glyph_16">16dp</dimen>
+    <!-- The trailing glyph of a row — handoff §6 «шеврон 18dp». Measured off the
+         prototype: every chevron, caret and state marker inside a card row is an
+         18×18 box flush against the card's 16dp inner gutter. 20 is still the size
+         of a glyph that stands ALONE (a button's icon), which is why both live here. -->
+    <dimen name="glyph_18">18dp</dimen>
     <dimen name="glyph_20">20dp</dimen>
+    <!-- The checkbox of a multi-select row (§7 «список приложений с чекбоксами»).
+         22dp box, 2dp border, radius 7, a 16dp tick inside it. -->
+    <dimen name="checkbox_size">22dp</dimen>
+    <dimen name="radius_checkbox">7dp</dimen>
     <!-- The glyph inside the 40dp tile. 22 is a size here and never a gap. -->
     <dimen name="tile_glyph">22dp</dimen>
     <!--
