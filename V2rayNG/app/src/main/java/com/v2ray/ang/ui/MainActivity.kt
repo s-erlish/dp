@@ -266,6 +266,13 @@ class MainActivity : HelperBaseActivity(), MainHost {
     /** Last computed bottom-nav padding for a tab's scrolling list; see [MainHost.listBottomInset]. */
     private var navListPadding = 0
 
+    /**
+     * The bottom-nav scrim's height BEFORE the window's bottom inset is added to it — the figure
+     * `activity_main.xml` states, read once from the inflated view so the layout stays the single
+     * place that number is written. [setupEdgeToEdge] adds the inset to it on every dispatch.
+     */
+    private var navScrimBaseHeight = 0
+
     private val shareMethod: Array<out String> by lazy { resources.getStringArray(R.array.share_method) }
     private val shareMethodMore: Array<out String> by lazy { resources.getStringArray(R.array.share_method_more) }
 
@@ -857,9 +864,19 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * bars; each tab's content receives the top inset (so it clears the clock) and the
      * bottom nav a bottom inset pad (so items clear the gesture bar). The bars themselves
      * stay transparent (handled by the theme, not touched here).
+     *
+     * **EVERY FIGURE BELOW THAT MEETS THE BOTTOM OF THE WINDOW IS THE INSET PLUS SOMETHING, NEVER A
+     * CONSTANT.** The bar, its scrim and the tabs' scrolling lists all have to clear the same
+     * hardware, and the phone that has a gesture bar and the phone that has none are the same build
+     * — the owner ran both, and every symptom he reported («значки выпали выше из-за слайдера»,
+     * «кнопка настройки залазит за навигацию») was a number here that had one of the two baked in.
      */
     private fun setupEdgeToEdge() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        // The scrim's XML height is its ZERO-INSET baseline (bar + headroom); read before the first
+        // dispatch can grow it, so a second dispatch adds the inset to the baseline and not to
+        // itself.
+        navScrimBaseHeight = binding.bottomNavScrim.layoutParams.height
         ViewCompat.setOnApplyWindowInsetsListener(binding.homeRoot) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             // There is no app bar: every tab draws its own header, so each tab's content clears the
@@ -875,6 +892,25 @@ class MainActivity : HelperBaseActivity(), MainHost {
             // keep flowing behind it, so there is no black bar in either nav mode.
             val density = resources.displayMetrics.density
             binding.bottomNav.updatePadding(bottom = bars.bottom)
+            // AND THE SCRIM GROWS WITH IT. The bar's padding lifts the icons by the whole inset, so
+            // a scrim of fixed height stays behind while they climb: at 24dp of gesture bar its ramp
+            // reached the icons already a fifth opaque, and at 48dp of 3-button navigation the icons
+            // stood above it entirely. Height = baseline + inset keeps the backdrop in exactly the
+            // relationship to the buttons it has on a phone with no gesture bar — the one the owner
+            // reports as correct — whatever the phone puts under them. Written only when it actually
+            // changes: this listener runs on every dispatch and a layout request per dispatch would
+            // be a needless pass.
+            // (Guarded on a real baseline: the arithmetic is only meaningful while the scrim is
+            // declared with an exact height. A layout that ever gave it wrap/match keeps whatever
+            // that means instead of being handed a nonsense number.)
+            if (navScrimBaseHeight > 0) {
+                val scrimHeight = navScrimBaseHeight + bars.bottom
+                val scrimLp = binding.bottomNavScrim.layoutParams
+                if (scrimLp.height != scrimHeight) {
+                    scrimLp.height = scrimHeight
+                    binding.bottomNavScrim.layoutParams = scrimLp
+                }
+            }
             // The nav overlays the content, so pad the scrollable lists so the last row clears the
             // full nav footprint: the system inset + the 56dp bar content + 16dp breathing room.
             val navHeightPx = (56 * density).toInt()

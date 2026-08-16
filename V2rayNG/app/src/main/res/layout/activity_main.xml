@@ -47,11 +47,19 @@
                  80dp, halved from 160 on the owner's report from the device: «серый фон
                  от навигации нужно сделать меньше раза в 2 именно по размеру». At 160 it
                  covered roughly a fifth of a phone screen, so the fade read as a grey band
-                 over the content rather than as the bar dissolving into it. The DRAWABLE is
-                 untouched — same gradient, same direction, same stops, per the owner: the
-                 gradient is wanted, only its extent was wrong — and 80dp still covers the
-                 56dp bar plus its gesture-inset padding, so the fill never meets a hard
-                 edge under the buttons. -->
+                 over the content rather than as the bar dissolving into it. The gradient
+                 itself is what the owner wants — only its extent was ever wrong.
+
+                 THIS 80 IS THE ZERO-INSET FIGURE AND NOTHING ELSE: 56dp of bar plus 24dp of
+                 headroom above the icons. The bar below grows UPWARD by the window's bottom
+                 inset (setupEdgeToEdge pads it so the icons clear the gesture pill), and a
+                 scrim that stayed 80 tall while the icons climbed 24-48dp left them standing
+                 above their own backdrop — the owner's second phone, the one with the gesture
+                 bar. So setupEdgeToEdge adds the same inset to this height, reading the number
+                 below as its baseline: the scrim is always bar + inset + headroom, and the
+                 phone with no gesture bar keeps precisely the 80 it has today.
+                 The DRAWABLE carries the fade at a constant 40dp so growing this height moves
+                 the ramp up instead of stretching it; see bg_bottom_nav_scrim.xml. -->
             <View
                 android:id="@+id/bottom_nav_scrim"
                 android:layout_width="match_parent"
@@ -61,8 +69,16 @@
 
             <!-- Custom bottom bar (replaces Material BottomNavigationView, which reserved tall
                  internal whitespace below the label and floated the items well above the edge).
-                 A plain weighted row of icon+label hugs the very bottom; a SMALL fixed bottom pad
-                 (~gesture bar only) is applied at runtime so it sits a few dp low.
+                 A plain weighted row of icon+label hugs the very bottom, and the WHOLE system inset
+                 is padded in at runtime (setupEdgeToEdge) so the buttons stand clear of the gesture
+                 pill or the 3-button strip rather than sharing that strip with them. The bar is
+                 wrap_content, so that padding grows it UPWARD: 56dp on a phone with no gesture bar,
+                 and 56 + the inset on a phone with one. Anything drawn behind these buttons has to
+                 follow that (see bottom_nav_scrim above) — that is the whole of the owner's «значки
+                 выпали выше из-за слайдера внизу экрана»: the buttons moved, the backdrop did not.
+                 (An earlier note here promised «a SMALL fixed bottom pad, a few dp» and the code
+                 never did that; the full inset is the Material rule and the one that keeps a 48dp
+                 touch target off the system strip.)
                  The destination set is Главная · Аккаунт · Настройки, in that order — three items.
                  Аккаунт used to require a LOGIN and deleted itself otherwise, which is the two-item
                  bar the owner photographed after pasting a подписка from the clipboard; it now
