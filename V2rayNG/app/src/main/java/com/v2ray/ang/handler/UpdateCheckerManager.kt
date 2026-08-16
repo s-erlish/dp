@@ -50,6 +50,10 @@ object UpdateCheckerManager {
 
     private const val TIMEOUT_MS = 15000
 
+    /** What GitHub answers for a repository that has published no release. Not an error. */
+    private const val HTTP_NOT_FOUND = 404
+    private const val HTTP_NO_CONTENT = 204
+
     /** Where a downloaded update lives. Under `cacheDir`, which is what `@xml/cache_paths` shares. */
     private const val DOWNLOAD_DIR = "updates"
 
@@ -66,7 +70,7 @@ object UpdateCheckerManager {
             if (feed.isBlank()) throw UpdateFailure(UpdateFailure.Reason.NO_CHANNEL)
 
             val url = if (includePreRelease) feed else feed.concatUrl("latest")
-            val response = fetch(url) ?: throw UpdateFailure(UpdateFailure.Reason.UNREACHABLE)
+            val response = fetch(url)
 
             val release = parse(response, includePreRelease)
                 ?: throw UpdateFailure(UpdateFailure.Reason.NO_RELEASE)
@@ -191,11 +195,32 @@ object UpdateCheckerManager {
 
     // ------------------------------------------------------------------ feed
 
-    /** Direct first, then through the local HTTP inbound — the feed may be what is blocked. */
-    private fun fetch(url: String): String? {
-        val direct = HttpUtil.getUrlContent(UrlContentRequest(url = url, timeout = TIMEOUT_MS))
-        if (!direct.isNullOrEmpty()) return direct
-        return HttpUtil.getUrlContent(
+    /**
+     * Asks the feed, and tells the three answers apart.
+     *
+     * **«РЕЛИЗОВ ЕЩЁ НЕТ» IS AN ANSWER, NOT AN OUTAGE.** GitHub replies **404** to
+     * `/releases/latest` for a repository that has published none — and this project has published
+     * none yet: «пока что без ключей, не релизное приложение пока». That 404 used to be flattened
+     * into "no body", which became [UpdateFailure.Reason.UNREACHABLE], which the screen reported as
+     * «Не удалось связаться с сервером обновлений» and `CheckUpdateActivity` dropped into «Журнал»
+     * as an ERROR with a stack trace. The owner read that stack and reasonably concluded the app was
+     * broken. Nothing was broken; the feed answered, correctly, that there is nothing to offer.
+     *
+     * Direct first, then through the local HTTP inbound — the feed may be what is blocked. But only
+     * when the direct attempt got NO answer: once a server has replied with a status, asking the
+     * same question again through a proxy cannot change it, and the second attempt was the reason
+     * that 404 appeared in the log twice.
+     *
+     * @return the response body.
+     * @throws UpdateFailure [UpdateFailure.Reason.NO_RELEASE] when the feed answered that it has
+     *   nothing, [UpdateFailure.Reason.UNREACHABLE] when nothing answered at all.
+     */
+    private fun fetch(url: String): String {
+        val direct = HttpUtil.getUrlOutcome(UrlContentRequest(url = url, timeout = TIMEOUT_MS))
+        direct.body?.takeIf { it.isNotEmpty() }?.let { return it }
+        if (direct.answered) return orFailure(direct.code)
+
+        val proxied = HttpUtil.getUrlOutcome(
             UrlContentRequest(
                 url = url,
                 timeout = TIMEOUT_MS,
@@ -203,7 +228,32 @@ object UpdateCheckerManager {
                 proxyUsername = SettingsManager.getSocksUsername(),
                 proxyPassword = SettingsManager.getSocksPassword(),
             )
-        )?.takeIf { it.isNotEmpty() }
+        )
+        proxied.body?.takeIf { it.isNotEmpty() }?.let { return it }
+        if (proxied.answered) return orFailure(proxied.code)
+
+        LogUtil.w(AppConfig.TAG, "Update feed ${AppConfig.APP_RELEASE_REPO}: no answer, directly or through the proxy")
+        throw UpdateFailure(UpdateFailure.Reason.UNREACHABLE)
+    }
+
+    /**
+     * Turns a status the feed actually answered with into the right dead end. Never returns.
+     *
+     * 404 is «there is no release», and so is 204/an empty 200 — a repository with nothing
+     * published, which is the state this project is in until the first signed build ships. Anything
+     * else (5xx, a rate limit, a gateway) is the feed failing to answer the question, which is what
+     * UNREACHABLE means.
+     */
+    private fun orFailure(code: Int): Nothing {
+        if (code == HTTP_NOT_FOUND || code == HTTP_NO_CONTENT || code in 200..299) {
+            LogUtil.i(
+                AppConfig.TAG,
+                "Update feed ${AppConfig.APP_RELEASE_REPO} has no published release (HTTP $code)"
+            )
+            throw UpdateFailure(UpdateFailure.Reason.NO_RELEASE)
+        }
+        LogUtil.w(AppConfig.TAG, "Update feed ${AppConfig.APP_RELEASE_REPO} answered HTTP $code")
+        throw UpdateFailure(UpdateFailure.Reason.UNREACHABLE)
     }
 
     private fun parse(response: String, includePreRelease: Boolean): GitHubRelease? =

@@ -178,6 +178,26 @@ object HttpUtil {
 
 
     /**
+     * What a plain GET actually ended in — because "null" answers two different questions with the
+     * same word, and a caller that cannot tell them apart reports the wrong thing.
+     *
+     * [code] is the HTTP status when a server answered at all, and [NO_RESPONSE] when none did
+     * (offline, blocked, DNS, timeout, TLS). A 404 from a feed that has nothing to list is an
+     * ANSWER; it is not an outage, and it must not be reported as one — see
+     * `UpdateCheckerManager.fetch`, which is where that distinction was missing and turned an empty
+     * release list into «Не удалось связаться с сервером обновлений» plus a stack trace in «Журнал».
+     */
+    data class UrlContentOutcome(val body: String?, val code: Int) {
+        val answered: Boolean get() = code != NO_RESPONSE
+        val successful: Boolean get() = code in 200..299
+
+        companion object {
+            /** Nothing on the other end replied, so there is no status to reason about. */
+            const val NO_RESPONSE = -1
+        }
+    }
+
+    /**
      * Retrieves the content of a URL as a string.
      *
      * @param url The URL to fetch content from.
@@ -186,7 +206,21 @@ object HttpUtil {
      * @return The content of the URL as a string.
      */
     fun getUrlContent(request: UrlContentRequest): String? {
-        val url = request.url ?: return null
+        val outcome = getUrlOutcome(request)
+        // The status is only worth a line when the caller is not going to look at it — the ones
+        // that do (getUrlOutcome) decide for themselves whether it is news.
+        if (outcome.answered && !outcome.successful) {
+            LogUtil.w(AppConfig.TAG, "Failed to get URL content, code=${outcome.code}")
+        }
+        return outcome.body
+    }
+
+    /**
+     * The same GET as [getUrlContent], but it reports WHAT happened instead of only whether a body
+     * came back, and it says nothing to the log: the caller decides which outcomes are news.
+     */
+    fun getUrlOutcome(request: UrlContentRequest): UrlContentOutcome {
+        val url = request.url ?: return UrlContentOutcome(null, UrlContentOutcome.NO_RESPONSE)
         val client = buildOkHttpClient(request.timeout, request.httpPort, request.proxyUsername, request.proxyPassword, followRedirects = true)
         val requestBuilder = Request.Builder()
             .url(url)
@@ -198,15 +232,14 @@ object HttpUtil {
         try {
             client.newCall(requestBuilder.build()).execute().use { response ->
                 if (!response.isSuccessful) {
-                    LogUtil.w(AppConfig.TAG, "Failed to get URL content, code=${response.code}")
-                    return null
+                    return UrlContentOutcome(null, response.code)
                 }
-                return response.body?.string()
+                return UrlContentOutcome(response.body?.string(), response.code)
             }
         } catch (e: Exception) {
-            LogUtil.e(AppConfig.TAG, "Failed to get URL content", e)
+            LogUtil.w(AppConfig.TAG, "Failed to get URL content: ${e.message}")
         }
-        return null
+        return UrlContentOutcome(null, UrlContentOutcome.NO_RESPONSE)
     }
 
     /**

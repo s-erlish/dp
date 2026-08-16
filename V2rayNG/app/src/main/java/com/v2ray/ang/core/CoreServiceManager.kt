@@ -442,18 +442,31 @@ object CoreServiceManager {
             var time = -1L
             var errorStr = ""
 
+            // A PROBE THAT MISSES IS A READING, NOT A FAULT — and this one runs every 30 seconds
+            // for as long as the tunnel is up, so getting its severity wrong is not a detail.
+            //
+            // The FIRST attempt is expected to fail on plenty of healthy connections: that is the
+            // entire reason there is a second URL to fall back to. It was written as an ERROR with
+            // a stack trace under it, twice per probe, which is the same false alarm the подписка
+            // fetch used to raise from its own first-attempt-through-the-proxy (see
+            // `AngConfigManager.updateConfigViaSub`). «Журнал» filled with red while the connection
+            // was working perfectly.
+            //
+            // So: the first miss is one INFO line naming the reason, the second is a WARN — the
+            // tunnel really is not answering, which is worth seeing — and neither carries a trace,
+            // because the reason is in the message and the стек of a timeout tells nobody anything.
             try {
                 time = coreController.measureDelay(SettingsManager.getDelayTestUrl())
             } catch (e: Exception) {
-                LogUtil.e(AppConfig.TAG, "StartCore-Manager: Failed to measure delay", e)
                 errorStr = e.message?.substringAfter("\":") ?: "empty message"
+                LogUtil.i(AppConfig.TAG, "StartCore-Manager: primary delay URL did not answer ($errorStr)")
             }
             if (time == -1L) {
                 try {
                     time = coreController.measureDelay(SettingsManager.getDelayTestUrl(true))
                 } catch (e: Exception) {
-                    LogUtil.e(AppConfig.TAG, "StartCore-Manager: Failed to measure delay", e)
                     errorStr = e.message?.substringAfter("\":") ?: "empty message"
+                    LogUtil.w(AppConfig.TAG, "StartCore-Manager: the tunnel answered neither delay URL ($errorStr)")
                 }
             }
 

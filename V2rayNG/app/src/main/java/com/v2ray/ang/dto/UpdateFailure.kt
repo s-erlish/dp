@@ -44,6 +44,23 @@ class UpdateFailure(val reason: Reason) : Exception(reason.name) {
         NOT_NEWER,
 
         /** The device would not open the package installer at all. */
-        INSTALLER_UNAVAILABLE,
+        INSTALLER_UNAVAILABLE;
+
+        /**
+         * Whether this is an ANSWER rather than a BREAKAGE — which decides how loudly the log
+         * records it.
+         *
+         * «Релизов ещё нет» is the correct reply from a repository that has published none, and
+         * this project has published none: «пока что без ключей, не релизное приложение пока». It
+         * used to reach «Журнал» as an ERROR with a stack trace under it, which is what an app
+         * falling over looks like; the owner sent a screenshot of it believing something had
+         * broken. The screen still says the same sentence either way — it is only the log's
+         * severity that changes, because the log is where the false alarm lived.
+         *
+         * A build with no channel, a version this device has no APK for and a release that is not
+         * newer are the same kind of thing: the check ran, and the answer is "nothing for you".
+         */
+        val expected: Boolean
+            get() = this == NO_CHANNEL || this == NO_RELEASE || this == NO_ASSET || this == NOT_NEWER
     }
 }
