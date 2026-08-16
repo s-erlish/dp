@@ -259,6 +259,17 @@ class MainActivity : HelperBaseActivity(), MainHost {
         get() = supportFragmentManager.findFragmentByTag(MainTab.HOME.tag) as? HomeFragment
 
     /**
+     * The Настройки tab's fragment, or null until the tab has been opened once (it is attached
+     * lazily — see [syncTabFragments]). Looked up by tag for the same reason [homeFragment] is.
+     *
+     * The shell needs it for ONE thing: pushing a changed bottom inset into the tab's scrolling
+     * list, exactly as it pushes one into Главная's ([setupEdgeToEdge]). A tab attached after the
+     * window's insets were dispatched reads the published figure itself.
+     */
+    private val settingsFragment: SettingsTabFragment?
+        get() = supportFragmentManager.findFragmentByTag(MainTab.SETTINGS.tag) as? SettingsTabFragment
+
+    /**
      * The one row-action listener shared by every server list (see [MainHost.serverActions]).
      */
     private val adapterListener: ActivityAdapterListener by lazy { ActivityAdapterListener() }
@@ -921,6 +932,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
             // because a fragment was added, and a fragment added later reads the field itself.
             navListPadding = navPad
             homeFragment?.applyListInsets()
+            settingsFragment?.applyListInsets()
             insets
         }
     }

@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.BuildConfig
@@ -56,7 +57,31 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        applyListInsets()
         setupSettings()
+    }
+
+    /**
+     * The bottom navigation OVERLAYS this tab — the cards scroll under its scrim rather than
+     * stopping at a solid bar — so the last row of the last card only clears the buttons if the
+     * scroll CONTENT reserves their footprint. It did not: the layout's own 16dp of breathing room
+     * was all there was, and «Схемы URL-адресов» sat half behind the bar with the list scrolled to
+     * its end (owner's report from the device).
+     *
+     * The figure is the shell's ([MainHost.listBottomInset]: the window's bottom inset + the 56dp
+     * bar + breathing room) and not a number written here, because the two phones the owner runs
+     * disagree about it by the height of a gesture bar. Floored at the layout's own 16 so a dispatch
+     * that has not happened yet cannot leave the last card flush against the edge — the same shape
+     * `HomeFragment.applyListInsets` uses, deliberately, rather than a second mechanism for one
+     * screen.
+     *
+     * Called on every inset dispatch by the shell too (`MainActivity.setupEdgeToEdge`): insets are
+     * not re-dispatched just because this tab was finally opened, and this tab is attached lazily.
+     */
+    fun applyListInsets() {
+        if (!isBindingInitialized) return
+        val floor = resources.getDimensionPixelSize(R.dimen.space_16)
+        binding.settingsContent.updatePadding(bottom = maxOf(mainHost.listBottomInset, floor))
     }
 
     /**

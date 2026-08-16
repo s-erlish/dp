@@ -107,7 +107,24 @@
     android:fillViewport="true"
     android:scrollbars="none">
 
+    <!--
+        THE SCROLL CONTENT, and its bottom padding is a FLOOR rather than the figure.
+
+        The bottom navigation is an overlay: it floats over this tab so the cards scroll UNDER its
+        scrim instead of stopping at a solid bar. Nothing here reserves space for it, so this 16 —
+        the breathing room the design gives the last card — left «Схемы URL-адресов», the very last
+        row, half-covered by the bar with the list already scrolled to its end (owner's report from
+        the device). The bar is 56dp of buttons plus whatever the phone's gesture bar or 3-button
+        strip adds, which is why the real figure cannot be written here at all: it is different on
+        two phones running the same build.
+
+        SettingsTabFragment.applyListInsets raises this to the shell's own measurement
+        (MainHost.listBottomInset = system inset + bar + breathing room) and never below the 16 —
+        the same mechanism, and the same floor idea, Главная's list already uses
+        (HomeFragment.applyListInsets). The id exists for that call and for nothing else.
+    -->
     <LinearLayout
+        android:id="@+id/settings_content"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:clipChildren="false"
