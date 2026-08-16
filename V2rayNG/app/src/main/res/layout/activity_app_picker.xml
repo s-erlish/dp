@@ -62,7 +62,7 @@
             android:clipToPadding="false"
             android:paddingBottom="@dimen/space_32"
             android:scrollbars="vertical"
-            tools:listitem="@layout/view_row" />
+            tools:listitem="@layout/view_row_line" />
 
         <LinearLayout
             android:id="@+id/skeleton"

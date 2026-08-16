@@ -20,7 +20,7 @@
     <string name="tv_receive_regenerate">Показать новый код</string>
 
     <!-- Phone send screen -->
-    <string name="tv_send_title">Отправить на телевизор</string>
+    <string name="tv_send_title">Отправить на TV</string>
     <string name="tv_send_instructions">Отсканируйте QR-код, показанный на телевизоре, затем выберите подписку для отправки. Оба устройства должны быть в одной сети Wi-Fi.</string>
     <string name="tv_send_scan">Сканировать код телевизора</string>
     <string name="tv_send_no_subs">Нет подписок для отправки. Сначала добавьте подписку.</string>

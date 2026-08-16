@@ -19,6 +19,7 @@ import com.v2ray.ang.core.CoreNativeManager
 import com.v2ray.ang.databinding.ActivityCheckUpdateBinding
 import com.v2ray.ang.dto.CheckUpdateResult
 import com.v2ray.ang.dto.UpdateFailure
+import com.v2ray.ang.extension.toast
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.UpdateCheckerManager
 import com.v2ray.ang.ui.component.EmptyStateBinder
@@ -94,16 +95,36 @@ class CheckUpdateActivity : BaseActivity() {
         )
         ToolbarBinder.attachTo(binding.toolbar.root, binding.mainContent)
 
-        RowBinder.bind(
-            root = binding.rowVersion.root,
-            title = getString(R.string.about_version),
-            value = "${BuildConfig.VERSION_NAME} (${CoreNativeManager.getLibVersion()})",
-            valueIsNumeric = true,
-            trailing = RowBinder.Trailing.None,
-        )
+        // §7's caption, not a row: «departament 2.2.1». It still copies on tap — the row it
+        // replaced carried a copy action and a bug report needs the core build too.
+        val version = "${BuildConfig.VERSION_NAME} (${CoreNativeManager.getLibVersion()})"
+        binding.tvVersion.text = getString(R.string.upd_version_line, version)
+        binding.tvVersion.contentDescription = getString(R.string.about_version_cd)
+        binding.tvVersion.onSingleClick {
+            Utils.setClipboard(this, version)
+            toast(R.string.notice_copied)
+        }
 
         bindPreReleaseRow()
         checkForUpdates()
+    }
+
+    /**
+     * «Проверить обновление» — §7's accent action row. The name is the affordance, so no chevron
+     * and no button; the tile carries the refresh glyph the prototype shows.
+     *
+     * It repeats what opening the screen already does, and that is the point: a check that only
+     * happens on entry leaves the user with no way to ask again after fixing their network.
+     */
+    private fun bindCheckRow() {
+        RowBinder.bind(
+            root = binding.rowCheck.root,
+            title = getString(R.string.upd_action_check),
+            glyph = R.drawable.ic_refresh_24dp,
+            tone = RowBinder.RowTone.ACCENT,
+            trailing = RowBinder.Trailing.None,
+            onClick = { checkForUpdates() },
+        )
     }
 
     /**
@@ -126,10 +147,12 @@ class CheckUpdateActivity : BaseActivity() {
     }
 
     private fun bindPreReleaseRow() {
+        bindCheckRow()
         RowBinder.bind(
             root = binding.rowPreRelease.root,
             title = getString(R.string.upd_prerelease),
             subtitle = getString(R.string.upd_prerelease_hint),
+            glyph = R.drawable.ic_source_code_24dp,
             trailing = RowBinder.Trailing.Toggle(
                 checked = MmkvManager.decodeSettingsBool(
                     AppConfig.PREF_CHECK_UPDATE_PRE_RELEASE,
@@ -167,9 +190,28 @@ class CheckUpdateActivity : BaseActivity() {
                 throw e
             } catch (e: Exception) {
                 if (!isActive) return@launch
-                LogUtil.e(AppConfig.TAG, "Update check failed", e)
+                logCheckOutcome(e)
                 showFailure(e, retry = ::checkForUpdates)
             }
+        }
+    }
+
+    /**
+     * A DEAD END IS NOT ALWAYS A FAULT, and «Журнал» has to be able to tell the difference.
+     *
+     * Every outcome of the check used to be written as an ERROR with a stack trace under it —
+     * including «релизов ещё нет», which is the honest reply of a repository that has published
+     * none. The owner opened the log, saw a red stack and reported the app as broken. The screen is
+     * unchanged (it says the same sentence, with the same next step); what changes is that an
+     * expected answer is one INFO line naming it, and only a real failure keeps the error and the
+     * trace. See [UpdateFailure.Reason.expected].
+     */
+    private fun logCheckOutcome(e: Exception) {
+        val reason = (e as? UpdateFailure)?.reason
+        if (reason != null && reason.expected) {
+            LogUtil.i(AppConfig.TAG, "Update check: nothing to offer (${reason.name})")
+        } else {
+            LogUtil.e(AppConfig.TAG, "Update check failed", e)
         }
     }
 

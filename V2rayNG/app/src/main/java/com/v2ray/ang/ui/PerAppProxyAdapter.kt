@@ -3,11 +3,12 @@ package com.v2ray.ang.ui
 import android.annotation.SuppressLint
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.core.view.isVisible
 import androidx.core.widget.ImageViewCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ItemEditorSectionBinding
-import com.v2ray.ang.databinding.ViewRowCardBinding
+import com.v2ray.ang.databinding.ViewRowLineBinding
 import com.v2ray.ang.dto.AppInfo
 import com.v2ray.ang.ui.component.RowBinder
 
@@ -20,10 +21,12 @@ import com.v2ray.ang.ui.component.RowBinder
  *    solved with punctuation - it does not sort, it does not translate, it reads as a typo, and it
  *    put Latin asterisks in front of a Russian label. The list is grouped instead: «Ваши приложения»
  *    then «Системные приложения», each under a real section header ([ItemEditorSectionBinding]).
- * 2. **The boolean was a `MaterialCheckBox` inside a card**, while every other boolean in the
- *    product is a switch inside a row. It is now [RowBinder.Trailing.Toggle], so the whole row is
- *    the target, the switch is not separately focusable, and TalkBack hears a checkable node
- *    instead of a button.
+ * 2. **The boolean was a bare `MaterialCheckBox` inside a card**, one card per app, so a list of
+ *    128 apps was 128 bordered boxes. It is one card's worth of rows now, separated by the
+ *    full-width hairline §6 asks for, and the box itself is [RowBinder.Trailing.Checkbox] - which
+ *    is the control handoff §7 draws here («список приложений с чекбоксами») and the right promise
+ *    for membership of a set. The whole ROW is the target, the box is not separately focusable,
+ *    and TalkBack hears a checkable node instead of a button.
  *
  * Selection is not owned here: [isSelected] and [onToggle] are passed in, so the per-app screen can
  * back it with its MMKV-persisting view model and the picker with an in-memory set, and neither has
@@ -86,24 +89,28 @@ class PerAppProxyAdapter(
         return if (viewType == VIEW_TYPE_SECTION) {
             SectionViewHolder(ItemEditorSectionBinding.inflate(inflater, parent, false))
         } else {
-            AppViewHolder(ViewRowCardBinding.inflate(inflater, parent, false))
+            AppViewHolder(ViewRowLineBinding.inflate(inflater, parent, false))
         }
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (val entry = entries[position]) {
             is Entry.Section -> (holder as SectionViewHolder).binding.sectionTitle.text = entry.title
-            is Entry.App -> (holder as AppViewHolder).bind(entry.info)
+            // The hairline runs the full width and never sits directly under a section header:
+            // there it would double the header's own bottom rule.
+            is Entry.App -> (holder as AppViewHolder)
+                .bind(entry.info, divided = position > 0 && entries[position - 1] is Entry.App)
         }
     }
 
     private class SectionViewHolder(val binding: ItemEditorSectionBinding) :
         RecyclerView.ViewHolder(binding.root)
 
-    private inner class AppViewHolder(val binding: ViewRowCardBinding) :
+    private inner class AppViewHolder(val binding: ViewRowLineBinding) :
         RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(app: AppInfo) {
+        fun bind(app: AppInfo, divided: Boolean) {
+            binding.rowDivider.isVisible = divided
             RowBinder.bind(
                 root = binding.row.root,
                 title = app.appName,
@@ -112,7 +119,11 @@ class PerAppProxyAdapter(
                 // below. Passing a non-zero glyph is what keeps the 40dp tile - and therefore the
                 // 68dp text origin - identical to every other row in the product.
                 glyph = R.drawable.ic_per_apps_24dp,
-                trailing = RowBinder.Trailing.Toggle(
+                // A BOX AND NOT A SWITCH — §7 «список приложений с чекбоксами». A switch says
+                // «this is on now»; this list marks 128 apps as members of a set the MODE row
+                // above then acts on, and a column of switches claims to turn 128 things on one
+                // at a time.
+                trailing = RowBinder.Trailing.Checkbox(
                     checked = isSelected(app.packageName),
                     onCheckedChange = { onToggle(app.packageName) },
                 ),

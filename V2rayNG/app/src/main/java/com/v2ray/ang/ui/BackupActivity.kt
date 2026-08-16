@@ -63,6 +63,9 @@ class BackupActivity : HelperBaseActivity() {
             root = binding.toolbar.root,
             title = getString(R.string.backup_title),
             activity = this,
+            // §7's optional 13sp note: the prototype says what the copy IS before the rows say
+            // what you can do with it.
+            note = getString(R.string.backup_note),
         )
         ToolbarBinder.attachTo(binding.toolbar.root, binding.mainContent)
 
@@ -99,6 +102,7 @@ class BackupActivity : HelperBaseActivity() {
         RowBinder.bind(
             root = binding.rowShare.root,
             title = getString(R.string.backup_action_share),
+            subtitle = getString(R.string.backup_action_share_hint),
             glyph = R.drawable.ic_share_24dp,
             trailing = RowBinder.Trailing.None,
             enabled = !busy,

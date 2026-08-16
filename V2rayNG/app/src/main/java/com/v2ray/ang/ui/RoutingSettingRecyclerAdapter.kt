@@ -4,7 +4,7 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import com.v2ray.ang.R
 import com.v2ray.ang.contracts.BaseAdapterListener
-import com.v2ray.ang.databinding.ViewRowCardBinding
+import com.v2ray.ang.databinding.ViewRowLineBinding
 import com.v2ray.ang.dto.entities.RulesetItem
 import com.v2ray.ang.helper.ItemTouchHelperAdapter
 import com.v2ray.ang.helper.ItemTouchHelperViewHolder
@@ -45,11 +45,16 @@ class RoutingSettingRecyclerAdapter(
     override fun getItemCount() = viewModel.getAll().size
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RuleViewHolder =
-        RuleViewHolder(ViewRowCardBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+        RuleViewHolder(ViewRowLineBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
     override fun onBindViewHolder(holder: RuleViewHolder, position: Int) {
         val ruleset = viewModel.getAll()[position]
         val context = holder.itemView.context
+
+        // §6: the hairline runs the full width of the card and there is none above the first
+        // row. Bound per item rather than by an ItemDecoration so insert, delete and drag
+        // reorder all keep it right.
+        holder.binding.rowDivider.isVisible = position > 0
 
         RowBinder.bind(
             root = holder.binding.row.root,
@@ -68,7 +73,7 @@ class RoutingSettingRecyclerAdapter(
         // The listener is cleared before the state is set: this is a recycled view, and assigning
         // `isChecked` while the previous row's listener is still attached would write THAT rule's
         // guid with THIS rule's value.
-        val toggle = holder.binding.rowCardSwitch
+        val toggle = holder.binding.rowLineSwitch
         toggle.setOnCheckedChangeListener(null)
         toggle.isVisible = true
         toggle.isChecked = ruleset.enabled
@@ -100,7 +105,7 @@ class RoutingSettingRecyclerAdapter(
         ).joinToString(" · ")
     }
 
-    inner class RuleViewHolder(val binding: ViewRowCardBinding) :
+    inner class RuleViewHolder(val binding: ViewRowLineBinding) :
         RecyclerView.ViewHolder(binding.root), ItemTouchHelperViewHolder {
 
         override fun onItemSelected() {

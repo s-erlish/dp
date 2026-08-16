@@ -71,6 +71,11 @@
                         android:layout_height="wrap_content"
                         layout="@layout/view_row" />
 
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
                     <include
                         android:id="@+id/row_package"
                         android:layout_width="match_parent"
@@ -90,40 +95,15 @@
                 <LinearLayout style="@style/Widget.Departament.CardSection.Body">
 
                     <include
-                        android:id="@+id/row_url_schemes"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        layout="@layout/view_row" />
-
-                    <include
-                        android:id="@+id/row_log"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        layout="@layout/view_row" />
-
-                    <include
-                        android:id="@+id/row_check_update"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        layout="@layout/view_row" />
-
-                    <include
                         android:id="@+id/row_source_code"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         layout="@layout/view_row" />
 
-                    <include
-                        android:id="@+id/row_feedback"
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        layout="@layout/view_row" />
-
-                    <include
-                        android:id="@+id/row_tg_channel"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        layout="@layout/view_row" />
+                        android:layout_height="wrap_content" />
 
                     <include
                         android:id="@+id/row_licenses"
@@ -131,8 +111,73 @@
                         android:layout_height="wrap_content"
                         layout="@layout/view_row" />
 
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                    <include
+                        android:id="@+id/row_feedback"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                    <include
+                        android:id="@+id/row_tg_channel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
                     <include
                         android:id="@+id/row_privacy_policy"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                    <!-- The three below are not in §7's table for this screen: «Схемы ссылок»,
+                         «Журнал» and «Проверить обновления» are screens the handoff was drawn
+                         without sight of (П-07). They keep their door here, after the five the
+                         design does name, in the design's own order. -->
+
+                    <include
+                        android:id="@+id/row_url_schemes"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                    <include
+                        android:id="@+id/row_log"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                    <include
+                        android:id="@+id/row_check_update"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         layout="@layout/view_row" />

@@ -11,17 +11,27 @@
   group. A-38 removes the ActionBar these lived on, so leaving them there would have
   deleted five features outright.
 
-  The screen is one ledger, top to bottom (R1):
+  2026-08 REDESIGN — handoff README §7, verified against the prototype frame by frame
+  (docs/design2026/port-shots-2/43-routing.png). The screen is one ledger:
 
-      H3 toolbar «Маршрутизация» + «Добавить правило»
-      24 · Row.Value «Стратегия доменов», cycles AsIs / IPIfNonMatch / IPOnDemand
-      24 · «Правила» · rule rows at 0, or the empty state
-      24 · «Наборы и обмен» · four action rows
-      32
+      кнопка назад 44dp · «Маршрутизация» 24sp/700
+      «Доменная стратегия»              · card, one row, select popup
+      «Настройки правил маршрутизации»  · card, one line per rule, or the empty state
+      «Добавить правило»                · card, one accent action row
+      «Наборы и обмен»                  · card, four action rows            (П-09)
 
-  Deleted with the old file: the 12dp card inset, the 60dp row height, the 14dp inner
-  padding, the 16sp/13sp inline sizes, the 18dp chevron and the purple icon tile - a
-  fourth tile colour that encoded no category (D-5).
+  THREE THINGS THE PROTOTYPE HAS AND THIS FILE DID NOT. The strategy card had no
+  section header above it, so the screen opened on an unlabelled row. The rules list
+  was ONE CARD PER RULE — a stack of bordered boxes inside a fourth box, which is
+  both a nested card and the one composition the prototype never uses; it is one card
+  with a full-width hairline between rules now (@layout/view_row_line). And «Добавить
+  правило» was an icon in the header: §7's lekalo carries no toolbar action, and the
+  prototype draws the add as an accent row in its own card under the list, where it
+  has a name instead of being a «+» the user has to interpret.
+
+  «Наборы и обмен» is not in the prototype and stays (П-09): four features —
+  presets, clipboard import, QR import, export — that the handoff was written without
+  sight of. They are ordinary rows, not accent ones: one accent group per screen.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -52,7 +62,13 @@
             android:clipChildren="false"
             android:orientation="vertical">
 
-            <!-- «Стратегия доменов» opens §6's select popup, so this card must NOT clip its
+            <TextView
+                style="@style/SettingsSectionLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/routing_domain_strategy" />
+
+            <!-- «Доменная стратегия» opens §6's select popup, so this card must NOT clip its
                  children — a popup anchored on the row would be sliced off at the card's bottom
                  edge (§11 grabl 4). The row rounds itself instead: it is the card's only one, so
                  RoutingSettingActivity gives it @drawable/bg_row_only via RowBinder.edge. -->
@@ -94,7 +110,7 @@
                 android:background="@drawable/bg_card_inert"
                 android:clipToOutline="true"
                 android:nestedScrollingEnabled="false"
-                tools:listitem="@layout/view_row" />
+                tools:listitem="@layout/view_row_line" />
 
             <include
                 android:id="@+id/empty_state"
@@ -103,6 +119,24 @@
                 android:layout_marginTop="@dimen/space_24"
                 android:layout_marginBottom="@dimen/space_24"
                 layout="@layout/view_empty_state" />
+
+            <!-- «Добавить правило» — §7 draws it as an accent row in its own card directly
+                 under the rules, not as a «+» in the header. 12 above it, which is the gap
+                 the prototype puts between a card and the card that follows it with no
+                 section header in between. -->
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Departament.CardSection"
+                android:layout_marginTop="@dimen/space_12">
+
+                <LinearLayout style="@style/Widget.Departament.CardSection.Body">
+
+                    <include
+                        android:id="@+id/row_add_rule"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        layout="@layout/view_row" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
             <TextView
                 style="@style/SettingsSectionLabel"
@@ -120,17 +154,34 @@
                         android:layout_height="wrap_content"
                         layout="@layout/view_row" />
 
+                    <!-- §6: «Разделитель во всю ширину карточки», not inset to the text
+                         origin — the prototype draws it as a border-top on the row. -->
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
                     <include
                         android:id="@+id/row_import_clipboard"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         layout="@layout/view_row" />
 
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
                     <include
                         android:id="@+id/row_import_qrcode"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         layout="@layout/view_row" />
+
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
 
                     <include
                         android:id="@+id/row_export"

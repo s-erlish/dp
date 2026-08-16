@@ -28,16 +28,25 @@
   exactly ONE of them is ever visible - the component's "one action, or none" rule,
   enforced by the screen instead of by the stub.
 
-  2026-08 REDESIGN (handoff README §7): the sub-page lekalo header, and the two
-  settings rows are grouped into one card - §7 draws this screen as «Искать
-  предварительный выпуск · Проверить» inside a single card with the version under
-  it. @id/row_version stays a ROW rather than becoming that caption, because it is
-  a Row.Value with a copy action and a caption cannot be copied.
+  2026-08 REDESIGN — handoff README §7, checked against the prototype frame
+  (docs/design2026/port-shots-2/48-update.png). The prototype draws this screen as:
 
-  THE ACTION IS STILL A BUTTON, not a row. §7's lekalo puts «Проверить» in the card
-  as a row, but this screen's action changes tier between states («Обновить»
-  primary / «Повторить» tertiary / «Установить» / «Отменить»), and a row has one
-  appearance. Turning it into a row would delete four of the seven states above.
+      кнопка назад · «Проверить обновление» 24sp/700
+      карточка · «Искать предварительный выпуск» (переключатель)
+               · «Проверить обновление» (акцентная строка действия)
+      подпись  · «departament 2.2.1»
+
+  and this file is now that. What moved: the version stopped being a Row.Value at the
+  top of the card and became the caption under it, where the prototype puts it (it
+  still copies on tap, so nothing was lost but a row); «Проверить обновление» stopped
+  being only an implicit consequence of opening the screen and became the accent row
+  the prototype names.
+
+  THE STATE ACTIONS STAY BUTTONS. §7's lekalo has one row per action, but «Обновить»
+  / «Установить» / «Отменить» / «Повторить» change TIER between states and a row has
+  one appearance. The accent row above is the CHECK; those four are the outcome, they
+  live under the verdict they belong to, and turning them into rows would delete four
+  of the seven states listed above.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -73,18 +82,40 @@
                 <LinearLayout style="@style/Widget.Departament.CardSection.Body">
 
                     <include
-                        android:id="@+id/row_version"
+                        android:id="@+id/row_pre_release"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         layout="@layout/view_row" />
 
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
                     <include
-                        android:id="@+id/row_pre_release"
+                        android:id="@+id/row_check"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         layout="@layout/view_row" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
+
+            <!-- The installed version, as the caption the prototype draws under the card
+                 («departament 2.2.1») rather than as a row of its own. It still copies on tap,
+                 which is what the row it replaced did. -->
+            <TextView
+                android:id="@+id/tv_version"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_12"
+                android:background="@drawable/bg_row"
+                android:minHeight="@dimen/view_height_dp48"
+                android:paddingStart="@dimen/screen_gutter"
+                android:paddingTop="@dimen/space_8"
+                android:paddingEnd="@dimen/screen_gutter"
+                android:paddingBottom="@dimen/space_8"
+                android:textAppearance="@style/TextAppearance.App.Caption"
+                tools:text="departament 2.2.1 (25.3.6)" />
 
             <!-- The result block: one state at a time, never two. Both layout_width and
                  layout_height are declared because an <include> ignores every layout_*

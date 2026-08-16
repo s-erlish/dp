@@ -67,14 +67,24 @@
                         android:layout_height="wrap_content"
                         layout="@layout/view_row" />
 
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
                     <include
-                        android:id="@+id/row_restore_local"
+                        android:id="@+id/row_share"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         layout="@layout/view_row" />
 
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
                     <include
-                        android:id="@+id/row_share"
+                        android:id="@+id/row_restore_local"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         layout="@layout/view_row" />
@@ -97,11 +107,21 @@
                         android:layout_height="wrap_content"
                         layout="@layout/view_row" />
 
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
                     <include
                         android:id="@+id/row_backup_webdav"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         layout="@layout/view_row" />
+
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
 
                     <include
                         android:id="@+id/row_restore_webdav"

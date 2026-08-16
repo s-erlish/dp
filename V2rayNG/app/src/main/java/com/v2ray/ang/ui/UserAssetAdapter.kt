@@ -5,7 +5,8 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.v2ray.ang.R
 import com.v2ray.ang.contracts.BaseAdapterListener
-import com.v2ray.ang.databinding.ViewRowCardBinding
+import androidx.core.view.isVisible
+import com.v2ray.ang.databinding.ViewRowLineBinding
 import com.v2ray.ang.extension.toTrafficString
 import com.v2ray.ang.ui.component.RowBinder
 import com.v2ray.ang.viewmodel.UserAssetViewModel
@@ -35,7 +36,7 @@ class UserAssetAdapter(
     override fun getItemCount() = viewModel.itemCount
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserAssetViewHolder =
-        UserAssetViewHolder(ViewRowCardBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+        UserAssetViewHolder(ViewRowLineBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
     override fun onBindViewHolder(holder: UserAssetViewHolder, position: Int) {
         val item = viewModel.getAsset(position) ?: return
@@ -48,6 +49,10 @@ class UserAssetAdapter(
             val dateFormat = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
             "${file.length().toTrafficString()}  ·  ${dateFormat.format(Date(file.lastModified()))}"
         }
+
+        // §6: the hairline runs the full width of the card, and there is none above the first
+        // file.
+        holder.binding.rowDivider.isVisible = position > 0
 
         // A locked asset, and one imported from a local file, has no URL to edit.
         val editable = item.assetUrl.locked != true && item.assetUrl.url != "file"
@@ -80,6 +85,6 @@ class UserAssetAdapter(
         )
     }
 
-    class UserAssetViewHolder(val binding: ViewRowCardBinding) :
+    class UserAssetViewHolder(val binding: ViewRowLineBinding) :
         RecyclerView.ViewHolder(binding.root)
 }

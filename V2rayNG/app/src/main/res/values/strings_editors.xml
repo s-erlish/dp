@@ -78,9 +78,9 @@
          A-20 settings/routing - Маршрутизация
          ================================================================== -->
     <string name="routing_title">Маршрутизация</string>
-    <string name="routing_domain_strategy">Стратегия доменов</string>
+    <string name="routing_domain_strategy">Доменная стратегия</string>
     <string name="routing_import_confirm">Текущие правила будут заменены набором из этого источника. Продолжить?</string>
-    <string name="routing_section_rules">Правила</string>
+    <string name="routing_section_rules">Настройки правил маршрутизации</string>
     <string name="routing_section_actions">Наборы и обмен</string>
     <string name="routing_rule_on">Включено</string>
     <string name="routing_rule_off">Выключено</string>
@@ -98,7 +98,7 @@
     <string name="routing_export_empty">Экспортировать нечего: список правил пуст</string>
     <string name="routing_import_done">Набор правил загружен</string>
     <string name="routing_import_failed">Не удалось загрузить набор. Проверьте данные и повторите.</string>
-    <string name="routing_strategy_cd">Сменить стратегию доменов</string>
+    <string name="routing_strategy_cd">Сменить доменную стратегию</string>
 
     <!-- A-21 settings/routing/rule/{id} - Правило -->
     <string name="routing_ed_title_new">Новое правило</string>
@@ -190,8 +190,8 @@
          A-25 settings/assets - Файлы ресурсов
          ================================================================== -->
     <string name="asset_title">Файлы ресурсов</string>
-    <string name="asset_source">Источник файлов</string>
-    <string name="asset_section_files">Файлы</string>
+    <string name="asset_source">Источник Geo-файлов</string>
+    <string name="asset_section_files">Файлы ресурсов</string>
     <string name="asset_action_add_file">Добавить файл с устройства</string>
     <string name="asset_action_add_url">Добавить по ссылке</string>
     <string name="asset_action_add_qrcode">Добавить по QR-коду</string>
@@ -203,7 +203,7 @@
     <string name="asset_action_edit">Изменить ссылку</string>
     <string name="asset_action_delete">Удалить файл</string>
     <string name="asset_delete_confirm">Удалить файл? Его можно будет скачать снова.</string>
-    <string name="asset_source_cd">Сменить источник файлов</string>
+    <string name="asset_source_cd">Сменить источник Geo-файлов</string>
     <string name="asset_downloading">Загружаем файлы…</string>
     <string name="asset_download_failed">Не удалось скачать файлы. Проверьте сеть и повторите.</string>
 
@@ -225,9 +225,9 @@
     <string name="log_search_hint">Поиск по журналу</string>
     <string name="log_empty_title">Записей пока нет</string>
     <string name="log_empty_line">Журнал заполнится при следующем подключении.</string>
-    <string name="log_action_copy">Скопировать всё</string>
+    <string name="log_action_copy">Копировать</string>
     <string name="log_action_share">Поделиться файлом</string>
-    <string name="log_action_clear">Очистить журнал</string>
+    <string name="log_action_clear">Очистить</string>
     <string name="log_copy_hint">Долгое нажатие копирует строку</string>
     <string name="log_level_error">Ошибка</string>
     <string name="log_level_warn">Внимание</string>
@@ -251,17 +251,20 @@
     <string name="about_check_update">Проверить обновления</string>
     <string name="about_source_code">Исходный код</string>
     <string name="about_feedback">Обратная связь</string>
-    <string name="about_telegram">Telegram-канал</string>
-    <string name="about_licenses">Лицензии</string>
+    <string name="about_telegram">Канал в Telegram</string>
+    <string name="about_licenses">Лицензии открытого ПО</string>
     <string name="about_privacy">Политика конфиденциальности</string>
 
     <!-- ==================================================================
          A-36 Проверка обновлений
          ================================================================== -->
-    <string name="upd_title">Обновления</string>
-    <string name="upd_prerelease">Проверять тестовые сборки</string>
+    <string name="upd_title">Проверить обновление</string>
+    <string name="upd_prerelease">Искать предварительный выпуск</string>
+    <!-- The version caption §7 draws under the card: «departament 2.2.1». The core build
+         follows it in brackets because that is what a bug report needs. -->
+    <string name="upd_version_line">departament %1$s</string>
     <string name="upd_prerelease_hint">Ранние версии выходят чаще и могут работать нестабильно</string>
-    <string name="upd_action_check">Проверить сейчас</string>
+    <string name="upd_action_check">Проверить обновление</string>
     <string name="upd_checking">Проверяем обновления…</string>
     <string name="upd_none_title">Обновлений нет</string>
     <string name="upd_none_line">Установлена последняя версия.</string>
@@ -317,18 +320,20 @@
     <!-- ==================================================================
          A-29 settings/data - Данные и резервные копии
          ================================================================== -->
-    <string name="backup_title">Данные и резервные копии</string>
-    <string name="backup_grp_device">На устройстве</string>
-    <string name="backup_grp_cloud">Облачная копия</string>
-    <string name="backup_action_create">Создать копию на устройстве</string>
-    <string name="backup_action_create_hint">Сохранит серверы, подписки и настройки в один файл</string>
+    <string name="backup_title">Резервное копирование</string>
+    <string name="backup_note">Файл с серверами и настройками</string>
+    <string name="backup_grp_device">Данные</string>
+    <string name="backup_grp_cloud">Облако</string>
+    <string name="backup_action_create">Сохранить копию</string>
+    <string name="backup_action_create_hint">Все серверы и настройки в один файл</string>
     <string name="backup_action_restore">Восстановить из файла</string>
-    <string name="backup_action_restore_hint">Заменит текущие настройки содержимым файла</string>
-    <string name="backup_action_share">Поделиться копией</string>
+    <string name="backup_action_restore_hint">Заменит текущие сервера</string>
+    <string name="backup_action_share">Поделиться конфигурацией</string>
+    <string name="backup_action_share_hint">Отправить файл в другое приложение</string>
     <string name="backup_action_webdav_setup">Настройки WebDAV</string>
     <string name="backup_action_webdav_backup">Выгрузить копию в облако</string>
     <string name="backup_action_webdav_restore">Восстановить из облака</string>
-    <string name="backup_webdav_not_set">Адрес не указан</string>
+    <string name="backup_webdav_not_set">Не настроено</string>
     <string name="backup_webdav_required">Сначала укажите адрес WebDAV</string>
     <string name="backup_busy">Выполняем…</string>
     <string name="backup_created">Копия создана</string>

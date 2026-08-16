@@ -11,7 +11,7 @@ import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityUrlSchemeListBinding
 import com.v2ray.ang.databinding.ItemEditorSectionBinding
 import com.v2ray.ang.databinding.ViewCardSectionBinding
-import com.v2ray.ang.databinding.ViewRowBinding
+import com.v2ray.ang.databinding.ViewRowLineBinding
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.ui.component.EmptyStateBinder
 import com.v2ray.ang.ui.component.RowBinder
@@ -76,10 +76,12 @@ class UrlSchemeListActivity : BaseActivity() {
             val card = ViewCardSectionBinding.inflate(inflater, binding.schemeList, false)
             binding.schemeList.addView(card.root)
 
-            section.schemes.forEach { scheme ->
-                val row = ViewRowBinding.inflate(inflater, card.cardBody, false)
+            section.schemes.forEachIndexed { index, scheme ->
+                val row = ViewRowLineBinding.inflate(inflater, card.cardBody, false)
+                // §6: the hairline runs the full width of the card and never above its first row.
+                row.rowDivider.isVisible = index > 0
                 RowBinder.bind(
-                    root = row.root,
+                    root = row.row.root,
                     title = getString(scheme.labelRes),
                     subtitle = scheme.uri,
                     // The button IS the action, so the row is inert - one target, not two.

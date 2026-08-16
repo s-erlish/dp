@@ -29,12 +29,22 @@
 
   2026-08 REDESIGN (handoff README §7): the sub-page lekalo header, @layout/view_sub_header.
 
-  THE APP LIST IS NOT PUT IN A CARD, and that is a considered departure. §7 draws
-  «список приложений с чекбоксами» inside one card, which is right for the five
-  demo apps the prototype holds; this list is 128 rows long, scrolls the rest of the
-  screen and shares its frame with a skeleton and an empty state. A card around a
-  full-height scrolling list either clips its own corners away at the fold or draws
-  a boundary that never closes. The mode group above it is the card §7 asks for.
+  THE APP LIST IS ROWS, NOT ONE CARD PER APP. Until this pass every app was its own
+  MaterialCardView with a 4dp margin, so 128 apps drew 128 bordered boxes — the one
+  composition the prototype never uses anywhere. They are rows with a full-width
+  hairline between them now (@layout/view_row_line), which is §6's «строка» exactly.
+
+  THE LIST IS STILL NOT WRAPPED IN A CARD, and that part is a considered departure.
+  §7 draws «список приложений с чекбоксами» inside one card, which is right for the
+  five demo apps the prototype holds; this list is 128 rows long, scrolls the rest of
+  the screen, carries two section headers inside it («Ваши» / «Системные») and shares
+  its frame with a skeleton and an empty state. A card around a full-height scrolling
+  list draws a boundary that never closes. The mode group above it is the card §7
+  asks for, and the rows below read as its continuation.
+
+  THE CHECKBOX IS THE PROTOTYPE'S CONTROL. Each app carries the 22dp box of
+  @drawable/bg_checkbox rather than a switch: a switch says «this is on now», a box
+  says «this one is in the set», and the set is what the mode row acts on.
 
   «Российские приложения» (@id/row_ru_preset) STAYS. It is not in §7's table
   because handler/RussianAppsPreset.kt did not exist when the handoff was drawn; the
@@ -68,6 +78,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 layout="@layout/view_row" />
+
+            <!-- §6: «Разделитель во всю ширину карточки». -->
+            <com.google.android.material.divider.MaterialDivider
+                style="@style/Widget.Departament.Divider.Full"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
 
             <!-- «Российские приложения» — the named bypass preset, in the same card as the
                  mode it depends on, because it is a shortcut for filling that mode's list
@@ -118,7 +134,7 @@
             android:clipToPadding="false"
             android:paddingBottom="@dimen/space_32"
             android:scrollbars="vertical"
-            tools:listitem="@layout/view_row" />
+            tools:listitem="@layout/view_row_line" />
 
         <!-- The silhouette of the list, not a spinner over a blank screen: same tile,
              same 68 text origin, same 56 minimum. Shown only after 300ms. -->

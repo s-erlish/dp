@@ -18,6 +18,7 @@ import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.ui.component.EmptyStateBinder
+import com.v2ray.ang.ui.component.RowBinder
 import com.v2ray.ang.ui.component.SkeletonBinder
 import com.v2ray.ang.ui.component.SubPage
 import com.v2ray.ang.ui.component.ToolbarBinder
@@ -75,6 +76,7 @@ class LogcatActivity : BaseActivity(), SwipeRefreshLayout.OnRefreshListener {
         }
 
         binding.refreshLayout.setOnRefreshListener(this)
+        bindActionRows()
         loadLogs()
     }
 
@@ -130,22 +132,47 @@ class LogcatActivity : BaseActivity(), SwipeRefreshLayout.OnRefreshListener {
         }
     }
 
-    private fun showLogActions() {
-        val hasLines = viewModel.getAll().isNotEmpty()
-        EditorActionsSheet(this, getString(R.string.editor_actions_title))
-            .action(R.string.log_action_copy, R.drawable.ic_copy, enabled = hasLines) {
+    /**
+     * «Копировать» and «Очистить» as the two accent action rows §7 draws under the slab.
+     *
+     * They act on the WHOLE log and not on the searched subset - that is what the названия say
+     * and it is what the prototype's card means. «Поделиться файлом» is the one action left in
+     * the overflow: it is not in the design, so it has no row to live in, and an action reachable
+     * from two places is one place too many.
+     */
+    private fun bindActionRows() {
+        RowBinder.bind(
+            root = binding.rowCopy.root,
+            title = getString(R.string.log_action_copy),
+            glyph = R.drawable.ic_copy,
+            tone = RowBinder.RowTone.ACCENT,
+            trailing = RowBinder.Trailing.None,
+            onClick = {
                 Utils.setClipboard(this, viewModel.getAll().joinToString("\n"))
                 toast(R.string.notice_copied)
-            }
-            .action(R.string.log_action_share, R.drawable.ic_share_24dp, enabled = hasLines) {
-                shareLogcat()
-            }
-            .destructive(R.string.log_action_clear) {
+            },
+        )
+        RowBinder.bind(
+            root = binding.rowClear.root,
+            title = getString(R.string.log_action_clear),
+            glyph = R.drawable.ic_logcat_24dp,
+            tone = RowBinder.RowTone.ACCENT,
+            trailing = RowBinder.Trailing.None,
+            onClick = {
                 lifecycleScope.launch {
                     withContext(Dispatchers.IO) { viewModel.clearLogcat() }
                     refreshData()
                     toastSuccess(R.string.log_cleared)
                 }
+            },
+        )
+    }
+
+    private fun showLogActions() {
+        val hasLines = viewModel.getAll().isNotEmpty()
+        EditorActionsSheet(this, getString(R.string.editor_actions_title))
+            .action(R.string.log_action_share, R.drawable.ic_share_24dp, enabled = hasLines) {
+                shareLogcat()
             }
             .show()
     }

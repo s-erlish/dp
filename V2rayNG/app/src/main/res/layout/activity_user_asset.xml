@@ -49,6 +49,15 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <!-- §7 puts a section header over this card too — the prototype's first group on
+                 «Файлы ресурсов» is «Источник Geo-файлов», and without it the screen opened on an
+                 unlabelled row. -->
+            <TextView
+                style="@style/SettingsSectionLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/asset_source" />
+
             <com.google.android.material.card.MaterialCardView style="@style/Widget.Departament.CardSection">
 
                 <LinearLayout style="@style/Widget.Departament.CardSection.Body">
@@ -58,6 +67,11 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         layout="@layout/view_row" />
+
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
 
                     <include
                         android:id="@+id/row_download"
@@ -83,7 +97,7 @@
                 android:background="@drawable/bg_card_inert"
                 android:clipToOutline="true"
                 android:nestedScrollingEnabled="false"
-                tools:listitem="@layout/view_row" />
+                tools:listitem="@layout/view_row_line" />
 
             <include
                 android:id="@+id/empty_state"

@@ -64,13 +64,14 @@ class RoutingSettingActivity : HelperBaseActivity() {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
 
+        // NO TOOLBAR ACTION. §7's lekalo is «кнопка назад → заголовок → группы карточек» and
+        // carries none; the prototype puts «Добавить правило» in a card under the rules, where
+        // it has a name instead of being a «+» the user has to interpret. Same function, and
+        // one fewer target in the header.
         ToolbarBinder.bind(
             root = binding.toolbar.root,
             title = getString(R.string.routing_title),
             activity = this,
-            actionIcon = R.drawable.ic_add_24dp,
-            actionDescription = getString(R.string.routing_action_add),
-            onAction = { addRule() },
         )
         ToolbarBinder.attachTo(binding.toolbar.root, binding.mainContent)
 
@@ -143,6 +144,16 @@ class RoutingSettingActivity : HelperBaseActivity() {
     // ------------------------------------------------------------- actions
 
     private fun bindActionRows() {
+        // §7's accent action row: the name IS the affordance, so no chevron and no button. And
+        // no tile either - the prototype gives this one row no glyph at all, so its label starts
+        // on the 16dp gutter, which is what makes it read as an action rather than a setting.
+        RowBinder.bind(
+            root = binding.rowAddRule.root,
+            title = getString(R.string.routing_action_add),
+            tone = RowBinder.RowTone.ACCENT,
+            trailing = RowBinder.Trailing.None,
+            onClick = { addRule() },
+        )
         RowBinder.bind(
             root = binding.rowPresets.root,
             title = getString(R.string.routing_action_presets),
