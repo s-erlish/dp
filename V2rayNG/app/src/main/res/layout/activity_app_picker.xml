@@ -31,7 +31,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingStart="@dimen/screen_gutter"
-        android:paddingTop="@dimen/space_8"
+        android:paddingTop="@dimen/screen_gutter"
         android:paddingEnd="@dimen/screen_gutter">
 
         <include

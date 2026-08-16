@@ -77,7 +77,7 @@
 
             <com.google.android.material.card.MaterialCardView
                 style="@style/Widget.Departament.CardSection"
-                android:layout_marginTop="@dimen/space_8">
+                android:layout_marginTop="@dimen/screen_gutter">
 
                 <LinearLayout style="@style/Widget.Departament.CardSection.Body">
 

@@ -49,9 +49,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingStart="@dimen/screen_gutter"
-        android:paddingTop="@dimen/space_8"
+        android:paddingTop="@dimen/screen_gutter"
         android:paddingEnd="@dimen/screen_gutter"
-        android:paddingBottom="@dimen/space_8">
+        android:paddingBottom="@dimen/space_12">
 
         <include
             android:id="@+id/search"

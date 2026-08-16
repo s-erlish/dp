@@ -402,7 +402,10 @@
     <style name="SettingsSectionLabel" parent="TextAppearance.App.Title">
         <item name="android:paddingStart">@dimen/screen_gutter</item>
         <item name="android:paddingEnd">@dimen/screen_gutter</item>
-        <item name="android:paddingTop">@dimen/space_24</item>
+        <!-- 22 above and 8 below - handoff §6 states the section header as
+             «16sp/700, padding 22×16×8dp» and the prototype measures exactly that.
+             24 was the nearest rung on the old scale; space_22 exists now. -->
+        <item name="android:paddingTop">@dimen/space_22</item>
         <item name="android:paddingBottom">@dimen/space_8</item>
         <item name="android:textAllCaps">false</item>
     </style>

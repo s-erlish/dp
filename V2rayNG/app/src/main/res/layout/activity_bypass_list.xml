@@ -13,13 +13,13 @@
 
   The screen now reads top to bottom as one ledger (R1):
 
-      H3 toolbar                       «Прокси по приложениям» + one overflow
+      §7 header                        «Прокси по приложениям» + one overflow
       Row.Value «Режим»                cycles Все / Только выбранные / Кроме выбранных
                                        in place; its subtitle says what the mode DOES
       search 56                        filters in place, never navigates
       meta line                        «Отмечено 4 из 128», Caption, Numeric figures
       grouped list                     «Ваши приложения» then «Системные приложения»,
-                                       one Row.Toggle per app, the row owns the switch
+                                       one checkbox row per app, the row owns the box
 
   Three states share the frame below the meta line and exactly one is visible at a
   time: the list, the skeleton (the package manager is slow on a cold start and the
@@ -69,7 +69,7 @@
          grouped-card composition; the shared toolbar above stays. -->
     <com.google.android.material.card.MaterialCardView
         style="@style/Widget.Departament.CardSection"
-        android:layout_marginTop="@dimen/space_8">
+        android:layout_marginTop="@dimen/screen_gutter">
 
         <LinearLayout style="@style/Widget.Departament.CardSection.Body">
 
@@ -102,7 +102,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingStart="@dimen/screen_gutter"
-        android:paddingTop="@dimen/space_8"
+        android:paddingTop="@dimen/space_12"
         android:paddingEnd="@dimen/screen_gutter">
 
         <include

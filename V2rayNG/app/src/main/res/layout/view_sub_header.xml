@@ -48,8 +48,7 @@
     android:layout_height="wrap_content"
     android:background="?android:attr/colorBackground"
     android:elevation="0dp"
-    android:orientation="vertical"
-    android:paddingBottom="@dimen/space_8">
+    android:orientation="vertical">
 
     <!-- The back row. §7 «padding:4px 16px 0» — the 4 above the control, the 16 is
          the gutter the title below already stands on. -->
@@ -133,11 +132,14 @@
         tools:text="Отсканируйте QR-код, показанный на телевизоре."
         tools:visibility="visible" />
 
+    <!-- FLUSH UNDER THE TITLE, with no gap of its own. §6 puts a section header's own
+         22dp of padding directly under the page title and the prototype measures zero
+         between them; a padding here plus a margin here used to add 17dp to every
+         sub-screen before its first word. The hairline still ships at alpha 0. -->
     <View
         android:id="@+id/toolbar_hairline"
         android:layout_width="match_parent"
         android:layout_height="@dimen/stroke_hairline"
-        android:layout_marginTop="@dimen/space_8"
         android:alpha="0"
         android:background="?attr/colorOutlineVariant" />
 </LinearLayout>
