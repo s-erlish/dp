@@ -40,6 +40,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:clipChildren="false"
         android:clipToPadding="false"
         android:paddingBottom="@dimen/space_32"
         android:scrollbars="none">
@@ -47,6 +48,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:clipChildren="false"
             android:orientation="vertical">
 
             <!-- §7 puts a section header over this card too — the prototype's first group on
@@ -58,9 +60,18 @@
                 android:layout_height="wrap_content"
                 android:text="@string/asset_source" />
 
-            <com.google.android.material.card.MaterialCardView style="@style/Widget.Departament.CardSection">
+            <!-- «Источник Geo-файлов» opens §6's select popup, so this card must NOT clip its
+                 children or the popup is sliced off at its bottom edge (§11 grabl 4). Its two
+                 rows carry the card's corners themselves — see UserAssetActivity.bindSourceRow. -->
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Departament.CardSection"
+                android:clipChildren="false"
+                android:clipToPadding="false">
 
-                <LinearLayout style="@style/Widget.Departament.CardSection.Body">
+                <LinearLayout
+                    style="@style/Widget.Departament.CardSection.Body"
+                    android:clipChildren="false"
+                    android:clipToPadding="false">
 
                     <include
                         android:id="@+id/row_source"
