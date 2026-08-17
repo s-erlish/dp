@@ -103,10 +103,11 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- «Вход в departament». The Latin token is re-set in the brand face
-                 at bind time (D-14.1); that span is the whole brand moment on this
-                 screen and is why there is no logo, no shield tile and no wordmark
-                 lockup above it. -->
+            <!-- «Вход в аккаунт» (the owner's wording, 2026-08-17). A Latin token in
+                 the title is re-set in the brand face at bind time (D-14.1) — this
+                 heading no longer has one, and that is why there is still no logo, no
+                 shield tile and no wordmark lockup above it: the screen names the
+                 errand, not the product. -->
             <TextView
                 android:id="@+id/gate_title"
                 android:layout_width="match_parent"

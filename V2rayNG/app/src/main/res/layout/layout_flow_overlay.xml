@@ -189,6 +189,45 @@
         </FrameLayout>
     </LinearLayout>
 
+    <!--
+      «ОТКРЫТЬ TELEGRAM» — единственное действие на слое, и оно живёт ЗДЕСЬ, а не
+      на отдельном экране. Выбор чужого приложения можно закрыть случайно, Telegram
+      может не открыться вовсе, а ссылка на токен уже выдана и опрос уже идёт: без
+      этой кнопки у ожидания нет второй попытки, и остаётся только «назад».
+
+      ВНИЗУ, А НЕ В СТОЙКЕ. `flow_stack` центрирован, поэтому кнопка внутри него
+      подняла бы кольцо на 76dp в момент своего появления — на экране, весь смысл
+      которого в том, что кольцо стоит на месте. Внизу же она делит место с тостом
+      финала: пока идёт ожидание, снизу эта пилюля, на четвёртом шаге — тост, и
+      вместе они не встречаются никогда. Отсюда и общая коробка: те же боковые
+      поля и тот же нижний отступ, что у тоста.
+
+      Пилюля — та же, что на начальном экране и в гейте: 52dp, radius_button,
+      контур 1.5dp, без заливки, глиф в фирменном #2AABEE. Один способ — один вид,
+      где бы его ни предлагали. Показывается только в потоке Telegram и только
+      после того, как ссылка выдана (FlowOverlay.offerOpenTelegram).
+    -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/flow_open_telegram"
+        style="@style/Widget.Departament.Button.Secondary.Tall"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="@dimen/flow_toast_inset"
+        android:layout_marginEnd="@dimen/flow_toast_inset"
+        android:layout_marginBottom="@dimen/flow_toast_bottom"
+        android:alpha="0"
+        android:text="@string/auth_open_telegram"
+        android:textAppearance="@style/TextAppearance.App.Button"
+        android:visibility="gone"
+        app:backgroundTint="@color/ob_pill_container"
+        app:cornerRadius="@dimen/radius_button"
+        app:icon="@drawable/ic_telegram_24dp"
+        app:iconTint="@color/telegram_brand"
+        app:strokeColor="?attr/colorOutline"
+        app:strokeWidth="@dimen/ob_stroke"
+        tools:visibility="visible" />
+
     <!-- Тост финала. 40dp, radius 100dp, поверхность на шаг выше фона; поднимается
          на 260 мс и уходит вместе со слоем. Это не Snackbar: у него нет действия
          и он ничего не перекрывает — экран под ним всё равно уходит. -->

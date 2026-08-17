@@ -25,10 +25,17 @@
 <resources>
 
     <!-- ===================== A · the gate ===================== -->
-    <!-- The Latin token «departament» is set in the brand face by LoginActivity
-         (14-auth.md 5.1, D-14.1). Keep the word spelled exactly like this or the
-         span will not find it and the heading silently loses the brand moment. -->
-    <string name="auth_gate_title">Вход в departament</string>
+    <!-- THE OWNER'S WORDING, 2026-08-17: «вместо вход в департамент напиши вход в
+         аккаунт». One string, two readers — the gate (layout_auth_gate.xml) and the
+         Аккаунт tab's signed-out block (activity_account.xml) — which is why it is
+         changed here and not at either call site.
+
+         IT NO LONGER CARRIES THE LATIN TOKEN, and that is deliberate rather than an
+         oversight: LoginActivity.brandedTitle looks for «departament» to set it in
+         the brand face (14-auth.md 5.1, D-14.1) and now simply finds nothing, which
+         is the case it has always handled. The span is kept, not deleted — a title
+         that regains the word gets the brand moment back with no code change. -->
+    <string name="auth_gate_title">Вход в аккаунт</string>
     <string name="auth_gate_body">Здесь будут подписка, устройства и платежи.</string>
     <string name="auth_btn_telegram">Войти через Telegram</string>
     <!-- KEPT, AND NO LONGER ON A CONTROL. The owner's ruling takes e-mail, OTP, 2FA

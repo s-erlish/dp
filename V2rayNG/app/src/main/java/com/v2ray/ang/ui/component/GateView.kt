@@ -3,12 +3,10 @@ package com.v2ray.ang.ui.component
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
-import android.content.ActivityNotFoundException
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.util.AttributeSet
 import android.view.View
 import android.widget.FrameLayout
@@ -24,16 +22,11 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
-import com.v2ray.ang.auth.AuthManager
-import com.v2ray.ang.auth.AuthManager.LoginState
-import com.v2ray.ang.auth.BackendConfig
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.ui.LoginActivity
-import com.v2ray.ang.ui.MainActivity
 import com.v2ray.ang.ui.MainHost
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.reducedMotion
-import com.v2ray.ang.viewmodel.AuthViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -63,6 +56,11 @@ import kotlinx.coroutines.withContext
  * `AuthViewModel`, — это второй потребитель одного и того же состояния, а не вторая реализация
  * входа. `LoginActivity` со всем, что у неё есть (почта, OTP, 2FA, Google), остаётся в проекте и
  * открывается строкой «Войти через сайт»: она перестала быть путём по умолчанию, а не исчезла.
+ *
+ * САМ ПОТОК ЗДЕСЬ БОЛЬШЕ НЕ ЖИВЁТ — он в [TelegramFlow], и это переезд, а не переделка. Механика
+ * была написана под начальный экран и оказалась нужна вкладке «Аккаунт», которая показывает тот же
+ * блок входа; оставить её приватной значило завести вторую такую же. Начальный экран зовёт её ровно
+ * так же, как вкладка, и остаётся владельцем только своего второго потока — «из буфера».
  */
 class GateView @JvmOverloads constructor(
     context: Context,
@@ -126,9 +124,25 @@ class GateView @JvmOverloads constructor(
     /** Ссылка, найденная в буфере. null — буфер пуст, и это состояние, а не ошибка. */
     private var clipLink: String? = null
 
+    /** Поток «из буфера» — единственный, который этот экран ведёт сам. */
     private var flow: FlowOverlay? = null
     private var flowJob: Job? = null
-    private var telegramOpened = false
+
+    /**
+     * Поток «Telegram», общий с вкладкой «Аккаунт». Экземпляр создаётся один раз на вью и живёт
+     * ровно столько же: сама попытка привязана к окну, а не к нему.
+     */
+    private val telegram = TelegramFlow(object : TelegramFlow.Host {
+        override fun refreshSubscriptions() {
+            host?.refreshSubscriptions()
+        }
+
+        override suspend fun awaitSubscriptionImport() {
+            host?.awaitSubscriptionImport()
+        }
+
+        override fun onFailed(message: Int) = showCause(message)
+    })
 
     override fun onFinishInflate() {
         super.onFinishInflate()
@@ -217,12 +231,13 @@ class GateView @JvmOverloads constructor(
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
         if (!hasWindowFocus || !onboarding) return
-        val running = flow
-        if (running != null) {
-            if (telegramOpened) running.step(1)
-        } else {
-            refreshClipboard(animate = entered)
+        if (telegram.isRunning) {
+            telegram.onReturn()
+            return
         }
+        // Поток «из буфера» ничего не ждёт снаружи: он идёт сам и буфер перечитывать не просит.
+        if (flow != null) return
+        refreshClipboard(animate = entered)
     }
 
     // ------------------------------------------------------------------ буфер обмена
@@ -422,8 +437,10 @@ class GateView @JvmOverloads constructor(
      */
     private fun startClipboardFlow(link: String) {
         val activity = activityOrNull() ?: return
-        if (flow != null) return
-        holdHome(activity)
+        // Слой снимается на финале ([handOff]), а работа за ним может ещё доигрывать — поэтому
+        // спрашиваем и про неё, иначе второе нажатие в кадре финала завело бы второй импорт.
+        if (flow != null || flowJob?.isActive == true || telegram.isRunning) return
+        HomeHold.take(activity)
         val overlay = FlowOverlay.show(activity, FlowOverlay.Kind.CLIPBOARD)
         flow = overlay
         flowJob = activity.lifecycleScope.launch {
@@ -452,88 +469,18 @@ class GateView @JvmOverloads constructor(
     // ------------------------------------------------------------------ поток «Telegram»
 
     /**
-     * §3, набор «Telegram». Слой показывает состояния того же `AuthManager`, которым живёт
-     * `AuthViewModel`: открываем Telegram → проверяем вход (когда пользователь вернулся) →
-     * добавляем подписку → готово.
+     * §3, набор «Telegram» — и он идёт В [TelegramFlow], а не здесь.
+     *
+     * Осталась ровно одна вещь, которую поток решить не может: куда деваться, если бэкенда нет
+     * вовсе. Входить тогда некуда, и экран входа скажет это своими словами.
      */
     private fun startTelegramFlow() {
         val activity = activityOrNull() ?: return
-        if (flow != null) return
-        if (!BackendConfig.isConfigured()) {
-            // Бэкенда нет — входить некуда; экран входа скажет это своими словами.
-            openSite()
-            return
-        }
-        holdHome(activity)
-        telegramOpened = false
-        val overlay = FlowOverlay.show(activity, FlowOverlay.Kind.TELEGRAM) { abortFlow() }
-        flow = overlay
-        flowJob = activity.lifecycleScope.launch {
-            AuthManager().beginTelegramLogin().collect { state ->
-                when (state) {
-                    is LoginState.AwaitingTelegram -> openTelegram(state.deepLink)
-                    is LoginState.Polling -> openTelegram(state.deepLink)
-                    is LoginState.Success -> {
-                        overlay.step(2)
-                        host?.refreshSubscriptions()
-                        // ЖДЁМ ЗДЕСЬ, А НЕ В ОБОЛОЧКЕ. MainActivity.revealHome держит на тех же
-                        // фактах ВХОД Главной, но к моменту его вызова FlowOverlay.finish overlay
-                        // уже снял — и ожидание показывает тёмную незаполненную Главную вместо
-                        // полоски, на которую человек смотрел. Один шаг раньше — и окно остаётся.
-                        //
-                        // refreshSubscriptions() выше обходит подписки, УЖЕ лежащие на устройстве,
-                        // и у нового аккаунта ему нечего обходить; подписку заводит другой путь —
-                        // HomeFragment.onLoggedIn. Поэтому ждём не его, а сам импорт.
-                        host?.awaitSubscriptionImport()
-                        delay(STEP_DWELL_MS)
-                        handOff(overlay)
-                    }
-
-                    is LoginState.Error -> failFlow(
-                        AuthViewModel.messageFor(state.error, awaitingTelegram = telegramOpened)
-                    )
-
-                    is LoginState.Idle, is LoginState.SiteLoading -> Unit
-                }
-            }
-        }
-    }
-
-    /** Ссылка открывается один раз на токен: повторный `Polling` не должен снова прыгать в Telegram. */
-    private fun openTelegram(deepLink: String) {
-        if (telegramOpened || deepLink.isBlank()) return
-        telegramOpened = true
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(deepLink))
-        try {
-            context.startActivity(intent)
-        } catch (e: ActivityNotFoundException) {
-            // Telegram не установлен: тот же t.me открывается в браузере и завершает то же
-            // подтверждение, поэтому опрос продолжается, а не падает.
-            LogUtil.w(AppConfig.TAG, "Telegram is not installed, falling back to the browser", e)
-            try {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(deepLink)).addCategory(Intent.CATEGORY_BROWSABLE))
-            } catch (second: ActivityNotFoundException) {
-                LogUtil.w(AppConfig.TAG, "No browser to open the Telegram link", second)
-                failFlow(R.string.auth_err_telegram_missing)
-            }
-        }
+        if (flow != null || telegram.isRunning) return
+        if (!telegram.start(activity)) openSite()
     }
 
     // ------------------------------------------------------------------ финал и срыв
-
-    /**
-     * Первая половина стыка: Главная ставится в предсборочное состояние ПОД уже поднятым слоем,
-     * пока её никто не видит. Иначе она соберётся сама, за секунду с небольшим, и слой уйдёт с
-     * готового экрана — это и есть грабля №6.
-     *
-     * Оболочка знает то, чего не знает вкладка: её флаг переживает пересоздание вьюх фрагмента
-     * (поворот экрана посреди потока), поэтому, когда хозяин — `MainActivity`, держим через неё, а
-     * [HomeHandoff] остаётся путём для любого другого хозяина.
-     */
-    private fun holdHome(activity: ComponentActivity) {
-        val shell = activity as? MainActivity
-        if (shell != null) shell.holdHomeEntrance() else HomeHandoff.prime()
-    }
 
     /**
      * ГРАБЛЯ №6, вторая половина. Последний шаг, тост — и снятие слоя тем же кадром, что и запуск
@@ -541,45 +488,36 @@ class GateView @JvmOverloads constructor(
      * зовёт этот колбэк. Между ними нет ни ожидания, ни поста, ни второго кадра.
      */
     private fun handOff(overlay: FlowOverlay) {
-        val shell = activityOrNull() as? MainActivity
+        val activity = activityOrNull()
         overlay.finish {
             // Слой уже снят строкой выше — оболочке остаётся снять флаг и проиграть таблицу §3.
-            if (shell != null) shell.revealHome { } else HomeHandoff.assemble()
+            if (activity != null) HomeHold.release(activity)
         }
         flow = null
-        telegramOpened = false
-    }
-
-    /** Пользователь нажал «назад» на слое прогрузки: поток брошен, экран возвращается как был. */
-    private fun abortFlow() {
-        flowJob?.cancel()
-        flowJob = null
-        flow?.cancel()
-        flow = null
-        telegramOpened = false
-        releaseHome()
     }
 
     /**
-     * Отпустить Главную, если поток кончился ничем. [holdHome] оставляет её в предсборочном
-     * состоянии — с нулевой прозрачностью строки аккаунта, кнопки и списка, — и без этой строки
-     * сорвавшийся поток оставил бы под собой пустой экран.
-     */
-    private fun releaseHome() {
-        val shell = activityOrNull() as? MainActivity
-        if (shell != null) shell.revealHome { } else HomeHandoff.assemble()
-    }
-
-    /**
-     * Отказ. Слой уходит, а причина остаётся на экране подписью — тем же способом, каким гейт уже
-     * показывает причину неудачной загрузки серверов. Ни тоста, ни диалога.
+     * Отказ. Слой уходит, Главная отпускается, а причина остаётся на экране подписью — тем же
+     * способом, каким гейт уже показывает причину неудачной загрузки серверов. Ни тоста, ни
+     * диалога.
      */
     private fun failFlow(@StringRes message: Int) {
         flow?.cancel()
         flow = null
         flowJob = null
-        telegramOpened = false
-        releaseHome()
+        activityOrNull()?.let { HomeHold.release(it) }
+        showCause(message)
+    }
+
+    /**
+     * Причина срыва подписью под заголовком. Отдельно от [failFlow], потому что у потока Telegram
+     * весь остальной разбор свой ([TelegramFlow]), а показать причину он просит хозяина — и на
+     * начальном экране это место здесь.
+     *
+     * Пишется СРАЗУ, пока слой ещё тает: его уход и есть появление сообщения, и второй анимации
+     * для этого не нужно.
+     */
+    private fun showCause(@StringRes message: Int) {
         caption.setText(message)
         caption.setTextColor(caption.themeColor(R.attr.colorDestructiveText))
     }

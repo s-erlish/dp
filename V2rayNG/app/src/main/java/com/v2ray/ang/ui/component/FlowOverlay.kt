@@ -17,6 +17,7 @@ import androidx.annotation.MainThread
 import androidx.annotation.StringRes
 import androidx.core.animation.doOnEnd
 import androidx.core.view.isVisible
+import com.google.android.material.button.MaterialButton
 import com.v2ray.ang.R
 import com.v2ray.ang.util.reducedMotion
 
@@ -31,6 +32,11 @@ import com.v2ray.ang.util.reducedMotion
  * ЧТО ЭТО НЕ ТАКОЕ. Это не экран входа и не замена `LoginActivity` (PORT-DELTA П-13): слой ничего не
  * решает и ничего не запрашивает — он **показывает** состояние, которое ему сообщает поток. Тайминги
  * README (1200 / 3000 / 4600 мс) — потолки анимации, а не расписание: шаги двигает ответ сервера.
+ *
+ * ОДНО ДЕЙСТВИЕ У НЕГО ВСЁ ЖЕ ЕСТЬ, и оно ничего из сказанного выше не отменяет: «Открыть Telegram»
+ * ([offerOpenTelegram]) повторяет то, что слой уже сделал сам, когда выбор приложения закрыли
+ * случайно или Telegram не открылся. Выбора оно не предлагает и состояния не меняет; отмена — это
+ * по-прежнему «назад».
  *
  * ТРИ ВЕЩИ, КОТОРЫЕ ЗДЕСЬ СДЕЛАНЫ НАРОЧНО:
  *
@@ -59,6 +65,7 @@ class FlowOverlay private constructor(
     private val note: TextView = root.findViewById(R.id.flow_note)
     private val bar: View = root.findViewById(R.id.flow_bar)
     private val barFill: View = root.findViewById(R.id.flow_bar_fill)
+    private val openTelegram: MaterialButton = root.findViewById(R.id.flow_open_telegram)
     private val toast: LinearLayout = root.findViewById(R.id.flow_toast)
     private val toastLabel: TextView = root.findViewById(R.id.flow_toast_label)
 
@@ -98,7 +105,58 @@ class FlowOverlay private constructor(
         title.setText(titleFor(step))
         note.setText(noteFor(step))
         applyProgress(step, animate = true)
+        // Открывать Telegram больше незачем: подтверждение получено, дальше работает сервер. Уход
+        // кнопки здесь, а не в финале, — она освобождает низ экрана до того, как оттуда поднимется
+        // тост, и две вещи не оказываются в одном месте.
+        if (step >= STEP_CONFIRMED) hideAction()
         if (step == LAST_STEP) playFinale()
+    }
+
+    /**
+     * Показать на слое «Открыть Telegram». Зовётся потоком в тот момент, когда ссылка на токен
+     * выдана: раньше открывать нечего, а после подтверждения — уже незачем (см. [step]).
+     *
+     * Это ЕДИНСТВЕННОЕ действие, которое слой предлагает, и оно не противоречит его роли: слой
+     * по-прежнему ничего не решает и ничего не запрашивает — он повторяет то, что уже сделал сам,
+     * когда выбор приложения закрыли случайно или Telegram не открылся. Отмена остаётся «назад».
+     */
+    @MainThread
+    fun offerOpenTelegram(onOpen: () -> Unit) {
+        if (removed || kind != Kind.TELEGRAM || step >= STEP_CONFIRMED) return
+        openTelegram.onSingleClick(Haptic.PRESS) { onOpen() }
+        if (openTelegram.isVisible) return
+        openTelegram.pressFeedback(R.anim.press_button)
+        revealAction()
+    }
+
+    /** Появление действия: те же 8dp подъёма и та же кривая, что у любого раскрытия в продукте. */
+    private fun revealAction() {
+        openTelegram.alpha = 0f
+        openTelegram.isVisible = true
+        if (root.reducedMotion()) {
+            openTelegram.alpha = 1f
+            openTelegram.translationY = 0f
+            return
+        }
+        openTelegram.translationY = ACTION_RISE_DP * root.resources.displayMetrics.density
+        openTelegram.animate().alpha(1f).translationY(0f)
+            .setDuration(root.durationOf(R.integer.motion_reveal))
+            .setInterpolator(root.curve(R.interpolator.ease_out_quint))
+            .start()
+    }
+
+    private fun hideAction() {
+        if (!openTelegram.isVisible) return
+        openTelegram.animate().cancel()
+        if (root.reducedMotion()) {
+            openTelegram.isVisible = false
+            return
+        }
+        openTelegram.animate().alpha(0f)
+            .setDuration(root.durationOf(R.integer.motion_state_exit))
+            .setInterpolator(root.curve(R.interpolator.ease_standard))
+            .withEndAction { openTelegram.isVisible = false }
+            .start()
     }
 
     /**
@@ -352,6 +410,12 @@ class FlowOverlay private constructor(
 
         private const val LAST_STEP = 3
 
+        /**
+         * Шаг «Добавляем подписку»: с него и дальше открывать Telegram уже не нужно.
+         * @see offerOpenTelegram
+         */
+        private const val STEP_CONFIRMED = 2
+
         /** §3: 18 / 54 / 86 / 100 %. */
         private val PERCENT = intArrayOf(18, 54, 86, 100)
 
@@ -394,5 +458,8 @@ class FlowOverlay private constructor(
         private const val SONAR_TO = 1.6f
         private const val CHECK_FROM = 0.9f
         private const val TOAST_RISE_DP = 8f
+
+        /** Подъём «Открыть Telegram» при появлении — тот же, что у тоста и у любого раскрытия. */
+        private const val ACTION_RISE_DP = 8f
     }
 }

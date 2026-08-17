@@ -276,10 +276,35 @@
                 android:textAppearance="@style/TextAppearance.App.Body"
                 android:textColor="?attr/colorOnSurfaceVariant" />
 
+            <!-- THE FAILURE LINE, AND IT SITS ABOVE THE BUTTONS. The Telegram sign-in now
+                 runs ON THIS TAB, under the flow overlay, so its reason has to land here
+                 rather than on a screen that has closed: «поток сорвался» is answered by a
+                 sentence in the block that offered the sign-in, exactly as the start screen
+                 answers it in its own caption. Above the buttons, like the gate's own error,
+                 so a two-line failure grows upwards into the lead spacer instead of shoving
+                 the pills down under the thumb. Body 14 in the error TEXT red (6.15:1), not
+                 the fill red. Hidden until there is something to say — and colour is never
+                 the only channel, the sentence is. -->
+            <TextView
+                android:id="@+id/tv_signed_out_error"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_12"
+                android:accessibilityLiveRegion="polite"
+                android:textAppearance="@style/TextAppearance.App.Body"
+                android:textColor="?attr/colorDestructiveText"
+                android:visibility="gone"
+                tools:text="@string/auth_err_network"
+                tools:visibility="visible" />
+
             <!-- TELEGRAM FIRST, exactly as on the start screen — the same two doors in the
                  same order, so someone who has seen one recognises the other. The glyph
                  carries Telegram's blue and the label does not: a second brand's hue marks
-                 the method, it does not get to spend this product's accent. -->
+                 the method, it does not get to spend this product's accent.
+
+                 IT STARTS THE SIGN-IN WHERE IT STANDS. No Activity is pushed: the flow
+                 overlay goes up over this tab, Telegram opens, and the wait happens here.
+                 See AccountFragment.startTelegramSignIn. -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_signed_out_telegram"
                 style="@style/Widget.Departament.Button.Secondary.Tall"

@@ -86,15 +86,27 @@ import kotlinx.coroutines.launch
  * running, and [EXTRA_LINK] runs the same Telegram flow with the JWT of the account that is already
  * signed in, so the backend links instead of logging a second one in.
  *
- * **Why the fourth mode exists (2026-08-17).** The Аккаунт tab's signed-out block was rebuilt to
- * look exactly like this gate — same heading, same two contour pills, same order — and its «Войти
- * через Telegram» opened [MODE_TELEGRAM], which is this gate. So the tap answered the question and
- * the answer was the question again: «нажимаешь вход через телеграм, открывается снова окно где
- * предлагается войти через телеграм». A gate is the right screen for a caller that has not asked
- * the question yet and the wrong one for a caller whose own button already named the method, so a
- * button that names Telegram now STARTS Telegram ([MODE_TELEGRAM_START]) instead of offering it a
- * second time. The gate is untouched — both its buttons stay, and every other caller still lands
- * on it.
+ * **Why the fourth mode exists, and why nothing calls it today (2026-08-17).** The Аккаунт tab's
+ * signed-out block was rebuilt to look exactly like this gate — same heading, same two contour
+ * pills, same order — and its «Войти через Telegram» opened [MODE_TELEGRAM], which is this gate. So
+ * the tap answered the question and the answer was the question again: «нажимаешь вход через
+ * телеграм, открывается снова окно где предлагается войти через телеграм». [MODE_TELEGRAM_START]
+ * was the answer to that: mint the token on entry and land on the awaiting stack, so the method is
+ * carried out rather than offered twice.
+ *
+ * It removed the duplicated CHOICE and left the duplicated SCREEN, which is what the owner reported
+ * next: «меня кидает на новое окно где опять кнопки открыть телеграм и вход через сайт, этого быть
+ * не должно, ВСЁ ДОЛЖНО ПРОИСХОДИТЬ НА ВКЛАДКЕ АККАУНТ». A tap on a tab that already shows the
+ * offer must not push an Activity at all — so the tab runs the flow in place now
+ * (`AccountFragment.startTelegramSignIn` -> `TelegramFlow`), exactly as Главная's start screen
+ * always has, and this mode has no caller left.
+ *
+ * **It is kept, and so is the gate.** Refinement is not removal: the entry point moved, the
+ * capability did not. A caller that has NOT named the method still wants [MODE_TELEGRAM] — the gate
+ * is the screen where the choice is made, «Привязать Telegram» arrives on it, and a caller that HAS
+ * named the method but cannot host an overlay still wants [MODE_TELEGRAM_START]. Both surfaces,
+ * both stacks and every path through them are untouched and tested by the site route, which shares
+ * all of it.
  *
  * **What is deliberately gone**: the `Toast` on a failure the user can act on, and the debug
  * `AlertDialog` that put the raw HTTP body on screen (14-auth.md 13.3, D-14.F). The cause goes to
@@ -343,16 +355,19 @@ class LoginActivity : BaseActivity() {
     }
 
     /**
-     * «Вход в departament» with the Latin token in the brand face (D-14.1). This span is the whole
-     * brand moment on the screen, and it is why the gate needs no logo, no shield tile and no
-     * wordmark lockup: 03-direction.md F17 forbids a shield outside the connect object and
-     * 11-app-structure.md 4.3.1 forbids a wordmark competing with the heading, so the product names
-     * itself in the one place where a Latin word already exists. The Russian around it stays in the
-     * UI face — Space Grotesk maps zero Cyrillic codepoints, so setting it on the whole line would
-     * silently hand every Russian glyph to the platform fallback.
+     * Sets the Latin token in the brand face (D-14.1), when the title has one. The span was the
+     * whole brand moment on this screen, and it is why the gate needs no logo, no shield tile and
+     * no wordmark lockup: 03-direction.md F17 forbids a shield outside the connect object and
+     * 11-app-structure.md 4.3.1 forbids a wordmark competing with the heading, so the product named
+     * itself in the one place where a Latin word already existed. The Russian around it stays in
+     * the UI face — Space Grotesk maps zero Cyrillic codepoints, so setting it on the whole line
+     * would silently hand every Russian glyph to the platform fallback.
      *
-     * If the owner rejects the mixed face, delete this function and use `setText`; the layout does
-     * not change by a pixel.
+     * **NEITHER TITLE CARRIES THE TOKEN TODAY.** The heading is «Вход в аккаунт» by the owner's
+     * ruling of 2026-08-17 and link mode's is «Привязать Telegram», so the `indexOf` below misses
+     * and the raw string is returned — the branch this function has always had for exactly this.
+     * It is kept rather than removed: a title that regains the word gets the brand face back with
+     * no code change, and the layout does not depend on either outcome by a pixel.
      */
     private fun brandedTitle(titleRes: Int): CharSequence {
         val raw = getString(titleRes)
@@ -1157,10 +1172,13 @@ class LoginActivity : BaseActivity() {
          * Open straight INTO the Telegram attempt: mint the token, hand the deep link to Telegram
          * and sit on the gate's own awaiting stack while the poll runs.
          *
-         * For a caller whose control already named the method — the Аккаунт tab's «Войти через
-         * Telegram» — where [MODE_TELEGRAM] would answer a tap by re-asking it. A caller that has
-         * NOT asked yet still wants [MODE_TELEGRAM]: the gate is the screen where the choice is
-         * made, and it is not going anywhere.
+         * For a caller whose control already named the method, where [MODE_TELEGRAM] would answer
+         * a tap by re-asking it. **No caller today**: the one it was written for — the Аккаунт
+         * tab's «Войти через Telegram» — now runs the flow on the tab itself and pushes nothing,
+         * which is the same objection carried one step further. It stays because the objection is
+         * about pushing a screen, not about this mode: a caller that names the method and CANNOT
+         * host an overlay still wants exactly this, and every line of it is live code shared with
+         * link mode, which does mint on entry and does land on the awaiting stack.
          */
         const val MODE_TELEGRAM_START = "telegram_start"
 

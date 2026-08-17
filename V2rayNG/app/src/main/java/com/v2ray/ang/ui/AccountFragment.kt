@@ -13,6 +13,7 @@ import android.view.animation.AnimationUtils
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
@@ -44,6 +45,7 @@ import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.ui.component.Haptic
+import com.v2ray.ang.ui.component.TelegramFlow
 import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.ui.component.pressFeedback
 import com.v2ray.ang.ui.component.restoreChecked
@@ -125,6 +127,31 @@ class AccountFragment : Fragment() {
     // Set right before a purchase/top-up call so the NEXT error emission is surfaced as the real
     // "Ошибка оплаты" diagnostic dialog instead of the friendly toast. Cleared on success.
     private var awaitingPaymentError = false
+
+    /**
+     * THE TELEGRAM SIGN-IN, RUN ON THIS TAB AND NOWHERE ELSE.
+     *
+     * The same object Главная's start screen uses ([TelegramFlow]) — one flow, two callers. It
+     * raises the flow overlay over this tab, opens Telegram and keeps the wait here; no Activity is
+     * pushed, so there is no second screen to be thrown onto and no second choice to make.
+     *
+     * The three things a flow cannot know are wired here: where its «обнови подписки» goes, what it
+     * is allowed to wait for, and where a failure is written.
+     */
+    private val telegramFlow = TelegramFlow(object : TelegramFlow.Host {
+        override fun refreshSubscriptions() {
+            (activity as? MainHost)?.refreshSubscriptions()
+        }
+
+        override suspend fun awaitSubscriptionImport() {
+            // The shell's own bounded wait, so the overlay stays up until the подписка is REALLY
+            // in — the tab must not be handed back empty for the second and a half the import
+            // takes. Signed-in data then lands on it through the account-state collector below.
+            (activity as? MainHost)?.awaitSubscriptionImport()
+        }
+
+        override fun onFailed(message: Int) = showSignedOutError(message)
+    })
 
     // Gallery picker for a custom avatar. GetContent grants a one-shot read grant, which is
     // enough since we copy the bytes into app storage immediately. Registered at construction
@@ -274,8 +301,10 @@ class AccountFragment : Fragment() {
      * guard is 500ms per view and it is the ONLY sanctioned way to attach a listener under `ui`.
      *
      * The haptic set is closed by 00-rules.md 8.10 and this tab uses exactly two of it: PRESS on
-     * the switch flip and on the sign-out, which are the two taps that change something; nothing
-     * else here vibrates, navigation included.
+     * the sign-in, the switch flip and the sign-out, which are the taps that change something;
+     * nothing else here vibrates, navigation included. «Войти через Telegram» is in that set
+     * because it no longer navigates — it starts the errand, and its twin on the start screen
+     * fires the same haptic for the same reason.
      */
     private fun wireActions() {
         binding.btnTopUp.onSingleClick { showTopUpDialog() }
@@ -300,16 +329,20 @@ class AccountFragment : Fragment() {
         // the same order, so someone who has seen one recognises the other. MODE_SITE's form is
         // where registration lives («Создать аккаунт»), which is why there is no third button.
         //
-        // EACH BUTTON STARTS ITS METHOD; NEITHER OPENS A SCREEN THAT ASKS AGAIN. «Войти через
-        // Telegram» used to open LoginActivity.MODE_TELEGRAM, i.e. the gate — and once this block
-        // was rebuilt to look like that gate (same heading, same two contour pills, same order),
-        // the tap led from the question to the question: «нажимаешь вход через телеграм,
-        // открывается снова окно где предлагается войти через телеграм». The block ASKS, so the
-        // screen behind it must ANSWER: MODE_TELEGRAM_START mints the token and opens Telegram on
-        // entry, landing on the gate's own awaiting stack, and MODE_SITE has always opened the
-        // form itself. The gate is still the right screen for a caller that has not asked yet —
-        // it is untouched, and «Привязать Telegram» below still goes through it.
-        binding.btnSignedOutTelegram.onSingleClick { openLogin(LoginActivity.MODE_TELEGRAM_START) }
+        // «ВСЁ ДОЛЖНО ПРОИСХОДИТЬ НА ВКЛАДКЕ АККАУНТ», and that is a rule about SCREENS, not about
+        // which screen. Two rounds were spent making the pushed screen better — first it was the
+        // gate, which asked the question this block had already answered; then MODE_TELEGRAM_START,
+        // which answered it but still pushed an Activity that carried «Открыть Telegram» and «Войти
+        // через сайт» on it. Both are the same defect: the tap left this tab. So it stops leaving.
+        // [startTelegramSignIn] runs the flow HERE, under the overlay, with Telegram opening over
+        // it — the very machinery Главная has used all along, now called from two places instead of
+        // living in one.
+        //
+        // «Войти через сайт» still opens LoginActivity, and correctly so: that one is a FORM, i.e.
+        // genuinely another screen, and nothing about it duplicates the tap that opened it. The
+        // gate and MODE_TELEGRAM_START are untouched and still reachable — «Привязать Telegram»
+        // below goes through the gate, and every other caller of LoginActivity is unchanged.
+        binding.btnSignedOutTelegram.onSingleClick(Haptic.PRESS) { startTelegramSignIn() }
         binding.btnSignedOutSite.onSingleClick { openLogin(LoginActivity.MODE_SITE) }
         // Cold-load error: re-run the initial load (and re-show the skeleton while it retries).
         binding.btnRetryLoad.onSingleClick {
@@ -338,9 +371,53 @@ class AccountFragment : Fragment() {
     }
 
     /**
-     * Opens [LoginActivity] straight on the door the tapped button names — and, for a door that is
-     * an action rather than a surface, straight THROUGH it: [LoginActivity.MODE_TELEGRAM_START]
-     * carries out the tap instead of showing a screen where it could be made again.
+     * «ВОЙТИ ЧЕРЕЗ TELEGRAM» — IN PLACE, WITH NO SCREEN PUSHED. The whole of the owner's report.
+     *
+     * The overlay goes up over this tab, Telegram opens over the overlay, and the wait, the retry
+     * («Открыть Telegram», on the overlay itself), the failure and the success all happen here.
+     *
+     * BACK CANCELS AT EVERY POINT OF THE WAIT and lands back on this block: [FlowOverlay] owns a
+     * back callback for the whole of its life and hands it to [TelegramFlow.cancel], which drops
+     * the poll, removes the overlay and releases Главная. The block underneath was never touched,
+     * so there is nothing to restore — cancelling REVEALS it rather than rebuilding it.
+     *
+     * The one thing the flow will not do is invent a backend: with none configured there is
+     * nowhere to sign in, and the site form is the surface that says so in its own words.
+     */
+    private fun startTelegramSignIn() {
+        val window = activity ?: return
+        if (telegramFlow.isRunning) return
+        // A previous attempt's reason is not this attempt's state.
+        showSignedOutError(null)
+        if (!telegramFlow.start(window)) openLogin(LoginActivity.MODE_SITE)
+    }
+
+    /**
+     * The signed-out block's failure line — the tab's answer to a flow that ended in a reason
+     * rather than a session. Pass null to take it back.
+     *
+     * Written the moment the flow reports, i.e. while the overlay is still fading: the overlay
+     * leaving IS the reveal, and a second animation under a dissolving full-screen layer would be
+     * motion nobody can see. Guarded on the binding because the reason can land on a tab whose view
+     * has gone.
+     */
+    private fun showSignedOutError(@StringRes message: Int?) {
+        val b = _binding ?: return
+        if (message == null) {
+            b.tvSignedOutError.isVisible = false
+            return
+        }
+        b.tvSignedOutError.setText(message)
+        b.tvSignedOutError.isVisible = true
+    }
+
+    /**
+     * Opens [LoginActivity] on the door the tapped button names.
+     *
+     * ON THE SIGNED-OUT BLOCK IT IS «ВОЙТИ ЧЕРЕЗ САЙТ» AND NOTHING ELSE — a form is genuinely
+     * another screen, so pushing one is not the defect the Telegram button had. The same door is
+     * where [startTelegramSignIn] falls back to when there is no backend to sign in against, and
+     * the «Способы входа» rows are the method's other users.
      */
     private fun openLogin(mode: String) {
         startActivity(
@@ -503,6 +580,9 @@ class AccountFragment : Fragment() {
         latestProfile = null
         currentSubs = emptyList()
         selectedSubIndex = 0
+        // The signed-out block is about to come back; a reason left over from the last sign-in
+        // attempt would be the first thing on it and would be describing nothing.
+        showSignedOutError(null)
         subAdapter.submit(emptyList())
         binding.llSubDots.removeAllViews()
         binding.llSubDots.isVisible = false
@@ -1488,6 +1568,12 @@ class AccountFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         if (pendingPayment) startPaymentPolling()
+        // BACK FROM TELEGRAM. The user confirming in another app is the only thing that moves the
+        // wait's second step, and this is the tab's version of the window-focus signal the start
+        // screen uses. It is a no-op unless a flow is running and the link has actually been
+        // opened, so returning from a checkout — the other thing that leaves and comes back —
+        // cannot be mistaken for it.
+        telegramFlow.onReturn()
     }
 
     /**
