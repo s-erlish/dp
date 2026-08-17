@@ -644,12 +644,18 @@
                 android:text="@string/account_top_up"
                 android:textAppearance="@style/TextAppearance.App.Button"
                 app:cornerRadius="@dimen/radius_button"
-                app:icon="@drawable/ic_add_24dp"
-                app:iconGravity="textStart"
-                app:iconPadding="@dimen/space_8"
-                app:iconSize="18dp"
                 app:strokeColor="?attr/colorPrimary"
                 app:strokeWidth="@dimen/stroke_frame" />
+
+            <!-- NO GLYPH ON THIS ONE, and it is the block comment above being obeyed rather
+                 than a preference. §5.4 makes the pair equal and unranked on purpose — «two
+                 ways of spending money on the same account, and the screen refuses to rank
+                 them». A «+» on one of them ranks it, and it also cost the label its centring:
+                 MaterialButton with iconGravity=textStart centres the icon AND the text as one
+                 group, so «Пополнить» sat off-centre while «Продлить» beside it did not. Both
+                 halves of the owner's report — «у кнопки пополнить почему-то появился плюс, и
+                 текст не посередине, плюс надо убрать и оцентровать как было раньше» — are the
+                 same attribute. -->
 
             <!-- «Продлить» carries the light label, not the accent one: two accent
                  labels side by side would make the pair read as one wide control. -->
