@@ -35,7 +35,9 @@ import com.v2ray.ang.auth.dto.TariffGroupDto
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
+import com.v2ray.ang.ui.component.Haptic
 import com.v2ray.ang.ui.component.SubPage
+import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.ui.component.ToolbarBinder
 import com.v2ray.ang.util.reducedMotion
 import com.v2ray.ang.viewmodel.AccountViewModel
@@ -162,10 +164,17 @@ class BuyTariffActivity : BaseActivity() {
             awaitingPaymentError = it.getBoolean(STATE_AWAITING_ERROR, false)
         }
 
+        // The stepper keeps a RAW listener on purpose, and it is the one control in the product
+        // that has to: reaching five extra devices means five taps, and SingleClick's 500ms window
+        // would swallow four of them. Nothing duplicates — changeExtraDevices clamps and repaints.
         btnDevMinus.setOnClickListener { changeExtraDevices(-1) }
         btnDevPlus.setOnClickListener { changeExtraDevices(+1) }
-        btnPay.setOnClickListener { onPayClicked() }
-        btnRetry.setOnClickListener { reload() }
+        // These two do not. onPayClicked refuses to start a second REQUEST (viewModel
+        // .paymentInFlight), but the flag is only raised once a method has been picked, so two taps
+        // before the sheet appears opened two PaymentMethodSheets on top of each other. Haptic.PRESS
+        // is the purchase-confirm rung (00-rules.md 8.10) and the example in SingleClick's own doc.
+        btnPay.onSingleClick(Haptic.PRESS) { onPayClicked() }
+        btnRetry.onSingleClick { reload() }
 
         // The method pick comes back as DATA, on this activity's own FragmentManager, and the
         // listener is registered by whichever instance is alive (D11). The sheet used to hand its

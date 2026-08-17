@@ -10,6 +10,7 @@ import com.v2ray.ang.R
 import com.v2ray.ang.databinding.LayoutSubscriptionMetaBarBinding
 import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.util.reducedMotion
 
 /**
@@ -129,12 +130,17 @@ class HomeMetaPagerAdapter(
         // that deletes a подписка could act on a different one from the card under the thumb.
         bindPage(meta, subId, MmkvManager.decodeSubscription(subId))
         turnCaret(meta.btnCollapse, if (collapsed()) COLLAPSED_DEGREES else 0f)
-        meta.btnCollapse.setOnClickListener { onToggleList() }
-        meta.btnPing.setOnClickListener { onPingAll() }
-        meta.btnRefresh.setOnClickListener { onRefreshAll() }
-        meta.btnPin.setOnClickListener { onTogglePin(subId) }
-        meta.btnSupport.setOnClickListener { onOpenSupport(subId) }
-        meta.btnTelegram.setOnClickListener { onOpenTelegram(subId) }
+        // onSingleClick, not setOnClickListener (PORT-DELTA П-31, and SingleClick.kt's own rule
+        // that every raw hit under ui/ is a defect). These six are the card's action row and four of
+        // them have a duplicable effect: two subscription refreshes, two ping sweeps, two browser
+        // tabs for «Поддержка», two Telegram launches. The 500ms stamp lives on the view, so a
+        // recycled page carries its own guard and no per-holder state is needed.
+        meta.btnCollapse.onSingleClick { onToggleList() }
+        meta.btnPing.onSingleClick { onPingAll() }
+        meta.btnRefresh.onSingleClick { onRefreshAll() }
+        meta.btnPin.onSingleClick { onTogglePin(subId) }
+        meta.btnSupport.onSingleClick { onOpenSupport(subId) }
+        meta.btnTelegram.onSingleClick { onOpenTelegram(subId) }
         // Deleting a подписка, from the card that shows it. A long press is a hidden affordance and
         // the card's own layout has no free slot for a visible control, so HomeFragment says out
         // loud that it is here; a visible trailing action is filed with that layout's owner.

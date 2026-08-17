@@ -9,6 +9,7 @@ import com.v2ray.ang.R
 import com.v2ray.ang.databinding.SheetServerActionsBinding
 import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.template.TemplateManager
+import com.v2ray.ang.ui.component.onSingleClick
 
 /**
  * Incy-styled bottom sheet with per-server actions, shown on long-press of a server row
@@ -52,12 +53,15 @@ class ServerActionsSheet(
         binding.rowEdit.visibility = shareEditVisibility
         binding.rowDuplicate.visibility = shareEditVisibility
 
-        binding.rowShareQr.setOnClickListener { dialog.dismiss(); onShareQr() }
-        binding.rowShareClipboard.setOnClickListener { dialog.dismiss(); onShareClipboard() }
-        binding.rowEdit.setOnClickListener { dialog.dismiss(); onEdit() }
-        binding.rowDuplicate.setOnClickListener { dialog.dismiss(); onDuplicate() }
-        binding.rowSetDefault.setOnClickListener { dialog.dismiss(); onSetDefault() }
-        binding.rowDelete.setOnClickListener { dialog.dismiss(); onDelete() }
+        // dismiss() is not the guard it looks like: the sheet animates out, and a second tap
+        // landing during that animation ran the action again — two duplicated серверы from one
+        // «Дублировать», two delete confirmations from one «Удалить».
+        binding.rowShareQr.onSingleClick { dialog.dismiss(); onShareQr() }
+        binding.rowShareClipboard.onSingleClick { dialog.dismiss(); onShareClipboard() }
+        binding.rowEdit.onSingleClick { dialog.dismiss(); onEdit() }
+        binding.rowDuplicate.onSingleClick { dialog.dismiss(); onDuplicate() }
+        binding.rowSetDefault.onSingleClick { dialog.dismiss(); onSetDefault() }
+        binding.rowDelete.onSingleClick { dialog.dismiss(); onDelete() }
 
         dialog.show()
     }

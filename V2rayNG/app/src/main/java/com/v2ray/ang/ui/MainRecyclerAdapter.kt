@@ -26,6 +26,7 @@ import com.v2ray.ang.handler.SubscriptionNaming
 import com.v2ray.ang.helper.ItemTouchHelperAdapter
 import com.v2ray.ang.helper.ItemTouchHelperViewHolder
 import com.v2ray.ang.template.TemplateManager
+import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.ui.component.pressFeedback
 import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.viewmodel.MainViewModel
@@ -236,7 +237,10 @@ class MainRecyclerAdapter(
         holder.binding.sectionCount.text = header.count.toString()
         val isCollapsed = collapsed.contains(header.subId)
         holder.binding.sectionChevron.rotation = if (isCollapsed) -90f else 0f
-        holder.binding.sectionHeaderRoot.setOnClickListener {
+        // Guarded like every other control (П-31): a doubled tap here nets out to the same
+        // collapse state but pays for two full rebuildRows + notifyDataSetChanged passes over the
+        // whole list to get there.
+        holder.binding.sectionHeaderRoot.onSingleClick {
             if (collapsed.contains(header.subId)) collapsed.remove(header.subId) else collapsed.add(header.subId)
             rebuildRows()
             notifyDataSetChanged()
@@ -306,7 +310,11 @@ class MainRecyclerAdapter(
         val followsAServer = position > 0 && rows[position - 1] is Row.Server
         binding.infoContainer.isActivated = !selected && followsAServer
 
-        binding.infoContainer.setOnClickListener {
+        // The most-tapped control in the product, and it was the one still on a raw listener.
+        // The stamp lives on the view, so recycling carries the guard with the row. It does not
+        // touch the deliberate repeatability of the reconnect offer — that is a fresh tap seconds
+        // later, not a doubled one inside 500ms.
+        binding.infoContainer.onSingleClick {
             adapterListener?.onSelectServer(guid)
         }
         // LONG-PRESS IS THE ROUTE TO THE ACTIONS SHEET — edit, share, QR, duplicate, delete.
