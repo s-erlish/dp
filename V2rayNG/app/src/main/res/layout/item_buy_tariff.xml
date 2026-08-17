@@ -163,13 +163,34 @@
                 app:tint="?attr/colorOnSurfaceVariant" />
         </LinearLayout>
 
-        <!-- Сроки. Раскрываются только у выбранного тарифа. -->
+        <!-- Сроки. Раскрываются только у выбранного тарифа.
+
+             IT HAS NO PADDING ON ANY SIDE, AND THE BOTTOM ONE IS THE FIX. The term
+             rows are full-bleed: each one paints its own frame (@drawable/bg_buy_option
+             / _selected) edge to edge, so on the left and the right that frame lands on
+             the card's own stroke and the group reads as one bar. The bottom carried
+             space_8, which put an 8dp strip of bare card between the last row's frame
+             and the card's — «если раскрыть, то там где 90 дней там и рамка полная
+             видишь там пустое пространство есть, не ровно выделяется целый бар этих
+             кнопок выбора».
+
+             It was not the animation. BuyTariffActivity.reveal animates the HEIGHT and
+             then settlePanel puts it back to WRAP_CONTENT on every leg, including the
+             reduced-motion one, so the panel always comes to rest on its measured
+             content and never a frame short. The strip was in the layout the whole
+             time, at rest as much as in flight.
+
+             Nor is it breathing room the card needs. The prototype's own panel ends on
+             its last row too — what follows the terms there is the «Оплатить …» block,
+             which this screen moved to the checkout card at the foot of the page (§7),
+             and the padding is what stayed behind when the button left. With it gone
+             the last row's fill and frame run to the card's edge and the card clips
+             them to its 20dp corners, exactly as it already does at the sides. -->
         <LinearLayout
             android:id="@+id/ll_price_options"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingBottom="@dimen/space_8"
             android:visibility="gone"
             tools:visibility="visible" />
     </LinearLayout>
