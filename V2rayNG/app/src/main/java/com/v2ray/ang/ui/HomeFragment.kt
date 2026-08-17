@@ -1249,20 +1249,49 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * Restored as the arc stops, so a connected object is the full-strength accent ring §4 asks for
      * and an idle one is its muted static ring.
      *
-     * ## AND IT IS A MOVEMENT, ON THE ARC'S OWN CLOCK
+     * ## AND IT IS A MOVEMENT
      *
      *     «получается пролаг … потом слишком резко конец анимации и возврат полной заливки вокруг
      *      кольца … надо доработать чтобы это было плавно, а не так резко»
      *
      * This used to be a property write: the boolean flipped and `applyRingColor` repainted the
      * stroke in that frame. So the arc left over 165ms while the ring under it came back in one —
-     * two events where the eye expects one, and the harder one landed first.
+     * two events where the eye expects one, and the harder one landed first. [ringTrackAlpha] is
+     * what fixed that: the intent flips in a frame, the VALUE travels.
      *
-     * [over] is the duration of the movement the arc is making at this instant, handed in by
-     * [paintConnect] from [showSweep] / [hideSweep], so the ring is always on the arc's clock rather
-     * than on a second one that happens to be the same length. Zero means «no movement to join» —
-     * a repaint that finds the arc already where it belongs — and then this lands instantly, which
-     * is also the reduced-motion answer.
+     * [over] is the length of the movement the arc is making at this instant, handed in by
+     * [paintConnect] from [showSweep] / [hideSweep]. Zero means «no movement to join» — a repaint
+     * that finds the arc already where it belongs — and then this lands instantly, which is also the
+     * reduced-motion answer. **It is a gate on both directions and the CLOCK on only one.**
+     *
+     * ## …AND THE TWO DIRECTIONS ARE NOT THE SAME MOVEMENT
+     *
+     *     «полное кольцо оно плавно исчезает и начинается анимация обновления, а после конца
+     *      обновления подписки кольцо резко обратно возвращается, надо также чтобы оно плавно
+     *      возвращалось вокруг кнопки, я про заливку эту»
+     *
+     * He is precise, and the report is asymmetric: the way IN is right, the way BACK is not. Both
+     * ran on `over` and on `ease_standard`, so the number was never the difference — the CATEGORY
+     * was.
+     *
+     * GOING DOWN, THE RING IS HANDING OVER. The arc is arriving on top of it and the eye is on the
+     * arc; the ring's fade is the background half of one gesture, so it belongs on the arc's clock
+     * (`motion_windup`, 200) and finishes with it. Untouched.
+     *
+     * COMING BACK, THE RING IS THE ONLY THING LEFT ON SCREEN. The arc is dissolving and there is
+     * nothing else to look at, so this is not the tail of an exit — it is an ELEMENT ARRIVING ON A
+     * SCREEN THAT IS ALREADY THERE, which motion.xml §8 names and prices: `motion_appear` (460) on
+     * `ease_out_quint`. Joined to the exit it inherited two things it should never have had:
+     *
+     *  - `ease_standard` is cubic-bezier(.2, 0, 0, 1) — HALF the travel in the first fifth of the
+     *    window. Over an exit that is what you want, because an exit should be gone. Over the one
+     *    object the eye is now locked to it is a step with a tail, which is «резко» exactly.
+     *  - [hideSweep] hands over [windDownSweep]'s window, and that window is 165–440ms depending on
+     *    WHERE THE ARC HAPPENED TO BE STANDING when the подписка landed. The same gesture came out a
+     *    different length on every refresh, and at the floor it was back to full in under 90ms.
+     *
+     * The two still START in the same frame, which is what makes them one gesture; they simply do
+     * not have to END together. The arc leaves, the track it was riding fills back in behind it.
      */
     private fun dimRingTrack(dimmed: Boolean, over: Long = 0L) {
         if (ringTrackDimmed == dimmed) return
@@ -1276,9 +1305,12 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             applyRingColor(ringColor)
             return
         }
+        // The hand-over rides the arc; the return is an appearance and keeps its own tempo.
+        val travel = if (dimmed) over else durAppear
+        val curve = if (dimmed) easeStandard else easeOutQuint
         ringTrackAnimator = ValueAnimator.ofInt(ringTrackAlpha, target).apply {
-            duration = over
-            interpolator = easeStandard
+            duration = travel
+            interpolator = curve
             addUpdateListener {
                 ringTrackAlpha = it.animatedValue as Int
                 // `ringColor` is read live: a state tint may be crossing at the same time, and the
@@ -3095,8 +3127,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // dropping it mid-turn. The `sweepRunning` edge is what keeps the entrance one-shot.
         //
         // Each side ANSWERS WITH THE LENGTH OF THE MOVEMENT IT JUST STARTED, and zero when it found
-        // nothing to move. That answer is the whole of the hand-off below: the ring's step down and
-        // step back up run on the arc's clock, in the same frame, so the two read as one gesture.
+        // nothing to move. Zero is the whole of what the ring needs from both sides — «there is no
+        // movement here to join», so land instantly. The step DOWN additionally rides that length,
+        // because the arc is arriving over it and the two are one gesture; the step back UP is an
+        // appearance and keeps its own tempo. @see dimRingTrack
         val handover = if (sweeping) showSweep() else hideSweep()
         sweepRunning = sweeping
         // The ring under the arc steps down to the prototype's 30% for as long as the arc is on it,
@@ -3817,7 +3851,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      *
      * Idempotent on purpose, because it is called from every repaint that finds the core
      * negotiating: the ENTRANCE plays only when the arc was not on screen, while the revolution is
-     * re-armed unconditionally — [onPause] stops the infinite animator and [onResume]'s render is
+     * re-armed unconditionally — [onStop] stops the infinite animator and [onResume]'s render is
      * what has to put it back, without replaying an entrance the user already saw.
      *
      * @return how long the arc's arrival takes, or 0 when it was already there. [paintConnect] puts
@@ -3858,7 +3892,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * Waiting for a WHOLE revolution would have been up to 1100ms of held screen, which is the
      * owner's other complaint spelled backwards.
      *
-     * @return that window, so the ring's return can be laid over it.
+     * @return that window, or 0 when there was no arc to send away. THE RING'S RETURN IS NO LONGER
+     *   LAID OVER IT — it only reads the zero, as «nothing is moving, land instantly». A window that
+     *   is 165ms on one refresh and 440ms on the next, because that is where the arc happened to be
+     *   standing, is not a clock a second object can keep. @see dimRingTrack
      */
     private fun hideSweep(): Long {
         val sweep = binding.connectSweep
