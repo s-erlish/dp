@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.graphics.BitmapFactory
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -185,6 +186,14 @@ object NotificationManager {
         }
         val builder = NotificationCompat.Builder(service, channelId)
             .setSmallIcon(R.drawable.ic_stat_name)
+            // THE MARK, IN COLOUR, AND THIS IS THE ONLY PLACE IT CAN BE. The small icon above is
+            // drawn by the system from its ALPHA ALONE, tinted — every notification since Lollipop
+            // is, and no flag turns that off — so ic_stat_name is the letterform as a silhouette.
+            // The large icon is the one surface in the shade that keeps colour, so the logo goes
+            // here exactly as the owner drew it: blue mark on its cream ground.
+            .setLargeIcon(
+                BitmapFactory.decodeResource(service.resources, R.drawable.ic_notification_logo)
+            )
             .setColor(ContextCompat.getColor(service, R.color.icon_blue))
             .setContentTitle(title)
             .setPriority(NotificationCompat.PRIORITY_LOW)
