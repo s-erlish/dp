@@ -346,17 +346,73 @@
     -->
     <dimen name="space_16_reverse">-16dp</dimen>
     <!--
+        THE TOOLBAR ACTION'S BOX. Both headers lay it out; ToolbarBinder only pulls it.
+
+        THE GLYPH IS NOT CENTRED UNLESS THE SLOT SAYS SO. A MaterialButton whose
+        iconGravity is `start` — the library default, unchanged anywhere in
+        Widget.Departament.Button.Icon's chain — sets iconLeft to 0 and lets TextView draw
+        the icon at the view's paddingLeft. This slot never wrote a padding, so it inherited
+        m3_btn_icon_only_default_padding = 10dp, while the style's 48dp minWidth padded the
+        REST of the box out on the trailing side: 10 in front of the glyph, 14 behind it.
+        The two nudges below were measured from a centred glyph and were therefore 2dp out,
+        and the plate the press paints was 2dp off the glyph it belongs to. view_toolbar.xml
+        pinned exactly this for the back arrow two rounds ago, for exactly this reason — the
+        library moved its own default from 12 to 10 — and the action was left inheriting it.
+        (48 − 24) / 2:
+    -->
+    <dimen name="toolbar_action_pad_trail">12dp</dimen>
+
+    <!--
+        AND THE LEAD SIDE IS 6dp WIDER, which is a touch target and not a nudge.
+
+        Putting «⋮»'s ink on the 16dp gutter ends its box 6dp past the screen edge, and the
+        6dp that hangs off cannot be touched: the control was a 42dp target. Growing the box
+        INWARD by the same 6 gives it back — 18 + 24 + 12 is 54, of which 48 is on screen —
+        and it costs nothing anywhere else, because the glyph's distance from the box's
+        TRAILING edge (12 + 24 = 36 from the leading one) is what the nudges are measured
+        from and that does not move. 00-rules.md 14.2, without a TouchDelegate.
+    -->
+    <dimen name="toolbar_action_pad_lead">18dp</dimen>
+
+    <!--
+        THE HEADER'S PRESS PLATE, inset from the box on all four sides
+        (@style/Widget.Departament.Button.Icon.Toolbar) so it can never reach the screen
+        edge: 48 − 2 × 10 = 28, the same disc @dimen/row_action_plate_inset leaves in the
+        row. «⋮»'s box ends 6dp past the edge, so the plate clears it by 4; the back
+        arrow's box is flush with the edge, so its plate clears by 10.
+    -->
+    <dimen name="toolbar_plate_inset">10dp</dimen>
+
+    <!--
+        The lead half of that inset, carrying @dimen/toolbar_action_pad_lead's extra 6 so the
+        28dp disc stays CONCENTRIC WITH THE GLYPH rather than with the widened box. 10 + 6.
+        A plate that is 3dp off the glyph it sits under is the defect this whole file is
+        about, one axis over.
+    -->
+    <dimen name="toolbar_plate_inset_lead">16dp</dimen>
+
+    <!--
         THE TOOLBAR ACTION'S OPTICAL NUDGE, per glyph. Read ToolbarBinder.alignInkToGutter for
         the arithmetic; these are its two results.
 
-        Both action glyphs live in a correctly placed 24dp box and differ only in how much of
-        that box they draw in: ic_add_24dp's ink runs x 5-19, ic_more_vert_24dp's x 10-14. That
-        leaves 5dp of air behind «+» and 10dp behind «⋮», so the same slot puts one 21dp from
-        the screen edge and the other 26dp, against the back chevron's ink at 20dp opposite.
+        Both action glyphs live in the same box and differ only in how much of it they draw
+        in: ic_add_24dp's ink runs x 5-19 of its 24 units, ic_more_vert_24dp's x 10-14. With
+        the glyph pinned by the two paddings above, the trailing air is 12 + 5 = 17 behind
+        «+» and 12 + 10 = 22 behind «⋮», so these are the distances that put BOTH inks on 16,
+        the one gutter the page title below them starts on:
 
-        These are the two distances back to 20. Negative, not spacing steps, and per GLYPH and
-        not per slot on purpose — one shared value big enough for «⋮» would shove «+» past the
-        16dp gutter.
+            «+»  16 − 17 = −1        «⋮»  16 − 22 = −6
+
+        THE NUMBERS DID NOT CHANGE AND THEY WERE NOT RIGHT. They were derived against a
+        centred glyph the slot did not have, and each header then added a further 4dp of its
+        own — view_sub_header's toolbar_bar paddingEnd, view_toolbar's marginEnd — that the
+        binder knew nothing about. So the pair equalised the two glyphs with each other, at
+        22dp on one header and 18dp on the other, and never on the gutter. The 4dp bases are
+        gone from both layouts and the padding is written down; the same two numbers now mean
+        what they always claimed to.
+
+        Negative, not spacing steps, and per GLYPH and not per slot on purpose — one shared
+        value big enough for «⋮» would shove «+» 5dp past the gutter.
     -->
     <dimen name="toolbar_action_nudge_wide">-1dp</dimen>
     <dimen name="toolbar_action_nudge_overflow">-6dp</dimen>

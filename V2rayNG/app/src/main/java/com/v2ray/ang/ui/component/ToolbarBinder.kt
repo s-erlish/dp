@@ -115,39 +115,49 @@ object ToolbarBinder {
     }
 
     /**
-     * Puts the action's INK where the back arrow's ink is, which its box cannot do on its own.
+     * Puts the action's INK on the 16dp gutter, which its box cannot do on its own.
      *
-     * Both controls are 24dp glyph boxes, and both boxes are correctly placed. What differs is how
-     * much of each box is actually drawn in, and the two glyphs this slot ever holds are the two
-     * extremes in the whole icon set:
+     * THE LINE IS THE GUTTER AND NOT THE BACK ARROW, which is what the round before this one got
+     * wrong — the same mistake [RowBinder.alignInkToGutter] made one component down, and it is
+     * corrected here for the same reason. 16 is where the page title starts, where every card's
+     * content edge is, where each of the row's five trailing glyphs now stops, and the ONE gutter
+     * `CLAUDE.md` gives the product. Levelling the action with a control instead of with that line
+     * closed the gap the owner could see and left the whole slot adrift of it: «вот нашел что
+     * плюсик сверху он левее, надо правее опять сделать».
+     *
+     * ONE NUMBER CANNOT SERVE BOTH GLYPHS. The slot holds the two extremes of the icon set — a
+     * 24-unit viewport filled x 5…19 by «+» and x 10…14 by «⋮» — so a pull big enough for the
+     * overflow shoves the plus 5dp past the gutter. The correction belongs to the GLYPH and is
+     * applied here, at the one place that knows which glyph is going in:
      *
      * ```
-     *              ink within the 24dp box     air on the trailing side
-     *   ic_add_24dp        x 5 … 19                     5dp
-     *   ic_more_vert_24dp  x 10 … 14                   10dp
+     *                       ink of 24 units   air behind it   trailing air in box   pull
+     *   ic_add_24dp              5 … 19            5dp            12 + 5 = 17       -1
+     *   ic_more_vert_24dp       10 … 14           10dp            12 + 10 = 22      -6
      * ```
      *
-     * So the same slot draws «+» 21dp from the screen edge and «⋮» 26dp from it, against the back
-     * chevron's ink at 20dp on the other side. The overflow is the one that reads as adrift, and it
-     * is the one the owner named — «три точки которые сверху справа их бы тоже чутка правее сделать
-     * и это касается везде где они есть».
+     * THE 12 IS THE SLOT'S NOW AND NOT THE LIBRARY'S, and that is why these numbers finally mean
+     * what they say. A `MaterialButton` with `iconGravity=start` draws its icon at `paddingLeft`,
+     * and this slot inherited `m3_btn_icon_only_default_padding` — 10, not 12 — while the style's
+     * 48dp `minWidth` padded the box out behind the glyph instead. Both headers then added a
+     * further 4dp of their own that this function knew nothing about, so the pair equalised the
+     * two glyphs with each other at 22dp on one header and 18dp on the other. The paddings are
+     * written on the slot and the 4dp bases are gone (`view_toolbar.xml`, `view_sub_header.xml`);
+     * the arithmetic is on the two dimensions in `values/dimens.xml`.
      *
-     * A margin on the SLOT cannot fix that, because a nudge big enough for «⋮» pushes «+» past the
-     * 16dp gutter. The correction belongs to the glyph, so it is applied here — the one place that
-     * knows which glyph is going in — and it is expressed as the distance each one has to travel to
-     * reach the same 20dp the back arrow sits at.
-     *
-     * A glyph this function does not know about gets no nudge, which is the safe default: it keeps
-     * its box's placement, exactly as before this existed.
+     * A glyph this function does not know about is reset to NO pull rather than left alone. It is
+     * the honest default — it draws the slot exactly where the layout puts it — and it is now load
+     * bearing: neither header carries a resting margin any more, so "leave it" would mean
+     * inheriting whichever pull the previous bind happened to write.
      */
     private fun MaterialButton.alignInkToGutter(@DrawableRes icon: Int) {
         val nudge = when (icon) {
             R.drawable.ic_more_vert_24dp -> R.dimen.toolbar_action_nudge_overflow
             R.drawable.ic_add_24dp -> R.dimen.toolbar_action_nudge_wide
-            else -> return
+            else -> 0
         }
         val params = layoutParams as? ViewGroup.MarginLayoutParams ?: return
-        val value = resources.getDimensionPixelSize(nudge)
+        val value = if (nudge == 0) 0 else resources.getDimensionPixelSize(nudge)
         if (params.marginEnd == value) return
         params.marginEnd = value
         layoutParams = params

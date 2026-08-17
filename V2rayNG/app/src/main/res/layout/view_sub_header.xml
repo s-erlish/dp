@@ -43,6 +43,13 @@
   inside it. view_toolbar.xml carries the identical change, so the back affordance
   still does not move between the two headers.
 
+  THE ACTION IS ON 16 AND THE ARROW'S INK IS ON 20, deliberately. The trailing slot
+  is compared with the card edges and the row glyphs directly beneath it, which stop
+  on 16 exactly; the arrow is compared with a TITLE, whose box is on 16 but whose ink
+  starts a dp or two inside it, and moving the arrow's ink to 16 would push 4dp of its
+  48dp target off the screen. The full argument is on @id/toolbar_back in
+  view_toolbar.xml, including what to change if the owner asks for the arrow again.
+
   56 IS A MINIMUM ON THE BAR AND THE TITLE HAS NO HEIGHT AT ALL. At font scale
   200% a 24sp headline needs ~50dp of line box; every text box here is
   wrap_content and grows with it (00-rules.md 14.5).
@@ -63,7 +70,21 @@
 
     <!-- The back row. §7 «padding:4px 16px 0» — the 4 above the control. There is no
          leading padding any more: the back target starts at the screen edge and it is
-         the GLYPH, at 12, that carries the alignment (see the arithmetic above). -->
+         the GLYPH, at 12, that carries the alignment (see the arithmetic above).
+
+         AND NO TRAILING PADDING EITHER, which is the whole of «вот нашел что плюсик
+         сверху он левее, надо правее опять сделать». It carried space_4, and that 4 did
+         two things nobody had counted. It held the action's ink at 22dp from the screen
+         edge while view_toolbar.xml — same binder, same slot, no such padding — held its
+         at 18: the header's own two variants disagreed by 4dp about where an action
+         goes. And being PADDING on a ViewGroup that clips to it by default, it was also
+         a clip line 4dp inside the screen, so the action's box (which is pulled PAST
+         the edge to reach the gutter) had its press plate cut on it — the same shear
+         the owner photographed on the row's «⋮».
+
+         The distance an action stands off the edge belongs to the binder, per glyph,
+         because the two glyphs need different ones. A bar-wide padding cannot express
+         that and can only get in the binder's way. -->
     <LinearLayout
         android:id="@+id/toolbar_bar"
         android:layout_width="match_parent"
@@ -71,8 +92,7 @@
         android:baselineAligned="false"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingTop="@dimen/space_4"
-        android:paddingEnd="@dimen/space_4">
+        android:paddingTop="@dimen/space_4">
 
         <!-- ICON GAP CLOSED (as in view_toolbar): @drawable/ic_chevron_left is a real
              left-pointing glyph. It used to be ic_chevron_right under
@@ -107,12 +127,22 @@
         <!-- AT MOST ONE, and on §7's lekalo most screens have none: an action is a
              row in a card, where it can carry a name. The slot stays because
              ToolbarBinder resolves it and because «Добавить правило» style toolbar
-             actions already bound here must keep working. -->
+             actions already bound here must keep working.
+
+             THE PADDING IS THIS SLOT'S, NOT THE LIBRARY'S — 18 in front of the glyph
+             and 12 behind it. Read the identical note in view_toolbar.xml and
+             @dimen/toolbar_action_pad_lead: 12 is what centres a 24dp glyph in a 48dp
+             box (the button was inheriting Material's 10 and drawing 2dp off), and the
+             extra 6 in front grows the box inward to replace the 6dp «⋮» hangs past the
+             screen edge once its ink is on the gutter. -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/toolbar_action"
             style="@style/Widget.Departament.Button.Icon.Toolbar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:insetLeft="@dimen/toolbar_plate_inset_lead"
+            android:paddingStart="@dimen/toolbar_action_pad_lead"
+            android:paddingEnd="@dimen/toolbar_action_pad_trail"
             android:visibility="gone"
             app:icon="@drawable/ic_more_vert_24dp"
             tools:ignore="ContentDescription"

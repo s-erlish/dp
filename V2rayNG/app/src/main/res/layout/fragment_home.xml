@@ -158,7 +158,18 @@
             <!-- No background at all, and @anim/press_icon for the response. The
                  borderless ripple that used to be here has been transparent product-wide
                  since colorControlHighlight was cleared (themes.xml), so «+» answered a
-                 tap with nothing whatever — and §1 puts an icon on the 0.88 rung. -->
+                 tap with nothing whatever — and §1 puts an icon on the 0.88 rung.
+
+                 ITS PADDING IS ASYMMETRIC AND THAT IS THE ALIGNMENT. 12 all round drew
+                 the glyph in the middle of the box, and ic_add_24dp leaves 5dp of its own
+                 viewport empty behind its ink, so the «+» stopped at 21 from the screen
+                 edge while the title, the cards and every row under it stop at 16 — «вот
+                 нашел что плюсик сверху он левее, надо правее опять сделать». 17 / 7
+                 moves the GLYPH the 5dp instead of moving the box, which keeps the whole
+                 48dp target on screen and leaves the popup anchored to this box where it
+                 was. It is safe here and only here: with no background there is no press
+                 plate to be left behind by an off-centre glyph. See
+                 @dimen/home_add_pad_lead. -->
             <ImageView
                 android:id="@+id/btn_home_add"
                 android:layout_width="@dimen/view_height_dp48"
@@ -168,7 +179,10 @@
                 android:clickable="true"
                 android:contentDescription="@string/home_add_subscription"
                 android:focusable="true"
-                android:padding="@dimen/space_12"
+                android:paddingStart="@dimen/home_add_pad_lead"
+                android:paddingTop="@dimen/space_12"
+                android:paddingEnd="@dimen/home_add_pad_trail"
+                android:paddingBottom="@dimen/space_12"
                 android:scaleType="fitCenter"
                 app:srcCompat="@drawable/ic_add_24dp"
                 app:tint="?attr/colorOnSurface" />

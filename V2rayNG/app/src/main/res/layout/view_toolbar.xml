@@ -29,10 +29,19 @@
   still holds: the glyph ends at 36 and the title's marginStart space_4 lands it at 52,
   16 clear of the glyph, exactly as before.
 
-  The trailing action is deliberately NOT moved. marginEnd space_4 plus the library's
-  10 puts its glyph's far edge at 14, not the 16 this comment used to claim; it is
-  symmetrical with nothing now, and correcting it is the toolbar owner's call, not a
-  side effect of fixing the back arrow.
+  THE TRAILING ACTION IS ON THE GUTTER NOW, and it took three tries because two of the
+  three numbers involved were inherited. Its glyph is pinned by a padding of its own
+  (18 / 12, see the note on the slot), its 4dp margin is gone, and ToolbarBinder's per-
+  glyph pull is measured from the box's trailing edge — so «+» and «⋮» both end their
+  ink on 16, which is where the title starts, where every row's trailing glyph stops,
+  and the one gutter CLAUDE.md gives the product. «вот нашел что плюсик сверху он
+  левее, надо правее опять сделать».
+
+  THE BACK ARROW STAYS AT 20 and that is a decision, not an oversight. Its ink is 20
+  from the leading edge against the action's 16 on the other side, so the header is 4dp
+  asymmetric — read the note on @id/toolbar_back for why 20 is the number that keeps
+  its 48dp target whole and why the text under it is not the thing it should be
+  levelled with.
 
   56 IS A MINIMUM, NEVER A HEIGHT. At font scale 200% a 16sp title needs ~34dp of
   line box and this bar grows to hold it. android:layout_height="56dp" on anything
@@ -78,7 +87,33 @@
              STRING GAP CLOSED (M-44): this was the tree's one hardcoded
              android:contentDescription. It is now @string/cd_back, defined in
              res/values/strings_ui_polish.xml — the toolbar belongs to no single screen,
-             so its one string lives in the cross-cutting file rather than a screen's. -->
+             so its one string lives in the cross-cutting file rather than a screen's.
+
+             WHY ITS INK STAYS AT 20 WHILE THE ACTION MOVED TO 16. The two are not the
+             same problem read in a mirror:
+
+             1. The box is FLUSH with the screen edge (owner report 0.4.9, «эту кнопку
+                нужно сделать чуть левее»), so all 48dp of the target is on screen and
+                the leading edge of the screen is part of it — a Fitts's-law gain the
+                trailing action cannot have. Moving the ink to 16 needs the box at −4,
+                which leaves 44dp touchable: a 14.2 regression on the one control every
+                sub-page must always answer, bought for 4dp.
+             2. What it would be levelling with is TEXT, and a text box on the 16dp
+                gutter starts its INK a dp or two inside it. The arrow at 20 is ~2.5dp
+                off the title's first stroke, not 4, and at 16 it would overshoot to the
+                left of it. The trailing slot has no such slack: it is compared with the
+                card edges and the row glyphs directly under it, which stop on 16 exactly.
+
+             So the header is 4dp asymmetric on purpose. If the owner asks for this
+             arrow again, the move is layout_marginStart −4 here and in
+             view_sub_header.xml, plus expandTouchTarget(56) in ToolbarBinder to give
+             back the 4dp of target — not a change to any number in dimens.xml.
+
+             WHAT DID CHANGE FOR IT is the press plate: @dimen/toolbar_plate_inset draws
+             a 28dp disc inside this box instead of filling it, because a 48dp plate on a
+             box flush with the screen edge sits tangent to that edge, which is the shape
+             the owner has now reported three times. 10dp of clearance here, and the
+             target keeps every one of its 48dp — an inset moves paint, not measurement. -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/toolbar_back"
             style="@style/Widget.Departament.Button.Icon.Toolbar"
@@ -111,13 +146,30 @@
 
         <!-- AT MOST ONE. A second action becomes an overflow whose glyph is
              ic_more_vert_24dp. The caller sets app:icon AND
-             android:contentDescription, which states the action and not the object. -->
+             android:contentDescription, which states the action and not the object.
+
+             ITS PADDING IS WRITTEN HERE FOR THE SAME REASON THE BACK ARROW'S IS, and
+             this slot is where that lesson had not been applied. With no padding of its
+             own the button took m3_btn_icon_only_default_padding — 10, not the 12 the
+             comment above assumes — and the style's 48dp minWidth then padded the box
+             out behind the glyph, so the icon drew 10 in front and 14 behind and every
+             number ToolbarBinder measured was 2dp out. The lead side is 18 rather than
+             12 so the 6dp «⋮» hangs off the screen edge is grown back on the inside
+             where it can be touched; the trailing 12 is what the nudge is measured
+             from, and it does not move. See @dimen/toolbar_action_pad_lead.
+
+             AND NO 4dp MARGIN. It had one, and ToolbarBinder overwrites marginEnd on
+             every bind, so the 4 only ever applied to a glyph the binder does not
+             know — which is now reset to zero there rather than left to inherit a
+             base nobody measured against. -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/toolbar_action"
             style="@style/Widget.Departament.Button.Icon.Toolbar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="@dimen/space_4"
+            android:insetLeft="@dimen/toolbar_plate_inset_lead"
+            android:paddingStart="@dimen/toolbar_action_pad_lead"
+            android:paddingEnd="@dimen/toolbar_action_pad_trail"
             android:visibility="gone"
             app:icon="@drawable/ic_more_vert_24dp"
             tools:ignore="ContentDescription"

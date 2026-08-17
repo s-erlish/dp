@@ -74,4 +74,28 @@
     -->
     <dimen name="space_after_touch_target">3dp</dimen>
 
+    <!--
+        THE «+» AT THE TOP OF ГЛАВНАЯ, AND THE ONLY WAY ITS INK REACHES THE GUTTER.
+
+        Same complaint as the sub-page header's action, one screen over: «вот нашел что
+        плюсик сверху он левее, надо правее опять сделать». @id/btn_home_add is a 48dp
+        target whose box ends 4dp from the screen edge (@id/home_top_row's paddingEnd,
+        which @dimen/select_popup_offset_right_add is measured against and must keep), so
+        with 12dp of padding all round its 24dp glyph drew at 12 and ic_add_24dp's own
+        5dp of trailing air put the ink at 4 + 12 + 5 = 21 — five dp inside the 16 every
+        block under it starts from.
+
+        THE BOX DOES NOT MOVE, THE GLYPH DOES. Pulling the box would hang it off the
+        screen and cost a dp of touch target for nothing; this control has no press plate
+        at all (background is @null, the response is @anim/press_icon's 0.88), so the one
+        thing an off-centre glyph would normally break — a plate that no longer sits under
+        it — does not exist here. So the padding goes asymmetric by exactly ic_add's air:
+
+            trailing  12 − 5 = 7      leading  48 − 24 − 7 = 17      ink  4 + 12 = 16
+
+        The 48dp target is untouched, and so is the popup anchored to the box.
+    -->
+    <dimen name="home_add_pad_lead">17dp</dimen>
+    <dimen name="home_add_pad_trail">7dp</dimen>
+
 </resources>
