@@ -270,6 +270,16 @@ class MainActivity : HelperBaseActivity(), MainHost {
         get() = supportFragmentManager.findFragmentByTag(MainTab.SETTINGS.tag) as? SettingsTabFragment
 
     /**
+     * Same one job as [settingsFragment], for the same reason. The account tab's list ends in «Выйти
+     * из аккаунта», and it used to reserve a hard-coded 96dp for the bar — 56 + 16 + a system inset
+     * guessed at 24. That guess is right only on a phone with a gesture bar; with three-button
+     * navigation the inset is nearer 48 and the last card sits under the bar, which is exactly how
+     * «Схемы URL-адресов» disappeared on the settings tab.
+     */
+    private val accountFragment: AccountFragment?
+        get() = supportFragmentManager.findFragmentByTag(MainTab.ACCOUNT.tag) as? AccountFragment
+
+    /**
      * The one row-action listener shared by every server list (see [MainHost.serverActions]).
      */
     private val adapterListener: ActivityAdapterListener by lazy { ActivityAdapterListener() }
@@ -933,6 +943,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
             navListPadding = navPad
             homeFragment?.applyListInsets()
             settingsFragment?.applyListInsets()
+            accountFragment?.applyListInsets()
             insets
         }
     }
