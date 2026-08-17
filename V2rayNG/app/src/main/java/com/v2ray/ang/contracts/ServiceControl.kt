@@ -20,6 +20,16 @@ interface ServiceControl {
     fun stopService()
 
     /**
+     * Пауза: brings the tunnel down and leaves the service — and its row in the shade — standing.
+     *
+     * The difference from [stopService] is only what survives: the foreground notification is
+     * re-worded instead of cancelled, so the way back is still in the shade. Everything that
+     * costs anything comes down exactly as it does on a stop — core loop, tun interface, the
+     * network callback, tun2socks, the speed meter.
+     */
+    fun pauseService()
+
+    /**
      * Protects the VPN socket.
      * @param socket The socket to protect.
      * @return True if the socket is protected, false otherwise.

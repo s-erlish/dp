@@ -116,6 +116,33 @@ class CoreVpnService : VpnService(), ServiceControl {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         LogUtil.i(AppConfig.TAG, "StartCore-VPN: Service command received")
         try {
+            // A STICKY RESTART OF A PAUSED SERVICE IS NOT A REQUEST TO CONNECT.
+            //
+            // `START_STICKY` is what keeps a real session alive across a kill, and it hands back a
+            // `null` intent — which, in a fresh process, looks exactly like the restart of a
+            // tunnel that WAS running and is supposed to come back up. A pause that the system
+            // killed would therefore have turned the VPN back on by itself, with nobody asking.
+            // The flag is on disk for precisely this (see CoreServiceManager.isPaused): re-post
+            // the paused row from the selected server, re-arm its «Остановить», and stay down.
+            if (intent == null && CoreServiceManager.isPaused()) {
+                LogUtil.i(AppConfig.TAG, "StartCore-VPN: Restarted while paused; the tunnel stays down")
+                val paused = MmkvManager.getSelectServer()?.let { MmkvManager.decodeServerConfig(it) }
+                if (!NotificationManager.showNotification(paused)) {
+                    LogUtil.e(AppConfig.TAG, "StartCore-VPN: Failed to enter foreground while paused; stopping")
+                    stopAllService()
+                    return START_NOT_STICKY
+                }
+                CoreServiceManager.ensureCommandReceiver()
+                return START_STICKY
+            }
+
+            // EVERY OTHER START COMMAND IS A CONNECT, «Возобновить» in the shade included — it is
+            // an Intent to this class and nothing else (@see AppConfig.ACTION_RESUME_SERVICE), so
+            // it needs no branch of its own here; the ordinary start path IS the way back. The
+            // pause ends before the row is re-drawn below, so the shade says «Подключение…» from
+            // the first frame of the reconnect rather than still offering to resume it.
+            CoreServiceManager.clearPaused()
+
             // Promote to foreground first (mandatory within ~5s). showNotification is hardened to
             // never throw and returns false if the system refused the foreground promotion.
             if (!NotificationManager.showNotification(null)) {
@@ -206,6 +233,27 @@ class CoreVpnService : VpnService(), ServiceControl {
 
     override fun stopService() {
         stopAllService(true)
+    }
+
+    /**
+     * Пауза: the same teardown as [stopService] with the two lines that would burn the bridge
+     * left out — `stopSelf()` and the cancelled notification.
+     *
+     * The tun interface IS closed. Leaving it up with nothing reading it would not be a pause,
+     * it would be an outage: every route still points into the tunnel and no core is emptying
+     * it, so the phone loses the internet rather than the VPN. Closing it hands routing back to
+     * the system, which is what «выключить впн» means to the person who pressed the button.
+     *
+     * THE VPN PERMISSION IS NOT ASKED FOR AGAIN ON THE WAY BACK. `VpnService.prepare()` returns
+     * null once the user has consented to this app, and consent belongs to the package, not to
+     * the interface — closing the tunnel does not withdraw it, and this service does not even
+     * stop, so nothing here can. [setupVpnService] runs its `prepare()` on resume exactly as it
+     * does on a cold connect and gets null back, then establishes a fresh interface. (The one
+     * case where it does not is the one where the user revoked the permission in Settings
+     * meanwhile, and that already reports a start failure instead of a silent dead end.)
+     */
+    override fun pauseService() {
+        stopAllService(isForced = true, keepAlive = true)
     }
 
     override fun vpnProtect(socket: Int): Boolean {
@@ -455,7 +503,15 @@ class CoreVpnService : VpnService(), ServiceControl {
         tun2SocksService?.startTun2Socks()
     }
 
-    private fun stopAllService(isForced: Boolean = true) {
+    /**
+     * @param isForced also close the tun interface (and, unless paused, stop the service itself).
+     * @param keepAlive **пауза**: everything comes down except this service and its row in the
+     *   shade. The ONLY two differences from a stop are on this page — `stopCoreLoop` keeps the
+     *   notification instead of cancelling it, and `stopSelf()` is not called. Written as a
+     *   parameter rather than a parallel method on purpose: a copy of this teardown would drift
+     *   from it the first time either half changed.
+     */
+    private fun stopAllService(isForced: Boolean = true, keepAlive: Boolean = false) {
 //        val configName = defaultDPreference.getPrefString(PREF_CURR_CONFIG_GUID, "")
 //        val emptyInfo = VpnNetworkInfo()
 //        val info = loadVpnNetworkInfo(configName, emptyInfo)!! + (lastNetworkInfo ?: emptyInfo)
@@ -472,7 +528,7 @@ class CoreVpnService : VpnService(), ServiceControl {
         tun2SocksService?.stopTun2Socks()
         tun2SocksService = null
 
-        CoreServiceManager.stopCoreLoop()
+        CoreServiceManager.stopCoreLoop(keepAlive)
 
         if (isForced) {
             //stopSelf has to be called ahead of mInterface.close(). otherwise v2ray core cannot be stooped
@@ -480,7 +536,11 @@ class CoreVpnService : VpnService(), ServiceControl {
             //This can be verified by putting stopself() behind and call stopLoop and startLoop
             //in a row for several times. You will find that later created v2ray core report port in use
             //which means the first v2ray core somehow failed to stop and release the port.
-            stopSelf()
+            //
+            // A PAUSE KEEPS THE SERVICE, so it is the one path that does not stop itself. The
+            // ordering the comment above protects is preserved: the core stop was asked for a few
+            // lines up and the interface is still closed after it, with the same delay.
+            if (!keepAlive) stopSelf()
 
             // Add a small delay to allow the async core stop operation to complete
             // before closing the VPN interface, preventing a race condition that can

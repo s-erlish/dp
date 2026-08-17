@@ -134,6 +134,21 @@ object AppConfig {
     const val BROADCAST_ACTION_ACTIVITY = "$ANG_PACKAGE.action.activity"
     const val BROADCAST_ACTION_WIDGET_CLICK = "$ANG_PACKAGE.action.widget.click"
 
+    /**
+     * «Возобновить» in the shade, as a start command addressed to the service itself.
+     *
+     * IT IS NOT A BROADCAST, AND THAT IS THE POINT. Every command that talks to a LIVE core —
+     * `MSG_STATE_STOP`, `MSG_STATE_PAUSE` — travels on [BROADCAST_ACTION_SERVICE] to a receiver
+     * that `CoreServiceManager` registers while the tunnel is up. Resuming is the other
+     * direction: it is a START, and it has to work in the one case where that receiver may not
+     * exist — the paused foreground service was killed and `START_STICKY` brought it back with a
+     * `null` intent and a fresh process. A broadcast into that would be a button that does
+     * nothing; an Intent to the service class starts it if it must. Same split as
+     * [com.v2ray.ang.core.CoreServiceManager.startVService] (Intent) versus `stopVService`
+     * (broadcast) — the shade just reuses it.
+     */
+    const val ACTION_RESUME_SERVICE = "$ANG_PACKAGE.action.resume"
+
     /** Tasker extras. */
     const val TASKER_EXTRA_BUNDLE = "com.twofortyfouram.locale.intent.extra.BUNDLE"
     const val TASKER_EXTRA_STRING_BLURB = "com.twofortyfouram.locale.intent.extra.BLURB"
@@ -262,6 +277,21 @@ object AppConfig {
     const val MSG_STATE_SPEED_UPDATE = 51
     const val MSG_STATE_RESTART = 5
     const val MSG_MEASURE_DELAY = 6
+
+    /**
+     * «Пауза» in the shade: bring the tunnel down and leave the service — and its row — standing.
+     *
+     * A COMMAND, NOT A STATE. It is 9 rather than something in the 4x range because 41 is
+     * `MSG_STATE_STOP_SUCCESS`, a RESULT the service sends to the UI, and single digits are what
+     * this file uses for what the UI sends the service (3 start, 4 stop, 5 restart, 6 measure).
+     * Pause is one of those, so it takes the next free digit.
+     *
+     * NOTHING NEW IS PUBLISHED BACK. The tunnel really is down after this, so the answer is the
+     * one the stop path already sends — `MSG_STATE_STOP_SUCCESS` — and Главная, плитка in the
+     * shade and the виджет all read «не подключено» without a line of new code. A second state
+     * channel for «paused» would be a second truth about the same tunnel.
+     */
+    const val MSG_STATE_PAUSE = 9
 
     // NOBODY SENDS OR RECEIVES 61 IN THIS FORK, and the number is kept so a future upstream merge
     // does not reuse it for something else. It carried the probe's human-readable sentence to a

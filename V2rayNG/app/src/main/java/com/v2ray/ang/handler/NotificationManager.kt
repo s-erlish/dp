@@ -32,17 +32,45 @@ object NotificationManager {
     private const val NOTIFICATION_ID = 1
     private const val NOTIFICATION_PENDING_INTENT_CONTENT = 0
     private const val NOTIFICATION_PENDING_INTENT_STOP_V2RAY = 1
+    private const val NOTIFICATION_PENDING_INTENT_PAUSE = 2
+    private const val NOTIFICATION_PENDING_INTENT_RESUME = 3
     private const val QUERY_INTERVAL_MS = 3000L
+
+    /**
+     * WHAT THE ROW IN THE SHADE IS ALLOWED TO SAY. Three states, and every one of them is a fact
+     * about the tunnel rather than about what the user last pressed.
+     *
+     * The state is NOT stored here. [currentState] derives it from [CoreServiceManager] on every
+     * render — `isRunning()` is the core's own answer and `isPaused()` is the flag the pause path
+     * writes — so the label on the button and the sentence under the title cannot drift out of
+     * step with the thing they describe, not even for the moment a tunnel takes to come up.
+     */
+    private enum class Shade { CONNECTING, RUNNING, PAUSED }
 
     private var lastQueryTime = 0L
 
     /**
-     * The rate last actually written into the shade, so an unchanged one is not re-posted.
-     * Cleared whenever [mBuilder] is replaced — a new builder carries no speed line yet.
+     * WHAT WAS LAST ACTUALLY WRITTEN INTO THE SHADE, so an unchanged row is not re-posted.
+     *
+     * It used to hold the rate alone (`lastPushedSpeed`); the state joined it when the row grew a
+     * second thing it can say, because the guard has to cover BOTH — a state change must always
+     * post, and an identical state with an identical rate must never. Cleared whenever [mBuilder]
+     * is dropped: a new row carries neither a speed line nor a state yet.
      * @see updateSpeedNotificationOnce
      */
-    private var lastPushedSpeed: Pair<Long, Long>? = null
+    private var lastPushed: Posted? = null
+    private data class Posted(val state: Shade, val down: Long, val up: Long)
+
+    /**
+     * The server the row is about, remembered separately from the builder.
+     *
+     * Rebuilding the row for a new state must not lose the title — «🇵🇱 Poland» is still the
+     * answer to «which server is on pause» — and the one caller that knows the profile
+     * ([showNotification] out of `doStartCoreLoop`) is not the one that flips the state.
+     */
+    private var shadeTitle: String? = null
     private var mBuilder: NotificationCompat.Builder? = null
+    private var channelId: String? = null
     private var speedNotificationJob: Job? = null
     private var mNotificationManager: NotificationManager? = null
 
@@ -73,7 +101,8 @@ object NotificationManager {
      * drawables, a cleared service reference, PendingIntent issues, or a foreground-service
      * policy exception can no longer take down the VPN process.
      *
-     * @param currentConfig The current profile configuration.
+     * @param currentConfig The current profile configuration, or null when the caller does not
+     *   know it yet — the remembered title and state are used instead.
      * @return true if the service was promoted to the foreground, false otherwise.
      */
     fun showNotification(currentConfig: ProfileItem?): Boolean {
@@ -85,40 +114,36 @@ object NotificationManager {
         // Reset last query time to avoid querying stats too soon after showing the notification
         lastQueryTime = System.currentTimeMillis()
 
-        val channelId =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                try {
-                    createNotificationChannel()
-                } catch (e: Exception) {
-                    LogUtil.e(AppConfig.TAG, "showNotification: failed to create channel", e)
-                    AppConfig.RAY_NG_CHANNEL_ID
-                }
-            } else {
-                // If earlier version channel ID is not used
-                // https://developer.android.com/reference/android/support/v4/app/NotificationCompat.Builder.html#NotificationCompat.Builder(android.content.Context)
-                ""
-            }
+        val channel = ensureChannel(service)
+
+        // A START THAT ARRIVES WHILE A SESSION IS UP MUST NOT BLANK THE ROW IN THE SHADE.
+        // `CoreVpnService` promotes itself to the foreground with `null` before it knows which
+        // server it is about to run — the 5-second deadline does not wait for that — and with a
+        // live tunnel underneath, building from `null` would replace «🇵🇱 Poland  00:11:52» with
+        // a title-less notification for as long as the duplicate start took to be refused.
+        //
+        // It used to re-post the previous builder verbatim to avoid that. It does not need to any
+        // more: the title is remembered ([shadeTitle]), the clock is read back from the session
+        // rather than restarted, and the state comes from the core — so re-rendering from null
+        // reproduces the same row, and ALSO says the right thing when the state has moved on (a
+        // «Возобновить» row must not survive into the connect that «Возобновить» just started).
+        if (currentConfig != null) shadeTitle = titleOf(currentConfig)
+
+        val state = currentState()
+        val down = lastPushed?.down ?: 0L
+        val up = lastPushed?.up ?: 0L
 
         val notification = try {
-            // A START THAT ARRIVES WHILE A SESSION IS UP MUST NOT BLANK THE ROW IN THE SHADE.
-            // `CoreVpnService` promotes itself to the foreground with `null` before it knows which
-            // server it is about to run — the 5-second deadline does not wait for that — and with a
-            // live tunnel underneath, building from `null` would replace «🇵🇱 Poland  00:11:52» with
-            // a title-less notification for as long as the duplicate start took to be refused. When
-            // there is nothing new to say and something already said, re-post that.
-            val existing = mBuilder
-            if (currentConfig == null && existing != null) {
-                existing.build()
-            } else {
-                buildRichNotification(service, channelId, currentConfig)
+            buildRichNotification(service, channel, state, down, up).also {
+                lastPushed = Posted(state, down, up)
             }
         } catch (e: Exception) {
             // Any failure while assembling the rich notification must not prevent the mandatory
             // startForeground() call. Fall back to a minimal, always-valid notification.
             LogUtil.e(AppConfig.TAG, "showNotification: rich notification build failed, using fallback", e)
             mBuilder = null
-            lastPushedSpeed = null
-            buildFallbackNotification(service, channelId)
+            lastPushed = null
+            buildFallbackNotification(service, channel)
         }
 
         return try {
@@ -134,18 +159,69 @@ object NotificationManager {
     }
 
     /**
-     * THE ONGOING VPN NOTIFICATION. Two states, and nothing in either of them that is not asked for.
+     * RE-READS THE STATE AND RE-WRITES THE ROW. One call for both moments the shade has to move:
+     * the core finished coming up, and the user put it on pause.
      *
-     *   COLLAPSED   🇵🇱 Poland                                    00:11:52
-     *   EXPANDED    🇵🇱 Poland                                    00:11:52
-     *               ↓ 1,2 MB/s   ↑ 240 KB/s
-     *               [ Остановить ]
+     * It reads [CoreServiceManager] rather than being told what to say, so a caller cannot make
+     * the shade claim something the core does not. The memo in [post] keeps a call that changes
+     * nothing from costing a binder round trip.
+     */
+    fun refreshState() {
+        val service = getService() ?: return
+        val state = currentState()
+        // A rate belongs to a live tunnel and to nothing else: a paused row does not carry
+        // «↓ 0 B/s», it carries «На паузе».
+        if (state == Shade.RUNNING) {
+            post(service, state, lastPushed?.down ?: 0L, lastPushed?.up ?: 0L)
+        } else {
+            post(service, state, 0L, 0L)
+        }
+    }
+
+    /**
+     * The tunnel is down by the user's hand and the row stays: stop the meter, say «На паузе».
      *
-     * That shape is the owner's, to the line: «при раскрытии уведомления этого надо чтобы писало
-     * скорость, больше ничего не надо».
+     * The meter is cancelled here rather than through [stopSpeedNotification] so the pause costs
+     * ONE post instead of two — that one would push a zeroed rate into a row that is about to
+     * stop showing rates at all.
+     */
+    fun pauseNotification() {
+        speedNotificationJob?.cancel()
+        speedNotificationJob = null
+        refreshState()
+    }
+
+    /**
+     * THE ONGOING VPN NOTIFICATION. Three states, and nothing in any of them that is not asked for.
+     *
+     *   ПОДКЛЮЧЕНИЕ  🇵🇱 Poland
+     *                Подключение…
+     *                [ Остановить ]
+     *
+     *   РАБОТАЕТ     🇵🇱 Poland                                    00:11:52
+     *                ↓ 1,2 MB/s   ↑ 240 KB/s            (в развёрнутом виде)
+     *                [ Пауза ]  [ Остановить ]
+     *
+     *   ПАУЗА        🇵🇱 Poland
+     *                На паузе
+     *                [ Возобновить ]  [ Остановить ]
+     *
+     * The running shape is the owner's, to the line: «при раскрытии уведомления этого надо чтобы
+     * писало скорость, больше ничего не надо». The other two are the same shape with the truth in
+     * the second line instead of a rate.
      *
      * WHAT CHANGED AND WHY:
      *
+     *  - **«Пауза» exists at all** because «Остановить» took the notification with it, and there
+     *    was then nothing in the shade to turn the tunnel back on with: «надо в шторку сделать
+     *    кнопку паузы, чтобы можно было остановить впн и потом обратно включить прям из шторки».
+     *    Pause is a real pause — the service stays in the foreground with the tunnel down — and
+     *    that is what keeps the row (and therefore the way back) in the shade. A notification left
+     *    behind by a service that has stopped would be dismissible, and the first swipe would put
+     *    the user back where he started.
+     *  - **«Остановить» is untouched** and still does exactly what it did: same broadcast, same
+     *    teardown, row gone. It is present in all three states, because a pause the user cannot
+     *    end is a worse trap than no pause at all.
      *  - **«Перезапуск службы» is gone.** A notification action is the shortest path in the product
      *    and it was spending it on a developer's recovery gesture, one tap away from «Остановить» —
      *    the one thing a user actually reaches for here, and the one they must not miss. Restarting
@@ -153,36 +229,30 @@ object NotificationManager {
      *    are untouched, only this button is.
      *  - **No empty second line.** The content text was set to `""` on the way out
      *    ([stopSpeedNotification]), which does not remove the line, it prints an empty one. The
-     *    collapsed notification carries the title and the chronometer, and nothing where a sentence
-     *    would be.
-     *  - **The speed is IN the notification now**, in the expanded view only. It used to be
-     *    deliberately excluded — the comment in [updateSpeedNotificationOnce] said so — and that
-     *    decision is reversed rather than left contradicting the code. It costs no new work: the
-     *    stats job already ticks every [QUERY_INTERVAL_MS] for Главная, so the same tick writes the
-     *    line, at the same rate, and `setOnlyAlertOnce` keeps it silent.
+     *    running row carries the title and the chronometer and nothing where a sentence would be;
+     *    the other two carry a sentence that is worth the line.
+     *  - **The speed is IN the notification now**, in the expanded view of the RUNNING state only.
+     *    It used to be deliberately excluded — the comment in [updateSpeedNotificationOnce] said
+     *    so — and that decision is reversed rather than left contradicting the code. It costs no
+     *    new work: the stats job already ticks every [QUERY_INTERVAL_MS] for Главная, so the same
+     *    tick writes the line, at the same rate, and `setOnlyAlertOnce` keeps it silent.
      *
-     * The uptime is the system's own chronometer, so it counts without a single push from us.
+     * The uptime is the system's own chronometer, so it counts without a single push from us, and
+     * it is anchored to [CoreServiceManager.sessionStartedAt] — the instant the core came up —
+     * rather than to the instant this row was built, so a re-render mid-session does not reset it.
      */
-    private fun buildRichNotification(service: Service, channelId: String, currentConfig: ProfileItem?): Notification {
+    private fun buildRichNotification(
+        service: Service,
+        channelId: String,
+        state: Shade,
+        downPerSec: Long,
+        upPerSec: Long,
+    ): Notification {
         val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
 
         val startMainIntent = Intent(service, MainActivity::class.java)
         val contentPendingIntent = PendingIntent.getActivity(service, NOTIFICATION_PENDING_INTENT_CONTENT, startMainIntent, flags)
 
-        val stopV2RayIntent = Intent(AppConfig.BROADCAST_ACTION_SERVICE)
-        stopV2RayIntent.`package` = AppConfig.ANG_PACKAGE
-        stopV2RayIntent.putExtra("key", AppConfig.MSG_STATE_STOP)
-        val stopV2RayPendingIntent = PendingIntent.getBroadcast(service, NOTIFICATION_PENDING_INTENT_STOP_V2RAY, stopV2RayIntent, flags)
-
-        // Resolving the flag/name is pure string work but is defensively guarded so a malformed
-        // remark can never abort the notification build.
-        val title = currentConfig?.let { cfg ->
-            try {
-                "${FlagUtil.resolveFlag(cfg)} ${FlagUtil.stripLeadingFlag(cfg.remarks)}"
-            } catch (e: Exception) {
-                cfg.remarks
-            }
-        }
         val builder = NotificationCompat.Builder(service, channelId)
             .setSmallIcon(R.drawable.ic_stat_name)
             // БОЛЬШОГО ЗНАЧКА ЗДЕСЬ НЕТ, И ЭТО НЕ УПУЩЕНИЕ. Он тут был ровно один заход:
@@ -194,28 +264,128 @@ object NotificationManager {
             // Знак и так на месте: setSmallIcon выше — это марка, которую система рисует из
             // альфы и красит setColor'ом. Одного раза достаточно.
             .setColor(ContextCompat.getColor(service, R.color.notification_badge))
-            .setContentTitle(title)
+            .setContentTitle(shadeTitle)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
-            // System-rendered live uptime stopwatch (no per-second push, battery-free).
-            .setWhen(System.currentTimeMillis())
-            .setUsesChronometer(true)
-            .setShowWhen(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(contentPendingIntent)
-            .addAction(
-                R.drawable.ic_notif_stop,
-                service.getString(R.string.notification_action_stop_v2ray),
-                stopV2RayPendingIntent
-            )
+
+        when (state) {
+            Shade.RUNNING -> {
+                // System-rendered live uptime stopwatch (no per-second push, battery-free), counting
+                // from when the core actually came up — the same instant Главная counts from.
+                val startedAt = CoreServiceManager.sessionStartedAt().takeIf { it > 0L } ?: System.currentTimeMillis()
+                builder.setWhen(startedAt)
+                    .setUsesChronometer(true)
+                    .setShowWhen(true)
+                    .addAction(
+                        R.drawable.ic_notif_pause,
+                        service.getString(R.string.notification_action_pause),
+                        pausePendingIntent(service, flags)
+                    )
+                    .addAction(
+                        R.drawable.ic_notif_stop,
+                        service.getString(R.string.notification_action_stop_v2ray),
+                        stopPendingIntent(service, flags)
+                    )
+                // The rate reads zero until the first tick lands, three seconds in — honest, and it
+                // means the expanded height never changes under the user's thumb by growing a line.
+                // The memo is set to match, so an idle tunnel's first tick has nothing new to say
+                // and stays silent.
+                applySpeed(builder, service, downPerSec, upPerSec)
+            }
+
+            Shade.PAUSED -> {
+                // No clock: there is no session to count. The title stays, because «which server
+                // comes back» is the one thing worth keeping on a paused row.
+                builder.setShowWhen(false)
+                    .setContentText(service.getString(R.string.notification_state_paused))
+                    .addAction(
+                        R.drawable.ic_notif_resume,
+                        service.getString(R.string.notification_action_resume),
+                        resumePendingIntent(service, flags)
+                    )
+                    .addAction(
+                        R.drawable.ic_notif_stop,
+                        service.getString(R.string.notification_action_stop_v2ray),
+                        stopPendingIntent(service, flags)
+                    )
+            }
+
+            Shade.CONNECTING -> {
+                // NO «Пауза» HERE. There is nothing to pause yet, and a button whose press would
+                // race the handshake it is trying to interrupt is worse than one that appears a
+                // second later. «Остановить» is the action the connecting state has always had.
+                builder.setShowWhen(false)
+                    .setContentText(service.getString(R.string.notification_state_connecting))
+                    .addAction(
+                        R.drawable.ic_notif_stop,
+                        service.getString(R.string.notification_action_stop_v2ray),
+                        stopPendingIntent(service, flags)
+                    )
+            }
+        }
 
         mBuilder = builder
-        // The rate reads zero until the first tick lands, three seconds in — honest, and it means
-        // the expanded height never changes under the user's thumb by growing a line. The memo is
-        // set to match, so an idle tunnel's first tick has nothing new to say and stays silent.
-        applySpeed(builder, service, 0L, 0L)
-        lastPushedSpeed = 0L to 0L
         return builder.build()
+    }
+
+    /** «Остановить» — the broadcast the running core listens for. Unchanged, in every state. */
+    private fun stopPendingIntent(service: Service, flags: Int): PendingIntent {
+        val intent = Intent(AppConfig.BROADCAST_ACTION_SERVICE)
+        intent.`package` = AppConfig.ANG_PACKAGE
+        intent.putExtra("key", AppConfig.MSG_STATE_STOP)
+        return PendingIntent.getBroadcast(service, NOTIFICATION_PENDING_INTENT_STOP_V2RAY, intent, flags)
+    }
+
+    /** «Пауза» — same channel as «Остановить», because it too only ever addresses a live core. */
+    private fun pausePendingIntent(service: Service, flags: Int): PendingIntent {
+        val intent = Intent(AppConfig.BROADCAST_ACTION_SERVICE)
+        intent.`package` = AppConfig.ANG_PACKAGE
+        intent.putExtra("key", AppConfig.MSG_STATE_PAUSE)
+        return PendingIntent.getBroadcast(service, NOTIFICATION_PENDING_INTENT_PAUSE, intent, flags)
+    }
+
+    /**
+     * «Возобновить» — a start command addressed to the service class, not a broadcast.
+     *
+     * @see AppConfig.ACTION_RESUME_SERVICE for why the way back cannot travel on the broadcast
+     * channel. `getForegroundService` because the service may have to be created for this (the
+     * pause survives a process kill), and the paused service is already in the foreground in every
+     * other case, so the promotion is a no-op rather than a new one.
+     */
+    private fun resumePendingIntent(service: Service, flags: Int): PendingIntent {
+        val intent = Intent(service, service.javaClass).setAction(AppConfig.ACTION_RESUME_SERVICE)
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PendingIntent.getForegroundService(service, NOTIFICATION_PENDING_INTENT_RESUME, intent, flags)
+        } else {
+            PendingIntent.getService(service, NOTIFICATION_PENDING_INTENT_RESUME, intent, flags)
+        }
+    }
+
+    /** «🇵🇱 Poland». Pure string work, guarded so a malformed remark can never abort a build. */
+    private fun titleOf(config: ProfileItem): String {
+        return try {
+            "${FlagUtil.resolveFlag(config)} ${FlagUtil.stripLeadingFlag(config.remarks)}"
+        } catch (e: Exception) {
+            config.remarks
+        }
+    }
+
+    /**
+     * What the row is allowed to say, asked of the core rather than remembered.
+     *
+     * THE PAUSE IS ASKED ABOUT FIRST, and the order is the whole point. `stopLoop()` runs on its
+     * own thread, so for the tail of a pause the core still answers «running» while the interface
+     * is already coming down and the user has already been told the tunnel is off. Reading
+     * `isRunning` first would paint that tail as a live session — and, since nothing renders
+     * again afterwards, it would stay painted. The flag is only ever true when a person asked for
+     * it (every start clears it before any core starts), so it cannot lie in the other direction.
+     */
+    private fun currentState(): Shade = when {
+        CoreServiceManager.isPaused() -> Shade.PAUSED
+        CoreServiceManager.isRunning() -> Shade.RUNNING
+        else -> Shade.CONNECTING
     }
 
     /**
@@ -241,7 +411,9 @@ object NotificationManager {
         service.stopForeground(Service.STOP_FOREGROUND_REMOVE)
 
         mBuilder = null
-        lastPushedSpeed = null
+        lastPushed = null
+        shadeTitle = null
+        channelId = null
         speedNotificationJob?.cancel()
         speedNotificationJob = null
         mNotificationManager = null
@@ -284,6 +456,49 @@ object NotificationManager {
     }
 
     /**
+     * The channel to post on, remembered so a state change does not pay for the channel call.
+     *
+     * Below O there is no channel and the ID is the empty string:
+     * https://developer.android.com/reference/android/support/v4/app/NotificationCompat.Builder.html#NotificationCompat.Builder(android.content.Context)
+     */
+    private fun ensureChannel(service: Service): String {
+        channelId?.let { return it }
+        val resolved = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                createNotificationChannel()
+            } catch (e: Exception) {
+                LogUtil.e(AppConfig.TAG, "showNotification: failed to create channel", e)
+                AppConfig.RAY_NG_CHANNEL_ID
+            }
+        } else {
+            ""
+        }
+        channelId = resolved
+        return resolved
+    }
+
+    /**
+     * Rebuilds the row for a NEW state and posts it — once, and only if it differs.
+     *
+     * State changes are rare (a connect, a pause, a resume), so rebuilding the builder here is
+     * cheaper than keeping one mutable builder honest across three shapes — and it is the only
+     * place the action PendingIntents are re-minted, which is a binder call each and must never
+     * land on the three-second tick. That tick goes through [pushSpeed], which mutates.
+     */
+    private fun post(service: Service, state: Shade, downPerSec: Long, upPerSec: Long) {
+        val target = Posted(state, downPerSec, upPerSec)
+        if (lastPushed == target) return
+        val channel = channelId ?: return // nothing has been shown yet; startForeground comes first
+        try {
+            val notification = buildRichNotification(service, channel, state, downPerSec, upPerSec)
+            getNotificationManager()?.notify(NOTIFICATION_ID, notification)
+            lastPushed = target
+        } catch (e: Exception) {
+            LogUtil.e(AppConfig.TAG, "post: failed to update the ongoing notification", e)
+        }
+    }
+
+    /**
      * Writes the live rate into the EXPANDED notification and re-posts it.
      *
      * The line goes on [NotificationCompat.BigTextStyle] alone and the content text stays unset, so
@@ -292,11 +507,14 @@ object NotificationManager {
      * two are deliberately not the same string here.
      */
     private fun pushSpeed(downPerSec: Long, upPerSec: Long) {
+        // A rate is a fact about a RUNNING tunnel. A tick that lands in the gap between the pause
+        // and the job noticing it must not repaint a paused row with a speed line.
+        if (currentState() != Shade.RUNNING) return
         val builder = mBuilder ?: return
         val service = getService() ?: return
         applySpeed(builder, service, downPerSec, upPerSec)
         getNotificationManager()?.notify(NOTIFICATION_ID, builder.build())
-        lastPushedSpeed = downPerSec to upPerSec
+        lastPushed = Posted(Shade.RUNNING, downPerSec, upPerSec)
     }
 
     /** The expanded view's one line: «↓ 1,2 MB/s   ↑ 240 KB/s». */
@@ -342,9 +560,11 @@ object NotificationManager {
      *
      * Upstream had a guard for exactly this and this fork kept only its plumbing: `lastZeroSpeed`
      * was threaded in and out of this function and never branched on. It is replaced by the
-     * stronger form of the same idea — remember the pair actually pushed, and post only when the
+     * stronger form of the same idea — remember what was actually pushed, and post only when the
      * new one differs — which also covers a steady rate, not just a zero one. [showNotification]
-     * clears the memo when it rebuilds the builder, so a fresh row always gets its line back.
+     * clears the memo when it rebuilds the builder, so a fresh row always gets its line back. The
+     * memo carries the STATE as well as the rate, so «Пауза» always repaints the row and a paused
+     * row is never repainted twice.
      *
      * THE BROADCAST IS NOT GUARDED, and must not be: `MSG_STATE_SPEED_UPDATE` is Главная's only
      * source for the two figures, it is a local broadcast rather than a system call, and swallowing
@@ -384,7 +604,7 @@ object NotificationManager {
             val downPerSec = (proxyDownlink / sinceLastQueryInSeconds).toLong()
             val upPerSec = (proxyUplink / sinceLastQueryInSeconds).toLong()
             MessageUtil.sendMsg2UI(svc, AppConfig.MSG_STATE_SPEED_UPDATE, longArrayOf(downPerSec, upPerSec))
-            if (downPerSec to upPerSec != lastPushedSpeed) pushSpeed(downPerSec, upPerSec)
+            if (Posted(Shade.RUNNING, downPerSec, upPerSec) != lastPushed) pushSpeed(downPerSec, upPerSec)
         }
 
         lastQueryTime = queryTime

@@ -48,11 +48,45 @@ object CoreServiceManager {
      */
     private const val KEY_SESSION_STARTED_AT = "cache_connection_start_time"
 
+    /**
+     * «Пауза» is on — the tunnel is down and the service is still standing, waiting to be
+     * resumed from the shade.
+     *
+     * IT IS PERSISTED BECAUSE A PAUSED SERVICE CAN BE KILLED. The foreground service returns
+     * `START_STICKY`, so the system brings it back with a `null` intent — indistinguishable, in a
+     * fresh process, from the sticky restart of a tunnel that WAS running, which is supposed to
+     * reconnect. Without this on disk the restart would connect a VPN the user had switched off,
+     * on its own, with nobody watching. MMKV in `MULTI_PROCESS_MODE`, same as
+     * [KEY_SESSION_STARTED_AT] and for the same reason: the core lives in `:RunSoLibV2RayDaemon`.
+     */
+    private const val KEY_PAUSED = "cache_tunnel_paused"
+
     private val coreController: CoreController = CoreNativeManager.newCoreController(CoreCallback())
     private val mMsgReceive = ReceiveMessageHandler()
     private var currentConfig: ProfileItem? = null
     private var processFinder: XrayProcessFinder? = null
     private var browserDialer: IDialerService? = null
+
+    /**
+     * In-memory mirror of [KEY_PAUSED], filled from the store on first read.
+     *
+     * Reading the flag is on the notification's render path, so it is not worth a store lookup
+     * each time; a fresh process has to ask the store once, which is exactly what `null` here
+     * means. Only `:RunSoLibV2RayDaemon` ever writes it.
+     */
+    private var pausedCache: Boolean? = null
+
+    /**
+     * Whether the command receiver is registered, so registering it twice is impossible.
+     *
+     * A pause KEEPS it registered — «Остановить» on the paused row has to be heard — and the
+     * resume that follows runs [doStartCoreLoop] again, which used to register unconditionally. A
+     * receiver registered twice is delivered to twice: one «Остановить» would have run the whole
+     * teardown two times over. (It also closes a smaller hole that was always there: a
+     * [doStartCoreLoop] that throws after registering never unregistered, so the next attempt
+     * doubled it up.)
+     */
+    private var commandReceiverRegistered = false
 
     var serviceControl: SoftReference<ServiceControl>? = null
         set(value) {
@@ -130,6 +164,34 @@ object CoreServiceManager {
      * @return True if the service is running, false otherwise.
      */
     fun isRunning() = coreController.isRunning
+
+    /**
+     * **The tunnel is down and the way back is one tap in the shade.**
+     *
+     * A PAUSED TUNNEL IS NOT A RUNNING ONE, and everything that asks [isRunning] is right to say
+     * «не подключено»: the плитка in the shade goes INACTIVE, the виджет shows «включить»,
+     * Главная shows the resting ring. This flag adds nothing to that answer — it only says which
+     * of the two SHAPES the notification takes while the tunnel is down, «Возобновить» or gone.
+     *
+     * @see KEY_PAUSED for why it survives the process.
+     */
+    fun isPaused(): Boolean {
+        pausedCache?.let { return it }
+        return MmkvManager.decodeSettingsBool(KEY_PAUSED, false).also { pausedCache = it }
+    }
+
+    /**
+     * Ends the pause. Every start command is one — the shade's «Возобновить», the плитка, the
+     * виджет, Главная, Tasker — so this is called before a connect begins rather than after it
+     * succeeds: the row has to stop saying «На паузе» the moment the connect starts, and a
+     * connect that then fails leaves a stopped tunnel, not a paused one.
+     */
+    fun clearPaused() = setPaused(false)
+
+    private fun setPaused(value: Boolean) {
+        pausedCache = value
+        MmkvManager.encodeSettings(KEY_PAUSED, value)
+    }
 
     /**
      * **When the CURRENT tunnel came up**, in wall-clock millis, or 0 when none is up.
@@ -293,11 +355,7 @@ object CoreServiceManager {
             error(result.errorMessage.ifBlank { "Failed to get V2Ray config" })
         }
 
-        val mFilter = IntentFilter(AppConfig.BROADCAST_ACTION_SERVICE)
-        mFilter.addAction(Intent.ACTION_SCREEN_ON)
-        mFilter.addAction(Intent.ACTION_SCREEN_OFF)
-        mFilter.addAction(Intent.ACTION_USER_PRESENT)
-        ContextCompat.registerReceiver(service, mMsgReceive, mFilter, Utils.receiverFlags())
+        ensureCommandReceiver()
 
         currentConfig = config
         var tunFd = vpnInterface?.fd ?: 0
@@ -343,16 +401,65 @@ object CoreServiceManager {
         markSessionStarted()
 
         MessageUtil.sendMsg2UI(service, AppConfig.MSG_STATE_START_SUCCESS, "")
+        // AND THE SHADE STOPS SAYING «Подключение…» HERE, not a line earlier. The row was posted
+        // above, before `startLoop`, because the title has to be there and the foreground
+        // promotion cannot wait; at that point the core was not up yet and the row said so. This
+        // is the first instant «Подключено» is true, so it is the first instant the chronometer
+        // starts and «Пауза» appears.
+        NotificationManager.refreshState()
         NotificationManager.startSpeedNotification()
         LogUtil.i(AppConfig.TAG, "StartCore-Manager: Core started successfully")
     }
 
     /**
+     * Registers the receiver that carries «Остановить» and «Пауза» to a live service.
+     *
+     * Idempotent — see [commandReceiverRegistered]. Public because one caller is outside the
+     * start path: a paused service that the system killed and restarted has a row in the shade
+     * with two buttons on it, and one of them is a broadcast.
+     */
+    fun ensureCommandReceiver() {
+        if (commandReceiverRegistered) return
+        val service = getService() ?: return
+        val mFilter = IntentFilter(AppConfig.BROADCAST_ACTION_SERVICE)
+        mFilter.addAction(Intent.ACTION_SCREEN_ON)
+        mFilter.addAction(Intent.ACTION_SCREEN_OFF)
+        mFilter.addAction(Intent.ACTION_USER_PRESENT)
+        ContextCompat.registerReceiver(service, mMsgReceive, mFilter, Utils.receiverFlags())
+        commandReceiverRegistered = true
+    }
+
+    /**
      * Stops the V2Ray core service.
      * Unregisters broadcast receivers, stops notifications, and shuts down plugins.
+     *
+     * @param keepAlive **пауза**: take the tunnel down and leave the row in the shade standing,
+     *   re-worded to «На паузе», so it can offer the way back. Everything that costs anything
+     *   comes down either way — the core loop, the browser dialer, the speed meter, and (in the
+     *   caller) the tun interface, the network callback and tun2socks. What survives is a
+     *   foreground service with nothing to do and the notification that keeps it legal, which is
+     *   the price of a shade entry that cannot be swiped away and lost.
+     *
+     *   WHAT THE IDLE SERVICE COSTS. Nothing that draws power: no core loop, no timers, no
+     *   wakelocks, no radio — `startSpeedNotification` refuses to run without a live core, and so
+     *   does the delay probe, so a screen-on while paused re-starts neither. What it holds is the
+     *   `:RunSoLibV2RayDaemon` process resident and one foreground-service slot. That buys the one
+     *   property this feature is built on: an FGS notification is exempt from the Android 14 change
+     *   that made ongoing notifications dismissible, so the way back cannot be swiped away. A row
+     *   left behind by a service that had stopped would have no such protection.
+     *
+     *   The exposure to know about: the declared type is `specialUse`, which no shipped platform
+     *   puts a timeout on, but the platform has been adding per-type timeouts release by release
+     *   (`dataSync`, `mediaProcessing` on 15). If one ever lands on `specialUse`, this service
+     *   becomes a candidate for it, and the answer is `Service.onTimeout` ending the pause the way
+     *   «Остановить» does — not a change to the mechanic.
+     *
+     *   Two things deliberately do NOT happen under it: the notification is not cancelled, and
+     *   the command receiver stays registered — «Остановить» on the paused row is the user's way
+     *   out of the pause and it travels on that receiver.
      * @return True if the core was stopped successfully, false otherwise.
      */
-    fun stopCoreLoop(): Boolean {
+    fun stopCoreLoop(keepAlive: Boolean = false): Boolean {
         val service = getService() ?: return false
 
         // The session is over the moment the stop is asked for, whichever branch below announces
@@ -386,12 +493,26 @@ object CoreServiceManager {
             browserDialer = null
         }
 
-        NotificationManager.cancelNotification()
+        if (keepAlive) {
+            // THE FLAG IS SET BEFORE THE ROW IS RE-DRAWN, because the row asks for the state
+            // rather than being handed it ([NotificationManager.refreshState]).
+            //
+            // And it is honest at this instant, not optimistic: `coreController.stopLoop()` above
+            // is still finishing on its own thread, but the moment that decides where the user's
+            // packets go has already passed in the caller — `CoreVpnService` closes the tun
+            // interface, so traffic is off the tunnel — and «Пауза» is the truth about that.
+            setPaused(true)
+            NotificationManager.pauseNotification()
+        } else {
+            setPaused(false)
+            NotificationManager.cancelNotification()
 
-        try {
-            service.unregisterReceiver(mMsgReceive)
-        } catch (e: Exception) {
-            LogUtil.e(AppConfig.TAG, "StartCore-Manager: Failed to unregister receiver", e)
+            try {
+                service.unregisterReceiver(mMsgReceive)
+            } catch (e: Exception) {
+                LogUtil.e(AppConfig.TAG, "StartCore-Manager: Failed to unregister receiver", e)
+            }
+            commandReceiverRegistered = false
         }
 
         return true
@@ -615,6 +736,19 @@ object CoreServiceManager {
                 AppConfig.MSG_STATE_STOP -> {
                     LogUtil.i(AppConfig.TAG, "StartCore-Manager: Stop service")
                     serviceControl.stopService()
+                }
+
+                AppConfig.MSG_STATE_PAUSE -> {
+                    // A SECOND «Пауза» ON AN ALREADY PAUSED TUNNEL IS NOT A SECOND TEARDOWN.
+                    // The button only exists on the running row, but a broadcast is a broadcast:
+                    // a double tap in the shade, or a PendingIntent fired twice, would otherwise
+                    // run the whole teardown again — over a closed interface and a stopped core.
+                    if (!coreController.isRunning) {
+                        LogUtil.i(AppConfig.TAG, "StartCore-Manager: Nothing to pause; the tunnel is already down")
+                        return
+                    }
+                    LogUtil.i(AppConfig.TAG, "StartCore-Manager: Pause service")
+                    serviceControl.pauseService()
                 }
 
                 AppConfig.MSG_STATE_RESTART -> {
