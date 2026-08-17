@@ -61,6 +61,51 @@ import com.v2ray.ang.R
  */
 object NoticePolicy {
 
+    /**
+     * ============================================================================
+     * RULE 5, AND IT IS ABOUT THE MOMENT RATHER THAN THE MESSAGE.
+     * ============================================================================
+     *
+     * Nothing speaks while a full-screen flow is on the screen.
+     *
+     *     «когда залогинился через телеграм, анимация прошла и начала появляться главная, внизу
+     *      уведомление появилось "нет подписок для обновления", потом подгрузилось, в общем
+     *      как-то багнуло»
+     *
+     * The sentence he saw is a TRUE one and it is on [ALLOWED] on purpose: signing in fires
+     * `refreshSubscriptions()` before the account's подписка has been written, so the refresh
+     * really does find nothing to refresh, and «Обновить» with no подписки stored really does need
+     * an answer — on the screen where a person pressed «Обновить». It has no business on top of a
+     * sign-in the user is still in the middle of: the прогрузка overlay owns the whole window and
+     * states its own progress in four steps, and a bar sliding out from under it reports on an
+     * errand nobody started and about a condition that resolves itself two seconds later.
+     *
+     * WHY HERE AND NOT AT THE CALL SITE. The same three lines would otherwise have to be added to
+     * `MainActivity.importConfigViaSub`, and then to the next thing the flow triggers, and the one
+     * after that — the defect would be fixed for one sentence rather than for the moment. This is
+     * the layer that decides who may interrupt the user, and «not now» is the same kind of answer
+     * as «not ever». Rule 3's property holds either way: the allow-list is still the only door,
+     * this only closes it for a while.
+     *
+     * A BOOLEAN AND NOT A COUNTER, because a counter that leaks silences the app for the rest of
+     * the session. It is raised and lowered by the ONE contract that already brackets every
+     * full-screen flow — [com.v2ray.ang.ui.component.HomeHandoff] and `MainActivity`'s
+     * `holdHomeEntrance` / `revealHome` — and every path out of a flow, including the cancelled and
+     * the failed one, goes through the release half (`GateView.releaseHome`). Setting the same
+     * value twice costs nothing, so the two entry points cannot get out of step.
+     */
+    private var flowInProgress = false
+
+    /** A full-screen flow has taken the window. Called by the hand-off, not by a screen. */
+    fun enterFlow() {
+        flowInProgress = true
+    }
+
+    /** The window is the app's again. Idempotent; safe when no flow was running. */
+    fun leaveFlow() {
+        flowInProgress = false
+    }
+
     /** What a message is FOR. The policy's first question, before it looks at the text. */
     enum class Kind {
         /** Something worked. Never shown — rule 1. */
@@ -165,9 +210,20 @@ object NoticePolicy {
         R.string.tv_send_scanning_invalid,
     )
 
-    /** Rule 1 + rule 3, in one question. */
+    /** Rule 1 + rule 3 + rule 5, in one question. */
     fun allows(kind: Kind, @StringRes id: Int): Boolean =
-        kind != Kind.SUCCESS && id != 0 && ALLOWED.contains(id)
+        !flowInProgress && kind != Kind.SUCCESS && id != 0 && ALLOWED.contains(id)
+
+    /**
+     * Rule 5 alone, for the IN-FLIGHT signal, which is not on the policy channel and is not asked
+     * any of the other questions.
+     *
+     * «Обновляем данные…» is a state and normally must show itself (G2). Under a flow overlay it
+     * cannot: the overlay is the in-flight signal — a turning arc, a four-step caption and a
+     * progress bar — and a second one underneath it reports the same work twice from behind an
+     * opaque surface.
+     */
+    fun allowsProgress(): Boolean = !flowInProgress
 
     /**
      * A node summary in upstream's debug format — `[VLESS] Finland(***12:443)`, `[Custom] [Xray]`.
@@ -267,6 +323,8 @@ object Notice {
      * work continues is a lie.
      */
     fun progress(context: Context, text: CharSequence) {
+        // …with the ONE exception rule 5 names: a full-screen flow is already showing this work.
+        if (!NoticePolicy.allowsProgress()) return
         val activity = context.activity() ?: return
         val current = progressBar
         if (current != null && current.isShown) return

@@ -534,6 +534,22 @@ class MainActivity : HelperBaseActivity(), MainHost {
     private var entranceHeld = false
 
     /**
+     * A release that is waiting for the server list, or null.
+     *
+     * @see revealHome
+     */
+    private var pendingReveal: (() -> Unit)? = null
+
+    /**
+     * How many loads the shell has open — subscription refreshes, imports, exports.
+     *
+     * It is the balance of [showLoading] / [hideLoading], which every one of those errands already
+     * brackets, so it is the app's own answer to «данные ещё едут» rather than a second bookkeeping
+     * of the same fact. [revealHome] waits on it; nothing else reads it.
+     */
+    private var loadsInFlight = 0
+
+    /**
      * ARM the hand-off: call this BEFORE raising a full-screen loading overlay over the shell.
      *
      * Главная is stamped into its pre-entrance state — the account row, the «+», the connect
@@ -546,6 +562,9 @@ class MainActivity : HelperBaseActivity(), MainHost {
      */
     fun holdHomeEntrance() {
         entranceHeld = true
+        // Rule 5: nothing interrupts the user while a full-screen flow owns the window. The same
+        // bracket the tab's hold uses, because it is the same fact. @see NoticePolicy
+        NoticePolicy.enterFlow()
         homeFragment?.holdEntrance()
     }
 
@@ -563,11 +582,46 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * §3 puts this at 6450ms — the overlay fades over its last 520ms and is REMOVED here, not
      * hidden. Calling it without a prior [holdHomeEntrance] is harmless: Главная will already have
      * assembled, and an entrance plays once per view.
+     *
+     * ## What it waits for, and why it did not used to wait for anything
+     *
+     *     «главная должна появляться когда сервера уже подгрузились, а не потом»
+     *
+     * The overlay's schedule is an ANIMATION's schedule: the flow reports its last step, holds the
+     * finale 1300ms and fades over 520. Nothing in that adds up to «the list is ready» — the sign-in
+     * fires `refreshSubscriptions()` and moves on, so the screen was released when the overlay had
+     * finished counting, not when there was something to release it onto. What the user got was
+     * Главная assembling around an empty list, the rows arriving after it, and — since the fetch
+     * that had not finished was also the one that reports «нет подписок для обновления» — a bar
+     * about the fetch on top of the assemble.
+     *
+     * So the release waits for [loadsInFlight] to come back to zero, and the assemble then plays
+     * over a list that is already bound. Waiting costs nothing to look at: the screen is parked in
+     * §3's start values (every element at alpha 0, the gate block with them), so «показывать нечего,
+     * пока показывать нечего» is literally what is on the glass. The wait is bounded by the loads
+     * themselves — every one of them is an HTTP call with its own timeout, and every one balances
+     * its [showLoading] with a [hideLoading], including on the failure path.
+     *
+     * [dismissOverlay] still runs IMMEDIATELY and is never deferred: the overlay's own teardown is
+     * its own business, and holding a removed overlay's frame back would be the flash from the
+     * other side. What waits is the assemble.
      */
     fun revealHome(dismissOverlay: () -> Unit) {
-        entranceHeld = false
         dismissOverlay()
-        homeFragment?.playEntrance()
+        val release: () -> Unit = {
+            entranceHeld = false
+            NoticePolicy.leaveFlow()
+            homeFragment?.playEntrance()
+        }
+        if (loadsInFlight > 0) pendingReveal = release else release()
+    }
+
+    /** Runs a release that was waiting for the list, if the list has just become ready. */
+    private fun releaseHomeIfReady() {
+        if (loadsInFlight > 0) return
+        val release = pendingReveal ?: return
+        pendingReveal = null
+        release()
     }
 
     override fun showAddMenu(anchor: View) = showImportMenu(anchor)
@@ -615,11 +669,19 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * the same indicator the tab uses. Overrides the BaseActivity top-bar spinner.
      */
     override fun showLoading() {
-        runOnUiThread { homeFragment?.showConnectArc() }
+        runOnUiThread {
+            loadsInFlight++
+            homeFragment?.showConnectArc()
+        }
     }
 
     override fun hideLoading() {
-        runOnUiThread { homeFragment?.hideConnectArc() }
+        runOnUiThread {
+            if (loadsInFlight > 0) loadsInFlight--
+            homeFragment?.hideConnectArc()
+            // The list is ready; a hand-off that was waiting for it can let go now.
+            releaseHomeIfReady()
+        }
     }
 
     /**
@@ -1032,7 +1094,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
         if (items.isEmpty()) return
         SelectPopup.show(
             anchor = anchor,
-            options = items.map { it.title.orEmpty() },
+            options = items.map { it.title ?: "" },
             // NOT A VALUE PICKER. There is no "current" way of adding a подписка, so there is no
             // check column: -1 takes the mark's 22dp back and gives it to the labels.
             selectedIndex = -1,
