@@ -430,7 +430,17 @@ object RowBinder {
 
             is Trailing.Toggle -> with(slots.toggle) {
                 visibility = View.VISIBLE
-                isChecked = trailing.checked
+                // THE LISTENER IS DETACHED BEFORE THE STATE IS WRITTEN. `bind` runs again on every
+                // rebind — a resume, a value that changed elsewhere, a recycled holder — and
+                // assigning `isChecked` while the PREVIOUS bind's listener is still attached fires
+                // that closure, which belongs to the previous call's `trailing` and so writes the
+                // previous item's target with this item's value.
+                setOnCheckedChangeListener(null)
+                // ...and the position is restored, not played: this is a value being read back, and
+                // an animated state change queued before the first draw parks and then spills into
+                // it — the «переключатели дёргаются» defect. `restoreChecked`'s own guard leaves an
+                // animation the user just started with their finger alone.
+                restoreChecked(trailing.checked)
                 setOnCheckedChangeListener { _, checked -> trailing.onCheckedChange(checked) }
             }
 

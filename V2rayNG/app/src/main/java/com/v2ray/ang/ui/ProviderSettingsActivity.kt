@@ -19,6 +19,7 @@ import com.v2ray.ang.handler.SubscriptionUpdater
 import com.v2ray.ang.ui.component.SelectPopup
 import com.v2ray.ang.ui.component.SubPage
 import com.v2ray.ang.ui.component.ToolbarBinder
+import com.v2ray.ang.ui.component.restoreChecked
 import com.v2ray.ang.util.HttpUtil
 
 /**
@@ -136,19 +137,19 @@ class ProviderSettingsActivity : BaseActivity() {
         val hasSubscriptions = MmkvManager.decodeSubscriptions().isNotEmpty()
         setRowEnabled(binding.rowAutoUpdate, hasSubscriptions)
         setRowEnabled(binding.rowInterval, hasSubscriptions)
-        binding.switchAutoUpdate.isChecked = hasSubscriptions && isAutoUpdateOn()
+        binding.switchAutoUpdate.restoreChecked(hasSubscriptions && isAutoUpdateOn())
         binding.valueInterval.text = if (hasSubscriptions) {
             intervalLabel(storedIntervalMinutes())
         } else {
             getString(R.string.ps_no_subs_value)
         }
-        binding.switchNotify.isChecked = SettingsManager.isNotifyOnSubscriptionUpdate()
+        binding.switchNotify.restoreChecked(SettingsManager.isNotifyOnSubscriptionUpdate())
 
-        binding.switchUpdateOnLaunch.isChecked = SettingsManager.isUpdateSubscriptionOnLaunch()
-        binding.switchPingOnLaunch.isChecked = SettingsManager.isPingOnLaunch()
-        binding.switchPingOnUpdate.isChecked = SettingsManager.isPingOnSubscriptionUpdate()
+        binding.switchUpdateOnLaunch.restoreChecked(SettingsManager.isUpdateSubscriptionOnLaunch())
+        binding.switchPingOnLaunch.restoreChecked(SettingsManager.isPingOnLaunch())
+        binding.switchPingOnUpdate.restoreChecked(SettingsManager.isPingOnSubscriptionUpdate())
 
-        binding.switchSendHwid.isChecked = SettingsManager.isSendHwid()
+        binding.switchSendHwid.restoreChecked(SettingsManager.isSendHwid())
         binding.valueUserAgent.text = currentUserAgent()
 
         binding.valueSortOrder.text = getString(sortLabelRes(currentSortOrder()))

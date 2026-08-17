@@ -45,6 +45,7 @@ import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.ui.component.Haptic
 import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.ui.component.pressFeedback
+import com.v2ray.ang.ui.component.restoreChecked
 import com.v2ray.ang.util.AvatarManager
 import com.v2ray.ang.util.reducedMotion
 import com.v2ray.ang.viewmodel.AccountViewModel
@@ -787,7 +788,9 @@ class AccountFragment : Fragment() {
             sub.type.equals(SubscriptionSyncManager.TYPE_ROOT, ignoreCase = true) || sub.id.isNotBlank()
         b.cardAutorenew.isVisible = actionable
         if (!actionable) return
-        b.switchSubAutorenew.isChecked = sub.autoRenewEnabled
+        // Read back from the account, never chosen here (the row owns the tap), so the position is
+        // restored rather than played — this render is the tab's first frame. @see restoreChecked
+        b.switchSubAutorenew.restoreChecked(sub.autoRenewEnabled)
         b.tvSubAutorenew.text = when {
             !sub.autoRenewEnabled -> getString(R.string.account_sub_autorenew_off)
             sub.renewalPrice != null && !sub.expireAtIso.isNullOrBlank() -> getString(

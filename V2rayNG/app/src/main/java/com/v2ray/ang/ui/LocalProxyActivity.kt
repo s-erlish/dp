@@ -19,6 +19,7 @@ import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.ui.component.SubPage
 import com.v2ray.ang.ui.component.ToolbarBinder
+import com.v2ray.ang.ui.component.restoreChecked
 import com.v2ray.ang.util.Utils
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -120,7 +121,9 @@ class LocalProxyActivity : BaseActivity() {
         etSocksPass.setText(pass ?: "")
 
         val authOn = !user.isNullOrEmpty() && !pass.isNullOrEmpty()
-        switchSocksAuth.isChecked = authOn
+        // Read back, not chosen: restore the position instead of morphing the thumb across on the
+        // screen's first frame. @see restoreChecked
+        switchSocksAuth.restoreChecked(authOn)
         setSocksDetailsVisible(authOn)
 
         findViewById<View>(R.id.row_socks_auth).setOnClickListener { switchSocksAuth.toggle() }
@@ -282,7 +285,7 @@ class LocalProxyActivity : BaseActivity() {
     private fun bindSwitchRow(rowId: Int, switchId: Int, initial: Boolean, onChange: (Boolean) -> Unit) {
         val row = findViewById<View>(rowId)
         val sw = findViewById<MaterialSwitch>(switchId)
-        sw.isChecked = initial
+        sw.restoreChecked(initial)
         row.setOnClickListener { sw.toggle() }
         sw.setOnCheckedChangeListener { _, isChecked ->
             onChange(isChecked)
@@ -301,7 +304,7 @@ class LocalProxyActivity : BaseActivity() {
         btnToggleHotspotPass = findViewById(R.id.btn_toggle_hotspot_pass)
 
         val enabled = MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING, false)
-        switchHotspot.isChecked = enabled
+        switchHotspot.restoreChecked(enabled)
         groupHotspotDetails.visibility = if (enabled) View.VISIBLE else View.GONE
         if (enabled) {
             // Ядро включит LAN-инбаунд только с авторизацией: гарантируем наличие кред.

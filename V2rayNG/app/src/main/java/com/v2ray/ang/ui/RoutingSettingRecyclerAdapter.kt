@@ -9,6 +9,7 @@ import com.v2ray.ang.dto.entities.RulesetItem
 import com.v2ray.ang.helper.ItemTouchHelperAdapter
 import com.v2ray.ang.helper.ItemTouchHelperViewHolder
 import com.v2ray.ang.ui.component.RowBinder
+import com.v2ray.ang.ui.component.restoreChecked
 import com.v2ray.ang.viewmodel.RoutingSettingsViewModel
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
@@ -73,10 +74,16 @@ class RoutingSettingRecyclerAdapter(
         // The listener is cleared before the state is set: this is a recycled view, and assigning
         // `isChecked` while the previous row's listener is still attached would write THAT rule's
         // guid with THIS rule's value.
+        //
+        // And the state is RESTORED, not played. A recycled holder arrives carrying the last rule's
+        // position, so a plain `isChecked` morphs the thumb across on every bind — a 250 ms
+        // animated-vector per row, running while the list scrolls. `restoreChecked` jumps to the
+        // value and, because it does nothing when the value already matches, leaves the animation
+        // from the user's own tap alone when `notifyItemChanged` rebinds the row underneath it.
         val toggle = holder.binding.rowLineSwitch
         toggle.setOnCheckedChangeListener(null)
         toggle.isVisible = true
-        toggle.isChecked = ruleset.enabled
+        toggle.restoreChecked(ruleset.enabled)
         toggle.contentDescription = context.getString(R.string.routing_rule_enabled_cd)
         toggle.setOnCheckedChangeListener { _, checked ->
             val index = holder.bindingAdapterPosition

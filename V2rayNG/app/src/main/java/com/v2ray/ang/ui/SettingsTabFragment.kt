@@ -26,6 +26,7 @@ import com.v2ray.ang.tv.TvReceiveActivity
 import com.v2ray.ang.tv.TvSendActivity
 import com.v2ray.ang.ui.component.SelectPopup
 import com.v2ray.ang.ui.component.onSingleClick
+import com.v2ray.ang.ui.component.restoreChecked
 import com.v2ray.ang.ui.component.pressFeedback
 import com.v2ray.ang.util.LogUtil
 
@@ -286,44 +287,16 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         s.switchBoot.restoreChecked(MmkvManager.decodeStartOnBoot())
     }
 
-    /**
-     * Paints a switch with a value that is being READ BACK, not chosen — and does it without a
-     * frame of animation. Every switch on this tab goes through here from [bindSettingsState]; the
-     * only calls left on `isChecked` are the five [toggleBypassLan]-style handlers, which are the
-     * user flipping the switch and must animate.
-     *
-     * THE BUG THIS FIXES: «при входе в настройки переключатели дёргаются, типа отключаются
-     * включаются очень быстро». Every switch is inflated in its DEFAULT position — off — and only
-     * then handed the stored value, and the handover was animated, so a switch that is on was drawn
-     * off first and then morphed on in front of the user. It looked like the screen was flipping
-     * its own switches.
-     *
-     * `setChecked` alone does not prevent that, and this is the part that is easy to get wrong.
-     * `SwitchCompat.setChecked` guards exactly ONE animation — the thumb's slide along the track —
-     * behind `getWindowToken() != null && isLaidOut()`, so binding before the first layout does
-     * place the thumb instantly. What it does not guard is the drawable state change it also
-     * performs: `mtrl_switch_thumb` is an `<animated-selector>` whose unchecked→checked
-     * `<transition>` is an `<animated-vector>` that morphs the thumb's path (M3
-     * `mtrl_switch_thumb_pre/post_morphing_duration`, ~250 ms end to end). An AnimatedVectorDrawable
-     * asked to start before its view has ever been drawn does not lose the animation — it parks it
-     * and flushes it on the first `draw()`. So the morph does not merely survive the bind, it is
-     * timed to begin on the tab's very first frame, which is precisely when the user is looking.
-     *
-     * [android.view.View.jumpDrawablesToCurrentState] is the answer to exactly that: `SwitchCompat`
-     * overrides it to jump the thumb and the track to the end of whatever transition is in flight
-     * and to end the position animator. The state is already correct at that point; only the
-     * theatre around it is dropped.
-     *
-     * The `isChecked == value` guard keeps this honest in the other direction. [bindSettingsState]
-     * runs from both [onViewCreated] and [onResume] — back to back on the first open — and it runs
-     * again after every picker. Without the guard the second pass would end an animation the user
-     * had just started with their own finger; with it, a bind that changes nothing touches nothing.
-     */
-    private fun MaterialSwitch.restoreChecked(value: Boolean) {
-        if (isChecked == value) return
-        isChecked = value
-        jumpDrawablesToCurrentState()
-    }
+    // The switch-restore rule this tab was the first to need — «при входе в настройки переключатели
+    // дёргаются, типа отключаются включаются очень быстро» — now lives ONCE, in
+    // `ui/component/ComponentSupport.kt`, where every other screen with a switch can reach it: the
+    // whole reasoning (why `setChecked` is not enough, why the guard matters) is in its doc. It
+    // stayed private here for a while and every other screen kept the defect, which is the same
+    // shape as the mono-theme tile that had to be found three times.
+    //
+    // Every switch on this tab is READ BACK through it from [bindSettingsState]; the only calls left
+    // on `isChecked` are the [toggleBypassLan]-style handlers, which are the user flipping the
+    // switch and must animate.
 
     private fun isBypassLanOn(): Boolean =
         MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_BYPASS_LAN, "1") != "2"
