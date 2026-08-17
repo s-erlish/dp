@@ -3126,10 +3126,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * прогрузка sonar. One [AnimatorSet] with a start delay for the echo, never a chain of
      * `postDelayed`.
      *
-     * The hardware layer goes on the two rings — the things that move — and comes back off in
-     * `doOnEnd`. Never on @id/connect_frame: a layer is a buffer the size of the view it is given
-     * to, and one on the frame would re-impose the very 214dp square the layout has stopped
-     * drawing.
+     * The hardware layer goes on the two rings — the things that move — and comes back off when
+     * the set ends OR is cancelled, which is why the listener answers both. Never on
+     * @id/connect_frame: a layer is a buffer the size of the view it is given to, and one on the
+     * frame would re-impose the very 214dp square the layout has stopped drawing.
      *
      * EVERY NUMBER IS THE ONE THE DESIGN STATES, and they are the numbers @anim/connect_confirm
      * carried:
