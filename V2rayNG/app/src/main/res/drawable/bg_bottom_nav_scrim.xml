@@ -27,14 +27,18 @@
          reported from the device («какая-то лишняя полоска есть цвета»). Fading to the page colour
          makes the scrim's foot and the gradient's foot the same pixel in both dark themes.
 
-         Light is the one that still differs: its gradient ends #D3E0F7 against a colorBackground of
-         #F4F7FC. That is far closer than surface's #FFFFFF was, but not identical; closing it needs
-         a page-edge token, which is not worth minting for a theme this product does not ship in. -->
+         AND LIGHT IS CLOSED NOW TOO. It was the one theme still off: its gradient ends #D3E0F7
+         against a colorBackground of #F4F7FC, and that gap is what the owner saw — «на белой теме
+         также есть какая-то прозрачная полоска синяя в самом низу, независимо от положения на
+         экране». The note here used to say a page-edge token was "not worth minting for a theme
+         this product does not ship in"; that stopped being true the moment «Как в системе» became
+         the default. @color/page_edge IS the gradient's endColor, split by the same day/night
+         qualifier the gradient itself is split by, so the two cannot disagree per theme. -->
 
     <!-- The body: the page colour, from the foot of the fade band down to the screen edge. -->
     <item android:top="40dp">
         <shape android:shape="rectangle">
-            <solid android:color="?android:attr/colorBackground" />
+            <solid android:color="@color/page_edge" />
         </shape>
     </item>
 
@@ -47,7 +51,7 @@
             <gradient
                 android:angle="90"
                 android:endColor="@android:color/transparent"
-                android:startColor="?android:attr/colorBackground"
+                android:startColor="@color/page_edge"
                 android:type="linear" />
         </shape>
     </item>
