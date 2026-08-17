@@ -54,10 +54,12 @@ import com.v2ray.ang.util.Utils
 import com.v2ray.ang.util.animationsEnabled
 import com.v2ray.ang.util.tickHaptic
 import com.v2ray.ang.viewmodel.MainViewModel
+import com.v2ray.ang.ui.component.Waiters
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The three bottom-navigation destinations, in bar order: Главная · Аккаунт · Настройки.
@@ -226,6 +228,13 @@ interface MainHost {
     fun reportSubscriptionImport(running: Boolean)
 
     /**
+     * Suspends until the подписка import reported through [reportSubscriptionImport] has finished,
+     * so a full-screen flow can keep its own progress on screen for the whole of it instead of
+     * handing over to a Главная that has nothing on it yet. Bounded; see the implementation.
+     */
+    suspend fun awaitSubscriptionImport()
+
+    /**
      * Whether Главная's entrance (handoff §3, «Сборка главной») is being held for a full-screen
      * flow overlay, so the tab parks in its pre-entrance state at [HomeFragment.onViewCreated]
      * instead of assembling itself behind the overlay.
@@ -345,6 +354,14 @@ class MainActivity : HelperBaseActivity(), MainHost {
         // more seconds of a screen that is not painting itself is the boundary between «it is
         // thinking» and «it is broken». @see revealDeadline
         const val REVEAL_WAIT_MAX_MS = 4_000L
+
+        /**
+         * How long [MainActivity.awaitSubscriptionImport] gives the import to APPEAR before deciding
+         * there isn't one. Short on purpose: it is only covering the gap between the sign-in landing
+         * and `HomeFragment.onLoggedIn` raising the flag on the next main-thread message, and every
+         * path with no import at all pays it in full before falling through.
+         */
+        const val IMPORT_START_WINDOW_MS = 700L
     }
 
     private val requestActivityLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -710,8 +727,47 @@ class MainActivity : HelperBaseActivity(), MainHost {
 
     /** Runs a release that was waiting for the list, if the list has just become ready. */
     private fun releaseHomeIfReady() {
+        homeDataWaiters.notifyChanged()
         if (homeDataPending()) return
         releaseHomeNow()
+    }
+
+    /**
+     * Everyone suspended inside [awaitSubscriptionImport]. Woken on every change to either counter,
+     * because what each caller is waiting FOR differs — see the two phases there.
+     */
+    private val homeDataWaiters = Waiters()
+
+    /**
+     * KEEPS THE FLOW OVERLAY UP UNTIL THE ПОДПИСКА IS ACTUALLY IN.
+     *
+     * The owner asked for this twice, the second time after a partial fix: «почему он меня кидает на
+     * главную когда подписка ещё полностью не добавилась? должно продолжаться начальное окно, где
+     * добавление подписки вот это идёт с полосочкой и только потом как добавилось перекидывать на
+     * главную». [revealHome] holds the ENTRANCE on the same two facts, but by the time it runs the
+     * overlay has already been taken down by `FlowOverlay.finish`, so its wait shows a parked, dark
+     * Главная rather than the progress the user was watching. This is the wait one step earlier, on
+     * the flow's own side, where the overlay is still on screen.
+     *
+     * **IT IS TWO PHASES, AND THE FIRST ONE IS THE WHOLE POINT.** The naive version — "suspend while
+     * [homeDataPending]" — returns instantly and fixes nothing, and it does so for exactly the reason
+     * the previous attempt failed: the errand has not started yet. `LoginState.Success` is delivered
+     * to the flow's own collector, while the import is started by `HomeFragment.onLoggedIn` off the
+     * account-session flow, which is a later main-thread message. Ask at Success and the flag is
+     * still false. So phase 1 waits for the import to APPEAR, phase 2 waits for it to finish.
+     *
+     * **Neither phase can hang, and neither can stall a path that has no import at all.** Phase 1
+     * gives up after [IMPORT_START_WINDOW_MS] — the clipboard flow does its own import inline and
+     * never raises the flag, and a sign-in on an account with no подписка raises and lowers it in one
+     * pass, so both simply fall through. Phase 2 is bounded by [REVEAL_WAIT_MAX_MS], the same
+     * deadline [revealHome] uses, after which the overlay leaves and Главная comes up in whatever
+     * state it is honestly in.
+     */
+    override suspend fun awaitSubscriptionImport() {
+        // Phase 1 — let the import declare itself. Falling through here is a normal outcome.
+        withTimeoutOrNull(IMPORT_START_WINDOW_MS) { homeDataWaiters.await { homeDataPending() } }
+        // Phase 2 — and now let it finish.
+        withTimeoutOrNull(REVEAL_WAIT_MAX_MS) { homeDataWaiters.await { !homeDataPending() } }
     }
 
     /**

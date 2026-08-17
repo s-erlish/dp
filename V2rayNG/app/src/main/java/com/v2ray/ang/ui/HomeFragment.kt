@@ -3487,6 +3487,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             override fun onSubscriptionAdded() = mainViewModel.reloadServerList()
 
             override fun refreshSubscriptions() = mainHost.refreshSubscriptions()
+
+            // Straight through to the shell, which is where the import is tracked — this fragment
+            // starts it (onLoggedIn) but the shell is what knows when every one of them has landed.
+            override suspend fun awaitSubscriptionImport() = mainHost.awaitSubscriptionImport()
         }
     }
 

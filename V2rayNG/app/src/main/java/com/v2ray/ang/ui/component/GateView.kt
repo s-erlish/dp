@@ -92,6 +92,16 @@ class GateView @JvmOverloads constructor(
 
         /** Вход состоялся: подтянуть подписку аккаунта. */
         fun refreshSubscriptions()
+
+        /**
+         * Дождаться, пока импорт подписки аккаунта действительно закончится.
+         *
+         * Существует для того, чтобы начальное окно с полоской не уходило раньше времени:
+         * «должно продолжаться начальное окно, где добавление подписки вот это идёт с полосочкой
+         * и только потом как добавилось перекидывать на главную». Ограничено по времени на стороне
+         * оболочки — зависнуть не может, а на путях, где импорта нет вовсе, возвращается сразу.
+         */
+        suspend fun awaitSubscriptionImport()
     }
 
     private lateinit var shield: FrameLayout
@@ -466,6 +476,15 @@ class GateView @JvmOverloads constructor(
                     is LoginState.Success -> {
                         overlay.step(2)
                         host?.refreshSubscriptions()
+                        // ЖДЁМ ЗДЕСЬ, А НЕ В ОБОЛОЧКЕ. MainActivity.revealHome держит на тех же
+                        // фактах ВХОД Главной, но к моменту его вызова FlowOverlay.finish overlay
+                        // уже снял — и ожидание показывает тёмную незаполненную Главную вместо
+                        // полоски, на которую человек смотрел. Один шаг раньше — и окно остаётся.
+                        //
+                        // refreshSubscriptions() выше обходит подписки, УЖЕ лежащие на устройстве,
+                        // и у нового аккаунта ему нечего обходить; подписку заводит другой путь —
+                        // HomeFragment.onLoggedIn. Поэтому ждём не его, а сам импорт.
+                        host?.awaitSubscriptionImport()
                         delay(STEP_DWELL_MS)
                         handOff(overlay)
                     }
