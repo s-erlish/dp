@@ -298,8 +298,14 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
     // on `isChecked` are the [toggleBypassLan]-style handlers, which are the user flipping the
     // switch and must animate.
 
+    // «Обход локальной сети» is OFF until somebody turns it on (owner report 0.4.9). The switch and
+    // the tunnel have to agree on that, so this default and the one in
+    // [SettingsManager.routingRulesetsBypassLan] are the same "2" and move together — the switch
+    // reading one default while the core read the other is how a setting lies about itself.
+    // The key is a STRING, so "never touched" (null) stays distinguishable from "turned off" ("2")
+    // and from "turned on" ("1"): an install that enabled this on purpose is not disturbed.
     private fun isBypassLanOn(): Boolean =
-        MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_BYPASS_LAN, "1") != "2"
+        MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_BYPASS_LAN, "2") != "2"
 
     private fun isMonoOn(): Boolean =
         MmkvManager.decodeSettingsString(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_BLUE) == BaseActivity.THEME_MONO

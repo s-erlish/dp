@@ -184,10 +184,24 @@ object SettingsManager {
 
     /**
      * Check if routing rulesets bypass LAN.
+     *
+     * OFF WHEN NOBODY ASKED (owner report 0.4.9: «обход локальной сети почему-то по дефолту
+     * включён, хотя не должен быть»). `PREF_VPN_BYPASS_LAN` is a STRING, not a boolean, and that is
+     * what makes this change safe: it holds "1" (on), "2" (off) or nothing at all, and only
+     * [com.v2ray.ang.ui.SettingsTabFragment.toggleBypassLan] ever writes it, always with "1" or
+     * "2". So «never touched» is a third, distinguishable state — an install that had the switch
+     * turned on deliberately reads "1" and keeps bypassing, and only the untouched install changes
+     * behaviour, which is exactly what was asked for. Nothing seeds this key on first run, so no
+     * migration is needed and none is possible to get wrong.
+     *
+     * The fall-through below (a value that is neither "1" nor "2") derives the answer from the
+     * selected server's routing rules. It stays reachable only for a value this app never writes;
+     * `null` is answered here, because «unset» has to mean OFF and not «go and look».
+     *
      * @return True if bypassing LAN, false otherwise.
      */
     fun routingRulesetsBypassLan(): Boolean {
-        val vpnBypassLan = MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_BYPASS_LAN) ?: "1"
+        val vpnBypassLan = MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_BYPASS_LAN) ?: "2"
         if (vpnBypassLan == "1") {
             return true
         } else if (vpnBypassLan == "2") {
