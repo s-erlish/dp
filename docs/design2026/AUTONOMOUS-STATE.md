@@ -202,9 +202,35 @@ cd /home/user/dp/V2rayNG && ./gradlew :app:assembleFdroidDebug --no-daemon \
 
 **Оговорка, найденная волной Главной: `--project-cache-dir` изолирует не всё.** Каталог вывода
 `V2rayNG/build` остаётся общим, и `merged.dir/*.xml` продолжает исчезать посреди чужой задачи при
-одновременных прогонах. Своя директория кэша убирает часть гонок, но не эту. Единственное, что
-работает надёжно, — **повторить сборку**, и не считать чужое падение своим. Полностью развело бы
-только `--project-dir` на отдельные копии дерева или сериализация прогонов.
+одновременных прогонах. Своя директория кэша убирает часть гонок, но не эту.
+
+**Развести полностью — init-скрипт, переносящий каталог вывода. Проверено 2026-08-17: сборка прошла
+начисто, пока два других агента компилировали то же дерево.** Копии дерева и очередь из прогонов не
+нужны, `--project-dir` тоже.
+
+```bash
+SP=/tmp/claude-0/-home-user/a3073c71-0c29-5410-a83c-f47c0ca9fa31/scratchpad
+mkdir -p "$SP/iso-<участок>/out"
+cat > "$SP/iso-<участок>/init.gradle.kts" <<EOF
+val root = File("$SP/iso-<участок>/out")
+allprojects {
+    layout.buildDirectory.set(File(root, project.path.replace(':', '_').trim('_').ifEmpty { "root" }))
+}
+EOF
+cd /home/user/dp/V2rayNG && ANDROID_HOME=/opt/android-sdk ./gradlew :app:compilePlaystoreReleaseKotlin \
+  --init-script "$SP/iso-<участок>/init.gradle.kts" \
+  --project-cache-dir "$SP/iso-<участок>/pc" \
+  --console=plain --no-daemon > "$SP/build-<участок>.log" 2>&1
+```
+
+Две мелочи оттуда же, каждая стоила прогона:
+
+- **`ANDROID_HOME` в этой машине не выставлен**, и `local.properties` в репозитории нет. Без
+  `ANDROID_HOME=/opt/android-sdk` сборка падает не сразу, а на разрешении зависимостей задачи —
+  «SDK location not found» после того, как конфигурация уже прошла.
+- **Имя задачи без флейвора не существует.** `:app:compileReleaseKotlin` даёт «task is ambiguous»,
+  кандидаты — `compileFdroidReleaseKotlin` и `compilePlaystoreReleaseKotlin`. Флейвор обязателен во
+  всех узких задачах, не только в `assemble*`.
 
 ## Ловушка тем, которую стоит знать всем
 
