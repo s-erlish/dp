@@ -336,9 +336,11 @@
     <string name="ping_method_http">HTTP-запрос напрямую, минуя туннель</string>
     <string name="ping_method_tcp">TCP-соединение (tcping)</string>
     <string name="ping_method_icmp">ICMP-пинг — многие серверы его не пропускают</string>
-    <string name="title_pref_auto_fallback">Автопереход на рабочий сервер</string>
-    <string name="summary_pref_auto_fallback">После подключения проверяет, идёт ли трафик, и переключает на самый быстрый рабочий сервер, если туннель молчит</string>
-    <string name="auto_fallback_switching">Подключение не отвечает. Переключаемся на самый быстрый рабочий сервер…</string>
+    <!-- «Автопереход на рабочий сервер» и его строка состояния сняты вместе с самой функцией:
+         владелец велел убрать переключение на быстрейший сервер целиком, настройка удалена,
+         ключ принудительно false при каждом старте, а последний читатель строки —
+         HomeFragment — вместе с проверкой здоровья туннеля. Заголовок и пояснение настройки
+         остались без читателей ещё раньше. -->
     <string name="speed_zero" translatable="false">0 KB/s</string>
     <string name="menu_item_fast_connect">Подключиться к самому быстрому серверу</string>
     <string name="bottom_nav_home">Главная</string>

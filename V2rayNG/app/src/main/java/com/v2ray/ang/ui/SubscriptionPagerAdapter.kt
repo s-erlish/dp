@@ -50,11 +50,38 @@ class SubscriptionPagerAdapter : RecyclerView.Adapter<SubscriptionPagerAdapter.V
 
     private val items = mutableListOf<SubInfoDto>()
 
-    /** Replaces the pages with [list] and repaints. */
+    init {
+        // The page IS the подписка, and [identityOf] is the подписка's name in every other store on
+        // this screen, so the recycler can be told which page is which. Without stable ids a
+        // structural change hands ViewPager2 a set of pages it has to treat as all-new.
+        setHasStableIds(true)
+    }
+
+    override fun getItemId(position: Int): Long = identityOf(items[position]).hashCode().toLong()
+
+    /**
+     * Publishes [list].
+     *
+     * A REFRESH THAT BRINGS THE SAME ПОДПИСКИ REBINDS, IT DOES NOT REBUILD. The tab loads twice by
+     * design — the cache answers first, the network a moment later — and both answers came through
+     * `notifyDataSetChanged()`, which tells ViewPager2 that every page it is holding is void: pages
+     * are re-created, the pager re-lays-out, re-snaps and re-dispatches its page-selected callback,
+     * with the ring in the middle of it. That is the horizontal shudder the owner sees while the
+     * tab pulls its data in, and §5's rule for this object rules it out: «кольцо стоит на месте с
+     * первого кадра, меняется только заливка».
+     *
+     * So the identities are compared first. Same подписки in the same order — the overwhelmingly
+     * common case, since a refresh changes BYTES and not membership — and the pages stay exactly
+     * where they are while [onBindViewHolder] writes the new figures into them, which is the sweep
+     * the design asks for. Only a genuine change of membership goes through the structural notify,
+     * and stable ids keep the surviving pages in place even then.
+     */
     fun submit(list: List<SubInfoDto>) {
+        val sameSet = items.size == list.size &&
+            items.indices.all { identityOf(items[it]) == identityOf(list[it]) }
         items.clear()
         items.addAll(list)
-        notifyDataSetChanged()
+        if (sameSet) notifyItemRangeChanged(0, items.size) else notifyDataSetChanged()
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {

@@ -29,7 +29,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.view.animation.AccelerateDecelerateInterpolator
-import android.view.animation.Animation
 import android.view.animation.AnimationUtils
 import android.widget.LinearLayout
 import androidx.activity.result.contract.ActivityResultContracts
@@ -308,6 +307,12 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private var ringSettleAnimator: ValueAnimator? = null
 
     /**
+     * The confirmation sonar: the lead ring and its echo, one shot, held so a disconnect or a
+     * teardown can stop them and take their hardware layers back. @see emitConfirmRings
+     */
+    private var confirmAnimator: AnimatorSet? = null
+
+    /**
      * Whether the sweep is on screen, so the arc's wind-up fires on the EDGE into negotiating and
      * not on every repaint that happens to find it already spinning. See [playArcWindUp].
      */
@@ -376,6 +381,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private val easeInOut by lazy { AnimationUtils.loadInterpolator(requireContext(), R.interpolator.ease_in_out) }
 
     private val durWindUp get() = resources.getInteger(R.integer.motion_windup).toLong()
+    private val durPressIn get() = resources.getInteger(R.integer.motion_press_in).toLong()
+    private val durEmphasis get() = resources.getInteger(R.integer.motion_emphasis).toLong()
     private val durState get() = resources.getInteger(R.integer.motion_state).toLong()
     private val durStateExit get() = resources.getInteger(R.integer.motion_state_exit).toLong()
     private val durExpand get() = resources.getInteger(R.integer.motion_expand).toLong()
@@ -404,32 +411,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         }
     }
 
-    // Auto-fallback: one-shot post-connect health check that switches to the fastest working server
-    // if the current tunnel doesn't actually pass traffic. The "already fired this session" flag
-    // lives in the ViewModel (autoFallbackUsed).
-    private var healthCheckPending = false
-
-    // True while the confirmation re-probe is armed or in flight. A single negative probe is not
-    // evidence that the tunnel is dead — one dropped packet on a fine connection would otherwise
-    // tear the user off a working server — so the fallback needs two consecutive failures.
-    private var healthCheckConfirming = false
-
-    private val healthCheckRunnable = Runnable {
-        if (mainViewModel.isRunning.value == true) {
-            healthCheckPending = true
-            mainViewModel.testCurrentServerRealPing()
-        }
-    }
-
-    // The confirmation probe. Re-checks the same conditions as the first one, so a tunnel the user
-    // stopped meanwhile — or a fallback that already fired — cannot be probed back into action.
-    private val healthRecheckRunnable = Runnable {
-        if (mainViewModel.isRunning.value == true && !mainViewModel.autoFallbackUsed) {
-            healthCheckPending = true
-            mainViewModel.testCurrentServerRealPing()
-        }
-    }
-
     /** The 30s latency probe of the ACTIVE server, and the only producer of the «мс» figure. */
     private val latencyRunnable = object : Runnable {
         override fun run() {
@@ -454,12 +435,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // KEY_CONNECTION_START used to live here and the screen wrote it. It is now
         // CoreServiceManager.KEY_SESSION_STARTED_AT — same key, written beside the core loop, read
         // here through CoreServiceManager.sessionStartedAt(). See [startConnectionTimer].
-
-        const val HEALTH_CHECK_DELAY_MS = 7000L
-
-        // Gap before the confirmation re-probe: long enough for a momentary DNS/test-URL hiccup to
-        // pass, short enough that a genuinely dead tunnel is not endured.
-        const val HEALTH_CHECK_RECHECK_MS = 2000L
 
         // Upper bound for a connect attempt before the UI gives up and returns to idle.
         const val CONNECT_TIMEOUT_MS = 20000L
@@ -523,6 +498,16 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         const val ENTRANCE_ROW_SLIDE = 44f
         const val ENTRANCE_ROWS_DELAY_MS = 700L
         const val ENTRANCE_ROW_STAGGER_MS = 85L
+
+        // THE CONFIRMATION SONAR. The prototype's own figures, kept together with the code that
+        // plays them (see [emitConfirmRings]): the lead ring is thrown to 1.6 of the 170dp active
+        // ring — 272dp, clear of the whole object — and the echo settles just inside it at 1.5,
+        // starting at half the opacity. The tempo and the curve are tokens
+        // (@integer/motion_emphasis 600, @interpolator/ease_out_quint, @integer/motion_press_in 70
+        // for the echo's beat) and are not restated here.
+        const val CONFIRM_LEAD_TO = 1.6f
+        const val CONFIRM_ECHO_TO = 1.5f
+        const val CONFIRM_ECHO_ALPHA = 0.5f
     }
 
     private val requestVpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -617,8 +602,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     override fun onDestroyView() {
-        timerHandler.removeCallbacks(healthCheckRunnable)
-        timerHandler.removeCallbacks(healthRecheckRunnable)
         timerHandler.removeCallbacks(latencyRunnable)
         timerHandler.removeCallbacks(connectWatchdogRunnable)
         timerHandler.removeCallbacks(uptimeRunnable)
@@ -626,6 +609,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         ringAnimator = null
         breathAnimator?.cancel()
         breathAnimator = null
+        // The sonar holds a hardware layer on each of its two rings for the length of its flight;
+        // cancelling it here is what hands those buffers back if the screen goes mid-payoff.
+        confirmAnimator?.cancel()
+        confirmAnimator = null
         pillTint?.cancel()
         pillTint = null
         // The assemble is the one animation here with start delays measured in whole seconds, so it
@@ -655,13 +642,25 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     // ==================== What the shell calls ====================
 
     /**
-     * The server cache changed: rebuild the inline list and the subscription carousel from it.
+     * The server cache changed: follow it on the inline list, and on the carousel when the change
+     * is one the carousel can see.
+     *
+     * ONE ROW IS NOT A REASON TO REBUILD A ViewPager2. `index >= 0` names a single server whose
+     * stored latency just landed (`MainViewModel.publishMeasurement`, `MSG_MEASURE_CONFIG_SUCCESS`)
+     * — one repaint per server of a bulk test, and one every 30s while a tunnel is up. None of that
+     * changes a подписка, and the card shows no latency at all, so rebuilding the pages for it was
+     * work with no picture attached: pages re-created, holders re-bound, the pager re-laid-out and
+     * re-snapped, on the main thread, in bursts. [refreshServerList]'s own note already promised
+     * this and the caller above it was doing the opposite.
+     *
+     * A structural change — an import, a delete, a refresh, the end of a batch — still arrives as
+     * -1 and still rebuilds both surfaces, and so does a position the cache no longer resolves.
      *
      * @param index the changed server's index in the cache, or -1 for the whole list.
      */
     fun bindList(index: Int) {
         if (!isBindingInitialized) return
-        refreshServerSurfaces(index)
+        if (index >= 0) refreshServerList(index) else refreshServerSurfaces(index)
         render()
         // Whether there is a server at all is one of the two inputs to the shell's nav gates.
         mainHost.refreshNavGates()
@@ -1846,29 +1845,16 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             if (renderedConn == Conn.CONNECTED) paintFigures()
         }
 
-        mainViewModel.fastConnectAction.observe(viewLifecycleOwner) { guid ->
-            // One-shot event: ignore the retained value replayed on recreate/rotation.
-            if (!mainViewModel.consumeFastConnectEvent()) return@observe
-            if (guid == null) {
-                // No candidate, so no restart follows — the fallback attempt is over.
-                mainViewModel.fallbackInProgress = false
-                connectInProgress = false
-                tunnelError = true
-                applyRunningState(isLoading = false, isRunning = false)
-                return@observe
-            }
-            if (mainViewModel.isRunning.value == true) {
-                restartV2Ray()
-            } else {
-                // The tunnel went down while the fallback was still testing, so there is no internal
-                // stop left for the disconnect handler to protect.
-                mainViewModel.fallbackInProgress = false
-                connectInProgress = true
-                applyRunningState(isLoading = true, isRunning = false)
-                scheduleConnectWatchdog()
-                startVpnWithPermission()
-            }
-        }
+        // NO AUTO-FALLBACK OBSERVER ANY MORE. «Переключаться на быстрейший сервер» is gone by the
+        // owner's instruction — the setting was removed and the stored key is forced false on every
+        // start — and this screen's half of it went with it: the post-connect health probe, its
+        // confirmation re-probe and the `fastConnectAction` handler that restarted the tunnel on
+        // somebody else's server. The app does not move the user off the server he picked.
+        //
+        // What stays is everything that was never the fallback: the 30s latency probe
+        // ([latencyRunnable]) that produces the «мс» figure, and the connect watchdog.
+        // `MainViewModel.autoFallbackUsed` / `fallbackInProgress` / `fastConnectAction` /
+        // `consumeFastConnectEvent` have no readers left anywhere — see the report.
 
         mainViewModel.isRunning.observe(viewLifecycleOwner) { isRunning ->
             // A definitive running/stopped state arrived (success or failure): the connect attempt
@@ -1890,11 +1876,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
             if (isRunning) {
                 startConnectionTimer()
-                scheduleHealthCheckIfEnabled()
                 startLatencyProbe()
             } else {
                 stopConnectionTimer()
-                cancelHealthCheck()
                 stopLatencyProbe()
             }
 
@@ -1913,9 +1897,12 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
-     * One delay result serves two consumers: the latency shown beside the server identity, and the
-     * auto-fallback health check. The latency update runs FIRST and unconditionally — it is the
-     * reading, and the health check's `pending` flag says nothing about whether the figure is true.
+     * A delay result: the latency reading, and nothing else.
+     *
+     * It used to serve a second consumer — the auto-fallback health check, which read the same
+     * figure and moved the user to another server when it came back negative twice. That whole
+     * behaviour is gone by the owner's instruction, and with it the only reason this method ever
+     * did anything besides record the reading.
      */
     private fun onDelayResult(time: Long) {
         if (mainViewModel.isRunning.value == true) {
@@ -1935,31 +1922,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             // never once per row of a bulk test, so this is not a hot path.
             if (isBindingInitialized) render()
         }
-
-        if (!healthCheckPending) return
-        healthCheckPending = false
-        if (!MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_FALLBACK, true)) return
-        if (mainViewModel.autoFallbackUsed || mainViewModel.isRunning.value != true) return
-        if (time >= 0) {
-            // The tunnel answered: whatever the earlier probe hit was transient.
-            healthCheckConfirming = false
-            return
-        }
-        if (!healthCheckConfirming) {
-            // First failure only asks again — a working server must not be abandoned on one blip.
-            healthCheckConfirming = true
-            timerHandler.postDelayed(healthRecheckRunnable, HEALTH_CHECK_RECHECK_MS)
-            return
-        }
-        // Second consecutive failure: the tunnel really isn't passing traffic.
-        healthCheckConfirming = false
-        // Mark used BEFORE restarting so the restart's own START_SUCCESS doesn't re-arm.
-        mainViewModel.autoFallbackUsed = true
-        // The stop->start that follows is ours, not a user disconnect.
-        mainViewModel.fallbackInProgress = true
-        showStatus(getString(R.string.auto_fallback_switching))
-        // Exclude the server that just failed so we don't switch back to it.
-        mainViewModel.fastConnect(excludeGuid = MmkvManager.getSelectServer())
     }
 
     /**
@@ -2116,7 +2078,21 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private fun resolveState(): HomeState {
         val serverCount = mainViewModel.serversCache.size
         val selected = MmkvManager.getSelectServer()
-        val profile = selected?.let { MmkvManager.decodeServerConfig(it) }
+        // THE LINE UNDER THE SHIELD NAMES WHAT IS CARRYING THE TRAFFIC, NOT WHAT IS TICKED.
+        //
+        // Tapping a row SELECTS and never connects (MainActivity.setSelectServer), so while a
+        // tunnel is up the two can be different servers — and they routinely are, because picking
+        // another row is exactly how the user asks to move. The line used to read the SELECTION in
+        // every state, which meant the moment after that tap it named a server the traffic was not
+        // going through, and it kept naming it until the user applied the change.
+        //
+        // `MainViewModel.runningGuid` is the daemon's own answer to "which server is up" — the same
+        // fact the shell gates its «Переподключиться» offer on — so the running server names the
+        // line while there is one, and the selection names it when there is not. On any state where
+        // nothing is running the two are the same value anyway.
+        val running = mainViewModel.runningGuid?.takeIf { tunnelRunning || disconnecting }
+        val named = running ?: selected
+        val profile = named?.let { MmkvManager.decodeServerConfig(it) }
         val serverName = profile?.remarks
             ?.takeIf { it.isNotBlank() }
             // The leading country flag is the tile beside the name, never text inside it.
@@ -3124,37 +3100,103 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         binding.shieldOutline.animate().cancel()
         binding.shieldOutline.animate().alpha(0f).setDuration(durReveal).setInterpolator(easeStandard).start()
 
-        // The choreography itself lives in @anim/connect_confirm and its echo — one file each, so
-        // the rings' scale, fade and tempo cannot drift away from the tokens they are written in.
-        //
         // TWO RINGS. The lead ring, then a dimmer echo a beat behind it: the desktop's payoff
         // (ConnectHeroView.axaml, Sonar.pulsing + Sonar.pulsing-echo), which Android emitted only
         // the first half of. Two, and never a third — «максимум ДВА кольца, не радар».
-        emitConfirmRing(binding.connectRingPulse, R.anim.connect_confirm)
-        emitConfirmRing(binding.connectRingPulseEcho, R.anim.connect_confirm_echo)
+        emitConfirmRings()
     }
 
-    /** Plays one confirm ring and returns the view to INVISIBLE when it has finished. */
-    private fun emitConfirmRing(ring: View, animRes: Int) {
-        ring.clearAnimation()
-        ring.visibility = View.VISIBLE
-        val anim = AnimationUtils.loadAnimation(requireContext(), animRes)
-        anim.setAnimationListener(object : Animation.AnimationListener {
-            override fun onAnimationStart(animation: Animation?) = Unit
-            override fun onAnimationRepeat(animation: Animation?) = Unit
-            override fun onAnimationEnd(animation: Animation?) {
-                if (!isBindingInitialized) return
-                ring.visibility = View.INVISIBLE
-            }
-        })
-        ring.startAnimation(anim)
+    /**
+     * THE SONAR, AND IT MOVES ON ITS OWN — the two confirm rings, thrown clear of the object once
+     * and returned to INVISIBLE at the end of the travel.
+     *
+     * THE RINGS USED TO BE MOVED BY THE BOX THEY FLY OUT OF, and that is the third face of the
+     * fault the owner keeps reporting as «улетают за невидимый квадрат». A legacy view animation
+     * (`View.startAnimation`, @anim/connect_confirm) does not belong to the view it plays on: the
+     * PARENT resolves it every frame — `ViewGroup.getChildTransformation()` — and hands the result
+     * to the child inside its own draw pass, so the ring's geometry is computed by, and travels
+     * through, the 214dp frame. The two causes already known for this class of defect are the
+     * same shape: a container that clips its children, and a hardware layer handed to the
+     * container instead of to what moves inside it. This is the same mistake spelled a third way,
+     * and it is the one Главная had left — the clip is off on connect_frame, home_content and
+     * home_tab_root (fragment_home.xml), and no layer was ever put on the frame.
+     *
+     * So the rings are property animators now: SCALE_X/SCALE_Y/ALPHA on the ring's OWN RenderNode,
+     * exactly the construction [com.v2ray.ang.ui.component.FlowOverlay.playFinale] uses for the
+     * прогрузка sonar. One [AnimatorSet] with a start delay for the echo, never a chain of
+     * `postDelayed`.
+     *
+     * The hardware layer goes on the two rings — the things that move — and comes back off in
+     * `doOnEnd`. Never on @id/connect_frame: a layer is a buffer the size of the view it is given
+     * to, and one on the frame would re-impose the very 214dp square the layout has stopped
+     * drawing.
+     *
+     * EVERY NUMBER IS THE ONE THE DESIGN STATES, and they are the numbers @anim/connect_confirm
+     * carried:
+     *
+     *     lead  scale 1 -> 1.6, alpha 1.0 -> 0, @integer/motion_emphasis (600) on ease_out_quint,
+     *           which IS the prototype's own `sonar 600ms cubic-bezier(.22,1,.36,1)` at
+     *           `inset:22px`, i.e. on the 170dp active ring thrown out to 272dp;
+     *     echo  scale 1 -> 1.5, alpha 0.5 -> 0, same 600 on the same curve, one
+     *           @integer/motion_press_in (70) behind — the desktop's Sonar.pulsing-echo.
+     *
+     * The ring is parked at the END of its travel and hidden there, rather than being snapped back
+     * to 1.0 at full opacity for the frame between the last animation frame and the callback: the
+     * prototype's `animation-fill-mode: both` says the same thing, and the old `fillAfter="false"`
+     * was one frame of an opaque 170dp accent ring sitting on the object's own inner ring.
+     */
+    private fun emitConfirmRings() {
+        val lead = binding.connectRingPulse
+        val echo = binding.connectRingPulseEcho
+        confirmAnimator?.cancel()
+        val rings = listOf(lead, echo)
+        rings.forEach { it.visibility = View.VISIBLE }
+        lead.alpha = 1f
+        echo.alpha = CONFIRM_ECHO_ALPHA
+        rings.forEach { it.scaleX = 1f; it.scaleY = 1f }
+
+        confirmAnimator = AnimatorSet().apply {
+            playTogether(
+                ObjectAnimator.ofFloat(lead, View.SCALE_X, CONFIRM_LEAD_TO),
+                ObjectAnimator.ofFloat(lead, View.SCALE_Y, CONFIRM_LEAD_TO),
+                ObjectAnimator.ofFloat(lead, View.ALPHA, 0f),
+                ObjectAnimator.ofFloat(echo, View.SCALE_X, CONFIRM_ECHO_TO).apply { startDelay = durPressIn },
+                ObjectAnimator.ofFloat(echo, View.SCALE_Y, CONFIRM_ECHO_TO).apply { startDelay = durPressIn },
+                ObjectAnimator.ofFloat(echo, View.ALPHA, 0f).apply { startDelay = durPressIn },
+            )
+            duration = durEmphasis
+            interpolator = easeOutQuint
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    if (!isBindingInitialized) return
+                    rings.forEach { it.setLayerType(View.LAYER_TYPE_NONE, null) }
+                    parkConfirmRings()
+                }
+
+                override fun onAnimationCancel(animation: Animator) {
+                    if (!isBindingInitialized) return
+                    rings.forEach { it.setLayerType(View.LAYER_TYPE_NONE, null) }
+                }
+            })
+            rings.forEach { it.setLayerType(View.LAYER_TYPE_HARDWARE, null) }
+            start()
+        }
     }
 
     private fun clearConfirmRings() {
-        binding.connectRingPulse.clearAnimation()
-        binding.connectRingPulse.visibility = View.INVISIBLE
-        binding.connectRingPulseEcho.clearAnimation()
-        binding.connectRingPulseEcho.visibility = View.INVISIBLE
+        confirmAnimator?.cancel()
+        confirmAnimator = null
+        parkConfirmRings()
+    }
+
+    /** The rings' resting shape: invisible, unscaled, opaque, ready for the next confirmation. */
+    private fun parkConfirmRings() {
+        listOf(binding.connectRingPulse, binding.connectRingPulseEcho).forEach { ring ->
+            ring.visibility = View.INVISIBLE
+            ring.scaleX = 1f
+            ring.scaleY = 1f
+            ring.alpha = 1f
+        }
     }
 
     /**
@@ -3469,15 +3511,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * seconds is a control the user stops trusting.
      */
     private fun handleConnectAction() {
-        // A manual connect/disconnect starts a fresh session: allow auto-fallback again, and end any
-        // fallback restart still considered in flight (the user's tap supersedes it).
-        mainViewModel.autoFallbackUsed = false
-        mainViewModel.fallbackInProgress = false
-        healthCheckPending = false
-        healthCheckConfirming = false
-        timerHandler.removeCallbacks(healthCheckRunnable)
-        timerHandler.removeCallbacks(healthRecheckRunnable)
-
         when {
             connectInProgress -> {
                 // Cancel: stop whatever half-started and return to idle.
@@ -3565,18 +3598,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             }
             if (mainViewModel.isRunning.value == true) {
                 connectInProgress = false
-                // Nothing restarted, so an auto-fallback restart is no longer in flight — leaving
-                // the flag set would make the next real disconnect look internal.
-                mainViewModel.fallbackInProgress = false
                 tunnelError = true
                 if (isBindingInitialized) applyRunningState(isLoading = false, isRunning = true)
                 return@launch
             }
-            // The stop landed and the new start is going out now, so an auto-fallback restart is no
-            // longer in flight. Released here, after the stop the disconnect handler had to read as
-            // internal — releasing it any earlier hands that stop to the user-disconnect branch of
-            // cancelHealthCheck() and re-opens the switch/restart loop.
-            mainViewModel.fallbackInProgress = false
             startV2Ray()
         }
     }
@@ -3603,40 +3628,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     /** Cancels the connect watchdog once the attempt resolved (success/failure/stop). */
     private fun cancelConnectWatchdog() {
         timerHandler.removeCallbacks(connectWatchdogRunnable)
-    }
-
-    /**
-     * Schedules the one-shot post-connect health check, if auto-fallback is enabled and it hasn't
-     * already run this session.
-     */
-    private fun scheduleHealthCheckIfEnabled() {
-        // Any half-finished probe from the previous tunnel is void. Nothing about the fallback's
-        // one-shot state is touched here: this runs on EVERY isRunning==true emission, including the
-        // stale one the core answers MSG_REGISTER_CLIENT with (the quick-settings tile registers
-        // every time the panel opens), so "a tunnel is up" is not evidence that the fallback's
-        // restart has landed — the restart itself clears that flag.
-        healthCheckConfirming = false
-        timerHandler.removeCallbacks(healthRecheckRunnable)
-        if (mainViewModel.autoFallbackUsed) return
-        if (!MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_FALLBACK, true)) return
-        timerHandler.removeCallbacks(healthCheckRunnable)
-        timerHandler.postDelayed(healthCheckRunnable, HEALTH_CHECK_DELAY_MS)
-    }
-
-    /**
-     * Cancels a pending health check and its confirmation re-probe. On a *genuine* user disconnect
-     * it also clears the once-per-session fallback flag; during the fallback's own internal restart
-     * (`MainViewModel.fallbackInProgress`) the flag must survive, or the next START_SUCCESS re-arms
-     * the check and the switch/restart loop returns.
-     */
-    private fun cancelHealthCheck() {
-        healthCheckPending = false
-        healthCheckConfirming = false
-        timerHandler.removeCallbacks(healthCheckRunnable)
-        timerHandler.removeCallbacks(healthRecheckRunnable)
-        if (!mainViewModel.fallbackInProgress) {
-            mainViewModel.autoFallbackUsed = false
-        }
     }
 
     private fun startLatencyProbe() {

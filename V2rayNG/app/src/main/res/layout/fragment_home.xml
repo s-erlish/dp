@@ -91,7 +91,13 @@
   four move together.
 
   clipChildren / clipToPadding are false the whole way down because the confirm
-  ring scales past its own frame.
+  ring scales past its own frame: 170dp thrown to 1.6x is 272dp around a 214dp
+  box, so `connect_frame`, `home_content` and `home_tab_root` all have to stop
+  trimming their own child. It stops at `home_tab_root`. `tab_host` above it
+  keeps its clip and must: it carries the status-bar inset as padding, and that
+  is the one place unclipping puts content over the system bar. It costs the
+  ring nothing — tab_host trims `home_tab_root` to `home_tab_root`'s bounds, and
+  those are the whole screen.
 -->
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -110,6 +116,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:clipChildren="false"
+        android:clipToPadding="false"
         android:orientation="vertical"
         android:paddingBottom="@dimen/space_24">
 

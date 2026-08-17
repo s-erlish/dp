@@ -251,7 +251,19 @@ class FlowOverlay private constructor(
      */
     private fun dismiss(holdMs: Long, onRemoved: () -> Unit) {
         stopArc()
-        barAnimator?.cancel()
+        // ПОЛОСА НЕ ОТМЕНЯЕТСЯ ЗДЕСЬ, И ЭТО ВЕСЬ ДЕФЕКТ «полоса не доехала до конца».
+        //
+        // `finish()` зовёт `step(LAST_STEP)`, тот запускает переезд заливки к 100 % на 900 мс — и
+        // СЛЕДУЮЩЕЙ СТРОКОЙ, в том же стеке, попадал сюда, где аниматор отменялся до первого
+        // своего кадра. Заливка оставалась на 86 % предыдущего шага, под заголовком «Подписка
+        // добавлена», ровно как на кадре с видео. Ста процентов не было ни в одном кадре: их не
+        // «не успевали» показать — их отменяли.
+        //
+        // Отменять аниматор надо там, где исчезает вьюха, а не там, где начинается пауза: до
+        // начала таяния ещё 1300 мс (FINISH_HOLD_MS), полосе на её 900 хватает с запасом, и в
+        // прототипе она доезжает до правого края и стоит там весь остаток. Снятие слоя
+        // ([removeAndHandOff]) обрывает её в любом случае, в том числе на сорванном потоке, где
+        // holdMs = 0.
         if (root.reducedMotion()) {
             root.postDelayed({ removeAndHandOff(onRemoved) }, holdMs)
             return
@@ -276,6 +288,8 @@ class FlowOverlay private constructor(
         if (removed) return
         removed = true
         beat?.cancel()
+        barAnimator?.cancel()
+        barAnimator = null
         back?.remove()
         back = null
         val content = root.parent as? ViewGroup

@@ -141,10 +141,8 @@ class AccountFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        // The bottom nav overlays tab content, so keep the last card scrollable clear of it (this
-        // tab has no inset listener of its own like the Home/Servers lists do).
         binding.scrollRoot.clipToPadding = false
-        binding.scrollRoot.updatePadding(bottom = (96 * resources.displayMetrics.density).toInt())
+        applyListInsets()
         setupPager()
         wireActions()
         // The payment-method pick arrives as DATA, re-delivered to whichever view is alive when it
@@ -158,6 +156,28 @@ class AccountFragment : Fragment() {
         observeState()
         renderHeroState()
         loadAll()
+    }
+
+    /**
+     * Bottom room for the overlaid bottom bar, ASKED FOR RATHER THAN GUESSED.
+     *
+     * It was 96dp of hard-coded density — 56 of bar plus 16 of air plus **24 of a system inset
+     * written into the number**. That last 24 is not a constant: it is a gesture bar on one phone,
+     * nothing at all on another, and about 48dp on a three-button navigation bar. The figure
+     * happened to be right on the owner's device and would have put «Выйти из аккаунта» under the
+     * navigation bar on a three-button one — the same defect the settings list has already had.
+     *
+     * [MainHost.listBottomInset] is the shell's own answer (the real window inset + the 56dp bar +
+     * breathing room), computed once from the window insets and shared by every tab that owns a
+     * scrolling surface. The 16dp floor is what the card sits on before the first inset is handed
+     * out — this tab is created lazily and can well be built after that moment, which is why the
+     * shell calls this again from its inset listener.
+     */
+    fun applyListInsets() {
+        val b = _binding ?: return
+        val floor = resources.getDimensionPixelSize(R.dimen.space_16)
+        val inset = (activity as? MainHost)?.listBottomInset ?: 0
+        b.scrollRoot.updatePadding(bottom = maxOf(inset, floor))
     }
 
     override fun onDestroyView() {
@@ -187,6 +207,16 @@ class AccountFragment : Fragment() {
             adapter = subAdapter
             offscreenPageLimit = 1
             clipToPadding = false
+            // THE NEIGHBOUR-PEEK IS A CONSTANT, AND IT IS SET ONCE, HERE.
+            //
+            // It used to be written on every render as `if (count > 1) space_16 else 0`, i.e. the
+            // page's width changed by 32dp the moment a second подписка landed — mid-load, under
+            // the ring, on the frame the owner is watching. §5's rule for this object is that it
+            // does not move: «кольцо стоит на месте с первого кадра, меняется только заливка».
+            // A padding that never changes cannot move it, and with a single подписка it shows the
+            // same thing a zero padding did, because there is no neighbour to peek at.
+            val peek = resources.getDimensionPixelSize(R.dimen.space_16)
+            setPadding(peek, 0, peek, 0)
             setPageTransformer(
                 CompositePageTransformer().apply {
                     addTransformer(MarginPageTransformer(resources.getDimensionPixelSize(R.dimen.space_12)))
@@ -547,11 +577,15 @@ class AccountFragment : Fragment() {
         subAdapter.submit(list)
 
         val count = list.size
-        // Neighbour-peek padding only makes sense when there's a neighbour to peek at.
-        val peek = if (count > 1) resources.getDimensionPixelSize(R.dimen.space_16) else 0
-        binding.vpSubscriptions.setPadding(peek, 0, peek, 0)
-
-        buildDots(count)
+        // The peek padding is NOT written here — it is a constant, applied once in [setupPager].
+        // Re-deriving it from the page count is what made the ring's page 32dp narrower the moment
+        // the second подписка arrived, which is geometry moving while the tab loads.
+        //
+        // The dots are rebuilt only when their NUMBER changes; a second emission of the same list
+        // (the cache, then the network) used to tear down every dot view and build it again for an
+        // identical row.
+        val wantedDots = if (count > 1) count else 0
+        if (binding.llSubDots.childCount != wantedDots) buildDots(count) else updateDotSelection(selectedSubIndex)
         binding.llSubDots.isVisible = count > 1
         // No page measuring any more: after §5 a page IS the 172dp ring and nothing else, so the
         // pager's height is that constant and the layout states it. The old probe inflated a

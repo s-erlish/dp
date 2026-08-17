@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- ЭТОТ ФАЙЛ БОЛЬШЕ НЕ ПРОИГРЫВАЕТСЯ, И ЭТО НАМЕРЕННО.
+     Сонар подтверждения перешёл на property-аниматоры: движением теперь владеет само
+     кольцо (его RenderNode), а не коробка @id/connect_frame, внутри которой оно летает —
+     см. HomeFragment.emitConfirmRings и причину там же. Числа отсюда перенесены туда
+     слово в слово (1.6 / 1.5 / 0.5, motion_emphasis, ease_out_quint, motion_press_in);
+     файл оставлен как письменная запись их происхождения. Не подключайте его обратно
+     через View.startAnimation: именно этот путь и был дефектом. -->
 <!-- THE CONFIRM RING — «При подтверждении — один сонар» (handoff §4), emitted at the
      instant the tunnel confirms and by no other event in the product. Fires ONCE and
      never loops.
