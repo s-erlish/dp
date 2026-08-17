@@ -13,6 +13,7 @@ import com.v2ray.ang.auth.dto.DeviceDto
 import com.v2ray.ang.databinding.ItemDeviceBinding
 import com.v2ray.ang.ui.component.curve
 import com.v2ray.ang.ui.component.durationOf
+import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.util.reducedMotion
 import java.util.Locale
 
@@ -108,7 +109,9 @@ class DeviceAdapter(
         // A releasing row keeps neither: its action is already spent, and offering «Удалить» on a
         // row that says «Отключено от подписки» invites a second request for the same slot.
         b.btnDeviceDelete.visibility = if (isOwn || releasing) View.GONE else View.VISIBLE
-        b.btnDeviceDelete.setOnClickListener { onDelete(item) }
+        // Guarded: two taps are two release requests for the same slot, and the row cannot hide
+        // itself fast enough to stop the second — `releasing` only arrives with the next bind.
+        b.btnDeviceDelete.onSingleClick { onDelete(item) }
 
         // A recycled holder can arrive carrying the alpha a previous release left on it.
         holder.itemView.alpha = if (releasing) RELEASED_ALPHA else 1f

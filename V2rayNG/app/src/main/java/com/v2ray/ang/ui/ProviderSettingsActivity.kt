@@ -19,6 +19,7 @@ import com.v2ray.ang.handler.SubscriptionUpdater
 import com.v2ray.ang.ui.component.SelectPopup
 import com.v2ray.ang.ui.component.SubPage
 import com.v2ray.ang.ui.component.ToolbarBinder
+import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.ui.component.restoreChecked
 import com.v2ray.ang.util.HttpUtil
 
@@ -94,7 +95,7 @@ class ProviderSettingsActivity : BaseActivity() {
 
         // ОБНОВЛЕНИЕ
         binding.rowAutoUpdate.setOnClickListener { toggleAutoUpdate() }
-        binding.rowInterval.setOnClickListener { pickInterval() }
+        binding.rowInterval.onSingleClick { pickInterval() }
         binding.rowNotify.setOnClickListener {
             toggleBool(AppConfig.PREF_SUB_NOTIFY_ON_UPDATE, binding.switchNotify, SettingsManager.isNotifyOnSubscriptionUpdate())
         }
@@ -112,10 +113,14 @@ class ProviderSettingsActivity : BaseActivity() {
 
         // СЕТЬ
         binding.rowSendHwid.setOnClickListener { toggleSendHwid() }
-        binding.rowUserAgent.setOnClickListener { editUserAgent() }
+        binding.rowUserAgent.onSingleClick { editUserAgent() }
 
         // СПИСОК СЕРВЕРОВ
-        binding.rowSortOrder.setOnClickListener { pickSortOrder() }
+        // The three rows that OPEN something are guarded; a doubled tap on any of them stacked two
+        // окошка выбора / two dialogs. The toggle rows above keep a raw listener on purpose: they
+        // flip a stored boolean and repaint their own switch, so a doubled tap lands back exactly
+        // where it started and there is nothing to duplicate.
+        binding.rowSortOrder.onSingleClick { pickSortOrder() }
 
         bindState()
     }

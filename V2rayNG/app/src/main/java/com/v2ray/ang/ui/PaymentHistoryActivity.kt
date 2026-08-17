@@ -18,6 +18,7 @@ import com.v2ray.ang.databinding.ActivityPaymentHistoryBinding
 import com.v2ray.ang.ui.adapter.PaymentsAdapter
 import com.v2ray.ang.ui.component.SubPage
 import com.v2ray.ang.ui.component.ToolbarBinder
+import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.viewmodel.AccountViewModel
 import kotlinx.coroutines.launch
 
@@ -65,8 +66,10 @@ class PaymentHistoryActivity : BaseActivity() {
         binding.rvPayments.layoutManager = LinearLayoutManager(this)
         binding.rvPayments.adapter = paymentsAdapter
 
-        // Empty-state CTA: send the user straight into the buy flow.
-        binding.btnHistoryBuy.setOnClickListener {
+        // Empty-state CTA: send the user straight into the buy flow. Guarded, because this is
+        // literally the case SingleClick's own doc names — «the double tap that opens two
+        // BuyTariffActivity instances».
+        binding.btnHistoryBuy.onSingleClick {
             startActivity(Intent(this, BuyTariffActivity::class.java))
         }
 

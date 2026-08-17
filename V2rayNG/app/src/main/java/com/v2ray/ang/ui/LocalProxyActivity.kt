@@ -19,6 +19,7 @@ import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.ui.component.SubPage
 import com.v2ray.ang.ui.component.ToolbarBinder
+import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.ui.component.restoreChecked
 import com.v2ray.ang.util.Utils
 import java.net.Inet4Address
@@ -173,7 +174,9 @@ class LocalProxyActivity : BaseActivity() {
             Utils.setClipboard(this, etSocksPass.text.toString())
             toast(R.string.notice_copied)
         }
-        findViewById<MaterialButton>(R.id.btn_reset_creds).setOnClickListener {
+        // Guarded: each tap mints a NEW login and password, so a doubled one throws away the
+        // pair the user was just shown and hands them a second one.
+        findViewById<MaterialButton>(R.id.btn_reset_creds).onSingleClick {
             generateAndFillCreds()
             toastSuccess(R.string.lp_creds_reset)
         }
