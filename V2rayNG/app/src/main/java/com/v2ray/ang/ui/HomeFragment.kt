@@ -675,7 +675,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             startConnectionTimer()
             startLatencyProbe()
         }
-        refreshAccountData()
+        // The FIRST resume after a fresh view has nothing to ask for: [observeAccount] asked, a
+        // message ago, and the answers are still in flight. @see observeAccount
+        if (accountDataFetchedOnCreate) accountDataFetchedOnCreate = false else refreshAccountData()
         refreshServerSurfaces(-1)
         render()
     }
@@ -2422,7 +2424,29 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             }
         }
         refreshAccountData()
+        // …AND [onResume] IS ABOUT TO ASK FOR THE SAME THING. The shell hosts its tabs with
+        // show()/hide(), so a hidden tab stays RESUMED — which also means onResume ALWAYS follows
+        // onViewCreated, one main-thread message later, and it calls refreshAccountData() too.
+        // Every creation of this screen with a signed-in account therefore fired the account's
+        // whole fetch TWICE within a few milliseconds: `/client/profile` ran to completion both
+        // times (refreshProfile keeps no job, so neither run cancels the other and both publish),
+        // and `/subscription/all` + `/client/subscription` went out twice as well — latest-wins
+        // cancels the first coroutine, but by then its requests are on the wire and OkHttp finishes
+        // them; only the answers are thrown away. Six requests where three do the job, on every
+        // cold start, rotation and theme change.
+        //
+        // The fetch stays HERE rather than only in onResume, because the not-signed-in branch of
+        // [refreshAccountData] is what sets `accountResolved`/`subsResolved`, and those decide
+        // whether §3's entrance paints a skeleton or the gate. Deferring them by a frame would put
+        // a skeleton on the start screen. So onResume is the one that stands down, once.
+        accountDataFetchedOnCreate = true
     }
+
+    /**
+     * True from [observeAccount]'s own fetch until the first [onResume] after it, which is the one
+     * resume that has nothing left to ask for. @see observeAccount
+     */
+    private var accountDataFetchedOnCreate = false
 
     /** Every error ships a recovery affordance. */
     private fun showRetry() {

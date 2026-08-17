@@ -70,6 +70,7 @@ class AccountViewModel : ViewModel() {
     // must not race an older in-flight load and publish stale state. Cancel the previous before
     // launching the next (latest-wins).
     private var subsJob: Job? = null
+    private var profileJob: Job? = null
 
     private val _tariffs = MutableStateFlow<List<TariffGroupDto>>(emptyList())
     val tariffs: StateFlow<List<TariffGroupDto>> = _tariffs.asStateFlow()
@@ -119,15 +120,26 @@ class AccountViewModel : ViewModel() {
 
     // region loads
 
-    fun refreshProfile() = viewModelScope.launch {
-        repo.refreshProfile()
-            .onSuccess {
-                _profile.value = it
-                // Re-merge so the active/root sub reflects the profile's auto-renew flag + uuid,
-                // even if the profile finished loading after the subscription list.
-                if (hasSubData) _subscriptions.value = mergeSubscriptions(lastPrimary, lastAll, it)
-            }
-            .onFailure { report(it) }
+    /**
+     * LATEST-WINS, exactly as [loadSubscriptions] already was, and for the same reason it needed to
+     * be: this had NO job behind it, so two calls in the same breath both ran to the end and both
+     * published — the older answer landing last would overwrite the newer profile, and both paid
+     * for a `/client/profile` round trip. The screens ask more than once by design (a resume, a
+     * checkout returning, the payment poll's six rounds), so "more than once in flight" is the
+     * normal case here, not an edge one.
+     */
+    fun refreshProfile() {
+        profileJob?.cancel()
+        profileJob = viewModelScope.launch {
+            repo.refreshProfile()
+                .onSuccess {
+                    _profile.value = it
+                    // Re-merge so the active/root sub reflects the profile's auto-renew flag + uuid,
+                    // even if the profile finished loading after the subscription list.
+                    if (hasSubData) _subscriptions.value = mergeSubscriptions(lastPrimary, lastAll, it)
+                }
+                .onFailure { report(it) }
+        }
     }
 
     /**
@@ -591,6 +603,8 @@ class AccountViewModel : ViewModel() {
     fun clearAccountData() {
         subsJob?.cancel()
         subsJob = null
+        profileJob?.cancel()
+        profileJob = null
         devicesJob?.cancel()
         devicesJob = null
         _profile.value = null
