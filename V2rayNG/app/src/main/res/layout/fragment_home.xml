@@ -431,8 +431,17 @@
                  INSIDE the outermost ring, so the confirmation never actually left the
                  object. Frame 2230ms of the prototype's cycle shows the ring already
                  outside all three. So they are siblings of the arc now, at
-                 @dimen/connect_sweep, and @anim/connect_confirm carries the prototype's own
-                 1 → 1.6 at full opacity.
+                 @dimen/connect_sweep, and the prototype's own 1 → 1.6 at full opacity is
+                 what HomeFragment.emitConfirmRings plays.
+
+                 THEY MOVE ON THEIR OWN AND NOT THROUGH THIS FRAME. The pair used to be
+                 driven by @anim/connect_confirm through View.startAnimation, and a legacy
+                 view animation belongs to the PARENT — this 214dp box resolved it every
+                 frame and applied it inside its own draw, which is the box getting into
+                 the geometry of a circle whose whole purpose is to leave it. They are
+                 property animators on their own RenderNodes now; see the note over
+                 emitConfirmRings for the whole of why. The clipChildren/clipToPadding
+                 above are still required and still stop at @id/home_tab_root.
 
                  They sit BEFORE the disc so the disc draws over their first frames and the
                  ring reads as leaving the object's edge, which is the prototype's stacking
