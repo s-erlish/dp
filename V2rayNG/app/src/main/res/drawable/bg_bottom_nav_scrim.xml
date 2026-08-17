@@ -20,10 +20,21 @@
      between them, so the two must stay equal. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- The body: solid surface from the foot of the fade band down to the screen edge. -->
+    <!-- THE COLOUR IS THE PAGE'S, NOT THE SURFACE'S. This faded to ?attr/colorSurface while the
+         window root is painted with bg_home_gradient, whose foot is ?android:colorBackground:
+         #141619 over #0A0B0D in the blue theme, #121214 over #000000 in mono. A solid LIGHTER than
+         the page it lies on does not read as a fade, it reads as a band — which is exactly what was
+         reported from the device («какая-то лишняя полоска есть цвета»). Fading to the page colour
+         makes the scrim's foot and the gradient's foot the same pixel in both dark themes.
+
+         Light is the one that still differs: its gradient ends #D3E0F7 against a colorBackground of
+         #F4F7FC. That is far closer than surface's #FFFFFF was, but not identical; closing it needs
+         a page-edge token, which is not worth minting for a theme this product does not ship in. -->
+
+    <!-- The body: the page colour, from the foot of the fade band down to the screen edge. -->
     <item android:top="40dp">
         <shape android:shape="rectangle">
-            <solid android:color="?attr/colorSurface" />
+            <solid android:color="?android:attr/colorBackground" />
         </shape>
     </item>
 
@@ -36,7 +47,7 @@
             <gradient
                 android:angle="90"
                 android:endColor="@android:color/transparent"
-                android:startColor="?attr/colorSurface"
+                android:startColor="?android:attr/colorBackground"
                 android:type="linear" />
         </shape>
     </item>
