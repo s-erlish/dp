@@ -330,4 +330,19 @@
          width in the handoff, so they take the default until the owner gives
          one; SelectPopup falls back to this when a caller passes 0. -->
     <dimen name="select_popup_w_default">200dp</dimen>
+
+    <!--
+        THE SUB-PAGE'S TRAVEL, BACKWARDS. @dimen/space_16 negated, and it exists because
+        a push and a pop are not the same motion played by the same pair of files.
+
+        A stack slides as ONE sheet: pushing, the arriving page and the page it covers
+        both travel LEFT; popping, the leaving page and the page underneath both travel
+        RIGHT. Two of the four legs therefore start or end at −16 rather than +16, and
+        Android animation XML cannot negate a dimension reference, so the reverse
+        distance has to be its own token rather than a minus sign at the call site.
+
+        It is deliberately NOT part of the spacing scale — nothing may reach for it as a
+        gap. It is one distance, tied to space_16, and it moves only when that does.
+    -->
+    <dimen name="space_16_reverse">-16dp</dimen>
 </resources>
