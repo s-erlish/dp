@@ -88,8 +88,9 @@ class GateView @JvmOverloads constructor(
         /** Подписка добавлена: перечитать список серверов. */
         fun onSubscriptionAdded()
 
-        /** Вход состоялся: подтянуть подписку аккаунта. */
-        fun refreshSubscriptions()
+        // `refreshSubscriptions()` отсюда убран вместе с тем, ради чего он тут был: этот экран сам
+        // его не звал, он только пробрасывал вызов из [TelegramFlow.Host] в оболочку. Причина, по
+        // которой обход подписок после входа — лишняя работа, записана в `TelegramFlow.Host`.
 
         /**
          * Дождаться, пока импорт подписки аккаунта действительно закончится.
@@ -133,10 +134,6 @@ class GateView @JvmOverloads constructor(
      * ровно столько же: сама попытка привязана к окну, а не к нему.
      */
     private val telegram = TelegramFlow(object : TelegramFlow.Host {
-        override fun refreshSubscriptions() {
-            host?.refreshSubscriptions()
-        }
-
         override suspend fun awaitSubscriptionImport() {
             host?.awaitSubscriptionImport()
         }

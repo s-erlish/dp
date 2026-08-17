@@ -262,6 +262,11 @@ object AppConfig {
     const val MSG_STATE_SPEED_UPDATE = 51
     const val MSG_STATE_RESTART = 5
     const val MSG_MEASURE_DELAY = 6
+
+    // NOBODY SENDS OR RECEIVES 61 IN THIS FORK, and the number is kept so a future upstream merge
+    // does not reuse it for something else. It carried the probe's human-readable sentence to a
+    // status line this product does not have; the reading itself travels as a number on 62.
+    // @see com.v2ray.ang.core.CoreServiceManager.measureV2rayDelay
     const val MSG_MEASURE_DELAY_SUCCESS = 61
     const val MSG_STATE_DELAY_RESULT = 62
     const val MSG_MEASURE_CONFIG_START = 7

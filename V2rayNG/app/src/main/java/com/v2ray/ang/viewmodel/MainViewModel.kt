@@ -887,9 +887,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     reloadServerList()
                 }
 
-                AppConfig.MSG_MEASURE_DELAY_SUCCESS -> {
-                    updateTestResultAction.value = intent.getStringExtra("content")
-                }
+                // NO `MSG_MEASURE_DELAY_SUCCESS` BRANCH ANY MORE. It carried the 30-second probe's
+                // human-readable sentence — «Успешно, задержка 123 мс», optionally with the exit IP
+                // — for a status line this product does not have, and the one observer it reached
+                // (`HomeFragment`'s [updateTestResultAction]) never read the string: it rebuilt the
+                // whole server list instead, twice per probe, decoding every подписка out of MMKV to
+                // do it. The daemon no longer sends it; what the screen reads is the NUMBER, on the
+                // channel below. @see CoreServiceManager.measureV2rayDelay
 
                 AppConfig.MSG_STATE_DELAY_RESULT -> {
                     (intent.getSerializableExtra("content") as? Long)?.let {

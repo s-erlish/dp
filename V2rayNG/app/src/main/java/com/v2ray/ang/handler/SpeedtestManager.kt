@@ -350,6 +350,16 @@ object SpeedtestManager {
         }
     }
 
+    /**
+     * The exit IP as the geo-API sees it.
+     *
+     * UPSTREAM'S, AND WITHOUT A CALLER HERE ON PURPOSE. Its one call site was
+     * `CoreServiceManager.measureV2rayDelay`, which fired it after every successful 30-second probe
+     * — an HTTP request through the local proxy, 120 an hour while a tunnel is up — and handed the
+     * answer to a status line this product does not have, so it was discarded on arrival. The call
+     * is gone; the function stays, because it is upstream's and a screen that wants to show the exit
+     * IP would ask exactly this.
+     */
     fun getRemoteIPInfo(): String? {
         val url = MmkvManager.decodeSettingsString(AppConfig.PREF_IP_API_URL)
             .takeIf { !it.isNullOrBlank() } ?: AppConfig.IP_API_URL

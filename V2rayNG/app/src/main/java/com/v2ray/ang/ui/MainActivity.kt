@@ -684,14 +684,15 @@ class MainActivity : HelperBaseActivity(), MainHost {
      *     «почему он меня кидает на главную когда подписка ещё полностью не добавилась?»
      *
      * The same report came back, because [loadsInFlight] answers for the wrong half of a sign-in.
-     * `GateView` answers `LoginState.Success` with `refreshSubscriptions()`, i.e. `importConfigViaSub`
-     * — a walk over the подписки ALREADY on the device, re-fetching each. A brand-new account has
-     * none. That call therefore does no work at all, its `showLoading` is balanced within the half
-     * second its own `delay` costs, and the counter is back to zero while the errand the user is
-     * actually waiting on is only just starting: `HomeFragment.onLoggedIn` ->
-     * `AccountRepository.autoImportSubscriptions`, which is what WRITES the account's подписка and
-     * fetches its servers, and which reported to nobody. The gate opened on a proxy that had
-     * finished measuring nothing.
+     * `TelegramFlow` used to answer `LoginState.Success` with `refreshSubscriptions()`, i.e.
+     * `importConfigViaSub` — a walk over the подписки ALREADY on the device, re-fetching each. A
+     * brand-new account has none. That call therefore did no work at all, its `showLoading` was
+     * balanced within the half second its own `delay` costs, and the counter was back to zero while
+     * the errand the user is actually waiting on was only just starting: `HomeFragment.onLoggedIn`
+     * -> `AccountRepository.autoImportSubscriptions`, which is what WRITES the account's подписка
+     * and fetches its servers, and which reported to nobody. The gate opened on a proxy that had
+     * finished measuring nothing. **That walk is gone entirely now** — see `TelegramFlow.Host` —
+     * and the wait below is what was always doing the work.
      *
      * So the wait is on BOTH facts now — [loadsInFlight] and [subscriptionImportRunning] — and the
      * second one is bracketed at the import itself, in a `finally`, so the failed, the empty and the

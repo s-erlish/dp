@@ -667,6 +667,14 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      */
     override fun onResume() {
         super.onResume()
+        // The two loops [onPause] stood down. Both are re-armed only for a live tunnel, and both
+        // come back with a FRESH reading rather than the one they were showing when the app went
+        // away: [startConnectionTimer] re-reads the daemon's session stamp, and [startLatencyProbe]
+        // posts its probe immediately instead of waiting out an interval. @see onPause
+        if (mainViewModel.isRunning.value == true) {
+            startConnectionTimer()
+            startLatencyProbe()
+        }
         refreshAccountData()
         refreshServerSurfaces(-1)
         render()
@@ -681,6 +689,30 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      *
      * A hidden TAB is not this case: hidden tabs stay RESUMED, and a tab the user is one swipe away
      * from should be alive when he gets there.
+     *
+     * ## …AND THE MOTION WAS NOT THE ONLY THING THAT KEPT RUNNING
+     *
+     * The same rule — «нельзя тратить на то, чего никто не видит» — applies to the two REPEATING
+     * handlers this screen owns, and neither of them obeyed it: they were armed by the running-state
+     * observer and stood down only in [onDestroyView], which for a VPN client is almost never. The
+     * app spends its life in the background WITH THE TUNNEL UP; that is the normal state, not the
+     * exception, and in it the screen went on paying for both loops with nobody looking:
+     *
+     *  - [uptimeRunnable] woke the main thread once a SECOND, formatted a h:mm:ss string and wrote
+     *    it into a TextView that is not on the glass. 3600 wake-ups an hour for an invisible label.
+     *  - [latencyRunnable] fired a real probe every 30s: `MSG_MEASURE_DELAY` crosses into the daemon
+     *    and `CoreServiceManager.measureV2rayDelay` sends an HTTP request THROUGH THE TUNNEL (twice
+     *    when the first URL misses). That is the radio, not the CPU — 120 round trips an hour to
+     *    refresh a figure on a screen that is not being shown. Each answer then broadcast back into
+     *    this process and drove a full `render()` of the invisible hierarchy.
+     *
+     * Nothing is lost by standing them down: [onResume] re-arms both, and both come back with a
+     * fresh reading in the same frame — the clock re-reads the daemon's own session stamp
+     * (`CoreServiceManager.sessionStartedAt`), so it is exact however long the app was away, and the
+     * probe posts immediately rather than after an interval, so the «мс» figure the user comes back
+     * to is newer than the one he left. The connect watchdog is deliberately NOT stood down: it is a
+     * one-shot deadline under an attempt that is still in flight, and an attempt does not stop being
+     * in flight because the user switched apps.
      */
     override fun onPause() {
         stopAmbient()
@@ -689,6 +721,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // it. [onResume]'s render() puts it back through showSweep(), which re-arms the spin
         // without replaying the entrance.
         stopSweepSpin()
+        // The callbacks only — NOT [stopConnectionTimer], which also wipes the session's start
+        // instant and blanks the readings. The session is not over; only the screen has gone.
+        timerHandler.removeCallbacks(uptimeRunnable)
+        stopLatencyProbe()
         super.onPause()
     }
 
@@ -2304,7 +2340,13 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         }
 
         mainViewModel.updateTestResultAction.observe(viewLifecycleOwner) {
-            // A bulk ping finished for one row; the list repaints itself from the stored delay.
+            // A BULK CHECK REPORTED PROGRESS, and that is now the only thing that gets here — the
+            // comment above this line used to say so while a second producer stood behind it. The
+            // 30-second probe of the ACTIVE server also published on this channel, so a full list
+            // rebuild (every подписка re-decoded out of MMKV, then notifyDataSetChanged) ran twice
+            // every thirty seconds for a message that named no server and changed no stored delay.
+            // That producer is gone; a batch's progress is bounded by the batch, which is what makes
+            // the rebuild affordable here. @see MainViewModel's receiver.
             if (isBindingInitialized) refreshServerList(-1)
         }
     }
@@ -2441,8 +2483,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      *     «почему он меня кидает на главную когда подписка ещё полностью не добавилась? должно
      *      продолжаться начальное окно … и только потом как добавилось перекидывать на главную»
      *
-     * THE SIGN-IN FLOW WAS WAITING FOR A DIFFERENT ERRAND. `GateView.startTelegramFlow` answers
-     * `LoginState.Success` with `host?.refreshSubscriptions()`, which is the shell's
+     * THE SIGN-IN FLOW WAS WAITING FOR A DIFFERENT ERRAND. `TelegramFlow` used to answer
+     * `LoginState.Success` with its host's `refreshSubscriptions()`, which is the shell's
      * `importConfigViaSub()` — it walks the подписки that are ALREADY on the device and re-fetches
      * each one. A minute-old account has none, so that call finds nothing, returns in the half
      * second its own `delay` costs, and `loadsInFlight` is back to zero long before the account's
@@ -3485,8 +3527,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             override fun addByQr(anchor: View) = mainHost.showAddMenu(anchor)
 
             override fun onSubscriptionAdded() = mainViewModel.reloadServerList()
-
-            override fun refreshSubscriptions() = mainHost.refreshSubscriptions()
 
             // Straight through to the shell, which is where the import is tracked — this fragment
             // starts it (onLoggedIn) but the shell is what knows when every one of them has landed.

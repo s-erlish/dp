@@ -21,7 +21,6 @@ import com.v2ray.ang.extension.toast
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.NotificationManager
 import com.v2ray.ang.handler.SettingsManager
-import com.v2ray.ang.handler.SpeedtestManager
 import com.v2ray.ang.service.CoreProxyOnlyService
 import com.v2ray.ang.service.CoreVpnService
 import com.v2ray.ang.service.DialerNativeService
@@ -430,7 +429,29 @@ object CoreServiceManager {
     /**
      * Measures the connection delay for the current V2Ray configuration.
      * Tests with primary URL first, then falls back to alternative URL if needed.
-     * Also fetches remote IP information if the delay test was successful.
+     *
+     * ## THE SECOND HALF OF THIS USED TO BE A SECOND NETWORK REQUEST WITH NO READER
+     *
+     * Upstream answers a successful probe by ALSO fetching the exit IP (`SpeedtestManager
+     * .getRemoteIPInfo`, an HTTP call through the local proxy to `api.ip.sb`) and broadcasting a
+     * human-readable sentence — «Успешно, задержка 123 мс» plus the IP — as
+     * `MSG_MEASURE_DELAY_SUCCESS`, for a status line this product does not have. In this fork that
+     * sentence reached exactly one observer, `HomeFragment`'s `updateTestResultAction`, and that
+     * observer never looked at the string: it threw the whole list at `notifyDataSetChanged()`,
+     * having first re-decoded every подписка out of MMKV to rebuild the section headers. So the leg
+     * cost, EVERY THIRTY SECONDS FOR AS LONG AS A TUNNEL IS UP:
+     *
+     *  - one extra HTTP request through the proxy — 120 an hour, radio included, discarded on
+     *    arrival, to a service the user cannot even point elsewhere any more (`pref_ip_api_url` is
+     *    off the settings screen by 12-settings.md 6.1);
+     *  - two full main-thread list rebuilds, one per broadcast, for a message that names no server
+     *    and changes no stored delay.
+     *
+     * What the screen actually reads is the NUMBER, and it arrives on its own channel
+     * ([AppConfig.MSG_STATE_DELAY_RESULT] -> `MainViewModel.delayResultAction` ->
+     * `HomeFragment.onDelayResult`), which is untouched: the «мс» figure and the «сервер не
+     * отвечает» condition behind three consecutive misses work exactly as before. Only the leg with
+     * no reader is gone.
      */
     private fun measureV2rayDelay() {
         if (coreController.isRunning == false) {
@@ -470,21 +491,10 @@ object CoreServiceManager {
                 }
             }
 
-            val result = if (time >= 0) {
-                service.getString(R.string.connection_test_available, time)
-            } else {
-                service.getString(R.string.connection_test_error, errorStr)
-            }
-            MessageUtil.sendMsg2UI(service, AppConfig.MSG_MEASURE_DELAY_SUCCESS, result)
-            // Numeric result for the auto-fallback health check (ms, or -1 on failure).
+            // The reading, and nothing else. `errorStr` stays because it is what the two log lines
+            // above say; it is no longer formatted into a sentence for a surface that does not
+            // exist. @see the note above this function.
             MessageUtil.sendMsg2UI(service, AppConfig.MSG_STATE_DELAY_RESULT, time)
-
-            // Only fetch IP info if the delay test was successful
-            if (time >= 0) {
-                SpeedtestManager.getRemoteIPInfo()?.let { ip ->
-                    MessageUtil.sendMsg2UI(service, AppConfig.MSG_MEASURE_DELAY_SUCCESS, "$result\n$ip")
-                }
-            }
         }
     }
 

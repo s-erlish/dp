@@ -135,14 +135,13 @@ class AccountFragment : Fragment() {
      * raises the flow overlay over this tab, opens Telegram and keeps the wait here; no Activity is
      * pushed, so there is no second screen to be thrown onto and no second choice to make.
      *
-     * The three things a flow cannot know are wired here: where its «обнови подписки» goes, what it
-     * is allowed to wait for, and where a failure is written.
+     * The two things a flow cannot know are wired here: what it is allowed to wait for, and where a
+     * failure is written. There used to be a third — where its «обнови подписки» went — and it is
+     * gone because the errand was: the подписка of the account just signed into is written by
+     * `HomeFragment.onLoggedIn`, on every path, and walking the LOCAL подписки on top of that is
+     * either nothing to do or the same fetch twice. @see TelegramFlow.Host
      */
     private val telegramFlow = TelegramFlow(object : TelegramFlow.Host {
-        override fun refreshSubscriptions() {
-            (activity as? MainHost)?.refreshSubscriptions()
-        }
-
         override suspend fun awaitSubscriptionImport() {
             // The shell's own bounded wait, so the overlay stays up until the подписка is REALLY
             // in — the tab must not be handed back empty for the second and a half the import
