@@ -86,7 +86,9 @@ class BackupActivity : HelperBaseActivity() {
             title = getString(R.string.backup_action_create),
             subtitle = getString(R.string.backup_action_create_hint),
             glyph = R.drawable.ic_backup_24dp,
-            trailing = RowBinder.Trailing.None,
+            // The prototype gives all three data rows a chevron: each one opens the system
+            // file picker, which is a screen, and a chevron is the promise of one.
+            trailing = RowBinder.Trailing.Chevron,
             enabled = !busy,
             onClick = if (busy) null else ({ backupViaLocal() }),
         )
@@ -95,7 +97,7 @@ class BackupActivity : HelperBaseActivity() {
             title = getString(R.string.backup_action_restore),
             subtitle = getString(R.string.backup_action_restore_hint),
             glyph = R.drawable.ic_restore_24dp,
-            trailing = RowBinder.Trailing.None,
+            trailing = RowBinder.Trailing.Chevron,
             enabled = !busy,
             onClick = if (busy) null else ({ confirmRestore { restoreViaLocal() } }),
         )
@@ -104,7 +106,7 @@ class BackupActivity : HelperBaseActivity() {
             title = getString(R.string.backup_action_share),
             subtitle = getString(R.string.backup_action_share_hint),
             glyph = R.drawable.ic_share_24dp,
-            trailing = RowBinder.Trailing.None,
+            trailing = RowBinder.Trailing.Chevron,
             enabled = !busy,
             onClick = if (busy) null else ({ shareBackup() }),
         )

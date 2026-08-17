@@ -92,8 +92,11 @@ class UserAssetActivity : HelperBaseActivity() {
         RowBinder.bind(
             root = binding.rowSource.root,
             title = getString(R.string.asset_source),
+            // The current source is the SUBTITLE, where the prototype puts it: these names run
+            // to «Loyalsoldier/v2ray-rules-dat» and a trailing value would ellipsise all of it
+            // away. Same reason «User-Agent» on Настройки провайдеров reads its value that way.
+            subtitle = current,
             glyph = R.drawable.ic_globe_24dp,
-            value = current,
             trailing = RowBinder.Trailing.Glyph(
                 icon = R.drawable.ic_arrow_drop_down,
                 contentDescription = getString(R.string.asset_source_cd),
@@ -107,7 +110,6 @@ class UserAssetActivity : HelperBaseActivity() {
                     anchor = binding.rowSource.root,
                     options = sources.toList(),
                     selectedIndex = sources.indexOf(current).coerceAtLeast(0),
-                    valueView = binding.rowSource.rowValue,
                     caret = binding.rowSource.rowTrailingGlyph,
                 ) { picked ->
                     MmkvManager.encodeSettings(AppConfig.PREF_GEO_FILES_SOURCES, sources[picked])
