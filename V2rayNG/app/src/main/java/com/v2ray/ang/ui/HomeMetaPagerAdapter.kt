@@ -10,6 +10,7 @@ import com.v2ray.ang.R
 import com.v2ray.ang.databinding.LayoutSubscriptionMetaBarBinding
 import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.ui.component.expandTouchTarget
 import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.util.reducedMotion
 
@@ -118,6 +119,19 @@ class HomeMetaPagerAdapter(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT,
         )
+        // The four action discs draw at 36dp because that is what the design draws, and they are
+        // TAPPED at 48dp because that is the floor nothing in the product goes under (CLAUDE.md,
+        // PORT-DELTA П-29). The neighbouring @id/btn_collapse is a real 48dp view and needed
+        // nothing; these four keep their drawn size and grow only the hit rect.
+        //
+        // HERE AND NOT IN onBindViewHolder: the delegate is registered on the PARENT, so a call
+        // per bind would stack a fresh one on the row every time a page was recycled.
+        listOf(
+            binding.btnPing,
+            binding.btnRefresh,
+            binding.btnPin,
+            binding.btnTelegram,
+        ).forEach { it.expandTouchTarget() }
         return VH(binding)
     }
 
