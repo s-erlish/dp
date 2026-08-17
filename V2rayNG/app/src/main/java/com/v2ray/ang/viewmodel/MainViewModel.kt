@@ -85,37 +85,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val updateSpeedAction by lazy { MutableLiveData<Pair<Long, Long>>() }
     val delayResultAction by lazy { MutableLiveData<Long>() }
 
-    // Emitted after a "fast connect" test finishes: carries the chosen server guid
-    // (or null when no server produced a valid latency). Guarded as a one-shot event
-    // so the retained value is not replayed (and re-acted on) after recreate/rotation.
-    val fastConnectAction by lazy { MutableLiveData<String?>() }
-    private var pendingFastConnect = false
-    private var fastConnectEventPending = false
-    private var fastConnectExcludeGuid: String? = null
+    // NO AUTO-FALLBACK STATE HERE ANY MORE. «Переключаться на более быстрый сервер» is gone by the
+    // owner's instruction, and the bookkeeping it needed went with it: the fast-connect event
+    // LiveData and its one-shot guard, the "already fired this session" latch and the "our own
+    // restart is in flight" flag. They had no readers left once Главная dropped its half — keeping
+    // them would have left a working switch with nothing but the wiring cut.
+    //
+    // What is NOT touched, because the owner asked for the switching to go and nothing else
+    // (`PORT-DELTA.md` П-26): [testAllServers] and all four check methods, «обновить», the
+    // 30-second probe behind the «мс» figure on Главная, and picking a сервер by hand.
 
-    // Whether the one-shot auto-fallback has already fired for the current user-initiated
-    // session. Lives in the ViewModel so it survives Activity recreate (rotation/theme change)
-    // and is NOT reset by the fallback's own service restart — prevents reconnect loops.
-    var autoFallbackUsed = false
-
-    // True only while the auto-fallback's own stop→start restart is in flight: set when the
-    // fallback commits, released when the restart is actually issued (or abandoned). The anti-loop
-    // invariant rests on [autoFallbackUsed] surviving that restart, and this flag is what lets
-    // the disconnect handler tell the internal restart apart from a genuine user disconnect
-    // instead of leaving the distinction implicit in "nothing happens to clear the flag".
-    // It must NOT be released merely because a tunnel is up — the core reports "running" again on
-    // every client registration, and clearing it there would expose the internal stop.
-    var fallbackInProgress = false
-
-    /**
-     * Returns true exactly once per emitted fast-connect result, so observers ignore
-     * the LiveData value replayed when the Activity is recreated.
-     */
-    fun consumeFastConnectEvent(): Boolean {
-        val v = fastConnectEventPending
-        fastConnectEventPending = false
-        return v
-    }
     /**
      * The scope every latency measurement runs in.
      *
@@ -579,52 +558,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * RETIRED, AND INERT. Kept as a method because the screen still names it; it does nothing.
-     *
-     * > «надо убрать в целом эту функцию о переключении на более быстрый сервер»
-     *
-     * This was the acting half of the auto-fallback: measure every сервер, pick the fastest and
-     * hand it to Главная to restart the tunnel on. The deciding half — the post-connect health
-     * check that called it — is disarmed at the source, because
-     * [SettingsManager.retireAutoFallback] writes its key `false` on every app start, so nothing
-     * reaches this line any more. It refuses here as well rather than trusting that: two gates for
-     * a feature whose failure mode is taking the user off the сервер they chose.
-     *
-     * It publishes nothing. Emitting a null result would drive the screen's "no candidate" branch,
-     * which paints a connection error over a tunnel that is working perfectly.
-     *
-     * The measurement it used to drive is untouched — [testAllServers] and the four methods behind
-     * it are the manual check, and they are a live feature (`PORT-DELTA.md` П-26).
-     */
-    fun fastConnect(excludeGuid: String? = null) {
-        LogUtil.i(
-            AppConfig.TAG,
-            "Automatic server switching is retired; ignoring a fast-connect request" +
-                (excludeGuid?.let { " (excluding $it)" } ?: "")
-        )
-    }
-
-    /**
-     * Picks the server with the smallest positive latency from the current cache
-     * and marks it as the selected server.
-     *
-     * @return the selected server guid, or null if no server has a valid latency.
-     */
-    private fun selectFastestServer(excludeGuid: String? = null): String? {
-        var bestGuid: String? = null
-        var bestDelay = Long.MAX_VALUE
-        serversCache.forEach { sc ->
-            if (sc.guid == excludeGuid) return@forEach
-            val delay = MmkvManager.decodeServerAffiliationInfo(sc.guid)?.testDelayMillis ?: -1L
-            if (delay in 1 until bestDelay) {
-                bestDelay = delay
-                bestGuid = sc.guid
-            }
-        }
-        bestGuid?.let { MmkvManager.setSelectServer(it) }
-        return bestGuid
-    }
+    // `fastConnect()` and `selectFastestServer()` USED TO STAND HERE, and they are gone on the
+    // owner's word: «надо убрать в целом эту функцию о переключении на более быстрый сервер».
+    // Between them they were the acting half of the auto-fallback — measure every сервер, take the
+    // lowest latency, move the selection onto it and hand it to Главная to restart the tunnel on.
+    // The deciding half (Главная's post-connect health probe) and the setting are already gone;
+    // [SettingsManager.retireAutoFallback] additionally forces the stored key false on every start,
+    // so an install that once had it on cannot bring it back.
+    //
+    // Do not reintroduce a "pick the fastest for the user" path here. The failure mode is the one
+    // the owner objected to: the app quietly moving him off the сервер he chose.
 
     /**
      * Changes the subscription ID.
@@ -869,7 +812,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Called once a whole check has finished, whichever method ran it, and nowhere else: this is
-     * what drives «удалять недоступные» / «сортировать» after a test and the fast-connect pick.
+     * what drives «удалять недоступные» / «сортировать» after a test. It used to also pick a
+     * сервер for the retired auto-fallback; it does not choose for the user any more.
      *
      * @param autoRemoveInvalid whether this method's failures are evidence that a server is
      *        unreachable. TCP connect and the proxied real delay say yes. Direct HTTP and ICMP say
@@ -888,16 +832,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 sortByTestResults()
             }
 
-            val fastestGuid = if (pendingFastConnect) selectFastestServer(fastConnectExcludeGuid) else null
-
             withContext(Dispatchers.Main) {
                 reloadServerList()
-                if (pendingFastConnect) {
-                    pendingFastConnect = false
-                    fastConnectExcludeGuid = null
-                    fastConnectEventPending = true
-                    fastConnectAction.value = fastestGuid
-                }
             }
         }
     }
