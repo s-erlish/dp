@@ -230,7 +230,16 @@
 
     <!-- Row.Action's in-place action. When this is shown the ROW is not a target:
          two targets doing different things is the layout_subscription_meta_bar
-         mistake. android:contentDescription is MANDATORY and states the ACTION. -->
+         mistake. android:contentDescription is MANDATORY and states the ACTION.
+
+         ITS END MARGIN IS NOT ZERO AT RUNTIME, and this is the one slot in the file
+         where that is true. The glyphs above are 18dp ImageViews whose box sits on
+         the row's 16dp end padding; this is a 48dp touch minimum with a 22dp icon
+         centred in it, so 13dp of the box is air on the trailing side and the ink
+         lands 10 to 16dp further in than a chevron's — «они улетели куда-то влево».
+         RowBinder.alignInkToGutter pulls the box back per glyph on every bind (the
+         two glyphs that reach this slot differ by 6.4dp between themselves), which
+         is why the correction is not written here. The 48dp target keeps all 48. -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/row_icon_action"
         style="@style/Widget.Departament.Button.Icon"

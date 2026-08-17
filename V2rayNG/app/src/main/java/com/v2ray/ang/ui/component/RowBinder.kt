@@ -2,6 +2,7 @@ package com.v2ray.ang.ui.component
 
 import android.content.res.ColorStateList
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.annotation.DrawableRes
@@ -295,6 +296,51 @@ object RowBinder {
     }
 
     /**
+     * Puts [Trailing.IconAction]'s INK on the row's end gutter, which its box cannot do on its own.
+     *
+     * The trailing slot holds one of several objects and they are not the same KIND of object.
+     * `row_chevron` and `row_trailing_glyph` are 18dp `ImageView`s whose box sits on the row's 16dp
+     * end padding; `row_icon_action` is a `MaterialButton` carrying a 48dp touch minimum, and its
+     * 22dp icon is optically centred in that box, so 13dp of it is air before the icon starts.
+     * Same card, same slot, three different distances from the edge — «дальше баги по кнопкам 1-3
+     * скрины, они улетели куда-то влево».
+     *
+     * The datum is the chevron's ink, 22dp in from the row's end edge: it is the trailing control
+     * the product has most of, and it is the one on «О приложении» the owner did NOT name while
+     * naming the copy buttons beside it.
+     *
+     * ONE NUMBER CANNOT SERVE BOTH GLYPHS, which is the trap [ToolbarBinder.alignInkToGutter] hit
+     * first. Every glyph here is a 24-unit viewport drawn at 22dp, and the two that reach this slot
+     * fill it by very different amounts:
+     *
+     * ```
+     *                       ink within the 24 viewport     ink lands at
+     *   ic_copy                     x 2 … 21                  31.75
+     *   ic_more_vert_24dp           x 10 … 14                 38.17
+     * ```
+     *
+     * So the correction belongs to the glyph and is applied here, at the one place that knows which
+     * glyph is going in. The numbers and their arithmetic are on the two dimensions in
+     * `values/tokens_row_action.xml`; neither costs a pixel of touch target, and both travel through
+     * padding the row already owns, so nothing is clipped.
+     *
+     * A glyph this function does not know about is reset to no nudge rather than left alone — these
+     * rows are recycled by five adapters, and a stale margin from the previous holder's icon would
+     * outlive the icon that earned it.
+     */
+    private fun MaterialButton.alignInkToGutter(@DrawableRes icon: Int) {
+        val params = layoutParams as? ViewGroup.MarginLayoutParams ?: return
+        val value = when (icon) {
+            R.drawable.ic_more_vert_24dp -> resources.getDimensionPixelSize(R.dimen.row_action_nudge_overflow)
+            R.drawable.ic_copy -> resources.getDimensionPixelSize(R.dimen.row_action_nudge_wide)
+            else -> 0
+        }
+        if (params.marginEnd == value) return
+        params.marginEnd = value
+        layoutParams = params
+    }
+
+    /**
      * True when the trailing control is the action, which is the case 22-components 8.4 settles:
      * the row then stops being a target, because two targets doing different things is a defect and
      * not a convenience. [Trailing.None] is deliberately absent - a row with no trailing is inert
@@ -466,6 +512,7 @@ object RowBinder {
                 visibility = View.VISIBLE
                 setIconResource(trailing.icon)
                 contentDescription = trailing.contentDescription
+                alignInkToGutter(trailing.icon)
                 onSingleClick(action = trailing.onClick)
             }
 

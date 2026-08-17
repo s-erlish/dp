@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ============================================================================
+  THE TRAILING ICON BUTTON'S OPTICAL PULL — view_row.xml's @id/row_icon_action.
+  ============================================================================
+
+  A file of its own and not an addition to values/dimens.xml, because these two
+  numbers belong to the universal row alone: nothing else may reach for them, and
+  they are not a spacing step.
+
+  This is ToolbarBinder.alignInkToGutter's problem again, one component down, and
+  it takes the same answer: what the eye lines a column up by is the GLYPH's last
+  painted pixel, never the edge of the invisible touch target it is centred in.
+
+  view_row.xml's trailing slot holds one of several objects and they are not the
+  same KIND of object:
+
+    · @id/row_chevron / @id/row_trailing_glyph are 18dp ImageViews. Their box sits
+      on the row's 16dp end padding and the glyph very nearly fills it.
+    · @id/row_icon_action is a MaterialButton wearing
+      @style/Widget.Departament.Button.Icon: a 22dp icon optically centred in a
+      48dp touch minimum, so 13dp of that box is AIR on the trailing side before
+      the icon starts.
+
+  Measured off the drawables rather than guessed — every glyph in this set is a
+  24-unit viewport, and an ImageView at @dimen/glyph_18 fitCenters it to 18dp
+  (× 0.75) while the button draws it at 22dp (× 0.9167). Distance from the row's
+  end EDGE to the last painted pixel:
+
+                          box air   glyph air        ink lands at
+      ic_chevron_right       0       8 × 0.75  = 6.00     22.00   <- THE DATUM
+      ic_arrow_drop_down     0       7 × 0.75  = 5.25     21.25
+      ic_action_done         0       3 × 0.75  = 2.25     18.25
+      ic_copy               13       3 × 0.917 = 2.75     31.75
+      ic_more_vert_24dp     13      10 × 0.917 = 9.17     38.17
+
+  So one card can draw a chevron 22dp from its edge and a copy button 32dp from it,
+  and the owner read exactly that: «дальше баги по кнопкам 1-3 скрины, они улетели
+  куда-то влево». The chevron is the datum because it is the trailing control the
+  product has most of, and because it is the one on «О приложении» that he did NOT
+  name — the two offenders share that screen with it.
+
+  ONE NUMBER CANNOT SERVE BOTH GLYPHS, which is the trap the toolbar hit first:
+  «⋮» is a 4-unit column of dots in a 24-unit box and «копировать» is a 19-unit
+  frame in one, so they are 6.4dp apart before anything is moved. The correction is
+  therefore per glyph and lives in RowBinder, at the one place that knows which
+  glyph is going in.
+
+  NEITHER PULL COSTS A PIXEL OF TOUCH TARGET. The 48dp box keeps all 48; only where
+  it is drawn moves. And both stay INSIDE the row: the row's own paddingEnd is 16,
+  so a pull of up to 16 travels through padding the row already owns and nothing is
+  clipped.
+-->
+<resources>
+
+    <!--
+        ic_copy: ink 2…21 of 24, i.e. 2.75dp of air at 22dp.
+        31.75 − 10 = 21.75, a quarter of a dp inside the chevron's 22.00.
+        The 48dp box then ends 6dp short of the card's edge — the same clearance
+        @dimen/optical_nudge_touch_target leaves on the leading side of the
+        subscription card, which is the shipped precedent for this shape.
+    -->
+    <dimen name="row_action_nudge_wide">-10dp</dimen>
+
+    <!--
+        ic_more_vert_24dp: ink 10…14 of 24, i.e. 9.17dp of air at 22dp.
+        38.17 − 16 = 22.17, a sixth of a dp outside the chevron's 22.00.
+
+        SIXTEEN IS THE ROW'S WHOLE END GUTTER, and this control gives all of it
+        back: the glyph is so narrow that its own box has to travel the full
+        padding for the ink to reach the line. The 48dp target then ends flush with
+        the card's edge, which view_toolbar.xml already settled on the other side —
+        «the target reaching the screen edge is a Fitts's-law gain rather than a
+        cost». The press plate is a disc whose widest point is at the row's vertical
+        centre, well clear of the card's 20dp corners, so flush is tangent and never
+        a shear.
+
+        This is also the owner's standing request on this glyph, already honoured in
+        the toolbar: «три точки которые сверху справа их бы тоже чутка правее
+        сделать и это касается везде где они есть».
+    -->
+    <dimen name="row_action_nudge_overflow">-16dp</dimen>
+
+</resources>
