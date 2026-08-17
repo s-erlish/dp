@@ -61,6 +61,22 @@ class FlowOverlay private constructor(
     private val sonar: View = root.findViewById(R.id.flow_sonar)
     private val glyph: ImageView = root.findViewById(R.id.flow_glyph)
     private val check: ImageView = root.findViewById(R.id.flow_check)
+
+    /**
+     * ГАЛОЧКА ФИНАЛА — ТОЛЬКО ТАМ, ГДЕ ЦЕНТР КОЛЬЦА ПУСТ.
+     *
+     * У потока Telegram центр занят его маркой, и галочка всплывала ПОВЕРХ неё: два знака в одном
+     * кружке, второй закрывает первый ровно в тот момент, когда человек на него смотрит. Владелец:
+     * «там где значок телеграма в кружке, там после добавления появляется галочка, ее нужно
+     * убрать».
+     *
+     * Убрана она не отовсюду: у потока «из буфера» глифа нет вовсе, и галочка там — единственное,
+     * что вообще стоит в кольце. Снять её и оттуда значило бы оставить пустой кружок.
+     *
+     * Успех при этом объявляет не она. Кольцо замыкается акцентом (@id/flow_ring_done), уходит
+     * сонар и поднимается подпись — три сигнала, из которых галочка была четвёртым и лишним.
+     */
+    private val showsCheck: Boolean get() = kind != Kind.TELEGRAM
     private val title: TextView = root.findViewById(R.id.flow_title)
     private val note: TextView = root.findViewById(R.id.flow_note)
     private val bar: View = root.findViewById(R.id.flow_bar)
@@ -232,7 +248,7 @@ class FlowOverlay private constructor(
         if (root.reducedMotion()) {
             arc.alpha = 0f
             ringDone.alpha = 1f
-            check.alpha = 1f
+            if (showsCheck) check.alpha = 1f
             toast.alpha = 1f
             toast.translationY = 0f
             return
@@ -248,7 +264,9 @@ class FlowOverlay private constructor(
         check.scaleY = CHECK_FROM
         toast.translationY = TOAST_RISE_DP * root.resources.displayMetrics.density
         sonar.alpha = 1f
-        val lifted = listOf(arc, ringDone, sonar, check, toast)
+        // Галочка не поднимается в аппаратный слой, когда её не показывают: слой выдаётся ради
+        // анимации, а без неё это просто буфер на вью с alpha 0 до конца жизни экрана.
+        val lifted = listOfNotNull(arc, ringDone, sonar, check.takeIf { showsCheck }, toast)
 
         beat?.cancel()
         beat = AnimatorSet().apply {
@@ -267,18 +285,6 @@ class FlowOverlay private constructor(
                     duration = sonarMs
                     interpolator = settle
                 },
-                ObjectAnimator.ofFloat(check, View.ALPHA, 1f).apply {
-                    duration = pop
-                    interpolator = settle
-                },
-                ObjectAnimator.ofFloat(check, View.SCALE_X, 1f).apply {
-                    duration = pop
-                    interpolator = settle
-                },
-                ObjectAnimator.ofFloat(check, View.SCALE_Y, 1f).apply {
-                    duration = pop
-                    interpolator = settle
-                },
                 ObjectAnimator.ofFloat(toast, View.ALPHA, 1f).apply {
                     duration = toastMs
                     interpolator = settle
@@ -288,6 +294,22 @@ class FlowOverlay private constructor(
                     interpolator = settle
                 },
             )
+            if (showsCheck) {
+                playTogether(
+                    ObjectAnimator.ofFloat(check, View.ALPHA, 1f).apply {
+                        duration = pop
+                        interpolator = settle
+                    },
+                    ObjectAnimator.ofFloat(check, View.SCALE_X, 1f).apply {
+                        duration = pop
+                        interpolator = settle
+                    },
+                    ObjectAnimator.ofFloat(check, View.SCALE_Y, 1f).apply {
+                        duration = pop
+                        interpolator = settle
+                    },
+                )
+            }
             // Аппаратный слой только на время боя и снимается по его окончании — иначе кольцо
             // остаётся в отдельном буфере на весь экран.
             //
