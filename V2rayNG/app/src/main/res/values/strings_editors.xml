@@ -93,6 +93,11 @@
     <string name="routing_section_rules">Настройки правил маршрутизации</string>
     <string name="routing_section_actions">Наборы и обмен</string>
     <string name="routing_rule_on">Включено</string>
+    <!-- БЕЗ ЧИТАТЕЛЯ с 0.4.9 и намеренно не удалена. Вела подпись правила маршрутизации, когда
+         правило выключено, и повторяла собой переключатель, стоящий в той же строке:
+         «если отключить то почему-то пишется выключено, там такого быть не должно». Строка
+         остаётся на случай, если состояние понадобится там, где управления рядом нет — но в
+         строку с переключателем её возвращать не надо. См. RoutingSettingRecyclerAdapter.summarise. -->
     <string name="routing_rule_off">Выключено</string>
     <!-- The accessible name of the rule row's own switch, restored from 5e8cd54's chk_enable.
          It names the ACTION on the object, because the row already says which rule it is. -->

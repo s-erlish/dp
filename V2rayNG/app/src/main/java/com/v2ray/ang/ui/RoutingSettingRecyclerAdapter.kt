@@ -94,8 +94,17 @@ class RoutingSettingRecyclerAdapter(
     }
 
     /**
-     * «Выключено · google.com, ads · direct». State only when it is NOT the default, because a row
-     * that says «Включено» on every line has spent a line saying nothing.
+     * «google.com, ads · direct» — what the rule MATCHES and where it sends it, and nothing else.
+     *
+     * «Выключено» used to lead this line whenever the rule was off. The reasoning was that state is
+     * worth stating when it is not the default — which is true of a fact the reader cannot otherwise
+     * see, and false here: this row carries a switch, two dp to the right, already showing exactly
+     * that. So the word restated the control beside it and pushed the rule's actual content along by
+     * a segment. The owner, from the device: «если отключить то почему-то пишется выключено, там
+     * такого быть не должно».
+     *
+     * «Заблокировано» stays. A locked rule looks identical to an unlocked one — there is no control
+     * anywhere on the row reporting it — so that one IS the case the line is for.
      */
     private fun summarise(ruleset: RulesetItem, res: android.content.res.Resources): CharSequence {
         val matcher = listOfNotNull(
@@ -105,7 +114,6 @@ class RoutingSettingRecyclerAdapter(
         ).firstOrNull()?.joinToString(", ") ?: ruleset.port ?: ruleset.protocol?.joinToString(", ")
 
         return listOfNotNull(
-            res.getString(R.string.routing_rule_off).takeIf { !ruleset.enabled },
             res.getString(R.string.routing_rule_locked).takeIf { ruleset.locked == true },
             matcher,
             ruleset.outboundTag,
