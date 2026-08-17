@@ -22,6 +22,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.CompositePageTransformer
 import androidx.viewpager2.widget.MarginPageTransformer
 import androidx.viewpager2.widget.ViewPager2
@@ -218,6 +219,36 @@ class AccountFragment : Fragment() {
             // same thing a zero padding did, because there is no neighbour to peek at.
             val peek = resources.getDimensionPixelSize(R.dimen.space_16)
             setPadding(peek, 0, peek, 0)
+            // THE SAME THREE SWITCHES ГЛАВНАЯ'S CAROUSEL NEEDED, on the same object in another tab.
+            // Both reports the owner filed against the home card are reproducible here — this pager
+            // was simply not the one on screen when he wrote them:
+            //
+            // «сам тулбар подписки … почему-то можно растягивать и тянуть влево или вправо» — from
+            // Android 12 a RecyclerView answers a drag past its own edge with the stretch
+            // over-scroll, so on a carousel of one every horizontal drag is over-scroll and the ring
+            // is rubber. Set on the inner RecyclerView, never on the pager: `overScrollMode` on the
+            // pager reaches a container that does not scroll.
+            //
+            // «видишь у них рамки появляются по бокам … а не обрезаться» — ViewPager2 lays the inner
+            // RecyclerView out INSIDE the peek padding above, the neighbouring page is laid out
+            // beside it (outside that box), and a ViewGroup clips its children by default. The
+            // straight vertical cut 16dp in from each edge is that clip, not a border.
+            //
+            // clipChildren goes off on the INNER view only. The pager keeps it on, so the overflow
+            // is still trimmed at the pager's own bounds and nothing walks further up — the distance
+            // between that and SelectPopup.unclipAncestors drawing through the status bar is one
+            // step of the same walk.
+            //
+            // itemAnimator is stripped for the same reason Главная strips it. Today it is already
+            // gone — setPageTransformer(non-null) below saves the pager's animator and nulls it, and
+            // unlike Главная's this call is unconditional and never handed a null to restore it. The
+            // line is here so that a later `if (count > 1)` around the transformer cannot quietly
+            // hand the animator back, which is exactly how the defect returned on the other tab.
+            (getChildAt(0) as? RecyclerView)?.let { inner ->
+                inner.itemAnimator = null
+                inner.overScrollMode = View.OVER_SCROLL_NEVER
+                inner.clipChildren = false
+            }
             setPageTransformer(
                 CompositePageTransformer().apply {
                     addTransformer(MarginPageTransformer(resources.getDimensionPixelSize(R.dimen.space_12)))
@@ -674,6 +705,11 @@ class AccountFragment : Fragment() {
         val wantedDots = if (count > 1) count else 0
         if (binding.llSubDots.childCount != wantedDots) buildDots(count) else updateDotSelection(selectedSubIndex)
         binding.llSubDots.isVisible = count > 1
+        // A carousel of one is not a carousel: there is nowhere to swipe, so the gesture only
+        // produces the drag the owner asked to be rid of. Written on every render rather than once
+        // in setupPager, because the count is what decides it and the second подписка has to be able
+        // to turn the gesture back on in the same pass that adds its dot.
+        binding.vpSubscriptions.isUserInputEnabled = count > 1
         // No page measuring any more: after §5 a page IS the 172dp ring and nothing else, so the
         // pager's height is that constant and the layout states it. The old probe inflated a
         // whole card per render to arrive at a number the layout already knew.
