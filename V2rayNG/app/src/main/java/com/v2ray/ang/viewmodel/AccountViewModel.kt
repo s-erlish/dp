@@ -314,10 +314,14 @@ class AccountViewModel : ViewModel() {
     fun loadPayments() = viewModelScope.launch {
         repo.getPayments()
             .onSuccess {
-                _payments.value = it.items
+                // payments(), not items: the flat array and the nested `response` shape are both
+                // things this backend returns, and reading one of them directly is how the Devices
+                // screen once shipped blank (DevicesDto's note).
+                val operations = it.payments()
+                _payments.value = operations
                 // Warm the process-wide cache so PaymentHistoryActivity (a separate ViewModel
                 // instance) renders instantly instead of spinning through a fresh network load.
-                AccountCache.putPayments(it.items)
+                AccountCache.putPayments(operations)
             }
             .onFailure { report(it) }
     }
