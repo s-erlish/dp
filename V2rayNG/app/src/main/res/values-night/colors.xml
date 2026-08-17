@@ -12,11 +12,6 @@
   raised #1A1D21, inset #20242B.
 -->
 <resources>
-    <!-- Incy-style dark palette: near-black background, bright blue accent -->
-    <color name="brand_blue">#4C8DFF</color>
-    <color name="brand_blue_dark">#3B82F6</color>
-    <color name="brand_cream">#141619</color>
-
     <color name="colorPing">#22C55E</color>
     <color name="colorPingRed">#F04452</color>
     <color name="colorConfigType">#4C8DFF</color>
@@ -33,12 +28,6 @@
     <color name="chip_json_bg">#3A2E00</color>
     <color name="ping_good">#22C55E</color>
     <color name="ping_bad">#F04452</color>
-
-    <!-- Neutral (non-accent) icon tile, dark. Solid surfaceContainerHighest
-         fill (#20242B) + muted onSurfaceVariant glyph - no accent spent.
-         Glyph #9BA1AD on fill #20242B measures 6.00:1, twice the 3:1 icon floor. -->
-    <color name="icon_tile_neutral">#20242B</color>
-    <color name="icon_glyph_neutral">#9BA1AD</color>
 
     <!-- Primary - bright blue -->
     <color name="md_theme_primary">#4C8DFF</color>

@@ -190,17 +190,15 @@
         <!-- attrs already resolved to. 86 call sites across res/ and java/ are -->
         <!-- corrected by the six lines below with zero layout edits.           -->
         <!--                                                                   -->
-        <!-- Incy keeps ONE accent: green/orange/purple/yellow were already     -->
-        <!-- aliased to blue and stay aliased. They are retirement debt, not a  -->
-        <!-- palette — the coloured tile system is exactly three: accent,       -->
-        <!-- destructive, neutral (D-5). Live counts: iconTintBlue 43,          -->
-        <!-- Green 11, Purple 11, Red 10, Orange 9, Yellow 2.                   -->
+        <!-- Incy keeps ONE accent, and the retirement debt is now paid: the    -->
+        <!-- Green / Orange / Purple / Yellow tints were aliases of the accent  -->
+        <!-- kept alive only until their last call site migrated. The counts    -->
+        <!-- this comment used to record (Green 11, Purple 11, Orange 9,        -->
+        <!-- Yellow 2) are all zero, so the aliases are gone with them. The     -->
+        <!-- coloured tile system is exactly three: accent, destructive,        -->
+        <!-- neutral (D-5) — and neutral is an attribute, not a hue.            -->
         <!-- ================================================================ -->
         <item name="iconTintBlue">@color/md_theme_primary</item>
-        <item name="iconTintGreen">@color/md_theme_primary</item>
-        <item name="iconTintOrange">@color/md_theme_primary</item>
-        <item name="iconTintPurple">@color/md_theme_primary</item>
-        <item name="iconTintYellow">@color/md_theme_primary</item>
         <item name="iconTintRed">@color/md_theme_error</item>
 
         <!-- The tile FILLS stay on icon_tile_* for now. They are 20% washes and
@@ -212,10 +210,6 @@
              values-night/colors.xml. That file is not owned by this change;
              reported as follow-up. -->
         <item name="iconTileBgBlue">@color/icon_tile_blue</item>
-        <item name="iconTileBgGreen">@color/icon_tile_blue</item>
-        <item name="iconTileBgOrange">@color/icon_tile_blue</item>
-        <item name="iconTileBgPurple">@color/icon_tile_blue</item>
-        <item name="iconTileBgYellow">@color/icon_tile_blue</item>
         <item name="iconTileBgRed">@color/icon_tile_red</item>
 
         <!-- Latency text on the server row. 00-rules.md 3.5 binds these two
@@ -523,17 +517,9 @@
         <item name="pingBad">@color/mono_onSurface</item>
         <item name="indicatorColor">@color/mono_primary</item>
         <item name="iconTintBlue">@color/mono_onSurfaceVariant</item>
-        <item name="iconTintGreen">@color/mono_onSurfaceVariant</item>
-        <item name="iconTintOrange">@color/mono_onSurfaceVariant</item>
-        <item name="iconTintPurple">@color/mono_onSurfaceVariant</item>
         <item name="iconTintRed">@color/mono_onSurfaceVariant</item>
-        <item name="iconTintYellow">@color/mono_onSurfaceVariant</item>
         <item name="iconTileBgBlue">@color/mono_surfaceContainerHighest</item>
-        <item name="iconTileBgGreen">@color/mono_surfaceContainerHighest</item>
-        <item name="iconTileBgOrange">@color/mono_surfaceContainerHighest</item>
-        <item name="iconTileBgPurple">@color/mono_surfaceContainerHighest</item>
         <item name="iconTileBgRed">@color/mono_surfaceContainerHighest</item>
-        <item name="iconTileBgYellow">@color/mono_surfaceContainerHighest</item>
 
         <!-- Keep app-wide dialog styling under the mono overlay too. The overlay's
              greyscale ?attr colours flow into the same dialog theme automatically. -->

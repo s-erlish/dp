@@ -94,11 +94,6 @@
     <!-- shipped. Names referenced by themes.xml and by layouts.        -->
     <!-- ============================================================= -->
 
-    <!-- Brand: departament VPN blue (sampled from logo) -->
-    <color name="brand_blue">#1E5FC7</color>
-    <color name="brand_blue_dark">#17469A</color>
-    <color name="brand_cream">#F4F1EA</color>
-
     <color name="colorPing">#12B76A</color>
     <color name="colorPingRed">#E5484D</color>
     <color name="colorConfigType">#1E5FC7</color>
@@ -111,14 +106,10 @@
 
     <!-- Colored setting-row icon tints (same in light/dark).
          D-5: the coloured tile system is exactly three - accent, destructive,
-         neutral. icon_green / icon_yellow / icon_orange / icon_purple are NOT
-         used by new work; they stay only until their last reference migrates. -->
+         neutral. icon_green / icon_yellow / icon_orange / icon_purple stayed
+         only until their last reference migrated, and it has - they are gone. -->
     <color name="icon_blue">#4C8DFF</color>
-    <color name="icon_green">#22C55E</color>
-    <color name="icon_purple">#4C8DFF</color>
-    <color name="icon_yellow">#EAB308</color>
     <color name="icon_red">#F04452</color>
-    <color name="icon_orange">#FB923C</color>
     <color name="divider_color_light">#E4E9F2</color>
     <color name="colorIndicator">@color/md_theme_primary</color>
 
@@ -132,21 +123,16 @@
     <color name="ping_good">#0B7D4A</color>
     <color name="ping_bad">#C42B32</color>
     <!-- Icon-tile background fills (translucent hue, shared light/dark).
-         D-5: only _blue (accent) and _red (destructive) survive for new work. -->
+         D-5: only _blue (accent) and _red (destructive) survive; the green,
+         orange, purple and yellow washes had no reader left. -->
     <color name="icon_tile_blue">#334C8DFF</color>
-    <color name="icon_tile_green">#3322C55E</color>
-    <color name="icon_tile_orange">#33FB923C</color>
-    <color name="icon_tile_purple">#334C8DFF</color>
     <color name="icon_tile_red">#33F04452</color>
-    <color name="icon_tile_yellow">#33EAB308</color>
 
-    <!-- Neutral (non-accent) icon tile: solid surface fill + muted glyph.
-         Spends no accent budget so default/utility rows stay quiet and the
-         blue reads as the only accent. Light = surfaceContainerHighest tone;
-         night overrides in values-night/. Glyph #54607A on fill #E3EAF4
-         measures 5.21:1, clearing the 3:1 icon floor with headroom. -->
-    <color name="icon_tile_neutral">#E3EAF4</color>
-    <color name="icon_glyph_neutral">#54607A</color>
+    <!-- The neutral tile has no colour resource any more. It reads
+         ?attr/colorSurfaceContainerHighest for the fill and
+         ?attr/colorOnSurfaceVariant for the glyph — same pixels in both live
+         themes, and ThemeOverlay.Mono can re-point an attribute where it could
+         never re-point @color/icon_tile_neutral. See Widget.Departament.Tile. -->
 
     <!-- Primary colors - main tone: departament blue -->
     <color name="md_theme_primary">#1E5FC7</color>

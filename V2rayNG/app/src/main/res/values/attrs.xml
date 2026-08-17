@@ -67,21 +67,19 @@
     <attr name="pingBad" format="color" />
     <attr name="indicatorColor" format="color" />
 
-    <!-- Settings / sheet icon-tile glyph tints -->
+    <!-- Settings / sheet icon-tile glyph tints. Two, because D-5 closes the
+         coloured tile set at accent and destructive and the third — neutral —
+         is colorOnSurfaceVariant, not a hue of its own. The Green / Orange /
+         Purple / Yellow tints that stood here were aliases of the accent held
+         open until their last call site migrated; it has. -->
     <attr name="iconTintBlue" format="color" />
-    <attr name="iconTintGreen" format="color" />
-    <attr name="iconTintOrange" format="color" />
-    <attr name="iconTintPurple" format="color" />
     <attr name="iconTintRed" format="color" />
-    <attr name="iconTintYellow" format="color" />
 
-    <!-- Settings / sheet icon-tile background fills -->
+    <!-- Settings / sheet icon-tile background fills. Same two, same reason;
+         the neutral tile fills from colorSurfaceContainerHighest so the
+         monochrome overlay can reach it. -->
     <attr name="iconTileBgBlue" format="color" />
-    <attr name="iconTileBgGreen" format="color" />
-    <attr name="iconTileBgOrange" format="color" />
-    <attr name="iconTileBgPurple" format="color" />
     <attr name="iconTileBgRed" format="color" />
-    <attr name="iconTileBgYellow" format="color" />
 
     <!-- =================================================================== -->
     <!-- 2026-07 token wave (10-design-system.md 4.7, 2.2). Six semantic      -->

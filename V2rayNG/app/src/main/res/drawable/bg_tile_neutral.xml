@@ -5,7 +5,8 @@
   / yellow / green encode a category system this product does not have. 56 of 65
   shipped Android tiles are blue and only 4 are neutral; that is not a category
   system, it is noise. Reaching for a fourth colour means the screen is inventing a
-  taxonomy. Replaces bg_icon_neutral, which stays alive until its references migrate.
+  taxonomy. Replaced bg_icon_neutral, which was held open until its last reference
+  migrated and has now been removed along with the rest of the coloured ladder.
 
   THE FILL IS AN ATTRIBUTE, NOT @color/icon_tile_neutral. ThemeOverlay.Mono is
   applied at runtime and can only re-point ATTRIBUTES, so as a colour resource this
