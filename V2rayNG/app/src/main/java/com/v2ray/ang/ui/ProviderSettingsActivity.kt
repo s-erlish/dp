@@ -30,22 +30,31 @@ import com.v2ray.ang.util.HttpUtil
  * surface, so the screen, its title and its copy say подписка.
  *
  * Groups four cards:
- *  1. ОБНОВЛЕНИЕ    — auto-update toggle + interval picker + update notification toggle.
+ *  1. ОБНОВЛЕНИЕ    — auto-update toggle + update notification toggle.
  *  2. ПРИ ЗАПУСКЕ    — update-on-launch / ping-on-launch / ping-on-update toggles.
- *  3. СЕТЬ           — HWID toggle + subscription User-Agent editor.
+ *  3. СЕТЬ           — HWID toggle + the User-Agent this app sends (a read-out, not a control).
  *  4. СПИСОК СЕРВЕРОВ — server list sort order (single choice).
  *
+ * **EVERY ROW HERE IS ONE HEIGHT, 60dp, and neither half of that was free.** Owner report 0.4.9,
+ * «в настройках подписок такая же тема с высотой, надо фиксить»: four rows carried an unbounded
+ * second line (two of them ran to three lines) and every switch carried Material's 48dp
+ * `minTouchTargetSize` floor, 8dp above the 40dp tile — five different row heights from two
+ * unrelated causes. Both are fixed in `activity_provider_settings.xml`, which explains them; the
+ * dropped subtitles are still in `values/strings_provider.xml`, unread and commented as such.
+ *
  * Wiring notes:
- *  - Auto-update + interval are applied to the app's existing per-subscription auto-update
- *    mechanism ([com.v2ray.ang.dto.entities.SubscriptionItem.autoUpdate] /
+ *  - Auto-update is applied to the app's existing per-subscription auto-update mechanism
+ *    ([com.v2ray.ang.dto.entities.SubscriptionItem.autoUpdate] /
  *    [com.v2ray.ang.dto.entities.SubscriptionItem.updateInterval]) across every stored
- *    subscription, then rescheduled via [SubscriptionUpdater.sync]. This mirrors the global
- *    picker in MainActivity's settings tab — it changes real update behavior.
- *  - Every other row writes an [AppConfig] preference that the rest of the app reads: HWID and
- *    the User-Agent are consumed by the subscription fetch, the notification and the
- *    launch/update actions by [SubscriptionUpdater], the sort order by
- *    [SettingsManager.applyServerSortOrder]. Defaults live in [SettingsManager], not here, so
- *    the switch state and the behaviour can never drift apart.
+ *    subscription, then rescheduled via [SubscriptionUpdater.sync]. The INTERVAL itself is chosen
+ *    on the Настройки tab and not here any more — the block at the end of the ОБНОВЛЕНИЕ section
+ *    below records why that is a duplicate removed and not a capability lost.
+ *  - Every other row writes an [AppConfig] preference that the rest of the app reads: HWID is
+ *    consumed by the subscription fetch, the notification and the launch/update actions by
+ *    [SubscriptionUpdater], the sort order by [SettingsManager.applyServerSortOrder]. Defaults
+ *    live in [SettingsManager], not here, so the switch state and the behaviour can never drift
+ *    apart. The User-Agent row is the exception and writes nothing: it REPORTS what
+ *    [currentUserAgent] resolves, and the key behind it is still honoured by the fetch.
  */
 class ProviderSettingsActivity : BaseActivity() {
 
@@ -67,9 +76,6 @@ class ProviderSettingsActivity : BaseActivity() {
         /** 0.38 - the disabled alpha of the row grammar. */
         private const val ALPHA_DISABLED = 0.38f
     }
-
-    /** Interval options (minutes) offered by the interval picker: 1/2/6/12/24 hours. */
-    private val intervalValues = longArrayOf(60L, 120L, 360L, 720L, 1440L)
 
     /** Sort-order values persisted for the server list. */
     private val sortValues = arrayOf(
@@ -95,7 +101,6 @@ class ProviderSettingsActivity : BaseActivity() {
 
         // ОБНОВЛЕНИЕ
         binding.rowAutoUpdate.setOnClickListener { toggleAutoUpdate() }
-        binding.rowInterval.onSingleClick { pickInterval() }
         binding.rowNotify.setOnClickListener {
             toggleBool(AppConfig.PREF_SUB_NOTIFY_ON_UPDATE, binding.switchNotify, SettingsManager.isNotifyOnSubscriptionUpdate())
         }
@@ -113,13 +118,17 @@ class ProviderSettingsActivity : BaseActivity() {
 
         // СЕТЬ
         binding.rowSendHwid.setOnClickListener { toggleSendHwid() }
-        binding.rowUserAgent.onSingleClick { editUserAgent() }
+        // @id/row_user_agent IS DELIBERATELY NOT WIRED (owner 0.4.9: «убери возможность настройки
+        // user agent, чтобы жил было некликабельно»). It is Row.Fact — it reports the User-Agent
+        // subscription fetches actually send and leads nowhere. The layout clears its
+        // clickable/focusable/press so it is not a TalkBack or D-pad stop either. [editUserAgent]
+        // below is kept, unreferenced, on purpose; its own comment says why.
 
         // СПИСОК СЕРВЕРОВ
-        // The three rows that OPEN something are guarded; a doubled tap on any of them stacked two
-        // окошка выбора / two dialogs. The toggle rows above keep a raw listener on purpose: they
-        // flip a stored boolean and repaint their own switch, so a doubled tap lands back exactly
-        // where it started and there is nothing to duplicate.
+        // The row that OPENS something is guarded; a doubled tap on it stacked two окошка выбора.
+        // The toggle rows above keep a raw listener on purpose: they flip a stored boolean and
+        // repaint their own switch, so a doubled tap lands back exactly where it started and there
+        // is nothing to duplicate.
         binding.rowSortOrder.onSingleClick { pickSortOrder() }
 
         bindState()
@@ -138,16 +147,10 @@ class ProviderSettingsActivity : BaseActivity() {
     /** Reflect all persisted values/toggle states into the rows. */
     private fun bindState() {
         // With no подписка stored there is nothing for a schedule to apply to: toggling the switch
-        // wrote to an empty list and looked like it had worked. The two rows say so instead.
+        // wrote to an empty list and looked like it had worked. The row says so by going inert.
         val hasSubscriptions = MmkvManager.decodeSubscriptions().isNotEmpty()
         setRowEnabled(binding.rowAutoUpdate, hasSubscriptions)
-        setRowEnabled(binding.rowInterval, hasSubscriptions)
         binding.switchAutoUpdate.restoreChecked(hasSubscriptions && isAutoUpdateOn())
-        binding.valueInterval.text = if (hasSubscriptions) {
-            intervalLabel(storedIntervalMinutes())
-        } else {
-            getString(R.string.ps_no_subs_value)
-        }
         binding.switchNotify.restoreChecked(SettingsManager.isNotifyOnSubscriptionUpdate())
 
         binding.switchUpdateOnLaunch.restoreChecked(SettingsManager.isUpdateSubscriptionOnLaunch())
@@ -179,20 +182,6 @@ class ProviderSettingsActivity : BaseActivity() {
     }
 
     /**
-     * A подписка can carry an interval that is not one of the five offered here - the form in
-     * `SubEditActivity` takes any number of minutes. Such a value is shown as it is; the old `else`
-     * branch fell back to «1 ч» and so reported an interval the scheduler was not using.
-     */
-    private fun intervalLabel(minutes: Long): String = when (minutes) {
-        60L -> getString(R.string.ps_interval_1h)
-        120L -> getString(R.string.ps_interval_2h)
-        360L -> getString(R.string.ps_interval_6h)
-        720L -> getString(R.string.ps_interval_12h)
-        1440L -> getString(R.string.ps_interval_24h)
-        else -> getString(R.string.settings_sub_auto_update_minutes, minutes)
-    }
-
-    /**
      * Enable/disable auto-update across every stored subscription, then reschedule the
      * WorkManager task so the change takes effect immediately.
      */
@@ -209,32 +198,18 @@ class ProviderSettingsActivity : BaseActivity() {
         binding.switchAutoUpdate.isChecked = enable
     }
 
-    /**
-     * Single-choice interval picker. Persists the chosen interval locally and applies it to
-     * every subscription (turning auto-update on), then reschedules the updater.
-     */
-    private fun pickInterval() {
-        val entries = intervalValues.map { intervalLabel(it) }
-        val idx = intervalValues.indexOf(storedIntervalMinutes()).coerceAtLeast(0)
-        SelectPopup.show(
-            anchor = binding.rowInterval,
-            options = entries,
-            selectedIndex = idx,
-            widthRes = R.dimen.select_popup_w_interval,
-            valueView = binding.valueInterval,
-            caret = binding.caretInterval,
-        ) { which ->
-            val minutes = intervalValues[which]
-            MmkvManager.decodeSubscriptions().forEach { cache ->
-                val item = cache.subscription
-                item.autoUpdate = true
-                item.updateInterval = minutes
-                MmkvManager.encodeSubscription(cache.guid, item)
-            }
-            SubscriptionUpdater.sync(forceReschedule = true)
-            bindState()
-        }
-    }
+    // «ИНТЕРВАЛ ОБНОВЛЕНИЯ» IS NOT ON THIS SCREEN ANY MORE (owner 0.4.9: «он уже и так вынесен в
+    // общий список настроек»). Checked before removing rather than after: this screen's picker and
+    // the Настройки tab's «Автообновление подписки» wrote THE SAME STORAGE — SubscriptionItem
+    // .updateInterval and .autoUpdate on every stored подписка, followed by the same
+    // SubscriptionUpdater.sync(forceReschedule = true). There is no per-screen key (see the note on
+    // [DEFAULT_INTERVAL_MINUTES]), so nothing here was the sole writer of anything. The surviving
+    // control is [SettingsTabFragment.pickSubAutoUpdate]; it also offers «Выключено», which this
+    // list could not. The only value that stops being offerable is «2 ч» — the tab's list is
+    // 1/3/6/12/24 ч and Выкл — and an interval of 120 already stored survives and reads as «120 мин»
+    // there, because both screens fall back to the same settings_sub_auto_update_minutes.
+    // [storedIntervalMinutes] stays: [toggleAutoUpdate] needs it to turn auto-update back on at the
+    // interval that was last in force rather than at a number invented here.
 
     // ---------------- СЕТЬ ----------------
 
@@ -261,7 +236,20 @@ class ProviderSettingsActivity : BaseActivity() {
      * The value is validated HERE, on entry, and a rejected one is never stored: a User-Agent that
      * cannot travel in an HTTP header is silently replaced at fetch time, so storing it would put
      * a string in this row that the app will never send — and the row exists to say what is sent.
+     *
+     * **NOTHING CALLS THIS SINCE 0.4.9, AND IT IS KEPT ON PURPOSE** — «убери возможность настройки
+     * user agent, чтобы жил было некликабельно». What the owner asked for is that the row stop
+     * being a control, and that is done where a row's behaviour belongs: @id/row_user_agent no
+     * longer takes taps. Deleting the editor is a different act, and it is the one thing that could
+     * not be undone in a line — [AppConfig.PREF_SUB_USER_AGENT] is a LIVE key that
+     * [currentUserAgent] reads and every subscription fetch honours, so a value stored by an older
+     * build still travels, and the code that can change or clear it is this. Re-wiring it is one
+     * `onSingleClick`; rewriting the validation from the header rules is not.
+     *
+     * It also keeps `ps_user_agent_hint` and `ps_user_agent_error` attached to the thing they
+     * describe, which is the same reason `PerAppProxyActivity.Mode.hintRes` was retained.
      */
+    @Suppress("unused")
     private fun editUserAgent() {
         val field = TextInputLayout(this).apply {
             hint = getString(R.string.ps_user_agent_hint)

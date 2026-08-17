@@ -8,22 +8,52 @@
 
     THE ROW, and every number is §6's:
 
-        [ tile 40 (radius 12, NEUTRAL fill, glyph 22) ][ 16 ][ title 14/400 ]      [ 12 ][ value 13 ]
-                                                             [ subtitle 12.5/400 ]       [ or switch ]
-                                                                                          [ 4 ][ 18 ]
+        [ tile 40 (radius 12, NEUTRAL fill, glyph 22) ][ 16 ][ title 14/400 ]   [ 12 ][ value 13 ]
+                                                                                      [ or switch ]
+                                                                                       [ 4 ][ 18 ]
 
-    - minHeight @dimen/row_min_height 56, padding 10 x 16. The 40dp tile makes a row without a
-      subtitle measure 60 and the hairline above it 61, which is §6's «без подписи 61dp»; a row
-      whose text runs to three lines lands on 77, which is its «с подписью 77dp». Both are
-      CONSEQUENCES of the padding, never fixed heights — a fixed height clips a Russian label at
-      font scale 200% (П-29).
+    - minHeight @dimen/row_min_height 56, padding 10 x 16. The 40dp tile is the tallest thing in
+      the row, so every row measures 10 + 40 + 10 = 60 and the hairline above it 61, which is §6's
+      «без подписи 61dp». That is a CONSEQUENCE of the padding, never a fixed height — a fixed
+      height clips a Russian label at font scale 200% (П-29), and at 200% the text column
+      overtakes the tile and the row grows, which is the point.
     - The gap before the trailing slot is 12 when something is there to trail (§6: «правый отступ
       12dp только когда справа есть значение или переключатель») and 0 when nothing is — the
       prototype's own rule, `gap: (isToggle || pop || r[6]) ? '12px' : '0px'`. A chevron is not
       «значение»: it is the row's own punctuation, already spaced by its 4dp, and holding a second
       12dp open in front of it shortens the label for nothing. Eleven rows here trail only a
       chevron and set no gap at all.
-    - The subtitle is capped at two lines. §11 grabl 9: «длинные подписи ломают ритм строк».
+
+    NOT ONE ROW ON THIS TAB CARRIES A SUBTITLE, and every switch overrides android:minHeight.
+    Both are the same owner report (0.4.9): «эти все кнопки вкладки они некоторые больше по высоте,
+    чем некоторые… надо подравнять такие кнопки под обычный размер как условно у dns, у режима».
+    The tab had THREE heights and two independent causes, which is why fixing one of them would
+    have left the list still ragged:
+
+      1. NINE ROWS CARRIED A SECOND LINE. A one-line subtitle put the text column at 20 + 2 + 17
+         = 39, just under the tile, so those rows stayed at 60 — but four of the nine wrapped to
+         two lines at 360dp («Прямой доступ к устройствам», «Разбивает рукопожатие против DPI»,
+         «Подключаться после перезагрузки», «Автообновление, сеть, список серверов»), which puts
+         the column at 56 and the row at 76. A subtitle whose length decides the row's height is
+         not a subtitle, it is a leak, and §11 grabl 9 already said so: «длинные подписи ломают
+         ритм строк». Dropped at the CALL SITE — here, where each row is written — exactly as
+         @id/row_mode and @id/row_ru_preset were dropped at the RowBinder call in 0.4.9. NO STRING
+         WAS DELETED: all nine live on in values/strings_hub.xml and values/strings_settings_hub.xml
+         with a comment saying they have no reader and why.
+      2. EVERY SWITCH WAS 48dp TALL, subtitle or no subtitle. Material's
+         Widget.Material3.CompoundButton.MaterialSwitch sets android:minHeight="?minTouchTargetSize"
+         = 48dp, 8dp ABOVE the tile — so a toggle row measured 68 while a chevron row measured 60,
+         and no amount of removing text would have closed that. The floor is there to make a bare
+         switch a legal touch target; on this tab the switch is explicitly clickable="false"
+         focusable="false" because THE ROW is the target, and the row already carries
+         minHeight 56 (≥48). The floor is therefore protecting a target that does not exist here,
+         so each switch sets minHeight 0 and falls back to its own 32dp track. This is NOT a fixed
+         height and it clips nothing: a switch has no text, and the row is still wrap_content.
+
+    Net: all 25 rows resolve to the same 60dp, and the tile — not the trailing control and not the
+    copy — is what decides it. Before re-adding a subtitle to any row here, read П-29 and grabl 9,
+    and note that the two rows whose subtitle was their ONLY explanation («Локальный прокси»,
+    «Постоянный VPN») were reported to the owner as such when it was dropped.
 
     WHAT CHANGED IN THE 2026-08 PORT, and why each one is here rather than in a shared style:
 
@@ -325,36 +355,22 @@
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
                         android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_bypass_lan"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_2"
-                            android:ellipsize="end"
-                            android:maxLines="2"
-                            android:text="@string/hub_bypass_lan_sub"
-                            android:textAppearance="@style/TextAppearance.App.Caption" />
-                    </LinearLayout>
+                        android:text="@string/settings_bypass_lan"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switch_bypass_lan"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:clickable="false"
-                        android:focusable="false" />
+                        android:focusable="false"
+                        android:minHeight="0dp" />
                 </LinearLayout>
 
                 <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
@@ -395,36 +411,22 @@
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
                         android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_ipv6"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_2"
-                            android:ellipsize="end"
-                            android:maxLines="2"
-                            android:text="@string/hub_ipv6_sub"
-                            android:textAppearance="@style/TextAppearance.App.Caption" />
-                    </LinearLayout>
+                        android:text="@string/settings_ipv6"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switch_ipv6"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:clickable="false"
-                        android:focusable="false" />
+                        android:focusable="false"
+                        android:minHeight="0dp" />
                 </LinearLayout>
 
                 <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
@@ -599,28 +601,13 @@
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_local_proxy"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_2"
-                            android:ellipsize="end"
-                            android:maxLines="2"
-                            android:text="@string/hub_local_proxy_sub"
-                            android:textAppearance="@style/TextAppearance.App.Caption" />
-                    </LinearLayout>
+                        android:text="@string/settings_local_proxy"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <ImageView
                         android:layout_width="18dp"
@@ -669,28 +656,13 @@
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/hub_always_on"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_2"
-                            android:ellipsize="end"
-                            android:maxLines="2"
-                            android:text="@string/hub_always_on_sub"
-                            android:textAppearance="@style/TextAppearance.App.Caption" />
-                    </LinearLayout>
+                        android:text="@string/hub_always_on"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <ImageView
                         android:layout_width="18dp"
@@ -763,36 +735,22 @@
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
                         android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_mux"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_2"
-                            android:ellipsize="end"
-                            android:maxLines="2"
-                            android:text="@string/hub_mux_sub"
-                            android:textAppearance="@style/TextAppearance.App.Caption" />
-                    </LinearLayout>
+                        android:text="@string/settings_mux"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switch_mux"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:clickable="false"
-                        android:focusable="false" />
+                        android:focusable="false"
+                        android:minHeight="0dp" />
                 </LinearLayout>
 
                 <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
@@ -900,36 +858,22 @@
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
                         android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_fragment"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_2"
-                            android:ellipsize="end"
-                            android:maxLines="2"
-                            android:text="@string/hub_fragment_sub"
-                            android:textAppearance="@style/TextAppearance.App.Caption" />
-                    </LinearLayout>
+                        android:text="@string/settings_fragment"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switch_fragment"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:clickable="false"
-                        android:focusable="false" />
+                        android:focusable="false"
+                        android:minHeight="0dp" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -1128,36 +1072,22 @@
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
                         android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_boot"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_2"
-                            android:ellipsize="end"
-                            android:maxLines="2"
-                            android:text="@string/hub_boot_sub"
-                            android:textAppearance="@style/TextAppearance.App.Caption" />
-                    </LinearLayout>
+                        android:text="@string/settings_boot"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switch_boot"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:clickable="false"
-                        android:focusable="false" />
+                        android:focusable="false"
+                        android:minHeight="0dp" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -1419,28 +1349,13 @@
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_provider"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_2"
-                            android:ellipsize="end"
-                            android:maxLines="2"
-                            android:text="@string/settings_provider_sub"
-                            android:textAppearance="@style/TextAppearance.App.Caption" />
-                    </LinearLayout>
+                        android:text="@string/settings_provider"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <ImageView
                         android:layout_width="18dp"
@@ -1889,28 +1804,13 @@
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_url_scheme"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_2"
-                            android:ellipsize="end"
-                            android:maxLines="2"
-                            android:text="@string/settings_url_scheme_sub"
-                            android:textAppearance="@style/TextAppearance.App.Caption" />
-                    </LinearLayout>
+                        android:text="@string/settings_url_scheme"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <ImageView
                         android:layout_width="18dp"

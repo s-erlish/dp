@@ -42,6 +42,15 @@ import com.v2ray.ang.util.LogUtil
  * [restoreChecked], which is the difference between a value being read back and a value being
  * chosen: the first must appear already settled, only the second is allowed to animate.
  *
+ * **EVERY ROW ON THIS TAB IS ONE HEIGHT, 60dp, and no row carries a subtitle** (owner report
+ * 0.4.9: «надо подравнять такие кнопки под обычный размер как условно у dns, у режима, чтобы была
+ * единая высота правильная»). There were THREE heights and TWO independent causes — nine rows with
+ * a second line whose LENGTH decided the row's height, and Material's 48dp `minTouchTargetSize`
+ * floor on every switch, 8dp above the 40dp tile. Both live in `fragment_settings_tab.xml`, which
+ * explains each in full; the nine dropped strings are still in values/, unread and commented so.
+ * Nothing here changed, because nothing here ever set a subtitle: the rows are written in the
+ * layout, and that is their call site.
+ *
  * What the shell still owns: recreating the activity for a theme/language change, restarting a
  * running tunnel after a core-config change, and the result launcher that applies both when a
  * sub-screen returns ([MainHost.launchSettingsScreen]). Nothing here casts to `MainActivity`.
@@ -563,38 +572,63 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
     }
 
     /**
-     * «Оформление» — four choices, in the order the prototype lists them
-     * (`THEMES_OPTS = ['Тёмная', 'Светлая', 'Чёрно-белая', 'Как в системе']`):
-     *   0 = Тёмная       -> MODE_NIGHT_YES ("2") + blue accent (night resources)
-     *   1 = Светлая      -> MODE_NIGHT_NO  ("1") + blue accent (day resources, dark bar icons)
-     *   2 = Чёрно-белая  -> monochrome overlay, keeping the current night mode as-is
-     *   3 = Как в системе -> MODE_NIGHT_FOLLOW_SYSTEM ("0") + blue accent
+     * «Оформление» — four choices, «Как в системе» FIRST (owner 0.4.9: «также в оформлении надо
+     * чтобы 1 была кнопка как в системе и чтобы оно включалось по умолчанию»):
+     *   0 = Как в системе -> MODE_NIGHT_FOLLOW_SYSTEM ("0") + blue accent
+     *   1 = Тёмная        -> MODE_NIGHT_YES ("2") + blue accent (night resources)
+     *   2 = Светлая       -> MODE_NIGHT_NO  ("1") + blue accent (day resources, dark bar icons)
+     *   3 = Чёрно-белая   -> monochrome overlay, keeping the current night mode as-is
      *
-     * «Как в системе» is the one the list did not offer, and it is not new machinery:
-     * [SettingsManager.setNightMode] has always mapped PREF_UI_MODE_NIGHT "0" to
-     * MODE_NIGHT_FOLLOW_SYSTEM, and `arrays.xml`'s `ui_mode_night_value` has always declared it.
-     * The picker simply never let anyone reach it.
+     * That is a departure from the prototype's `THEMES_OPTS = ['Тёмная', 'Светлая', 'Чёрно-белая',
+     * 'Как в системе']`, and it is the owner's, recorded here so it is not "corrected" back.
+     *
+     * **REORDERING THIS LIST CANNOT REMAP ANYBODY'S STORED CHOICE, and that is a property of the
+     * storage rather than luck.** The index below is never persisted: it is computed FROM storage
+     * on every open, and what is written is [AppConfig.PREF_UI_MODE_NIGHT] as the strings "0" /
+     * "1" / "2" plus [AppConfig.PREF_COLOR_THEME]. Those three strings are AppCompat's own
+     * encoding, shared with `arrays.xml`'s `ui_mode_night_value`, with
+     * [SettingsManager.setNightMode] and with the legacy preference tree — so an install that
+     * stored «Тёмная» stored "2" and still reads back as «Тёмная» at its new index 1. No migration
+     * is needed and none was written; a migration here would have been the bug, not the fix.
+     *
+     * The fallback below is "0" and no longer "2", so that the ONE question this function answers
+     * — what is showing when nothing has been stored — gets the same answer as
+     * [SettingsManager.setNightMode], which has always fallen back to "0" = FOLLOW_SYSTEM. The two
+     * disagreed before: with the key absent the row said «Тёмная» while AppCompat was following the
+     * system, which is the row lying about the screen it is on.
+     *
+     * **THE FRESH-INSTALL DEFAULT IS NOT DECIDED HERE**, and it is still «Тёмная».
+     * `SettingsManager.ensureDefaultSettings()` WRITES `PREF_UI_MODE_NIGHT = "2"` into MMKV on
+     * first launch, so by the time anything reads it there is no such thing as "nothing stored"
+     * and every fallback in the app is dead code for this key. Making «Как в системе» the default
+     * is one character there — "2" -> "0" on the `ensureDefaultValue(AppConfig.PREF_UI_MODE_NIGHT,
+     * …)` line — and that file belongs to another wave, so it is reported rather than edited.
+     * Note for whoever makes it: `ensureDefaultValue` only writes when the key is ABSENT, so the
+     * change reaches new installs only and cannot disturb anyone who already has a value.
      *
      * Mono wins regardless of night mode, which is why it is a separate axis (PREF_COLOR_THEME)
-     * and why choosing it leaves PREF_UI_MODE_NIGHT alone. Light/dark/system are applied through
-     * AppCompatDelegate; the mono overlay is applied in BaseActivity.onCreate. Either path is
-     * picked up with recreate().
+     * and why choosing it leaves PREF_UI_MODE_NIGHT alone — the reorder does not touch it, and
+     * «Чёрно-белая» over a followed system night mode is a legal, unchanged combination. Light,
+     * dark and system are applied through AppCompatDelegate; the mono overlay is applied in
+     * BaseActivity.onCreate. Either path is picked up with recreate().
      */
     private fun currentAppearanceIndex(): Int = when {
-        isMonoOn() -> 2
-        else -> when (MmkvManager.decodeSettingsString(AppConfig.PREF_UI_MODE_NIGHT, "2")) {
-            "1" -> 1 // Светлая
-            "0" -> 3 // Как в системе
-            else -> 0 // Тёмная — the Incy default
+        isMonoOn() -> 3
+        else -> when (MmkvManager.decodeSettingsString(AppConfig.PREF_UI_MODE_NIGHT, "0")) {
+            "2" -> 1 // Тёмная
+            "1" -> 2 // Светлая
+            // "0" and anything unrecognised: AppCompat is left at FOLLOW_SYSTEM by
+            // setNightMode's own `when`, so this is what the screen is actually doing.
+            else -> 0 // Как в системе
         }
     }
 
     /** The label for an appearance index, used by both the row value and the popup. */
     private fun appearanceLabelRes(index: Int): Int = when (index) {
-        1 -> R.string.settings_appearance_light
-        2 -> R.string.settings_appearance_mono
-        3 -> R.string.hub_appearance_system
-        else -> R.string.settings_appearance_dark
+        1 -> R.string.settings_appearance_dark
+        2 -> R.string.settings_appearance_light
+        3 -> R.string.settings_appearance_mono
+        else -> R.string.hub_appearance_system
     }
 
     private fun pickAppearance() {
@@ -608,22 +642,22 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
             caret = binding.caretAppearance,
         ) { which ->
             when (which) {
-                1 -> {
+                1 -> { // Тёмная
+                    MmkvManager.encodeSettings(AppConfig.PREF_UI_MODE_NIGHT, "2")
+                    MmkvManager.encodeSettings(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_BLUE)
+                    SettingsManager.setNightMode()
+                }
+                2 -> { // Светлая
                     MmkvManager.encodeSettings(AppConfig.PREF_UI_MODE_NIGHT, "1")
                     MmkvManager.encodeSettings(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_BLUE)
                     SettingsManager.setNightMode()
                 }
-                2 -> {
+                3 -> {
                     // Чёрно-белая: mono overlay, keep the current night mode.
                     MmkvManager.encodeSettings(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_MONO)
                 }
-                3 -> {
+                else -> { // Как в системе
                     MmkvManager.encodeSettings(AppConfig.PREF_UI_MODE_NIGHT, "0")
-                    MmkvManager.encodeSettings(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_BLUE)
-                    SettingsManager.setNightMode()
-                }
-                else -> {
-                    MmkvManager.encodeSettings(AppConfig.PREF_UI_MODE_NIGHT, "2")
                     MmkvManager.encodeSettings(AppConfig.PREF_COLOR_THEME, BaseActivity.THEME_BLUE)
                     SettingsManager.setNightMode()
                 }

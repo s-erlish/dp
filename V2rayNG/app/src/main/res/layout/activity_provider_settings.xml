@@ -13,12 +13,12 @@
   and ToolbarBinder rather than BaseActivity.setContentViewWithToolbar and its 16sp
   MaterialToolbar title.
 
-  EVERY ROW IS §6's «Строка» NOW:
+  EVERY ROW IS §6's «Строка», AND EVERY ROW IS THE SAME HEIGHT:
 
       плитка 40dp r12 нейтральная, глиф 22dp   @style/Widget.Departament.Tile
-      → 16dp → заголовок 14sp + подпись 12.5sp Body + Caption
+      → 16dp → заголовок 14sp                  Body
       → 12dp → значение 13sp / переключатель   Subtitle / MaterialSwitch
-      минимум 56dp, растёт с подписью          @style/Widget.Departament.Row
+      минимум 56dp, высота по плитке = 60dp    @style/Widget.Departament.Row
 
   What that replaces, line for line: `?attr/selectableItemBackground` (a ripple, and
   §1 bans the whole kind — it is @drawable/bg_row plus @anim/press_row 0.975 now),
@@ -26,12 +26,35 @@
   card inset, a 68dp-inset hairline, and five colours of icon tile — blue, green,
   orange, yellow and purple — that encoded no category at all (D-5, §9).
 
-  TWO ROWS OPEN THE SELECT POPUP, not a dialog: «Интервал обновления» and
-  «Сортировка серверов» are two of the nine §6 names, so both carry the CARET
-  (@drawable/ic_arrow_drop_down) instead of a chevron — a chevron promises a screen
-  and neither row opens one — and both have a @id/caret_* the popup can turn 180°.
-  «User-Agent» keeps its chevron and its dialog: it is free text, not a choice from
-  a short list, and §6's popup has nothing to offer it.
+  NOT ONE ROW CARRIES A SUBTITLE, and every switch overrides android:minHeight.
+  Owner report 0.4.9, the same one that levelled the Настройки tab: «в настройках
+  подписок такая же тема с высотой, надо фиксить». This screen was the worse of the
+  two — FIVE different row heights, 60 / 61 / 68 / 78 / 95 — from two causes:
+
+    1. FOUR ROWS CARRIED A SECOND LINE, and unlike the tab's these had no maxLines,
+       so they ran as long as they liked: «Показывать уведомление после обновления
+       подписки» took two lines and «Отправлять идентификатор устройства при
+       обновлении подписки» took THREE, which is a 95dp row next to a 60dp one.
+       Dropped at the call site — here. NO STRING WAS DELETED; each one stays in
+       values/strings_provider.xml with a comment saying it has no reader and why.
+    2. EVERY SWITCH WAS 48dp TALL. Material's
+       Widget.Material3.CompoundButton.MaterialSwitch (the parent of
+       @style/Widget.Departament.Switch) sets android:minHeight="?minTouchTargetSize"
+       = 48dp — 8dp above the tile — so even a bare toggle row measured 68 against
+       a value row's 60. Every switch here is clickable="false" focusable="false"
+       because THE ROW is the target and the row already carries minHeight 56, so
+       the floor guards a target that does not exist; minHeight 0 lets the switch
+       sit at its own 32dp track. Not a fixed height, and a switch has no text to
+       clip: at font scale 200% the text column overtakes the tile and the row grows.
+
+  ONE ROW OPENS THE SELECT POPUP, not a dialog: «Сортировка серверов» is one of the
+  nine §6 names, so it carries the CARET (@drawable/ic_arrow_drop_down) instead of a
+  chevron — a chevron promises a screen and it opens none — and it has a
+  @id/caret_sort_order the popup can turn 180°.
+
+  «User-Agent» IS Row.Fact NOW: it reports, it does not lead anywhere. See the
+  comment on @id/row_user_agent. «Интервал обновления» is gone from this screen
+  altogether; see the comment where it stood, in the ОБНОВЛЕНИЕ card.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -97,26 +120,13 @@
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_refresh_24dp" />
 
-                        <LinearLayout
+                        <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_marginEnd="@dimen/space_12"
                             android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:text="@string/ps_auto_update"
-                                android:textAppearance="@style/TextAppearance.App.Body" />
-
-                            <TextView
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_4"
-                                android:text="@string/ps_auto_update_sub"
-                                android:textAppearance="@style/TextAppearance.App.Caption" />
-                        </LinearLayout>
+                            android:text="@string/ps_auto_update"
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
                         <com.google.android.material.materialswitch.MaterialSwitch
                             android:id="@+id/switch_auto_update"
@@ -125,55 +135,30 @@
                             android:layout_height="wrap_content"
                             android:clickable="false"
                             android:focusable="false"
-                            android:importantForAccessibility="no" />
+                            android:importantForAccessibility="no"
+                            android:minHeight="0dp" />
                     </LinearLayout>
 
-                    <com.google.android.material.divider.MaterialDivider
-                        android:id="@+id/divider_interval"
-                        style="@style/Widget.Departament.Divider.Full"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
+                    <!-- «ИНТЕРВАЛ ОБНОВЛЕНИЯ» СТОЯЛ ЗДЕСЬ и снят по указанию владельца
+                         («он уже и так вынесен в общий список настроек»). Проверено перед
+                         снятием, а не после: обе строки писали ОДНО И ТО ЖЕ хранилище —
+                         SubscriptionItem.updateInterval + .autoUpdate у каждой подписки,
+                         с последующим SubscriptionUpdater.sync(forceReschedule = true).
+                         Отдельного ключа у этого экрана нет и не было (см. комментарий
+                         к DEFAULT_INTERVAL_MINUTES в ProviderSettingsActivity).
+                         Уцелевший вход — «Автообновление подписки» (@id/row_sub_auto_update)
+                         в разделе ПОДПИСКА вкладки Настройки, SettingsTabFragment.
+                         pickSubAutoUpdate(). Он же умеет «Выключено», чего здешний список
+                         не умел. Единственная разница в наборе значений: здесь предлагалось
+                         «2 ч», а на вкладке — «3 часа»; уже сохранённые 120 минут не
+                         теряются, вкладка покажет их как «120 мин». Ни одна строка
+                         values/strings_provider.xml не удалена. -->
 
-                    <!-- Интервал обновления — §6 «окошко у значения» -->
-                    <LinearLayout
-                        android:id="@+id/row_interval"
-                        style="@style/Widget.Departament.Row"
-                        android:baselineAligned="false">
-
-                        <ImageView
-                            style="@style/Widget.Departament.Tile"
-                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
-                            android:layout_marginEnd="@dimen/space_16"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_ps_clock" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginEnd="@dimen/space_12"
-                            android:layout_weight="1"
-                            android:text="@string/ps_interval"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:id="@+id/value_interval"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle"
-                            tools:text="1 ч" />
-
-                        <ImageView
-                            android:id="@+id/caret_interval"
-                            android:layout_width="@dimen/glyph_18"
-                            android:layout_height="@dimen/glyph_18"
-                            android:layout_marginStart="@dimen/space_4"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_arrow_drop_down"
-                            app:tint="?attr/colorOnSurfaceVariant" />
-                    </LinearLayout>
-
+                    <!-- The id this divider used to carry (@id/divider_interval) went with the row
+                         it was named after. It never had a reader in Kotlin — the interval row was
+                         hidden by nothing and disabled instead — so the name was already only a
+                         label, and a divider called «interval» between «Автообновление» and
+                         «Уведомлять об обновлениях» would be a lie the next reader has to check. -->
                     <com.google.android.material.divider.MaterialDivider
                         style="@style/Widget.Departament.Divider.Full"
                         android:layout_width="match_parent"
@@ -193,26 +178,13 @@
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_ps_bell" />
 
-                        <LinearLayout
+                        <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_marginEnd="@dimen/space_12"
                             android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:text="@string/ps_notify_updates"
-                                android:textAppearance="@style/TextAppearance.App.Body" />
-
-                            <TextView
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_4"
-                                android:text="@string/ps_notify_updates_sub"
-                                android:textAppearance="@style/TextAppearance.App.Caption" />
-                        </LinearLayout>
+                            android:text="@string/ps_notify_updates"
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
                         <com.google.android.material.materialswitch.MaterialSwitch
                             android:id="@+id/switch_notify"
@@ -221,7 +193,8 @@
                             android:layout_height="wrap_content"
                             android:clickable="false"
                             android:focusable="false"
-                            android:importantForAccessibility="no" />
+                            android:importantForAccessibility="no"
+                            android:minHeight="0dp" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -265,7 +238,8 @@
                             android:layout_height="wrap_content"
                             android:clickable="false"
                             android:focusable="false"
-                            android:importantForAccessibility="no" />
+                            android:importantForAccessibility="no"
+                            android:minHeight="0dp" />
                     </LinearLayout>
 
                     <com.google.android.material.divider.MaterialDivider
@@ -301,7 +275,8 @@
                             android:layout_height="wrap_content"
                             android:clickable="false"
                             android:focusable="false"
-                            android:importantForAccessibility="no" />
+                            android:importantForAccessibility="no"
+                            android:minHeight="0dp" />
                     </LinearLayout>
 
                     <com.google.android.material.divider.MaterialDivider
@@ -337,7 +312,8 @@
                             android:layout_height="wrap_content"
                             android:clickable="false"
                             android:focusable="false"
-                            android:importantForAccessibility="no" />
+                            android:importantForAccessibility="no"
+                            android:minHeight="0dp" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -366,26 +342,13 @@
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_ps_fingerprint" />
 
-                        <LinearLayout
+                        <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_marginEnd="@dimen/space_12"
                             android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:text="@string/ps_send_hwid"
-                                android:textAppearance="@style/TextAppearance.App.Body" />
-
-                            <TextView
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_4"
-                                android:text="@string/ps_send_hwid_sub"
-                                android:textAppearance="@style/TextAppearance.App.Caption" />
-                        </LinearLayout>
+                            android:text="@string/ps_send_hwid"
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
                         <com.google.android.material.materialswitch.MaterialSwitch
                             android:id="@+id/switch_send_hwid"
@@ -394,7 +357,8 @@
                             android:layout_height="wrap_content"
                             android:clickable="false"
                             android:focusable="false"
-                            android:importantForAccessibility="no" />
+                            android:importantForAccessibility="no"
+                            android:minHeight="0dp" />
                     </LinearLayout>
 
                     <com.google.android.material.divider.MaterialDivider
@@ -402,11 +366,36 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content" />
 
-                    <!-- User-Agent: свободный текст, поэтому диалог и шеврон, а не окошко -->
+                    <!-- User-Agent — Row.Fact (view_row.xml 8.1): заголовок слева, значение
+                         справа, СТРОКА НИЧЕГО НЕ ОТКРЫВАЕТ.
+
+                         Владелец: «убери возможность настройки user agent, чтобы жил было
+                         некликабельно». Поэтому здесь нет шеврона (шеврон обещает экран),
+                         нет отклика на нажатие и нет clickable/focusable — иначе строка
+                         осталась бы остановкой для TalkBack и D-pad, то есть мишенью,
+                         которая ничего не делает. Стиль Widget.Departament.Row включает всё
+                         три, их приходится гасить здесь поимённо; stateListAnimator="@null"
+                         снимает @anim/press_row, а фон остаётся @drawable/bg_row — его
+                         состояние покоя и есть поверхность карточки, а нажатого состояния
+                         у неведущей строки не бывает.
+
+                         ЗНАЧЕНИЕ ПЕРЕЕХАЛО В ХВОСТ СТРОКИ и не потерялось. Прежде оно
+                         стояло второй строчкой (12.5sp, две строки), и это была ровно та
+                         подпись, из-за которой ряды на экране разной высоты. Прежний
+                         комментарий здесь возражал, что длинный User-Agent в хвосте
+                         обрежется до «Mozilla/5.0…» — но он и подписью обрезался, просто
+                         на строку позже, а всё, что приложение отправляет по умолчанию
+                         («v2rayNG/2.2.1», «departament/2.2.1»), это ~90dp при 206dp
+                         свободных, то есть целиком. Показать сокращённо то, что почти
+                         всегда влезает, лучше, чем ради редкого случая держать весь экран
+                         разновысоким. -->
                     <LinearLayout
                         android:id="@+id/row_user_agent"
                         style="@style/Widget.Departament.Row"
-                        android:baselineAligned="false">
+                        android:baselineAligned="false"
+                        android:clickable="false"
+                        android:focusable="false"
+                        android:stateListAnimator="@null">
 
                         <ImageView
                             style="@style/Widget.Departament.Tile"
@@ -415,43 +404,24 @@
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_ps_tag" />
 
-                        <!-- 4 and not 12 before the chevron: §6 gives the 12dp gap only to a row
-                             whose trailing slot holds a VALUE or a SWITCH. A bare glyph is
-                             punctuation on the row, and 12 in front of it opens a gutter down the
-                             right edge of the card. This row's value is its subtitle. -->
-                        <LinearLayout
+                        <!-- 12 и не 4: §6 даёт 12dp тому, у кого справа ЗНАЧЕНИЕ или
+                             переключатель, а здесь теперь значение. -->
+                        <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginEnd="@dimen/space_4"
+                            android:layout_marginEnd="@dimen/space_12"
                             android:layout_weight="1"
-                            android:orientation="vertical">
+                            android:text="@string/ps_user_agent"
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
-                            <TextView
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:text="@string/ps_user_agent"
-                                android:textAppearance="@style/TextAppearance.App.Body" />
-
-                            <!-- The value is the row's SUBTITLE and not its trailing text: a
-                                 User-Agent is a long string, and squeezed into the trailing slot
-                                 it ellipsised to «Mozilla/5.0…», which reports nothing. -->
-                            <TextView
-                                android:id="@+id/value_user_agent"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="@dimen/space_4"
-                                android:ellipsize="end"
-                                android:maxLines="2"
-                                android:textAppearance="@style/TextAppearance.App.Caption"
-                                tools:text="departament/2.2.1" />
-                        </LinearLayout>
-
-                        <ImageView
-                            android:layout_width="@dimen/glyph_18"
-                            android:layout_height="@dimen/glyph_18"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_chevron_right"
-                            app:tint="?attr/colorOnSurfaceVariant" />
+                        <TextView
+                            android:id="@+id/value_user_agent"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textAppearance="@style/TextAppearance.App.Subtitle"
+                            tools:text="departament/2.2.1" />
                     </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
