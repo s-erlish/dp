@@ -311,8 +311,12 @@ object SelectPopup {
         val popup: ViewGroup,
         val valueView: TextView?,
         val caret: View?,
-        @DimenRes val offsetTopRes: Int,
-        @DimenRes val offsetRightRes: Int,
+        // The two `select_popup_offset_*` ids the caller chose. Not annotated @DimenRes here: on a
+        // constructor property the annotation lands on the parameter today and on the backing field
+        // tomorrow, which the compiler warns about, and [show]'s own signature is where the
+        // contract is stated anyway.
+        val offsetTopRes: Int,
+        val offsetRightRes: Int,
     ) {
         var catcher: View? = null
 
