@@ -283,8 +283,6 @@ object AuthTokenStore {
 
     fun getToken(): String? = store()?.decodeString(KEY_TOKEN)
 
-    fun getExpiresAt(): Long = store()?.decodeLong(KEY_EXPIRES_AT, 0L) ?: 0L
-
     fun getUser(): UserProfileDto? {
         val json = store()?.decodeString(KEY_USER) ?: return null
         // Use the null-tolerant backend Gson so a cached profile with null string fields

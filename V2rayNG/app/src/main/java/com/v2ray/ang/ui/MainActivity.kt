@@ -371,10 +371,9 @@ class MainActivity : HelperBaseActivity(), MainHost {
         // parked and the app mute for the rest of the process — which is why it is not written after
         // the two consume* branches below, one of which returns.
         releaseAuthHandoff()
-        if (SettingsChangeManager.consumeRecreateUi()) {
-            recreate()
-            return@registerForActivityResult
-        }
+        // NO `consumeRecreateUi()` BRANCH: nothing has raised that flag in this fork, so the
+        // `recreate()` under it never ran. The theme is applied where it is picked. @see
+        // SettingsChangeManager
         if (SettingsChangeManager.consumeRestartService() && mainViewModel.isRunning.value == true) {
             restartConnection()
         }

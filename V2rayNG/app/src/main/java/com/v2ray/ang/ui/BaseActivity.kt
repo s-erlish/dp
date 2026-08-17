@@ -217,12 +217,4 @@ abstract class BaseActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Returns true when the base ProgressBar is currently visible.
-     *
-     * @return true if the progress bar exists and its visibility is VISIBLE
-     */
-    protected fun isLoadingVisible(): Boolean {
-        return progressBar?.visibility == View.VISIBLE
-    }
 }

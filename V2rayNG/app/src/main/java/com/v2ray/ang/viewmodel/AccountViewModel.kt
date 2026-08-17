@@ -91,10 +91,6 @@ class AccountViewModel : ViewModel() {
     private val _serverStatus = MutableStateFlow<List<ServerStatusDto>>(emptyList())
     val serverStatus: StateFlow<List<ServerStatusDto>> = _serverStatus.asStateFlow()
 
-    /** Local guids of the imported subscriptions after [autoImportSubscriptions]. */
-    private val _importedGuids = MutableStateFlow<List<String>>(emptyList())
-    val importedGuids: StateFlow<List<String>> = _importedGuids.asStateFlow()
-
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
 
@@ -368,10 +364,7 @@ class AccountViewModel : ViewModel() {
     fun autoImportSubscriptions(onImported: (List<String>) -> Unit = {}) = viewModelScope.launch {
         _loading.value = true
         repo.autoImportSubscriptions()
-            .onSuccess {
-                _importedGuids.value = it
-                onImported(it)
-            }
+            .onSuccess { onImported(it) }
             .onFailure { report(it) }
         // Publish through the same merge path as loadSubscriptions so the active/primary sub
         // renders (never the raw un-merged /all list) and lastPrimary/lastAll/hasSubData stay set.
@@ -610,7 +603,6 @@ class AccountViewModel : ViewModel() {
         _subsResolved.value = false
         _payments.value = emptyList()
         _deviceCount.value = null
-        _importedGuids.value = emptyList()
         _tariffs.value = emptyList()
         _error.value = null
         _loading.value = false

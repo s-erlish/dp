@@ -138,16 +138,4 @@ object TvPairingProtocol {
     /** Error response body, e.g. {"error":"duplicate"}. */
     fun buildErrorJson(error: String): String =
         JSONObject().put(JSON_KEY_ERROR, error).toString()
-
-    /**
-     * Extracts the {"error":".."} field from a TV response body, if present.
-     */
-    fun parseErrorJson(body: String?): String? {
-        if (body.isNullOrBlank()) return null
-        return try {
-            JSONObject(body).optString(JSON_KEY_ERROR).ifEmpty { null }
-        } catch (e: Exception) {
-            null
-        }
-    }
 }

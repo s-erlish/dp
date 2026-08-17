@@ -162,17 +162,6 @@ class MainRecyclerAdapter(
      */
     private var selectedGuid: String? = MmkvManager.getSelectServer()
 
-    /** Toggles collapse state across all provider sections. */
-    @SuppressLint("NotifyDataSetChanged")
-    fun toggleCollapseAll() {
-        val allSubIds = rows.filterIsInstance<Row.Header>().map { it.subId }
-        if (allSubIds.isEmpty()) return
-        val anyExpanded = allSubIds.any { !collapsed.contains(it) }
-        if (anyExpanded) collapsed.addAll(allSubIds) else collapsed.clear()
-        rebuildRows()
-        notifyDataSetChanged()
-    }
-
     override fun getItemCount() = rows.size + 1
 
     override fun getItemViewType(position: Int): Int {
@@ -460,9 +449,6 @@ class MainRecyclerAdapter(
         }
         positions.distinct().forEach { notifyItemChanged(it) }
     }
-
-    /** Flat adapter position of a server guid, or -1. */
-    fun positionOfGuid(guid: String): Int = flatPositionOf(guid)
 
     open class BaseViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         fun onItemSelected() {
