@@ -193,7 +193,7 @@ object NotificationManager {
             //
             // Знак и так на месте: setSmallIcon выше — это марка, которую система рисует из
             // альфы и красит setColor'ом. Одного раза достаточно.
-            .setColor(ContextCompat.getColor(service, R.color.icon_blue))
+            .setColor(ContextCompat.getColor(service, R.color.notification_badge))
             .setContentTitle(title)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
@@ -225,7 +225,7 @@ object NotificationManager {
     private fun buildFallbackNotification(service: Service, channelId: String): Notification {
         return NotificationCompat.Builder(service, channelId)
             .setSmallIcon(R.drawable.ic_stat_name)
-            .setColor(ContextCompat.getColor(service, R.color.icon_blue))
+            .setColor(ContextCompat.getColor(service, R.color.notification_badge))
             .setContentTitle(service.getString(R.string.app_name))
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
