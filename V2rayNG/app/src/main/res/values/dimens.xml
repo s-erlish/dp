@@ -345,4 +345,19 @@
         gap. It is one distance, tied to space_16, and it moves only when that does.
     -->
     <dimen name="space_16_reverse">-16dp</dimen>
+    <!--
+        THE TOOLBAR ACTION'S OPTICAL NUDGE, per glyph. Read ToolbarBinder.alignInkToGutter for
+        the arithmetic; these are its two results.
+
+        Both action glyphs live in a correctly placed 24dp box and differ only in how much of
+        that box they draw in: ic_add_24dp's ink runs x 5-19, ic_more_vert_24dp's x 10-14. That
+        leaves 5dp of air behind «+» and 10dp behind «⋮», so the same slot puts one 21dp from
+        the screen edge and the other 26dp, against the back chevron's ink at 20dp opposite.
+
+        These are the two distances back to 20. Negative, not spacing steps, and per GLYPH and
+        not per slot on purpose — one shared value big enough for «⋮» would shove «+» past the
+        16dp gutter.
+    -->
+    <dimen name="toolbar_action_nudge_wide">-1dp</dimen>
+    <dimen name="toolbar_action_nudge_overflow">-6dp</dimen>
 </resources>
