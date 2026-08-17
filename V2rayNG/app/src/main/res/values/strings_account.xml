@@ -84,12 +84,23 @@
     <string name="account_ring_unlimited">без ограничений</string>
     <string name="account_ring_of">из %1$s</string>
 
-    <!-- «Способы входа»: what this account can be signed in with. Today that is Telegram, and
-         the row names the account it is actually linked to rather than only the method. -->
+    <!-- «Способы входа»: what this account can be signed in with — Telegram and the site — and
+         each row names the account it is actually linked to rather than only the method.
+
+         THE TWO STATE LINES ARE SHARED BY BOTH ROWS. They are not Telegram's private copy: the
+         sentences are «Привязан · …» and «Не привязан», which say nothing about the method, and
+         both agree in gender with «Telegram» and with «Сайт» alike. A second pair spelling the
+         same two words would be a second name for one string, which this project does not do.
+         Their keys keep the older word because an id is not copy; see @string/auth_btn_email. -->
     <string name="account_login_methods">Способы входа</string>
     <string name="account_login_telegram">Telegram</string>
     <string name="account_login_telegram_linked">Привязан · %1$s</string>
     <string name="account_login_telegram_unlinked">Не привязан</string>
+    <!-- NEW (2026-08-17). «в аккаунте добавь кнопку где способы входа туда сайт, чтобы можно было
+         привязать почту с сайта». One word, and it is the SAME word the two sign-in surfaces use
+         for this door («Войти через сайт»), so the row and the button are recognisably one thing.
+         Not «Почта»: the e-mail is what the row REPORTS, the site is the way in. -->
+    <string name="account_login_site">Сайт</string>
 
     <!-- Tariffs -->
     <string name="account_tariffs_header">Тарифы</string>

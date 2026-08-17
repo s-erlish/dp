@@ -998,48 +998,153 @@
             app:strokeWidth="@dimen/stroke_hairline">
 
             <LinearLayout
-                android:id="@+id/row_login_telegram"
-                style="@style/Widget.Departament.Row.Action">
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
 
-                <FrameLayout
-                    android:layout_width="@dimen/tile_size"
-                    android:layout_height="@dimen/tile_size"
-                    android:background="@drawable/bg_tile_neutral"
-                    android:backgroundTint="?attr/colorSurfaceContainerHighest">
+                <!-- TWO ROWS, ONE MECHANIC. «в аккаунте добавь кнопку где способы входа
+                     туда сайт, чтобы можно было привязать почту с сайта, в общем да, не
+                     хватает этого, все в том же стиле как и кнопка телеграма там».
+
+                     So the site is a ROW of this list and not a button beside it: same
+                     40dp neutral tile, same 22dp glyph, same title over a state line,
+                     same full-bleed rule between them. The card stopped being the only
+                     one on the tab with a single row and no second line.
+
+                     AND THE STATE LINE IS THE AFFORDANCE. Each row is a read-out while
+                     the method IS attached and a way to attach it while it is not —
+                     AccountFragment.renderLoginMethods flips `clickable` and the chevron
+                     together, so a row never offers a tap that has nothing to do. That
+                     rule is shared by both: the Telegram row was a read-out with no way
+                     in at all on this tab (the only «Привязать Telegram» lived on the
+                     Главная gate, which is gone the moment a подписка exists). -->
+                <LinearLayout
+                    android:id="@+id/row_login_telegram"
+                    style="@style/Widget.Departament.Row.Navigation"
+                    android:background="@drawable/bg_row_top">
+
+                    <FrameLayout
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
+
+                        <ImageView
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
+                            android:layout_gravity="center"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_telegram_24dp"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_12"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/account_login_telegram"
+                            android:textAppearance="@style/TextAppearance.App.Body"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <TextView
+                            android:id="@+id/tv_login_telegram_state"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/space_2"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:text="@string/account_login_telegram_unlinked"
+                            android:textAppearance="@style/TextAppearance.App.Caption"
+                            tools:text="Привязан · @erlish" />
+                    </LinearLayout>
 
                     <ImageView
-                        android:layout_width="@dimen/tile_glyph"
-                        android:layout_height="@dimen/tile_glyph"
-                        android:layout_gravity="center"
+                        android:id="@+id/chevron_login_telegram"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
                         android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_telegram_24dp"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-                </FrameLayout>
+                        android:visibility="gone"
+                        app:srcCompat="@drawable/ic_chevron_right"
+                        app:tint="?attr/colorOnSurfaceVariant"
+                        tools:visibility="visible" />
+                </LinearLayout>
 
+                <!-- FULL BLEED, no 68dp inset — the prototype draws the rule between two
+                     rows edge to edge inside the card, and «Управление» right above
+                     already ports it that way. A rule that starts at the text is the
+                     Material list convention, not this design. -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/stroke_hairline"
+                    android:background="?attr/colorOutlineVariant" />
+
+                <!-- «Сайт» — the same word the two sign-in surfaces use for this door, so
+                     «Войти через сайт» and this row are recognisably the same thing. The
+                     glyph is @drawable/ic_ob_site, already drawn for the start screen; a
+                     second site glyph would be a second name for one mark. -->
                 <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/space_16"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
+                    android:id="@+id/row_login_site"
+                    style="@style/Widget.Departament.Row.Navigation"
+                    android:background="@drawable/bg_row_bottom">
 
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/account_login_telegram"
-                        android:textAppearance="@style/TextAppearance.App.Body"
-                        android:textColor="?attr/colorOnSurface" />
+                    <FrameLayout
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
-                    <TextView
-                        android:id="@+id/tv_login_telegram_state"
-                        android:layout_width="match_parent"
+                        <ImageView
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
+                            android:layout_gravity="center"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_ob_site"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_2"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:text="@string/account_login_telegram_unlinked"
-                        android:textAppearance="@style/TextAppearance.App.Caption"
-                        tools:text="Привязан · @erlish" />
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_12"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/account_login_site"
+                            android:textAppearance="@style/TextAppearance.App.Body"
+                            android:textColor="?attr/colorOnSurface" />
+
+                        <TextView
+                            android:id="@+id/tv_login_site_state"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/space_2"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:text="@string/account_login_telegram_unlinked"
+                            android:textAppearance="@style/TextAppearance.App.Caption"
+                            tools:text="Привязан · name@example.com" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:id="@+id/chevron_login_site"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:importantForAccessibility="no"
+                        android:visibility="gone"
+                        app:srcCompat="@drawable/ic_chevron_right"
+                        app:tint="?attr/colorOnSurfaceVariant"
+                        tools:visibility="visible" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>

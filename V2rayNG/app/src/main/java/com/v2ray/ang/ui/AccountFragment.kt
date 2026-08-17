@@ -501,7 +501,7 @@ class AccountFragment : Fragment() {
             binding.rowBalance.isVisible = false
             AvatarManager.setMonogram(binding.tvAvatarInitial, null)
             AvatarManager.applyAvatar(viewLifecycleOwner.lifecycleScope, requireContext(), binding.imgAvatar, binding.tvAvatarInitial, null)
-            binding.tvLoginTelegramState.setText(R.string.account_login_telegram_unlinked)
+            renderLoginMethods(null)
             return
         }
         // A real profile landed — leave the loading skeleton behind.
@@ -515,21 +515,7 @@ class AccountFragment : Fragment() {
         AvatarManager.setMonogram(binding.tvAvatarInitial, primary)
         AvatarManager.applyAvatar(viewLifecycleOwner.lifecycleScope, requireContext(), binding.imgAvatar, binding.tvAvatarInitial, profile)
 
-        // «Способы входа»: name the account the sign-in is actually tied to. `telegramLinked` alone
-        // is the method; the handle (or the display name, or the numeric id the backend gave us) is
-        // the answer to "which account is this".
-        binding.tvLoginTelegramState.text = if (profile.telegramLinked) {
-            val identity = profile.telegramUsername?.takeIf { it.isNotBlank() }?.let { "@$it" }
-                ?: profile.telegramName?.takeIf { it.isNotBlank() }
-                ?: profile.telegramId?.toString()
-            if (identity == null) {
-                getString(R.string.account_login_telegram_linked, getString(R.string.account_login_telegram))
-            } else {
-                getString(R.string.account_login_telegram_linked, identity)
-            }
-        } else {
-            getString(R.string.account_login_telegram_unlinked)
-        }
+        renderLoginMethods(profile)
 
         binding.rowBalance.isVisible = true
         val previousBalance = lastBalance
@@ -545,6 +531,100 @@ class AccountFragment : Fragment() {
         // first two was the owner's complaint, twice. `profile.referralCode` still arrives, the
         // referral endpoints are still wired (AccountRepository.getReferralStats) — the tab simply
         // has nowhere in its layout that shows it.
+    }
+
+    /**
+     * «СПОСОБЫ ВХОДА» — one card, two rows, one rule.
+     *
+     * Each row names a method, states which account it is attached to, and IS the way to attach it
+     * while it is not: «в аккаунте добавь кнопку где способы входа туда сайт, чтобы можно было
+     * привязать почту с сайта … все в том же стиле как и кнопка телеграма там».
+     *
+     * THE SITE ROW GOES WHERE «ВОЙТИ ЧЕРЕЗ САЙТ» GOES — [LoginActivity.MODE_SITE]. The owner has
+     * taken e-mail out of the interface as a method of its own, so there is no in-app "attach an
+     * address" form to send anyone to and there must not be a second one invented here; the site's
+     * own sign-in is where an address is proved, and that surface already exists.
+     *
+     * THE TELEGRAM ROW GAINS THE SAME AFFORDANCE, and this is the gap the second row exposed: the
+     * app's only «Привязать Telegram» sits on the Главная gate, which is not drawn once a подписка
+     * exists — i.e. exactly when someone would come here to attach one. It runs the flow that was
+     * already built and already used, [LoginActivity.EXTRA_LINK], which attaches to the session
+     * instead of signing a second account in.
+     *
+     * A LINKED ROW IS A READ-OUT, not a dimmed control: no chevron, no press response, no tap. A
+     * chevron on a row whose answer is «Привязан · @erlish» promises a screen that does not exist.
+     * `clickable` and `focusable` are cleared with it, so the row also stops being a stop for
+     * TalkBack's swipe and for a D-pad on TV.
+     *
+     * @param profile null while the tab has no session data yet — both rows report "not attached",
+     * which is also the state a signed-out visitor's blank tab shows.
+     */
+    private fun renderLoginMethods(profile: UserProfileDto?) {
+        val telegramIdentity = if (profile?.telegramLinked == true) {
+            profile.telegramUsername?.takeIf { it.isNotBlank() }?.let { "@$it" }
+                ?: profile.telegramName?.takeIf { it.isNotBlank() }
+                ?: profile.telegramId?.toString()
+                // Linked, but the backend named no handle: say the method rather than «Привязан · ».
+                ?: getString(R.string.account_login_telegram)
+        } else {
+            null
+        }
+        bindLoginMethod(
+            row = binding.rowLoginTelegram,
+            state = binding.tvLoginTelegramState,
+            chevron = binding.chevronLoginTelegram,
+            identity = telegramIdentity,
+        ) { openTelegramLink() }
+
+        // The address IS the identity here, and a blank one is exactly "no e-mail attached" — an
+        // account created from Telegram alone has none.
+        bindLoginMethod(
+            row = binding.rowLoginSite,
+            state = binding.tvLoginSiteState,
+            chevron = binding.chevronLoginSite,
+            identity = profile?.email?.takeIf { it.isNotBlank() },
+        ) { openLogin(LoginActivity.MODE_SITE) }
+    }
+
+    /** One row of «Способы входа». [identity] non-null means attached, and attached means inert. */
+    private fun bindLoginMethod(
+        row: View,
+        state: TextView,
+        chevron: View,
+        identity: String?,
+        onAttach: () -> Unit,
+    ) {
+        val linked = identity != null
+        state.text = if (linked) {
+            getString(R.string.account_login_telegram_linked, identity)
+        } else {
+            getString(R.string.account_login_telegram_unlinked)
+        }
+        chevron.isVisible = !linked
+        row.isClickable = !linked
+        row.isFocusable = !linked
+        if (linked) {
+            row.setOnClickListener(null)
+        } else {
+            row.onSingleClick { onAttach() }
+            row.pressFeedback(R.anim.press_row)
+        }
+        // The row's background is a selector with a fade; a recycled or re-bound row must not
+        // dissolve its previous look into this one (the rule found three times in this project).
+        row.jumpDrawablesToCurrentState()
+    }
+
+    /**
+     * «Привязать Telegram» — the flow that already exists, run against the session that is already
+     * signed in, so the backend attaches instead of logging a second account in. Mirrors
+     * `HomeFragment.openTelegramLink`.
+     */
+    private fun openTelegramLink() {
+        startActivity(
+            Intent(requireContext(), LoginActivity::class.java)
+                .putExtra(LoginActivity.EXTRA_MODE, LoginActivity.MODE_TELEGRAM)
+                .putExtra(LoginActivity.EXTRA_LINK, true)
+        )
     }
 
     /**
