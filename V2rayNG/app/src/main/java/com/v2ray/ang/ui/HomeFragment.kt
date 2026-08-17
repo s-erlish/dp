@@ -328,6 +328,20 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private var ringTrackDimmed = false
 
     /**
+     * The active ring's opacity RIGHT NOW, between [RING_ALPHA_TRACK] and [OPAQUE].
+     *
+     * [ringTrackDimmed] is the intent — «the arc is on the ring» — and this is the value on the
+     * glass, which travels between the two ends instead of jumping. They are separate because the
+     * intent flips in one frame and the movement takes the arc's own clock; a single boolean could
+     * only ever express the jump, and the jump is what the owner reported: «слишком резко … возврат
+     * полной заливки вокруг кольца».
+     */
+    private var ringTrackAlpha = OPAQUE
+
+    /** The travel between those two ends. @see dimRingTrack */
+    private var ringTrackAnimator: ValueAnimator? = null
+
+    /**
      * The last server name and flag this screen could resolve, so a live tunnel is never left with
      * nothing to call itself. @see resolveState
      */
@@ -367,6 +381,15 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * compositor awake from a screen nobody is looking at.
      */
     private var sweepSpin: ObjectAnimator? = null
+
+    /**
+     * The BOUNDED last stretch of that same revolution — from wherever the arc is to the next
+     * quarter mark — which is what the exit rides instead of cancelling the turn outright.
+     *
+     * Its own handle, because it drives the same ROTATION property as [sweepSpin] and the two must
+     * never run together. @see windDownSweep
+     */
+    private var sweepWindDown: ObjectAnimator? = null
 
     /** True while the arc's exit is still running, so an arriving load re-shows it. @see hideSweep */
     private var sweepHiding = false
@@ -521,6 +544,16 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         /** One full revolution — the arc's wind-up lands back where it started, so nothing snaps. */
         const val FULL_TURN_DEGREES = 360f
 
+        /**
+         * WHERE THE ARC IS ALLOWED TO STOP: the quarters of the circle.
+         *
+         * An exit that cancels the turn leaves the arc at an arbitrary angle, and the next
+         * appearance starts from a different one — the object never looks the same twice at the one
+         * moment it is standing still. A quarter is the coarsest mark that is always within half a
+         * second of the arc at the 1100ms tempo, which is what keeps the exit bounded. @see hideSweep
+         */
+        const val SWEEP_STOP_STEP = 90f
+
         // Where the connected settle lands. §4 asks for a DECAY, so the rings arrive at full
         // brightness on the moment of connection and come to rest a little under it — far enough
         // to be a fade, near enough that the object is still plainly the connected one. Any lower
@@ -665,6 +698,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         timerHandler.removeCallbacks(uptimeRunnable)
         ringAnimator?.cancel()
         ringAnimator = null
+        // The arc's hand-back to the ring. Short, but it writes a stroke into three GradientDrawables
+        // that are nulled at the bottom of this method. @see dimRingTrack
+        ringTrackAnimator?.cancel()
+        ringTrackAnimator = null
         breathAnimator?.cancel()
         breathAnimator = null
         // The sonar holds a hardware layer on each of its two rings for the length of its flight;
@@ -854,6 +891,67 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         if (isBindingInitialized) render()
     }
 
+    /**
+     * ============================================================================
+     * THE FRAME A LIST REBUILD IS IN IS NOT A FRAME AN ANIMATION MAY START IN.
+     * ============================================================================
+     *
+     *     «получается пролаг, когда идёт анимация обновления, то потом с пролагом каким-то слишком
+     *      резко конец анимации»
+     *
+     * A finished подписка refresh ends in ONE main-thread message that does all of this: decode
+     * every profile out of MMKV (`MainViewModel.updateCache`), rebuild the карусель, call
+     * `notifyDataSetChanged` over the result — and then start the arc's exit and, on a flow, §3's
+     * whole table. `notifyDataSetChanged` does not do the work; it requests a traversal, and that
+     * traversal is the NEXT frame — the same frame the animators were just told to treat as t=0.
+     * So frame one of the movement is spent binding thirty rows, frame two arrives 60–80ms later
+     * and the interpolator, which is a function of the clock and not of the frames it got, is
+     * already a third of the way through. That is the report exactly: a stall, then a jump, then
+     * nothing. The animation was never slow — it was never drawn.
+     *
+     * So the rebuild keeps its frame and the movement gets the next one. [action] runs in the
+     * pre-draw of the traversal the rebuild asked for, i.e. after measure, layout and every bind,
+     * with only the draw left — and the animator's first tick lands on the following vsync, which
+     * is a clean one.
+     *
+     * THE WAIT IS EXACTLY ONE FRAME AND CANNOT BE MORE, because [action] is usually the thing that
+     * balances a counter and a deferral that can be dropped is a leak. Three ways out and all three
+     * run it exactly once: no view at all (run now), the pre-draw (the intended one), and the view
+     * leaving the window before that frame ever happens. The [invalidate] is what guarantees the
+     * frame — a pre-draw listener only fires if something draws, and «nothing changed» is a real
+     * outcome of a load.
+     */
+    private fun afterListSettles(action: () -> Unit) {
+        if (!isBindingInitialized) {
+            action()
+            return
+        }
+        val root = binding.homeContent
+        if (!root.isAttachedToWindow) {
+            action()
+            return
+        }
+        var pending = true
+        fun once() {
+            if (!pending) return
+            pending = false
+            action()
+        }
+        val detached = object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) = Unit
+            override fun onViewDetachedFromWindow(v: View) {
+                v.removeOnAttachStateChangeListener(this)
+                once()
+            }
+        }
+        root.addOnAttachStateChangeListener(detached)
+        root.doOnPreDraw {
+            root.removeOnAttachStateChangeListener(detached)
+            once()
+        }
+        root.invalidate()
+    }
+
     // ==================== Building the connect object ====================
 
     /**
@@ -1024,11 +1122,12 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         ringOuter?.setStroke(frameStroke, ColorUtils.setAlphaComponent(colour, RING_ALPHA_OUTER))
         ringMid?.setStroke(frameStroke, ColorUtils.setAlphaComponent(colour, RING_ALPHA_MID))
         // The active ring is the arc's TRACK while the arc is on it, and a track is quieter than
-        // what runs on it. @see dimRingTrack
-        val inner = if (ringTrackDimmed) {
-            ColorUtils.setAlphaComponent(colour, RING_ALPHA_TRACK)
-        } else {
+        // what runs on it. The figure is read from [ringTrackAlpha] rather than from the boolean, so
+        // the step down and the step back up are a movement and not two states. @see dimRingTrack
+        val inner = if (ringTrackAlpha >= OPAQUE) {
             colour
+        } else {
+            ColorUtils.setAlphaComponent(colour, ringTrackAlpha)
         }
         ringInner?.setStroke(activeStroke, inner)
     }
@@ -1055,13 +1154,47 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * against a white ground, which is the same statement — quieter than the arc — spelled the way
      * a light theme spells it.
      *
-     * Restored the moment the arc stops, so a connected object is the full-strength accent ring §4
-     * asks for and an idle one is its muted static ring.
+     * Restored as the arc stops, so a connected object is the full-strength accent ring §4 asks for
+     * and an idle one is its muted static ring.
+     *
+     * ## AND IT IS A MOVEMENT, ON THE ARC'S OWN CLOCK
+     *
+     *     «получается пролаг … потом слишком резко конец анимации и возврат полной заливки вокруг
+     *      кольца … надо доработать чтобы это было плавно, а не так резко»
+     *
+     * This used to be a property write: the boolean flipped and `applyRingColor` repainted the
+     * stroke in that frame. So the arc left over 165ms while the ring under it came back in one —
+     * two events where the eye expects one, and the harder one landed first.
+     *
+     * [over] is the duration of the movement the arc is making at this instant, handed in by
+     * [paintConnect] from [showSweep] / [hideSweep], so the ring is always on the arc's clock rather
+     * than on a second one that happens to be the same length. Zero means «no movement to join» —
+     * a repaint that finds the arc already where it belongs — and then this lands instantly, which
+     * is also the reduced-motion answer.
      */
-    private fun dimRingTrack(dimmed: Boolean) {
+    private fun dimRingTrack(dimmed: Boolean, over: Long = 0L) {
         if (ringTrackDimmed == dimmed) return
         ringTrackDimmed = dimmed
-        applyRingColor(ringColor)
+        val target = if (dimmed) RING_ALPHA_TRACK else OPAQUE
+        // Two of these in flight would fight over one stroke; the newer intent wins outright.
+        ringTrackAnimator?.cancel()
+        ringTrackAnimator = null
+        if (over <= 0L || !isBindingInitialized || binding.connectFrame.reducedMotion()) {
+            ringTrackAlpha = target
+            applyRingColor(ringColor)
+            return
+        }
+        ringTrackAnimator = ValueAnimator.ofInt(ringTrackAlpha, target).apply {
+            duration = over
+            interpolator = easeStandard
+            addUpdateListener {
+                ringTrackAlpha = it.animatedValue as Int
+                // `ringColor` is read live: a state tint may be crossing at the same time, and the
+                // track's opacity has to ride whatever hue that tween is on rather than freeze one.
+                applyRingColor(ringColor)
+            }
+            start()
+        }
     }
 
     // ==================== THE ENTRANCE (handoff §3, «Сборка главной») ====================
@@ -2800,13 +2933,17 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // negotiating a tunnel, and a подписка being fetched.
         val sweeping = negotiating || backgroundLoads > 0
         // BOTH SIDES, and both idempotent: showSweep() re-arms a revolution the background
-        // stopped without replaying the entrance, hideSweep() fades the arc out instead of
+        // stopped without replaying the entrance, hideSweep() winds the arc down instead of
         // dropping it mid-turn. The `sweepRunning` edge is what keeps the entrance one-shot.
-        if (sweeping) showSweep() else hideSweep()
+        //
+        // Each side ANSWERS WITH THE LENGTH OF THE MOVEMENT IT JUST STARTED, and zero when it found
+        // nothing to move. That answer is the whole of the hand-off below: the ring's step down and
+        // step back up run on the arc's clock, in the same frame, so the two read as one gesture.
+        val handover = if (sweeping) showSweep() else hideSweep()
         sweepRunning = sweeping
         // The ring under the arc steps down to the prototype's 30% for as long as the arc is on it,
         // so the movement reads. Set BEFORE the tint below, which is what repaints the stroke.
-        dimRingTrack(sweeping)
+        dimRingTrack(sweeping, handover)
 
         // THE ONE BREATH LEFT. Negotiating owns the ring alphas at 850ms and says "working on it";
         // every other state is still, because §4 gives the object exactly one other motion — the
@@ -3354,8 +3491,13 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         viewLifecycleOwner.lifecycleScope.launch {
             val result = runCatching { AccountRepository().autoImportSubscriptions() }
                 .getOrElse { Result.failure(it) }
-            if (!isBindingInitialized) return@launch
-            hideConnectArc()
+            if (!isBindingInitialized) {
+                // The counter outlives the view — it is the fragment's, not the binding's — so the
+                // one exit with no screen left to paint still balances it. Left unbalanced, the arc
+                // would be spinning on the next view this fragment gets.
+                if (backgroundLoads > 0) backgroundLoads--
+                return@launch
+            }
             result
                 .onSuccess {
                     // The cache is what the list and the carousel are painted from, and the account
@@ -3363,12 +3505,16 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
                     mainViewModel.reloadServerList()
                     accountViewModel.loadSubscriptions()
                 }
-                .onFailure {
-                    // A REAL failure this time, so the gate is allowed to say so: `syncRequested`
-                    // is still set and `backgroundLoads` is back to zero, which is precisely the
-                    // pair [resolveGate] turns into SYNC_FAILED.
-                    render()
-                }
+            // THE REBUILD ABOVE AND THE ARC'S EXIT ARE NOT THE SAME FRAME any more. `hideConnectArc`
+            // used to run first and the rebuild second, in one message, so the exit's clock started
+            // on the frame that binds every row. @see afterListSettles
+            afterListSettles {
+                hideConnectArc()
+                // A REAL failure this time, so the gate is allowed to say so: `syncRequested`
+                // is still set and `backgroundLoads` is back to zero, which is precisely the
+                // pair [resolveGate] turns into SYNC_FAILED.
+                if (result.isFailure && isBindingInitialized) render()
+            }
         }
     }
 
@@ -3513,9 +3659,13 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * negotiating: the ENTRANCE plays only when the arc was not on screen, while the revolution is
      * re-armed unconditionally — [onPause] stops the infinite animator and [onResume]'s render is
      * what has to put it back, without replaying an entrance the user already saw.
+     *
+     * @return how long the arc's arrival takes, or 0 when it was already there. [paintConnect] puts
+     *   the ring's step down on the same clock. @see dimRingTrack
      */
-    private fun showSweep() {
+    private fun showSweep(): Long {
         val sweep = binding.connectSweep
+        var handover = 0L
         // «Visible» is not the same as «staying»: a background load that ends and a connect that
         // starts a beat later catch the arc mid-exit, still visible and still fading to nothing.
         // That is a fresh appearance and takes the entrance again — without this test the arc
@@ -3523,29 +3673,47 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         if (!sweep.isVisible || sweepHiding) {
             sweepHiding = false
             sweep.isVisible = true
-            playArcWindUp()
+            handover = playArcWindUp()
         }
         startSweepSpin()
+        return handover
     }
 
     /**
-     * The arc leaves. The exit is the reverse of [playArcWindUp] at 75% of it (motion_state_exit),
-     * and the revolution stops with the last frame rather than being left running behind an
-     * invisible view — the whole point of owning the animator instead of a Material indicator.
+     * THE ARC LEAVES, AND IT COASTS TO A STOP RATHER THAN BEING SWITCHED OFF.
+     *
+     * The exit used to be a flat `motion_state_exit` fade over an arc still turning at full tempo,
+     * cut at whatever angle the cancel happened to catch. 165ms is 54° of travel: short enough that
+     * the eye reads an end rather than a departure, which is half of «слишком резко конец
+     * анимации». The other half was the ring, and that is [dimRingTrack].
+     *
+     * So the arc now FINISHES A QUARTER. [windDownSweep] carries it to the next quarter mark of the
+     * circle at the unchanged 1100ms tempo — the tempo is never touched, §4 — and the fade runs over
+     * exactly that window, so the arc travels a readable distance while it dissolves and comes to
+     * rest on a mark instead of wherever the cancel landed.
+     *
+     * **The exit is bounded and the bound is stated in the design's own numbers**: the landing is at
+     * least `motion_state_exit` of travel away (54° — otherwise an arc already sitting on a mark
+     * would vanish in three frames) and at most that plus one quarter, so the window is 165–440ms.
+     * Waiting for a WHOLE revolution would have been up to 1100ms of held screen, which is the
+     * owner's other complaint spelled backwards.
+     *
+     * @return that window, so the ring's return can be laid over it.
      */
-    private fun hideSweep() {
+    private fun hideSweep(): Long {
         val sweep = binding.connectSweep
-        if (!sweep.isVisible || sweepHiding) return
+        if (!sweep.isVisible || sweepHiding) return 0L
         sweep.animate().cancel()
         if (sweep.reducedMotion()) {
             stopSweepSpin()
             sweep.alpha = 1f
             sweep.isVisible = false
-            return
+            return 0L
         }
+        val exit = windDownSweep()
         sweepHiding = true
         sweep.animate().alpha(0f)
-            .setDuration(durStateExit)
+            .setDuration(exit)
             .setInterpolator(easeStandard)
             .withEndAction {
                 // The flag is also the CANCEL guard. A ViewPropertyAnimator runs its end action on
@@ -3558,7 +3726,44 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
                 sweep.isVisible = false
             }
             .start()
+        return exit
     }
+
+    /**
+     * The last stretch of the revolution: from wherever the arc is to the next quarter mark, at the
+     * steady tempo, once.
+     *
+     * It replaces the infinite animator rather than running beside it — two animators on one
+     * ROTATION is how a steady spin gets snapped, which is the note [playArcWindUp] already carries
+     * — so it is held in its own handle and [startSweepSpin] drops it before re-arming.
+     *
+     * @return the length of that stretch in ms, which is also the length of the whole exit.
+     */
+    private fun windDownSweep(): Long {
+        val sweep = binding.connectSweep
+        val spin = resources.getInteger(R.integer.motion_spin).toLong()
+        sweepSpin?.cancel()
+        sweepSpin = null
+        val angle = turnOf(sweep.rotation)
+        // How far past the last mark the arc is, and therefore how far the next one is.
+        val past = angle - (angle / SWEEP_STOP_STEP).toInt() * SWEEP_STOP_STEP
+        var travel = SWEEP_STOP_STEP - past
+        // …and never so close that the exit would be over before it registered. The floor is
+        // motion_state_exit expressed as travel, i.e. the distance the old flat exit covered.
+        val minTravel = FULL_TURN_DEGREES * durStateExit / spin
+        while (travel < minTravel) travel += SWEEP_STOP_STEP
+        val window = (spin * travel / FULL_TURN_DEGREES).toLong()
+        sweepWindDown = ObjectAnimator.ofFloat(sweep, View.ROTATION, angle, angle + travel).apply {
+            duration = window
+            interpolator = android.view.animation.LinearInterpolator()
+            start()
+        }
+        return window
+    }
+
+    /** An angle folded back into one turn, so the arithmetic above never works on 3600°. */
+    private fun turnOf(rotation: Float): Float =
+        ((rotation % FULL_TURN_DEGREES) + FULL_TURN_DEGREES) % FULL_TURN_DEGREES
 
     /**
      * THE REVOLUTION: §4's «оборот 1100 мс», linear, one infinite ObjectAnimator on ROTATION.
@@ -3570,12 +3775,22 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * different animation; the design's arc is a fixed 19.5% of the circle at a steady tempo.
      *
      * Never restarted while it is already running: a repaint must not snap the arc back to 0°.
+     *
+     * AND IT PICKS UP WHERE THE ARC IS, not at 0°. A load that ends and another that arrives a beat
+     * later catch the arc inside [windDownSweep] — the infinite animator is gone by then, so a
+     * revolution declared from 0f would jump the arc across the circle in the one frame the user is
+     * most likely to be watching it. Starting from the current angle keeps the tempo unbroken
+     * through an interrupted exit.
      */
     private fun startSweepSpin() {
         if (sweepSpin?.isRunning == true) return
         val sweep = binding.connectSweep
         if (sweep.reducedMotion()) return
-        sweepSpin = ObjectAnimator.ofFloat(sweep, View.ROTATION, 0f, FULL_TURN_DEGREES).apply {
+        // The wind-down drives the same property; it is dropped rather than left to fight.
+        sweepWindDown?.cancel()
+        sweepWindDown = null
+        val from = turnOf(sweep.rotation)
+        sweepSpin = ObjectAnimator.ofFloat(sweep, View.ROTATION, from, from + FULL_TURN_DEGREES).apply {
             duration = resources.getInteger(R.integer.motion_spin).toLong()
             interpolator = android.view.animation.LinearInterpolator()
             repeatCount = ValueAnimator.INFINITE
@@ -3588,6 +3803,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private fun stopSweepSpin() {
         sweepSpin?.cancel()
         sweepSpin = null
+        // The bounded half of the same revolution. Cancelled here too, or an exit interrupted by
+        // onPause would go on turning an invisible arc. @see windDownSweep
+        sweepWindDown?.cancel()
+        sweepWindDown = null
         if (isBindingInitialized) binding.connectSweep.rotation = 0f
     }
 
@@ -3603,12 +3822,14 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      *
      * Fires on the EDGE into negotiating only, and never under reduced motion, where the arc is
      * the only signal there is and must simply be present.
+     *
+     * @return the length of that run-up, so the ring's step down joins it. @see dimRingTrack
      */
-    private fun playArcWindUp() {
+    private fun playArcWindUp(): Long {
         val sweep = binding.connectSweep
         if (sweep.reducedMotion()) {
             sweep.alpha = 1f
-            return
+            return 0L
         }
         sweep.animate().cancel()
         sweep.alpha = 0f
@@ -3617,6 +3838,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             .setDuration(durWindUp)
             .setInterpolator(easeOutQuint)
             .start()
+        return durWindUp
     }
 
     /** Exit is 75 percent of enter, and it emits nothing. */

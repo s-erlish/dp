@@ -1690,9 +1690,16 @@ class MainActivity : HelperBaseActivity(), MainHost {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val result = AngConfigManager.importBatchConfig(server, mainViewModel.subscriptionId, true)
+                // THE RESULT LANDS FIRST AND THE ARC LEAVES AFTERWARDS, with the existing half
+                // second between them. `showImportResult` rebuilds the whole list
+                // (`reloadServerList` -> `notifyDataSetChanged`), and that rebuild used to share a
+                // main-thread message with `hideLoading`, i.e. with the frame the arc's exit treats
+                // as t=0 — so the exit's first frames went on binding rows and the interpolator
+                // caught up in one jump. The delay was already here; it is now on the useful side of
+                // the work. @see importConfigViaSub
+                withContext(Dispatchers.Main) { showImportResult(result) }
                 delay(500L)
                 withContext(Dispatchers.Main) {
-                    showImportResult(result)
                     hideLoading()
                 }
             } catch (e: Exception) {
@@ -1764,6 +1771,26 @@ class MainActivity : HelperBaseActivity(), MainHost {
 
         lifecycleScope.launch(Dispatchers.IO) {
             val result = mainViewModel.updateConfigViaSubAll()
+            // ============================================================================
+            // THE REBUILD GETS ITS OWN FRAME, AND THAT IS THE «ПРОЛАГ».
+            // ============================================================================
+            //
+            //     «получается пролаг, когда идёт анимация обновления, то потом с пролагом каким-то
+            //      слишком резко конец анимации»
+            //
+            // `reloadServerList` decodes every profile out of MMKV, rebuilds the карусель and calls
+            // `notifyDataSetChanged`; the traversal that answers it binds every visible row. All of
+            // that used to sit in the SAME main-thread message as `hideLoading` — which starts the
+            // arc's exit and, on a sign-in flow, §3's whole table. An animator's clock is wall time,
+            // not frames: frame one went on the rebuild, frame two arrived 60–80ms later, and the
+            // interpolator was already a third of the way through. A stall, then a jump, then over.
+            //
+            // The half-second delay below already existed. Putting the rebuild in front of it costs
+            // nothing, shows the new rows half a second sooner, and hands every movement that
+            // follows a frame with nothing else in it.
+            if (result.configCount > 0) {
+                withContext(Dispatchers.Main) { mainViewModel.reloadServerList() }
+            }
             delay(500L)
             launch(Dispatchers.Main) {
                 // THE COUNTER IS GONE, and it is the second message the owner named: «Обновлено
@@ -1792,9 +1819,9 @@ class MainActivity : HelperBaseActivity(), MainHost {
                     result.successCount == 0 ->
                         toast(R.string.subs_update_none)
                 }
-                if (result.configCount > 0) {
-                    mainViewModel.reloadServerList()
-                }
+                // The reload used to stand here, immediately before this line. It now runs half a
+                // second earlier, on the same `configCount > 0` test — see the note above it — so
+                // that this message carries the arc's exit and Главная's entrance and nothing else.
                 hideLoading()
             }
         }
