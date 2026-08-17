@@ -13,13 +13,20 @@
 
       [ 12 ][ back, 24 glyph ][ 16 ][ Title 16/700 ][ flex ][ action (0-1) ][ 14 ]
 
-  THE GUTTER ARITHMETIC, because it is the part that gets rebuilt wrong — and it was.
-  The back control is a 48dp touch target (14.2) holding a 24dp glyph, and the 12 that
-  centres the glyph in it is now WRITTEN HERE (paddingStart/End space_12) instead of
-  inherited: Widget.Material3.Button.IconButton's own padding is
-  m3_btn_icon_only_default_padding, which Material moved from 12dp to 10dp, so the
-  glyph this file had promised at 16 was actually drawing at 14 and the number drifted
-  again with every library bump. Explicit padding pins it for good.
+  THE GUTTER ARITHMETIC, because it is the part that gets rebuilt wrong — and it was,
+  three times. Both controls are an EXACT 48dp box (14.2) holding a 24dp glyph, and what
+  places that glyph is neither a padding nor a margin: MaterialButton's iconGravity is
+  textStart, so the library CENTRES the icon and then shifts it by half the difference
+  between the two paddings. With a symmetric padding — which is now the style's, for both
+  slots — the glyph sits at the box's centre and the press plate, which is the box less
+  its insets, sits concentric with it. The insets are then split per slot to carry glyph
+  and plate together to the gutter each one has to reach.
+
+  THE BOXES USED TO BE wrap_content, and that is what made every number in this file
+  fiction: a MaterialButton with no text still measures a line box, so the back control
+  was laid out 68 × 64 and the action 80 × 64, the «28dp disc» was a 48×44 and a 54×44
+  stadium, and the title started at 72 rather than the 52 below. An icon-only control has
+  no text to grow with the font scale, so an exact 48 costs nothing here.
 
   Owner report 0.4.9, «эту кнопку нужно сделать чуть левее»: the control now sits FLUSH
   with the screen edge and its glyph at 12, four dp left of §7's nominal 16. §7's
@@ -29,13 +36,14 @@
   still holds: the glyph ends at 36 and the title's marginStart space_4 lands it at 52,
   16 clear of the glyph, exactly as before.
 
-  THE TRAILING ACTION IS ON THE GUTTER NOW, and it took three tries because two of the
-  three numbers involved were inherited. Its glyph is pinned by a padding of its own
-  (18 / 12, see the note on the slot), its 4dp margin is gone, and ToolbarBinder's per-
-  glyph pull is measured from the box's trailing edge — so «+» and «⋮» both end their
-  ink on 16, which is where the title starts, where every row's trailing glyph stops,
-  and the one gutter CLAUDE.md gives the product. «вот нашел что плюсик сверху он
-  левее, надо правее опять сделать».
+  THE TRAILING ACTION IS ON THE GUTTER NOW, and its box no longer leaves the screen to
+  get there. @dimen/toolbar_plate_inset_lead splits the slot's 20dp of inset 16/4, which
+  moves glyph and plate 6dp toward the trailing edge inside a box that stays 48 wide;
+  ToolbarBinder then holds the box off the edge by whatever the glyph's own air leaves
+  (0 for «⋮», 5 for «+»). Both inks end on 16 — where the title starts, where every row's
+  trailing glyph stops, the one gutter CLAUDE.md gives the product — with all 48dp of the
+  target on screen and the press disc 4dp clear of the window. «вот нашел что плюсик
+  сверху он левее, надо правее опять сделать».
 
   THE BACK ARROW STAYS AT 20 and that is a decision, not an oversight. Its ink is 20
   from the leading edge against the action's 16 on the other side, so the header is 4dp
@@ -109,19 +117,24 @@
              view_sub_header.xml, plus expandTouchTarget(56) in ToolbarBinder to give
              back the 4dp of target — not a change to any number in dimens.xml.
 
-             WHAT DID CHANGE FOR IT is the press plate: @dimen/toolbar_plate_inset draws
-             a 28dp disc inside this box instead of filling it, because a 48dp plate on a
-             box flush with the screen edge sits tangent to that edge, which is the shape
-             the owner has now reported three times. 10dp of clearance here, and the
-             target keeps every one of its 48dp — an inset moves paint, not measurement. -->
+             WHAT DID CHANGE FOR IT is the box and the press plate. The box is an EXACT
+             48 now instead of wrap_content: a MaterialButton with no text still measures
+             a line box, so this control was laid out 68 wide and 64 tall, its «28dp disc»
+             was really a 48×44 stadium, and the title beside it started at 72 rather than
+             the 52 this file promises. An icon-only control has nothing to grow, so an
+             exact 48 is free and every number here becomes deterministic.
+
+             ITS PADDING IS THE STYLE'S NOW. The 12 written here was doing nothing the
+             comment above claimed: iconGravity is textStart, so the glyph is CENTRED by
+             the library and only the difference between the two paddings moves it. Equal
+             is all that is required, and equal is what keeps the press disc concentric
+             with the glyph. -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/toolbar_back"
             style="@style/Widget.Departament.Button.Icon.Toolbar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="@dimen/view_height_dp48"
+            android:layout_height="@dimen/view_height_dp48"
             android:contentDescription="@string/cd_back"
-            android:paddingStart="@dimen/space_12"
-            android:paddingEnd="@dimen/space_12"
             app:icon="@drawable/ic_chevron_left" />
 
         <!-- Shown ONLY when the back control is hidden, so a tab screen's title still
@@ -148,28 +161,27 @@
              ic_more_vert_24dp. The caller sets app:icon AND
              android:contentDescription, which states the action and not the object.
 
-             ITS PADDING IS WRITTEN HERE FOR THE SAME REASON THE BACK ARROW'S IS, and
-             this slot is where that lesson had not been applied. With no padding of its
-             own the button took m3_btn_icon_only_default_padding — 10, not the 12 the
-             comment above assumes — and the style's 48dp minWidth then padded the box
-             out behind the glyph, so the icon drew 10 in front and 14 behind and every
-             number ToolbarBinder measured was 2dp out. The lead side is 18 rather than
-             12 so the 6dp «⋮» hangs off the screen edge is grown back on the inside
-             where it can be touched; the trailing 12 is what the nudge is measured
-             from, and it does not move. See @dimen/toolbar_action_pad_lead.
+             WHAT MOVES ITS GLYPH IS THE INSET SPLIT, NOT A PADDING PAIR, and that is the
+             correction this round makes. The 18/12 padding written here was measured for
+             a glyph parked at paddingLeft; iconGravity is textStart, so the glyph is
+             centred and an asymmetric padding only shifts it by half the difference —
+             3dp off the press disc it sits on, «фон не по центру, неровный фон». The
+             padding is symmetric (the style's) and the 20dp of inset is split 16/4
+             instead: box and disc both stay 48 and 28, and the pair carries glyph AND
+             plate 6dp toward the trailing edge together. See
+             @dimen/toolbar_plate_inset_lead.
 
              AND NO 4dp MARGIN. It had one, and ToolbarBinder overwrites marginEnd on
-             every bind, so the 4 only ever applied to a glyph the binder does not
-             know — which is now reset to zero there rather than left to inherit a
-             base nobody measured against. -->
+             every bind, so the 4 only ever applied to a glyph the binder does not know.
+             The binder's own margin is non-negative now, so the whole 48dp box is on
+             screen for both glyphs. -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/toolbar_action"
             style="@style/Widget.Departament.Button.Icon.Toolbar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="@dimen/view_height_dp48"
+            android:layout_height="@dimen/view_height_dp48"
             android:insetLeft="@dimen/toolbar_plate_inset_lead"
-            android:paddingStart="@dimen/toolbar_action_pad_lead"
-            android:paddingEnd="@dimen/toolbar_action_pad_trail"
+            android:insetRight="@dimen/toolbar_plate_inset_trail"
             android:visibility="gone"
             app:icon="@drawable/ic_more_vert_24dp"
             tools:ignore="ContentDescription"

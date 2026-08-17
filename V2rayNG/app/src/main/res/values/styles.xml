@@ -744,24 +744,49 @@
 
          AND THE ONE ICON BUTTON WHOSE PLATE IS NOT ITS BOX. Everywhere else a 48dp
          target sits inside a surface with room around it; here both controls are
-         datumed to the SCREEN's edge, and a header glyph is narrow enough that its box
-         has to reach that edge — or cross it — for the ink to land on the 16dp gutter.
-         «⋮» is the extreme: 4 units of dots in a 24-unit viewport, so its box ends 6dp
-         past the screen edge and a plate that filled the box was shorn flat by the
-         window on every press. Same defect as @dimen/row_action_plate_inset one
-         component up, and the same answer: the box stays where the alignment needs it,
-         the PAINT stops short of the edge. 48 − 2 × 10 leaves a 28dp disc, the same
-         plate the row's icon action draws, 4dp clear of the screen on the worst glyph
-         and 10dp clear under the back arrow.
+         datumed to the SCREEN's edge, and a header glyph is narrow enough that a plate
+         filling its box would be tangent to that edge. So the box stays where the
+         alignment needs it and the PAINT stops short: an inset pair summing to 20 in a
+         48dp box leaves a 28dp disc — the same plate the row's icon action draws.
 
-         ALL FOUR, because the parent zeroes all four and a horizontal-only inset makes
-         the drawable 28×48 — GradientDrawable clamps a pill to half the shorter side,
-         so the disc would come back as a stadium. The insets never touched measurement
-         (see the note on the parent style), so the touch target is exactly the box it
-         always was. -->
+         THE THREE RULES THIS SLOT OBEYS, all three measured off an inflated header
+         rather than read off the library's documentation, which is how the last two
+         rounds went wrong:
+
+         1. THE BOX IS AN EXACT 48. Both slots used to be wrap_content, and a
+            MaterialButton with no text still measures a line box: 68×64 for the back
+            arrow, 80×64 for the action. The insets are taken off THAT, so the «28dp
+            disc» this comment used to promise was really a 48×44 and a 54×44 stadium.
+            An icon-only control has no text to grow, so an exact 48 costs nothing and
+            makes every number below deterministic (00-rules.md 14.5 is about boxes
+            that hold text).
+
+         2. THE GLYPH IS CENTRED BY iconGravity=textStart, not by padding. Material sets
+            textStart on Widget.Material3.Button, so the icon lands at
+                drawn left = (W − iconSize) / 2 + (paddingLeft − paddingRight) / 2
+            and MaterialButtonHelper.loadFromAttributes ADDS each inset to the matching
+            padding. Therefore:
+
+                plate centre − glyph centre = (paddingRight_xml − paddingLeft_xml) / 2
+
+            The plate is concentric with the glyph IF AND ONLY IF the XML padding is
+            symmetric, whatever the insets are. That is why the padding below is one
+            number on all four sides and why neither slot writes its own any more: the
+            18/12 pair the last round added is exactly what put the action's disc 3dp
+            off its own «+» — «фон не по центру, неровный фон».
+
+         3. THE INSETS CARRY THE ASYMMETRY INSTEAD. insetLeft + insetRight = 20 keeps the
+            box at 48 and the disc at 28; moving the split slides GLYPH AND PLATE
+            TOGETHER inside the box, which is how each slot reaches its own gutter
+            without a box that leaves the screen. The two splits are on the slots.
+
+         ALL FOUR SIDES, because the parent zeroes all four and a horizontal-only inset
+         makes the drawable 28×48 — GradientDrawable clamps a pill to half the shorter
+         side, so the disc would come back as a stadium. -->
     <style name="Widget.Departament.Button.Icon.Toolbar" parent="Widget.Departament.Button.Icon">
         <item name="iconSize">@dimen/image_size_dp24</item>
         <item name="iconTint">@color/btn_secondary_content</item>
+        <item name="android:padding">@dimen/toolbar_action_pad_trail</item>
         <item name="android:insetTop">@dimen/toolbar_plate_inset</item>
         <item name="android:insetBottom">@dimen/toolbar_plate_inset</item>
         <item name="android:insetLeft">@dimen/toolbar_plate_inset</item>

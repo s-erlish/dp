@@ -94,23 +94,29 @@
     <dimen name="row_action_size">36dp</dimen>
 
     <!--
-        WHAT PUTS THE GLYPH IN THE MIDDLE OF THAT BOX, and the reason both pulls below
-        were landing 3dp past their own arithmetic.
+        THE SLOT'S PADDING, AND WHAT IT ACTUALLY DOES — which is not what the round that
+        added it wrote here.
 
-        A MaterialButton with `iconGravity=start` — the library default, and nothing in
-        @style/Widget.Departament.Button.Icon's parent chain overrides it — sets
-        iconLeft to 0 and hands the icon to TextView as a compound drawable, which
-        draws it at the view's paddingLeft. Widget.Material3.Button.IconButton's
-        padding is m3_btn_icon_only_default_padding = 10dp, so in a box measured
-        EXACTLY 36 the 22dp glyph drew at 10 with 4dp behind it: 3dp right of centre,
-        and every number in this file is measured from a CENTRED glyph. «⋮» was
-        reaching 13.17 and ic_copy 13.00 while the chevron beside them in the same
-        card stopped at 16.00 — «выше где кнопки копировать справа тоже видишь ты не
-        доделал».
+        It does NOT place the glyph. @style/Widget.Departament.Button.Icon inherits
+        iconGravity=textStart from Widget.Material3.Button (the library's `start` default
+        never reaches this chain), and textStart CENTRES the icon:
 
-        (36 − 22) / 2. Written on the slot, exactly as view_toolbar.xml writes the
-        back arrow's 12: a library that moves its own default again cannot move this
-        glyph with it.
+            iconLeft   = (W − textWidth − paddingEnd − iconSize − iconPadding − paddingStart) / 2
+            drawn left = paddingLeft + iconLeft = (W − iconSize) / 2 + (paddingLeft − paddingRight) / 2
+
+        Inflated and measured: box 36, resolved padding 11/11, icon bounds Rect(−4, 0, 18,
+        22) — so the glyph draws at 7 and its centre is the box's. It would draw at 7 for
+        ANY equal pair. What this number has to be is SYMMETRIC, because
+        @dimen/row_action_plate_inset's disc is centred on the box and the glyph is only
+        centred with it while the two sides match. The value 7 is kept because (36 − 22) / 2
+        is the number a reader expects to find.
+
+        ELEVEN AND NOT SEVEN, resolved, because MaterialButtonHelper.loadFromAttributes
+        finishes with setPaddingRelative(paddingStart + insetLeft, …): every inset is ADDED
+        to the matching padding as well as taken off the background. Symmetric insets keep
+        symmetric padding, so the invariant survives — but an asymmetric inset pair would
+        break the concentricity as surely as an asymmetric padding, and that is worth
+        knowing before anyone splits these four.
     -->
     <dimen name="row_action_glyph_air">7dp</dimen>
 
@@ -131,6 +137,13 @@
         is exactly the lever this needs:
 
             plate = 36 − 2 × 4 = 28,  clearance = 4 on «⋮», 10.25 on ic_copy
+
+        AND FOR ONE ROUND IT WAS STILL BEING CUT, 12dp of the 28, by something that is
+        not the card at all: the ROW's own 16dp paddingEnd, which clips its children
+        until clipToPadding is turned off. Rendered, the disc painted 296…312 in a 328dp
+        card and stopped exactly on that line rather than on its own 324 — «выделил зажав
+        на три точки и не решилась проблема, обрезается». view_row.xml's root carries the
+        fix; this inset was right and was never what shipped.
 
         FOUR AND NOT TWO. An inset on the horizontal pair alone leaves a 28×36
         drawable, and GradientDrawable clamps a pill radius to half the SHORTER side —
@@ -156,9 +169,9 @@
         subscription card, which is the shipped precedent for this shape. The plate
         inside it clears by 10.25 (@dimen/row_action_plate_inset).
 
-        The 7 was NOMINAL until this round: the glyph was drawing at the library's
-        10dp padding, so ic_copy's ink was landing on 13.00 and this number could not
-        have been right without @dimen/row_action_glyph_air beside it.
+        MEASURED, NOT ASSERTED: inflated at mdpi in a 328dp card the box lands at
+        286…322 and the glyph at 293…315, so ic_copy's ink ends 15.75dp from the card's
+        edge — a quarter of a dp, spent on getDimensionPixelSize rounding −9.75 to −10.
     -->
     <dimen name="row_action_nudge_wide">-9.75dp</dimen>
 
@@ -181,6 +194,12 @@
         рамки», the third report of this shape. What answers it is
         @dimen/row_action_plate_inset, not a smaller pull: the box stays flush, the
         PAINT stops 4dp short of the edge.
+
+        AND THE PULL IS WHAT PUTS THE SLOT WHERE THE CLIP WAS. Sixteen inside the row's
+        edge is exactly its paddingEnd, and a ViewGroup clips to its padding by default,
+        so this margin was handing the button to a clip line rather than to empty space.
+        view_row.xml turns that clip off; measured, «⋮»'s ink lands 16.17dp from the
+        card's edge and its disc 4dp, both uncut.
 
         This is also the owner's standing request on this glyph, already honoured in
         the toolbar: «три точки которые сверху справа их бы тоже чутка правее

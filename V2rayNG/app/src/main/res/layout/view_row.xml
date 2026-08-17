@@ -72,6 +72,23 @@
   is the row's name. A selected row must announce it (isSelected on the a11y node),
   not only draw it.
 -->
+<!-- clipToPadding=false IS THE PRESS PLATE'S FIX, and it is the whole of «выделил зажав на
+     три точки … обрезается».
+
+     The row's paddingEnd is the 16dp gutter, and RowBinder.alignInkToGutter parks the
+     trailing slot INSIDE that padding with a negative end margin so the glyph's ink can
+     reach the line. A ViewGroup clips its children to its padding box by default, so that
+     padding was also a CLIP LINE 16dp inside the card: the «⋮» button sat flush with the
+     card's edge, its 28dp press disc ran from 4 to 32dp inside it, and everything past 16
+     was cut off flat. Twelve of the disc's twenty-eight dp, on the side the finger is on —
+     which is why a round plate came back looking shorn no matter what the inset was set to.
+     Rendered and measured: plate painted 296…312 in a 328dp card, i.e. stopping exactly on
+     the 16dp padding line rather than on its own 324.
+
+     Nothing here moves as a result — the row draws its background full-bleed and lays every
+     child out inside the padding as before. What changes is that a child DELIBERATELY placed
+     in the padding is no longer amputated by it. RowBinder.pullInk's «nothing clips» is true
+     now; it was not before. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -79,7 +96,8 @@
     style="@style/Widget.Departament.Row"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:baselineAligned="false">
+    android:baselineAligned="false"
+    android:clipToPadding="false">
 
     <!-- TILED groups only. Gone = a plain row at the 16dp origin (5.3). The glyph is
          the caller's; the 40/12/22 geometry and the neutral fill are the style's. -->
@@ -305,31 +323,37 @@
          stood 8dp taller than the tiled rows under them for no reason a reader could
          see.
 
-         THE PADDING IS WRITTEN HERE BECAUSE THE ICON IS NOT CENTRED WITHOUT IT, and
-         that is the third round of «кнопки левее / правее» in one sentence. A
-         MaterialButton whose iconGravity is `start` — the library default, and nothing
-         in this chain overrides it — sets iconLeft to 0 and lets TextView draw the
-         compound drawable at paddingLeft. Widget.Material3.Button.IconButton's padding
-         is m3_btn_icon_only_default_padding, TEN, so 10 + 22 + 10 is 42 in a box that
-         measures 36: the glyph sat at 10 with 4dp behind it instead of 7 and 7, i.e.
-         3dp right of centre, and BOTH pulls below therefore landed 3dp past the line
-         they were measured for. On «О приложении» that is a copy button whose ink
-         stopped at 13 beside a chevron's at 16, in one card — exactly the difference
-         the owner keeps photographing. @dimen/row_action_glyph_air is (36 − 22) / 2
-         and it pins the glyph for good, the way view_toolbar.xml already pins the back
-         arrow's; the library moving its own number again cannot reach this slot.
+         THE PADDING'S ONLY JOB IS TO BE SYMMETRIC, and the note that used to stand
+         here had the mechanism wrong twice over. A MaterialButton's iconGravity is
+         `textStart` (2) — Widget.Material3.Button sets it, the library's own default
+         `start` never reaches this chain — and textStart CENTRES the glyph rather than
+         parking it at paddingLeft:
 
-         AND THE PLATE IS INSET SO IT CANNOT REACH THE CARD'S EDGE. Once «⋮»'s ink is
-         on the gutter its 36dp box is FLUSH with the row's end edge, and the press
-         plate fills the box, so the plate's edge was the card's edge — it covered the
-         card's hairline and the card's own 20dp clip cut the last of it flat: «вот
-         зажал три точки, а там фон залазит за рамки». The box may not move (the ink
-         is where the owner asked for it) and the target may not shrink, so what
-         changes is what is PAINTED in the box: @dimen/row_action_plate_inset leaves a
-         28dp disc concentric with the glyph and 4dp clear of the card on the worst
-         glyph. Four insets and not two — a horizontal-only inset makes the drawable
-         36×28 and GradientDrawable then clamps the pill to half the shorter side, i.e.
-         a stadium where the design says disc (see the note on the style).
+             iconLeft   = (W − textWidth − paddingEnd − iconSize − iconPadding − paddingStart) / 2
+             drawn left = paddingLeft + iconLeft = (W − iconSize) / 2 + (paddingLeft − paddingRight) / 2
+
+         Measured on the inflated row: box 36, resolved padding 11/11, icon bounds
+         Rect(−4, 0, 18, 22), so the glyph draws at 11 − 4 = 7 and is dead centre. The
+         VALUE of @dimen/row_action_glyph_air never mattered; only that the two sides
+         are equal. They are, so the glyph is centred and the plate below is concentric
+         with it — the one invariant this slot has to keep.
+
+         (Eleven and not seven because MaterialButtonHelper.loadFromAttributes ends with
+         setPaddingRelative(paddingStart + insetLeft, …): every inset is ADDED to the
+         padding as well as taken off the background. Symmetric insets keep symmetric
+         padding, which is why the four below are one number and not two.)
+
+         AND THE PLATE IS INSET SO IT IS SMALLER THAN THE BOX. Once «⋮»'s ink is on the
+         gutter its 36dp box is FLUSH with the row's end edge, and a plate that filled
+         the box would end on the card's own clip line. @dimen/row_action_plate_inset
+         leaves a 28dp disc, concentric with the glyph, 4dp clear of the card on the
+         worst glyph and 10.25 on «копировать». Four insets and not two — a
+         horizontal-only inset makes the drawable 36×28 and GradientDrawable then clamps
+         the pill to half the shorter side, i.e. a stadium where the design says disc.
+
+         THAT DISC WAS STILL BEING CUT, and not by the card: by this row's own
+         paddingEnd, which is a clip line until clipToPadding is turned off. See the
+         note above the root.
 
          ITS END MARGIN IS STILL NOT ZERO AT RUNTIME: 36 leaves 7dp of air beside the
          glyph and each glyph leaves its own, so RowBinder.alignInkToGutter pulls per

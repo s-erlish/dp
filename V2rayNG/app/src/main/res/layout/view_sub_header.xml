@@ -30,11 +30,13 @@
   other side — Widget.Departament.Button.Icon.Toolbar is a 48dp target, the Android
   touch floor that 44 is under, so a 4dp lead-in put the glyph at 4 + 12 = 16.
 
-  EXCEPT IT DID NOT, twice over. The 12 was inherited from
-  Widget.Material3.Button.IconButton, whose m3_btn_icon_only_default_padding Material
-  moved from 12dp to 10dp — so the glyph was really drawing at 14, and it would move
-  again on the next library bump. The 12 is written down here now (paddingStart/End
-  space_12), which pins the glyph inside its target for good.
+  EXCEPT IT DID NOT, and no padding was ever going to make it. MaterialButton's
+  iconGravity is textStart, so the library centres the glyph in the box and a padding only
+  shifts it by half the difference between its two sides; and the box was wrap_content, so
+  it measured a line box this control has no text for — 68 × 64, not 48. What places the
+  glyph now is an EXACT 48dp box with a symmetric padding (the style's) and a per-slot
+  split of the 20dp of inset, which moves the glyph and its press disc together. The full
+  arithmetic is in @style/Widget.Departament.Button.Icon.Toolbar.
 
   And the lead-in is GONE, on owner report 0.4.9: «эту кнопку нужно сделать чуть
   левее». The 48dp target is flush with the screen edge and the glyph sits at 12,
@@ -84,12 +86,19 @@
 
          The distance an action stands off the edge belongs to the binder, per glyph,
          because the two glyphs need different ones. A bar-wide padding cannot express
-         that and can only get in the binder's way. -->
+         that and can only get in the binder's way.
+
+         AND THE 4 THAT IS LEFT DOES NOT CLIP. clipToPadding defaults to true, so every
+         padding on a ViewGroup is also a clip line — that is what was shearing the row's
+         press disc one component up (see view_row.xml). Nothing is drawn above this bar's
+         4dp today, and turning the clip off is what keeps that a fact rather than an
+         arithmetic result. -->
     <LinearLayout
         android:id="@+id/toolbar_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:baselineAligned="false"
+        android:clipToPadding="false"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingTop="@dimen/space_4">
@@ -100,15 +109,19 @@
              @anim/press_icon, which this style carries, has a DEFAULT item animating
              scaleX to 1.0 and it fires on attach, so all 17 sub-pages shipped a back
              arrow pointing right. Do not put a scaleX mirror back; the new drawable is
-             android:autoMirrored, which is what RTL wants regardless. -->
+             android:autoMirrored, which is what RTL wants regardless.
+
+             THE BOX IS AN EXACT 48 AND THE PADDING IS THE STYLE'S — read the twin note in
+             view_toolbar.xml. wrap_content measured a line box this control has no text
+             for, so it stood 68 wide and 64 tall and dragged the whole bar to 68; the
+             press plate inside it was a 48×44 stadium rather than the 28dp disc every
+             comment here promises. -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/toolbar_back"
             style="@style/Widget.Departament.Button.Icon.Toolbar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="@dimen/view_height_dp48"
+            android:layout_height="@dimen/view_height_dp48"
             android:contentDescription="@string/cd_back"
-            android:paddingStart="@dimen/space_12"
-            android:paddingEnd="@dimen/space_12"
             app:icon="@drawable/ic_chevron_left" />
 
         <!-- ToolbarBinder shows this when a screen passes no activity, i.e. has no
@@ -129,20 +142,18 @@
              ToolbarBinder resolves it and because «Добавить правило» style toolbar
              actions already bound here must keep working.
 
-             THE PADDING IS THIS SLOT'S, NOT THE LIBRARY'S — 18 in front of the glyph
-             and 12 behind it. Read the identical note in view_toolbar.xml and
-             @dimen/toolbar_action_pad_lead: 12 is what centres a 24dp glyph in a 48dp
-             box (the button was inheriting Material's 10 and drawing 2dp off), and the
-             extra 6 in front grows the box inward to replace the 6dp «⋮» hangs past the
-             screen edge once its ink is on the gutter. -->
+             THE INSET SPLIT MOVES THE GLYPH, THE PADDING KEEPS THE PLATE UNDER IT — read
+             the identical note in view_toolbar.xml and @dimen/toolbar_plate_inset_lead.
+             The 18/12 padding pair that used to be here is what put the disc 3dp off the
+             «+» sitting on it, which is the second half of «фон не по центру, неровный
+             фон в общем, неправильный». -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/toolbar_action"
             style="@style/Widget.Departament.Button.Icon.Toolbar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="@dimen/view_height_dp48"
+            android:layout_height="@dimen/view_height_dp48"
             android:insetLeft="@dimen/toolbar_plate_inset_lead"
-            android:paddingStart="@dimen/toolbar_action_pad_lead"
-            android:paddingEnd="@dimen/toolbar_action_pad_trail"
+            android:insetRight="@dimen/toolbar_plate_inset_trail"
             android:visibility="gone"
             app:icon="@drawable/ic_more_vert_24dp"
             tools:ignore="ContentDescription"

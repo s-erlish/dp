@@ -367,7 +367,13 @@ object RowBinder {
      * `LinearLayout` places a child from what came before it. It shortens `mTotalLength` during
      * measure, which hands the same dp to the weight-1 text column, which then pushes everything
      * after it along by exactly that much. The slot ends up in the row's own end padding, where
-     * there is nothing to collide with and nothing clips.
+     * there is nothing to collide with.
+     *
+     * AND NOTHING CLIPS — WHICH IS NOW TRUE. `clipToPadding` defaults to true, so until
+     * `view_row.xml` turned it off the row's 16dp `paddingEnd` was also a clip line, and the press
+     * disc of a slot deliberately parked past it lost everything beyond 16: rendered and measured,
+     * 12dp of a 28dp disc, cut flat on the side the finger is on. «выделил зажав на три точки …
+     * обрезается». The pull is not the thing that was wrong; the clip was.
      */
     private fun View.pullInk(@DimenRes nudge: Int) {
         val params = layoutParams as? ViewGroup.MarginLayoutParams ?: return
