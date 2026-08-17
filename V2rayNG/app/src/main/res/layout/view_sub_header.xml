@@ -23,14 +23,25 @@
   wants the optional note reaches for @id/toolbar_note itself — that slot is this
   file's own and ships gone.
 
-  THE GUTTER ARITHMETIC, and why there is no −10dp margin here. §7 measures a 44dp
-  back control pulled 10dp left, which lands its 24dp glyph exactly on the 16dp
-  screen gutter (16 − 10 + (44 − 24) / 2 = 16). This file reaches that same pixel
-  from the other side: Widget.Departament.Button.Icon.Toolbar is a 48dp target —
-  the Android touch floor, which 44 is under — so marginStart space_4 puts its
-  glyph at 4 + (48 − 24) / 2 = 16. Same glyph, same place, one more dp of finger.
-  It is also exactly what view_toolbar.xml already does, so the back affordance
-  does not move between the two headers.
+  THE GUTTER ARITHMETIC, and where the −10dp went. §7 measures a 44dp back control
+  pulled 10dp left, which lands its 24dp glyph on the 16dp screen gutter
+  (16 − 10 + (44 − 24) / 2 = 16): the shift exists so the GLYPH sits on the gutter
+  and not the edge of its touch target. This file reached the same pixel from the
+  other side — Widget.Departament.Button.Icon.Toolbar is a 48dp target, the Android
+  touch floor that 44 is under, so a 4dp lead-in put the glyph at 4 + 12 = 16.
+
+  EXCEPT IT DID NOT, twice over. The 12 was inherited from
+  Widget.Material3.Button.IconButton, whose m3_btn_icon_only_default_padding Material
+  moved from 12dp to 10dp — so the glyph was really drawing at 14, and it would move
+  again on the next library bump. The 12 is written down here now (paddingStart/End
+  space_12), which pins the glyph inside its target for good.
+
+  And the lead-in is GONE, on owner report 0.4.9: «эту кнопку нужно сделать чуть
+  левее». The 48dp target is flush with the screen edge and the glyph sits at 12,
+  four dp left of §7's nominal 16 — the whole target on screen, nothing clipped,
+  and the arrow reads as belonging to the edge of the page rather than floating
+  inside it. view_toolbar.xml carries the identical change, so the back affordance
+  still does not move between the two headers.
 
   56 IS A MINIMUM ON THE BAR AND THE TITLE HAS NO HEIGHT AT ALL. At font scale
   200% a 24sp headline needs ~50dp of line box; every text box here is
@@ -50,8 +61,9 @@
     android:elevation="0dp"
     android:orientation="vertical">
 
-    <!-- The back row. §7 «padding:4px 16px 0» — the 4 above the control, the 16 is
-         the gutter the title below already stands on. -->
+    <!-- The back row. §7 «padding:4px 16px 0» — the 4 above the control. There is no
+         leading padding any more: the back target starts at the screen edge and it is
+         the GLYPH, at 12, that carries the alignment (see the arithmetic above). -->
     <LinearLayout
         android:id="@+id/toolbar_bar"
         android:layout_width="match_parent"
@@ -59,22 +71,25 @@
         android:baselineAligned="false"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="@dimen/space_4"
         android:paddingTop="@dimen/space_4"
         android:paddingEnd="@dimen/space_4">
 
-        <!-- ICON GAP (inherited from view_toolbar): res/drawable carries no
-             ic_arrow_back, so the 24dp chevron is mirrored, which draws the correct
-             left-pointing affordance. When ic_arrow_back lands, set it on app:icon
-             and DELETE the scaleX line. -->
+        <!-- ICON GAP CLOSED (as in view_toolbar): @drawable/ic_chevron_left is a real
+             left-pointing glyph. It used to be ic_chevron_right under
+             android:scaleX="-1", and that mirror never survived to the screen —
+             @anim/press_icon, which this style carries, has a DEFAULT item animating
+             scaleX to 1.0 and it fires on attach, so all 17 sub-pages shipped a back
+             arrow pointing right. Do not put a scaleX mirror back; the new drawable is
+             android:autoMirrored, which is what RTL wants regardless. -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/toolbar_back"
             style="@style/Widget.Departament.Button.Icon.Toolbar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:contentDescription="@string/cd_back"
-            android:scaleX="-1"
-            app:icon="@drawable/ic_chevron_right" />
+            android:paddingStart="@dimen/space_12"
+            android:paddingEnd="@dimen/space_12"
+            app:icon="@drawable/ic_chevron_left" />
 
         <!-- ToolbarBinder shows this when a screen passes no activity, i.e. has no
              back affordance. A sub-page always has one, so it ships gone. -->

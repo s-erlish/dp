@@ -11,14 +11,28 @@
   most repeated defect in the app is a sub-page whose Russian title is drawn in the
   20sp Latin wordmark face, which has no Cyrillic at all (D-11).
 
-      [ 16 ][ back, 24 glyph ][ 16 ][ Title 16/700 ][ flex ][ action (0-1) ][ 16 ]
+      [ 12 ][ back, 24 glyph ][ 16 ][ Title 16/700 ][ flex ][ action (0-1) ][ 14 ]
 
-  THE GUTTER ARITHMETIC, because it is the part that gets rebuilt wrong. The back
-  control is a 48dp touch target (14.2) holding a 24dp glyph, so the glyph sits 12
-  inside it. marginStart space_4 therefore puts the GLYPH at the 16dp gutter, exactly
-  where the title of the page below it starts, and the button's edge at 52. The
-  title's marginStart space_4 lands it at 56 — 16 clear of the glyph. The trailing
-  action mirrors it: marginEnd space_4 puts its glyph's far edge on the 16 gutter.
+  THE GUTTER ARITHMETIC, because it is the part that gets rebuilt wrong — and it was.
+  The back control is a 48dp touch target (14.2) holding a 24dp glyph, and the 12 that
+  centres the glyph in it is now WRITTEN HERE (paddingStart/End space_12) instead of
+  inherited: Widget.Material3.Button.IconButton's own padding is
+  m3_btn_icon_only_default_padding, which Material moved from 12dp to 10dp, so the
+  glyph this file had promised at 16 was actually drawing at 14 and the number drifted
+  again with every library bump. Explicit padding pins it for good.
+
+  Owner report 0.4.9, «эту кнопку нужно сделать чуть левее»: the control now sits FLUSH
+  with the screen edge and its glyph at 12, four dp left of §7's nominal 16. §7's
+  «−10dp влево» exists so the GLYPH lands on the gutter rather than the edge of its
+  touch target; the owner asked for a touch more, and the target reaching the screen
+  edge is a Fitts's-law gain rather than a cost. The invariant that matters downstream
+  still holds: the glyph ends at 36 and the title's marginStart space_4 lands it at 52,
+  16 clear of the glyph, exactly as before.
+
+  The trailing action is deliberately NOT moved. marginEnd space_4 plus the library's
+  10 puts its glyph's far edge at 14, not the 16 this comment used to claim; it is
+  symmetrical with nothing now, and correcting it is the toolbar owner's call, not a
+  side effect of fixing the back arrow.
 
   56 IS A MINIMUM, NEVER A HEIGHT. At font scale 200% a 16sp title needs ~34dp of
   line box and this bar grows to hold it. android:layout_height="56dp" on anything
@@ -55,10 +69,12 @@
         android:minHeight="@dimen/toolbar_height"
         android:orientation="horizontal">
 
-        <!-- ICON GAP: res/drawable has no back glyph. 22-components.md 12.1 asks for a
-             24dp ic_arrow_back; until the icon owner lands it, the 24dp chevron is
-             mirrored, which draws the correct left-pointing affordance. When
-             ic_arrow_back exists, set it on app:icon and DELETE the scaleX line.
+        <!-- ICON GAP CLOSED: @drawable/ic_chevron_left is a real left-pointing glyph now.
+             It used to be ic_chevron_right under android:scaleX="-1", and that mirror
+             never reached the screen — @anim/press_icon, which this style carries, has a
+             DEFAULT item that animates scaleX to 1.0 and it fires on attach, so the
+             arrow shipped pointing right. Do not reintroduce a scaleX mirror here; the
+             new drawable is android:autoMirrored, which is what RTL needs anyway.
              STRING GAP CLOSED (M-44): this was the tree's one hardcoded
              android:contentDescription. It is now @string/cd_back, defined in
              res/values/strings_ui_polish.xml — the toolbar belongs to no single screen,
@@ -68,10 +84,10 @@
             style="@style/Widget.Departament.Button.Icon.Toolbar"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/space_4"
             android:contentDescription="@string/cd_back"
-            android:scaleX="-1"
-            app:icon="@drawable/ic_chevron_right" />
+            android:paddingStart="@dimen/space_12"
+            android:paddingEnd="@dimen/space_12"
+            app:icon="@drawable/ic_chevron_left" />
 
         <!-- Shown ONLY when the back control is hidden, so a tab screen's title still
              starts at the 16dp gutter (12 here + the title's 4). -->
