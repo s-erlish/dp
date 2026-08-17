@@ -690,7 +690,11 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * render() puts them back, at whatever tempo the state then calls for.
      *
      * A hidden TAB is not this case: hidden tabs stay RESUMED, and a tab the user is one swipe away
-     * from should be alive when he gets there.
+     * from should be alive when he gets there. NEITHER IS A DIALOG ON TOP: the arc's revolution used
+     * to stand down here with the rest and answered Android's own VPN prompt by freezing under it.
+     * It is asked the stricter question in [onStop] now, and only it — the connected settle below is
+     * a 5.5s one-shot rather than an indefinite spinner, so standing it down at a prompt costs a
+     * decay nobody is reading rather than a signal somebody is.
      *
      * ## …AND THE MOTION WAS NOT THE ONLY THING THAT KEPT RUNNING
      *
@@ -718,16 +722,58 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      */
     override fun onPause() {
         stopAmbient()
-        // The arc's revolution is the OTHER infinite animator on this screen now that it is ours
-        // rather than Material's, and the same rule applies: nothing turns while nobody can see
-        // it. [onResume]'s render() puts it back through showSweep(), which re-arms the spin
-        // without replaying the entrance.
-        stopSweepSpin()
+        // The arc's revolution used to stand down HERE, and «paused» is not «gone». @see onStop
         // The callbacks only — NOT [stopConnectionTimer], which also wipes the session's start
         // instant and blanks the readings. The session is not over; only the screen has gone.
         timerHandler.removeCallbacks(uptimeRunnable)
         stopLatencyProbe()
         super.onPause()
+    }
+
+    /**
+     * ============================================================================
+     * THE REVOLUTION STANDS DOWN WHEN THE SCREEN IS GONE — «GONE», NOT «NOT ON TOP».
+     * ============================================================================
+     *
+     *     «когда подключаешься и еще не даёшь разрешение, то там вот эта полоска появляется, ее
+     *      быть не должно, в плане там должно быть все продумано, чтобы оно крутилось, а не
+     *      останавливалось»
+     *
+     * The one thing standing between the connect tap and a tunnel is Android's own «Запрос на
+     * подключение» — the consent Activity `VpnService.prepare()` hands back (see
+     * [startVpnWithPermission]) — and it is DIALOG-THEMED. A dialog-themed activity does not cover
+     * the one under it: the shell is paused and STILL ON THE GLASS, in full view behind the prompt.
+     * So `onPause` fired while the user was looking straight at Главная, and it cancelled the
+     * revolution and stamped the arc back to 0°. What was left on screen was
+     * @drawable/ic_connect_arc's fixed 19.7 % of the circumference — one segment of stroke, opaque,
+     * perfectly still — under a pill reading «Подключаемся…» and a clock at 00:00:00. That is the
+     * photograph, and a busy affordance frozen mid-sweep is the one thing it may never be: it does
+     * not say «waiting», it says «hung».
+     *
+     * IT KEEPS TURNING FOR THE WHOLE WAIT, and that is the honest state as well as the one he asked
+     * for. The attempt IS in flight — the user tapped connect and the app is now waiting on HIM
+     * rather than on a network — so the object is busy and says so, for as long as he takes. The
+     * alternative, holding the object at rest until consent lands, would have the control answer a
+     * tap with nothing at all and then start moving on its own later, which is a worse lie.
+     *
+     * Both answers are already clean and neither needed changing:
+     *
+     *  - DECLINE lands in [requestVpnPermission]'s else branch, which drops `connectInProgress` and
+     *    republishes idle, so the arc winds down through the ordinary exit and the ring fills back.
+     *    It now winds down from wherever it actually is instead of from a dead stop at 0°.
+     *  - THE WATCHDOG cannot fire at a dialog: [startVpnWithPermission] stands it down BEFORE
+     *    launching the prompt and [requestVpnPermission] re-arms it only on RESULT_OK, so the 20s
+     *    deadline measures the daemon and never the человек.
+     *
+     * THE RULE ITSELF IS UNCHANGED — nothing infinite turns while nobody can see it — only the
+     * question it is asked. `onStop` is that question: the window is not visible AT ALL. `onPause`
+     * only ever meant «something is on top of it». [onResume]'s render() puts the revolution back
+     * through showSweep(), which re-arms it without replaying the entrance, and onResume always
+     * follows the onStart that answers this.
+     */
+    override fun onStop() {
+        stopSweepSpin()
+        super.onStop()
     }
 
     override fun onDestroyView() {
