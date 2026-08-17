@@ -211,6 +211,32 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private var disconnecting = false
     private var tunnelError = false
 
+    /**
+     * A TEARDOWN THIS SCREEN ASKED FOR, WITH A START ALREADY QUEUED BEHIND IT.
+     *
+     *     «также когда переключаешься между серверами, то на момент пишет вот так и красное всё …
+     *      а потом подключается и пропадает»
+     *
+     * Switching servers is stop → start, and the daemon reports the stop the way it reports every
+     * stop. The observer in [observeTunnel] had no way to tell the two apart, so `!isRunning &&
+     * connectInProgress` — the test that means «the start we asked for did not happen» — was true
+     * for the intermediate half of a switch as well. For the fraction of a second between the two
+     * halves the object painted the FAILURE: red rings, «Не подключено», «Нажмите, чтобы
+     * повторить», and the session clock reset to 00:00:00 by `stopConnectionTimer`.
+     *
+     * This is the missing piece of intent. It is raised by [restartV2Ray] the moment it asks the
+     * daemon to stop, and it is lowered by exactly three things: the tunnel coming back up (the
+     * switch worked), the stop timing out (the old tunnel would not go), and the connect watchdog
+     * firing (the new one never came). None of the three can be skipped, so the flag cannot strand
+     * the control in a busy state — the watchdog is armed by the caller before the switch starts
+     * and, unlike before, now survives the intermediate report.
+     *
+     * It is not a dwell and not a latch: nothing here is timed. A state that the user must not see
+     * is one that must not be PAINTED, and the reason it must not be painted is that it is not
+     * true — no failure has happened, and the tunnel the clock is counting has not ended yet.
+     */
+    private var switching = false
+
     /** What [render] last drew, so a transition can be told from a repaint. */
     private var renderedConn: Conn? = null
 
@@ -437,6 +463,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private val connectWatchdogRunnable = Runnable {
         if (mainViewModel.isRunning.value != true) {
             connectInProgress = false
+            // A switch whose second half never answered has run out of rope, and THIS one is a real
+            // failure: [switching] is dropped here so the observer stops swallowing the daemon's
+            // «not running» and the object goes red, exactly as a plain start that stalls does.
+            switching = false
             tunnelError = true
             applyRunningState(isLoading = false, isRunning = false)
         }
@@ -1270,16 +1300,20 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         }
         binding.rvHomeServers.alpha = 0f
         binding.rvHomeServers.children.forEach { it.alpha = 0f }
-        // THE GATE BLOCK IS PARKED TOO, and it is not in the table above for a reason: it occupies
-        // the подписка slot's place and never appears with it, so it takes the slot's arrival
-        // rather than one of its own ([playEntrance] releases it with the rest).
+        // THE GATE BLOCK IS PARKED WHILE THE SCREEN IS HELD, AND ONLY THEN. It is not one of §3's
+        // seven rows and must not become one — the table is the design's and this block is the
+        // подписка slot's alternate occupant, arriving through paintSlot's own crossfade.
         //
-        // It has to be parked because the flow's release now waits for the server list, so there is
-        // a real interval in which the overlay is gone and the table has not started. Everything in
-        // the table is invisible there — and the gate, which was not, would have been the one thing
-        // on screen: on the Telegram path the state at that instant is «Загрузить серверы», i.e.
-        // this block with a button on it, flashed for as long as the fetch takes and then replaced.
-        binding.layoutGate.gate.alpha = 0f
+        // It has to be parked for the HOLD because the release now waits for the server list, so
+        // there is a real interval in which the overlay is gone and the table has not started yet.
+        // Everything in the table is invisible there; the gate, which was not, would have been the
+        // one thing on screen — on the Telegram path the state at that instant is «Загрузить
+        // серверы», i.e. this block with a button on it, shown for as long as the fetch takes and
+        // then replaced by the подписка card. Exactly the flash the hold exists to prevent.
+        //
+        // [playEntrance] clears the hold before it primes, so the release does not park it again;
+        // [clearEntrance] hands its opacity back either way.
+        if (entranceHeld) binding.layoutGate.gate.alpha = 0f
     }
 
     /**
@@ -2057,6 +2091,20 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // ([latencyRunnable]) that produces the «мс» figure, and the connect watchdog.
 
         mainViewModel.isRunning.observe(viewLifecycleOwner) { isRunning ->
+            // THE STOP HALF OF A SWITCH IS NOT AN OUTCOME, and this is the whole of the owner's
+            // red flash between two servers. @see switching
+            //
+            // Everything below this line treats the report as the END of an attempt: it stands the
+            // watchdog down, decides whether the attempt failed, stops the session clock and
+            // publishes a state. All four are wrong about a teardown we asked for and are already
+            // following with a start — including standing the watchdog down, which is what left the
+            // switch with no deadline of its own once it stopped being an "outcome". So the report
+            // is dropped whole, `connectInProgress` and `lastRunningState` keep the values they had
+            // before the switch, and the object stays in the busy state it was put in by
+            // [applySelectionToRunningTunnel] until the start half answers or the watchdog gives up.
+            if (switching && !isRunning) return@observe
+            switching = false
+
             // A definitive running/stopped state arrived (success or failure): the connect attempt
             // is over, so the watchdog is no longer needed.
             cancelConnectWatchdog()
@@ -3774,6 +3822,11 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             connectInProgress -> {
                 // Cancel: stop whatever half-started and return to idle.
                 connectInProgress = false
+                // A tap here during a switch is the user taking the operation back, so there is no
+                // start queued behind the stop any more and «not running» becomes an outcome again.
+                // Without this the flag would outlive the watchdog this branch stands down, and the
+                // next genuine stop would be swallowed. @see switching
+                switching = false
                 cancelConnectWatchdog()
                 tunnelError = false
                 CoreServiceManager.stopVService(requireContext())
@@ -3782,6 +3835,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
             mainViewModel.isRunning.value == true -> {
                 connectInProgress = false
+                switching = false
                 cancelConnectWatchdog()
                 disconnecting = true
                 tunnelError = false
@@ -3827,6 +3881,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             // The object is disabled in this state, so this is a backstop rather than the user's
             // first contact with the problem — the status line already says «Сервер не выбран».
             connectInProgress = false
+            // Reached from [restartV2Ray] too, and there it is the third way a switch can end with
+            // no start behind it. @see switching
+            switching = false
             applyRunningState(isLoading = false, isRunning = false)
             return
         }
@@ -3849,6 +3906,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             startV2Ray()
             return
         }
+        // THE INTENT, DECLARED BEFORE THE DAEMON IS ASKED TO STOP. From here until one of the three
+        // exits below, «not running» is a step of this operation and not its result. @see switching
+        switching = true
         CoreServiceManager.stopVService(requireContext())
         lifecycleScope.launch {
             val deadline = SystemClock.elapsedRealtime() + RESTART_STOP_TIMEOUT_MS
@@ -3856,6 +3916,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
                 delay(RESTART_STOP_POLL_MS)
             }
             if (mainViewModel.isRunning.value == true) {
+                // The old tunnel would not come down, so there is nothing queued behind it any more
+                // and this IS the outcome.
+                switching = false
                 connectInProgress = false
                 tunnelError = true
                 if (isBindingInitialized) applyRunningState(isLoading = false, isRunning = true)
