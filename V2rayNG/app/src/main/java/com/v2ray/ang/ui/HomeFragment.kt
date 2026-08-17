@@ -4120,7 +4120,17 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      */
     private fun startConnectionTimer() {
         val started = CoreServiceManager.sessionStartedAt()
-        connectionStartTime = if (started > 0L) started else System.currentTimeMillis()
+        connectionStartTime = when {
+            // The daemon's own stamp always wins, and a restart while the app was away puts a new
+            // one there — so a resume follows the session that is actually up.
+            started > 0L -> started
+            // NO STAMP, AND WE ALREADY GUESSED ONCE. [onResume] calls this on every return now, and
+            // re-guessing `now` each time would restart the counter from zero every time the user
+            // came back to a stamp-less session. The first guess is the oldest thing this screen
+            // knows about that tunnel, so it is the least wrong one to keep.
+            connectionStartTime > 0L -> connectionStartTime
+            else -> System.currentTimeMillis()
+        }
         timerHandler.removeCallbacks(uptimeRunnable)
         timerHandler.post(uptimeRunnable)
     }
