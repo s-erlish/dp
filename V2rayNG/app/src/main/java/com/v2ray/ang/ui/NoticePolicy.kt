@@ -210,9 +210,24 @@ object NoticePolicy {
         R.string.tv_send_scanning_invalid,
     )
 
+    /**
+     * RULE 5 ON ITS OWN, for a surface that is not on this channel and is asked none of the other
+     * questions.
+     *
+     * A full-screen flow owns the window and states its own progress; anything that slides out from
+     * under it reports on an errand nobody started. Two surfaces need exactly this question and
+     * nothing else — the in-flight bar ([allowsProgress]) and Главная's transient status bar
+     * (`HomeFragment.showStatus`, which the post-sign-in import raises «Подписка привязана» on,
+     * mid-flow, over the overlay that is already saying so in four steps).
+     *
+     * It is the one predicate and not a second copy of the flag, so a screen cannot end up asking a
+     * different question from the one the policy is answering.
+     */
+    fun allowsNow(): Boolean = !flowInProgress
+
     /** Rule 1 + rule 3 + rule 5, in one question. */
     fun allows(kind: Kind, @StringRes id: Int): Boolean =
-        !flowInProgress && kind != Kind.SUCCESS && id != 0 && ALLOWED.contains(id)
+        allowsNow() && kind != Kind.SUCCESS && id != 0 && ALLOWED.contains(id)
 
     /**
      * Rule 5 alone, for the IN-FLIGHT signal, which is not on the policy channel and is not asked
@@ -223,7 +238,7 @@ object NoticePolicy {
      * progress bar — and a second one underneath it reports the same work twice from behind an
      * opaque surface.
      */
-    fun allowsProgress(): Boolean = !flowInProgress
+    fun allowsProgress(): Boolean = allowsNow()
 
     /**
      * A node summary in upstream's debug format — `[VLESS] Finland(***12:443)`, `[Custom] [Xray]`.

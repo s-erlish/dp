@@ -849,9 +849,17 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      *
      * A transient EVENT, so it is a `Snackbar`, offset above the overlaid bottom navigation with the
      * shell's own inset figure. Persistent CONDITIONS go on the status strip instead.
+     *
+     * RULE 5 REACHES THIS SURFACE TOO. It is a bar at the bottom of Главная and it is raised by
+     * `onLoggedIn` («Подписка привязана») at the exact instant a sign-in flow owns the whole window
+     * — the same defect, on the same screen, as the «нет подписок для обновления» the owner caught,
+     * and the policy's whole point is that «not now» is decided about the MOMENT rather than about
+     * one sentence. It is asked the moment-question only: what this surface says is the connect
+     * machine's, not the notice channel's. @see NoticePolicy.allowsNow
      */
     fun showStatus(text: CharSequence) {
         if (!isBindingInitialized) return
+        if (!NoticePolicy.allowsNow()) return
         val bar = Snackbar.make(binding.root, text, Snackbar.LENGTH_SHORT)
         (bar.view.layoutParams as? ViewGroup.MarginLayoutParams)?.let { lp ->
             lp.bottomMargin += snackbarBottomOffset()
@@ -2423,13 +2431,51 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
+     * ============================================================================
+     * THIS IS THE IMPORT THAT ADDS THE ПОДПИСКА, AND NOTHING WAS WAITING FOR IT.
+     * ============================================================================
+     *
      * Runs once when the user transitions to signed-in: auto-import their подписки and reload the
      * server list on success.
+     *
+     *     «почему он меня кидает на главную когда подписка ещё полностью не добавилась? должно
+     *      продолжаться начальное окно … и только потом как добавилось перекидывать на главную»
+     *
+     * THE SIGN-IN FLOW WAS WAITING FOR A DIFFERENT ERRAND. `GateView.startTelegramFlow` answers
+     * `LoginState.Success` with `host?.refreshSubscriptions()`, which is the shell's
+     * `importConfigViaSub()` — it walks the подписки that are ALREADY on the device and re-fetches
+     * each one. A minute-old account has none, so that call finds nothing, returns in the half
+     * second its own `delay` costs, and `loadsInFlight` is back to zero long before the account's
+     * подписка exists. `revealHome` waited on that counter, saw it settle, and let Главная assemble
+     * around an empty list. `NoticePolicy` rule 5 says the same thing in prose and has said it since
+     * it was written: «signing in fires refreshSubscriptions() before the account's подписка has
+     * been written». The refresh is not the work; THIS is the work, and it reported to nobody.
+     *
+     * So it declares itself, on the one signal the hand-off reads. The bracket is
+     * [MainHost.reportSubscriptionImport] and not the shell's `showLoading`, because those two
+     * things are not the same: `showLoading` also raises the in-flight bar and spins the connect
+     * arc, and this import runs at EVERY cold start with a stored session, where announcing it
+     * would be the app reporting an errand nobody started.
+     *
+     * EVERY EXIT LOWERS IT. The bracket is a `finally`, so a failure, a cancelled scope (the
+     * fragment going while the two calls are in flight) and an empty account all reach it;
+     * `autoImportSubscriptions` additionally cannot throw — every branch of it returns a `Result`.
+     * The shell puts its own deadline under the wait on top of that. @see MainActivity.revealHome
      */
     private fun onLoggedIn() {
+        // Read once, here, while there certainly is an activity: `mainHost` goes through
+        // requireActivity(), and the `finally` below can run on a fragment that has been detached.
+        val shell = mainHost
+        shell.reportSubscriptionImport(true)
         lifecycleScope.launch {
-            AccountRepository().autoImportSubscriptions().onSuccess { mainViewModel.reloadServerList() }
-            accountViewModel.loadSubscriptions()
+            try {
+                AccountRepository().autoImportSubscriptions().onSuccess { mainViewModel.reloadServerList() }
+                accountViewModel.loadSubscriptions()
+            } finally {
+                // The reload above is the heaviest main-thread work on this path, and the release
+                // this unblocks is §3's whole table. They do not share a frame. @see afterListSettles
+                afterListSettles { shell.reportSubscriptionImport(false) }
+            }
         }
         showStatus(getString(R.string.toast_subscription_linked))
     }

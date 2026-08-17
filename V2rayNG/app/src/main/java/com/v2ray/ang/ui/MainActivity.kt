@@ -210,6 +210,22 @@ interface MainHost {
     fun refreshSubscriptions()
 
     /**
+     * Главная's own post-sign-in import — the errand that actually WRITES the account's подписка and
+     * fetches its servers (`HomeFragment.onLoggedIn` -> `AccountRepository.autoImportSubscriptions`).
+     *
+     * It is reported to the shell because the shell is what holds Главная back for a full-screen
+     * flow, and this is the one piece of work the flow is genuinely waiting on. It is deliberately
+     * NOT routed through `showLoading` / `hideLoading`: those also raise the in-flight bar and spin
+     * the connect arc, and this import runs at every cold start with a stored session, where
+     * announcing it would report an errand nobody started. Here the shell learns the fact and
+     * nothing else changes on screen.
+     *
+     * Called with `true` before the import begins and with `false` from a `finally`, so a failure, a
+     * cancelled scope and an account with no подписки all lower it. @see MainActivity.revealHome
+     */
+    fun reportSubscriptionImport(running: Boolean)
+
+    /**
      * Whether Главная's entrance (handoff §3, «Сборка главной») is being held for a full-screen
      * flow overlay, so the tab parks in its pre-entrance state at [HomeFragment.onViewCreated]
      * instead of assembling itself behind the overlay.
@@ -319,6 +335,16 @@ class MainActivity : HelperBaseActivity(), MainHost {
         // Remembers which bottom-nav tab was selected so it survives an activity
         // recreate (theme/language change) instead of snapping back to Home.
         const val KEY_SELECTED_NAV = "selected_bottom_nav"
+
+        // THE LONGEST Главная MAY BE HELD once the flow overlay has left the screen.
+        //
+        // Four seconds, and the figure is chosen against what the user is looking at rather than
+        // against what the network might do: the overlay's own finale already covers 2.7s of the
+        // import (900ms dwell + 1300ms hold + 520ms fade), so on any ordinary connection the wait
+        // below is zero and this never fires. When it does fire the network is in trouble, and four
+        // more seconds of a screen that is not painting itself is the boundary between «it is
+        // thinking» and «it is broken». @see revealDeadline
+        const val REVEAL_WAIT_MAX_MS = 4_000L
     }
 
     private val requestActivityLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -546,8 +572,38 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * It is the balance of [showLoading] / [hideLoading], which every one of those errands already
      * brackets, so it is the app's own answer to «данные ещё едут» rather than a second bookkeeping
      * of the same fact. [revealHome] waits on it; nothing else reads it.
+     *
+     * **It is not the whole answer, and believing it was is the defect [revealHome] documents.**
+     * The account's own import does not come through here — see [subscriptionImportRunning].
      */
     private var loadsInFlight = 0
+
+    /**
+     * Whether Главная's post-sign-in подписка import is still running.
+     *
+     * SEPARATE FROM [loadsInFlight] BECAUSE IT IS A DIFFERENT ERRAND, and telling them apart is the
+     * whole of the second defect. `loadsInFlight` counts refreshes of подписки that are already on
+     * the device; after a Telegram sign-in there are none, so it settles in half a second while the
+     * thing the user is waiting for — the account's подписка being written and its servers fetched —
+     * has not started reporting anything. @see MainHost.reportSubscriptionImport
+     */
+    private var subscriptionImportRunning = false
+
+    /**
+     * THE BOUND ON THE WAIT, and the reason [revealHome] cannot hang.
+     *
+     * The import behind [subscriptionImportRunning] is two API calls at 15s connect / 20s read
+     * apiece plus one fetch per подписка, so its OWN bound is most of a minute — far past the point
+     * where a screen that is not painting itself reads as a broken app rather than as a pause. Past
+     * this the entrance plays regardless and Главная comes up in the state it is honestly in: on
+     * this path that is the gate block's «Подписка активна, сервера ещё не загружены», a screen with
+     * a sentence and a button on it, which is a great deal better than nothing at all.
+     *
+     * A `postDelayed` and not an animator, because it is not a movement: it is a deadline, and
+     * `AnimatorSet` cannot express one. It is a single message and it is cancelled the moment the
+     * wait ends normally.
+     */
+    private val revealDeadline = Runnable { releaseHomeNow() }
 
     /**
      * ARM the hand-off: call this BEFORE raising a full-screen loading overlay over the shell.
@@ -598,9 +654,32 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * So the release waits for [loadsInFlight] to come back to zero, and the assemble then plays
      * over a list that is already bound. Waiting costs nothing to look at: the screen is parked in
      * §3's start values (every element at alpha 0, the gate block with them), so «показывать нечего,
-     * пока показывать нечего» is literally what is on the glass. The wait is bounded by the loads
-     * themselves — every one of them is an HTTP call with its own timeout, and every one balances
-     * its [showLoading] with a [hideLoading], including on the failure path.
+     * пока показывать нечего» is literally what is on the glass.
+     *
+     * ## …AND THAT WAS A WAIT ON THE WRONG ERRAND
+     *
+     *     «почему он меня кидает на главную когда подписка ещё полностью не добавилась?»
+     *
+     * The same report came back, because [loadsInFlight] answers for the wrong half of a sign-in.
+     * `GateView` answers `LoginState.Success` with `refreshSubscriptions()`, i.e. `importConfigViaSub`
+     * — a walk over the подписки ALREADY on the device, re-fetching each. A brand-new account has
+     * none. That call therefore does no work at all, its `showLoading` is balanced within the half
+     * second its own `delay` costs, and the counter is back to zero while the errand the user is
+     * actually waiting on is only just starting: `HomeFragment.onLoggedIn` ->
+     * `AccountRepository.autoImportSubscriptions`, which is what WRITES the account's подписка and
+     * fetches its servers, and which reported to nobody. The gate opened on a proxy that had
+     * finished measuring nothing.
+     *
+     * So the wait is on BOTH facts now — [loadsInFlight] and [subscriptionImportRunning] — and the
+     * second one is bracketed at the import itself, in a `finally`, so the failed, the empty and the
+     * cancelled runs all lower it. On the clipboard path the flow awaits its own import before it
+     * ever hands off, so neither fact is ever raised there and the release is immediate, which is
+     * correct: that list is bound a full second before the overlay starts leaving.
+     *
+     * **It is bounded twice.** Once by the work — every load balances its [showLoading] on every
+     * exit and every import lowers its flag in a `finally` — and once by [revealDeadline], which
+     * releases the screen regardless after [REVEAL_WAIT_MAX_MS]. A gate that can hang is worse than
+     * the bug it fixes.
      *
      * [dismissOverlay] still runs IMMEDIATELY and is never deferred: the overlay's own teardown is
      * its own business, and holding a removed overlay's frame back would be the flash from the
@@ -613,15 +692,46 @@ class MainActivity : HelperBaseActivity(), MainHost {
             NoticePolicy.leaveFlow()
             homeFragment?.playEntrance()
         }
-        if (loadsInFlight > 0) pendingReveal = release else release()
+        if (!homeDataPending()) {
+            release()
+            return
+        }
+        pendingReveal = release
+        binding.root.removeCallbacks(revealDeadline)
+        binding.root.postDelayed(revealDeadline, REVEAL_WAIT_MAX_MS)
     }
+
+    /**
+     * Whether anything Главная would assemble AROUND is still on its way: a shell load, or the
+     * account's own подписка import. The two are separate counters because they are separate
+     * errands; see each of them.
+     */
+    private fun homeDataPending(): Boolean = loadsInFlight > 0 || subscriptionImportRunning
 
     /** Runs a release that was waiting for the list, if the list has just become ready. */
     private fun releaseHomeIfReady() {
-        if (loadsInFlight > 0) return
+        if (homeDataPending()) return
+        releaseHomeNow()
+    }
+
+    /**
+     * Lets Главная go, whether or not what it was waiting for has arrived. Called by
+     * [releaseHomeIfReady] when it has, and by [revealDeadline] when it has taken too long.
+     */
+    private fun releaseHomeNow() {
+        binding.root.removeCallbacks(revealDeadline)
         val release = pendingReveal ?: return
         pendingReveal = null
         release()
+    }
+
+    override fun reportSubscriptionImport(running: Boolean) {
+        runOnUiThread {
+            subscriptionImportRunning = running
+            // The import is the LAST of the two facts to settle on the sign-in path, so this is
+            // usually the call that opens the gate.
+            if (!running) releaseHomeIfReady()
+        }
     }
 
     override fun showAddMenu(anchor: View) = showImportMenu(anchor)
