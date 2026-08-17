@@ -199,6 +199,15 @@
     <color name="mono_outline">#38383C</color>
     <color name="mono_outlineVariant">#28282C</color>
     <color name="mono_fab_active">#FFFFFF</color>
+    <!-- THE REST STATE OF THE CONNECT OBJECT, AND IT WAS MISSING HERE. `mono_fab_active` and
+         `mono_connected` were both flipped for the dark base and this one was not, so mono dark
+         fell back to the LIGHT value #C7C7CC — a near-white ring at rest on a #121214 ground.
+         That is louder than the blue theme's connected state, and it collapsed the distinction
+         the object exists to draw: §4 gives it «muted and STATIC when off», one arc while
+         negotiating, #FFFFFF once connected. Idle was reading as connected.
+         #46464A is the mono peer of the blue theme's own dark idle (#3A3F49 on #141619, 1.82:1):
+         one step above `mono_outline` #38383C, 2.03:1 on `mono_surface` — present, and quiet. -->
+    <color name="mono_fab_inactive">#46464A</color>
     <color name="mono_connected">#FFFFFF</color>
     <color name="mono_surfaceContainerLowest">#000000</color>
     <color name="mono_surfaceContainerLow">#0E0E10</color>

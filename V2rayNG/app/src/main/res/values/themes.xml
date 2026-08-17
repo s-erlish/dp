@@ -467,6 +467,17 @@
              the blue theme's #2A3142 / #F1F4FA. -->
         <item name="colorSurfaceInverse">@color/mono_onSurface</item>
         <item name="colorOnSurfaceInverse">@color/mono_surface</item>
+        <!-- ...and the third of that family, which was the ONE colour attribute
+             AppThemeBase declares and this overlay did not answer. Unset it kept
+             @color/md_theme_inversePrimary — #AEC7FF / #1E5FC7, a literal blue on
+             the screen whose entire point is that there is no hue on it. Nothing
+             in this product's own layouts names it, which is exactly why it
+             survived: M3 reads it for the accent drawn ON the inverse plane
+             (a snackbar action that misses snackbarStyle, tooltips, sliders).
+             mono_surface is that ink in both modes for the same reason it is
+             colorOnSurfaceInverse above — the inverse plane is mono_onSurface, so
+             what reads on it is mono_surface. -->
+        <item name="colorPrimaryInverse">@color/mono_surface</item>
         <item name="android:colorBackground">@color/mono_background</item>
         <item name="colorOnBackground">@color/mono_onBackground</item>
         <item name="colorOutline">@color/mono_outline</item>
