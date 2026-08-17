@@ -83,18 +83,6 @@ class AboutActivity : BaseActivity() {
 
     private fun bindLinks() {
         RowBinder.bind(
-            root = binding.rowUrlSchemes.root,
-            title = getString(R.string.about_url_schemes),
-            glyph = R.drawable.ic_hub_url_scheme,
-            onClick = { open(UrlSchemeListActivity::class.java) },
-        )
-        RowBinder.bind(
-            root = binding.rowLog.root,
-            title = getString(R.string.about_log),
-            glyph = R.drawable.ic_logcat_24dp,
-            onClick = { open(LogcatActivity::class.java) },
-        )
-        RowBinder.bind(
             root = binding.rowCheckUpdate.root,
             title = getString(R.string.about_check_update),
             glyph = R.drawable.ic_check_update_24dp,

@@ -149,32 +149,16 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content" />
 
-                    <!-- The three below are not in §7's table for this screen: «Схемы ссылок»,
-                         «Журнал» and «Проверить обновления» are screens the handoff was drawn
-                         without sight of (П-07). They keep their door here, after the five the
-                         design does name, in the design's own order. -->
+                    <!-- «СХЕМЫ URL-АДРЕСОВ» И «ЖУРНАЛ» СНЯТЫ ОТСЮДА по указанию владельца
+                         («в о приложении убери схемы url, журнал»), и обе никуда не делись:
+                         они стоят разделом «О приложении» на вкладке Настроек, и здесь были
+                         вторым входом в те же два экрана. Оба Activity, их строки и значки —
+                         на месте; ушёл дубль двери.
 
-                    <include
-                        android:id="@+id/row_url_schemes"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        layout="@layout/view_row" />
-
-                    <com.google.android.material.divider.MaterialDivider
-                        style="@style/Widget.Departament.Divider.Full"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
-
-                    <include
-                        android:id="@+id/row_log"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        layout="@layout/view_row" />
-
-                    <com.google.android.material.divider.MaterialDivider
-                        style="@style/Widget.Departament.Divider.Full"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
+                         «Проверить обновления» остаётся: этот экран здесь единственный,
+                         второго входа у него нет. Он и «Схемы ссылок» с «Журналом» не были
+                         в таблице §7 для этого экрана (П-07) — их дорисовали без ведома
+                         дизайна, и владелец подрезал ровно то, что задвоилось. -->
 
                     <include
                         android:id="@+id/row_check_update"
