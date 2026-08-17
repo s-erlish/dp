@@ -915,12 +915,30 @@
 
         There is no indeterminate state. A switch waiting on the network is replaced
         by the row's inline 20dp spinner and is not interactive.
+
+        AND THE PRESS IS THE ROW'S, WHICH IS WHY THE THUMB IS OURS. That clickable
+        ="false" two paragraphs up has a consequence nobody wrote down:
+        ViewGroup.dispatchSetPressed skips a child that can be pressed on its own and
+        forwards the state to every child that cannot, so the flag that makes the row
+        the single hit target is exactly what feeds the row's press INTO the switch.
+        M3's mtrl_switch_thumb answers it with a 28dp disc — the owner held the IPv6
+        row down and photographed the result, «в переключателе кружочек увеличился,
+        хотя такого быть не должно». @drawable/switch_thumb is that thumb with the
+        pressed entry left out and every other state, size and transition reproduced;
+        the whole account is in its header. The row keeps its own response
+        (@anim/press_row plus @drawable/bg_row); the switch stops adding a second one.
+
+        Applied here rather than on @id/row_switch alone because this style is the
+        theme's materialSwitchStyle, and the defect belonged to every switch that
+        sits in a clickable row — more than twenty of them, across the settings tab,
+        the provider screens, the local proxy and the universal row.
     -->
     <style name="Widget.Departament.Switch" parent="Widget.Material3.CompoundButton.MaterialSwitch">
         <item name="thumbTint">@color/switch_thumb_selector</item>
         <item name="trackTint">@color/switch_track_selector</item>
         <item name="trackDecorationTint">@color/switch_track_decoration</item>
         <item name="thumbIconTint">@color/switch_thumb_icon</item>
+        <item name="android:thumb">@drawable/switch_thumb</item>
         <item name="android:background">@null</item>
     </style>
 

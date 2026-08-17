@@ -215,7 +215,16 @@
         android:visibility="gone"
         tools:visibility="visible" />
 
-    <!-- The row owns the toggle; the switch is decoration that reports state. -->
+    <!-- The row owns the toggle; the switch is decoration that reports state.
+
+         AND clickable="false" HAS A SECOND EFFECT, which cost the owner a screenshot
+         of the IPv6 row: ViewGroup.dispatchSetPressed skips a child that can be
+         pressed on its own and forwards the state to every child that cannot, so the
+         flag that makes the row the single hit target is precisely what feeds the
+         row's press into this switch. M3's thumb answered with a 28dp disc. Do NOT
+         "fix" that by making the switch clickable — that trades one defect for two
+         targets. It is refused at @drawable/switch_thumb, which is Material's thumb
+         with the pressed entry left out and every other state reproduced. -->
     <com.google.android.material.materialswitch.MaterialSwitch
         android:id="@+id/row_switch"
         style="@style/Widget.Departament.Switch"
