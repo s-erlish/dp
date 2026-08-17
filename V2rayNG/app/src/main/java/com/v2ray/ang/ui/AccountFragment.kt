@@ -299,7 +299,17 @@ class AccountFragment : Fragment() {
         // Signed-out hero. Telegram first, exactly as on the start screen — the same two doors in
         // the same order, so someone who has seen one recognises the other. MODE_SITE's form is
         // where registration lives («Создать аккаунт»), which is why there is no third button.
-        binding.btnSignedOutTelegram.onSingleClick { openLogin(LoginActivity.MODE_TELEGRAM) }
+        //
+        // EACH BUTTON STARTS ITS METHOD; NEITHER OPENS A SCREEN THAT ASKS AGAIN. «Войти через
+        // Telegram» used to open LoginActivity.MODE_TELEGRAM, i.e. the gate — and once this block
+        // was rebuilt to look like that gate (same heading, same two contour pills, same order),
+        // the tap led from the question to the question: «нажимаешь вход через телеграм,
+        // открывается снова окно где предлагается войти через телеграм». The block ASKS, so the
+        // screen behind it must ANSWER: MODE_TELEGRAM_START mints the token and opens Telegram on
+        // entry, landing on the gate's own awaiting stack, and MODE_SITE has always opened the
+        // form itself. The gate is still the right screen for a caller that has not asked yet —
+        // it is untouched, and «Привязать Telegram» below still goes through it.
+        binding.btnSignedOutTelegram.onSingleClick { openLogin(LoginActivity.MODE_TELEGRAM_START) }
         binding.btnSignedOutSite.onSingleClick { openLogin(LoginActivity.MODE_SITE) }
         // Cold-load error: re-run the initial load (and re-show the skeleton while it retries).
         binding.btnRetryLoad.onSingleClick {
@@ -327,7 +337,11 @@ class AccountFragment : Fragment() {
         startActivity(Intent(requireContext(), target))
     }
 
-    /** Opens [LoginActivity] straight on the door the tapped button names. */
+    /**
+     * Opens [LoginActivity] straight on the door the tapped button names — and, for a door that is
+     * an action rather than a surface, straight THROUGH it: [LoginActivity.MODE_TELEGRAM_START]
+     * carries out the tap instead of showing a screen where it could be made again.
+     */
     private fun openLogin(mode: String) {
         startActivity(
             Intent(requireContext(), LoginActivity::class.java)

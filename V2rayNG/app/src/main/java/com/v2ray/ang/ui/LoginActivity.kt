@@ -82,8 +82,19 @@ import kotlinx.coroutines.launch
  *
  * **Every method that worked before still works**, through the same entry points: a plain launch
  * lands on A, [EXTRA_MODE] = [MODE_SITE] lands straight on B, [MODE_TELEGRAM] lands on A (where
- * Telegram is already the primary), and [EXTRA_LINK] runs the same Telegram flow with the JWT of the
- * account that is already signed in, so the backend links instead of logging a second one in.
+ * Telegram is already the primary), [MODE_TELEGRAM_START] lands on A with the attempt already
+ * running, and [EXTRA_LINK] runs the same Telegram flow with the JWT of the account that is already
+ * signed in, so the backend links instead of logging a second one in.
+ *
+ * **Why the fourth mode exists (2026-08-17).** The Аккаунт tab's signed-out block was rebuilt to
+ * look exactly like this gate — same heading, same two contour pills, same order — and its «Войти
+ * через Telegram» opened [MODE_TELEGRAM], which is this gate. So the tap answered the question and
+ * the answer was the question again: «нажимаешь вход через телеграм, открывается снова окно где
+ * предлагается войти через телеграм». A gate is the right screen for a caller that has not asked
+ * the question yet and the wrong one for a caller whose own button already named the method, so a
+ * button that names Telegram now STARTS Telegram ([MODE_TELEGRAM_START]) instead of offering it a
+ * second time. The gate is untouched — both its buttons stay, and every other caller still lands
+ * on it.
  *
  * **What is deliberately gone**: the `Toast` on a failure the user can act on, and the debug
  * `AlertDialog` that put the raw HTTP body on screen (14-auth.md 13.3, D-14.F). The cause goes to
@@ -110,11 +121,27 @@ class LoginActivity : BaseActivity() {
 
     /**
      * True when the gate sits behind the form, i.e. Back on surface B pops to surface A instead of
-     * closing the screen. False for [MODE_SITE], which opens the form with nothing behind it, and
-     * for link mode, which never reaches the form at all. It decides Back, NOT which surface opens
-     * — see [onCreate].
+     * closing the screen. False for [MODE_SITE], which opens the form with nothing behind it, for
+     * link mode, which never reaches the form at all, and at entry for [MODE_TELEGRAM_START], whose
+     * caller answered the gate's question before this screen was ever created. It decides Back, NOT
+     * which surface opens — see [onCreate].
+     *
+     * [goToMail] also sets it, and that is the one place the form is ever PUSHED from the gate. A
+     * page that arrived by the sub-page transition has to leave by reversing it, whatever the entry
+     * mode was — closing the screen under a page the gate itself opened would be a different
+     * animation than the one the user just watched.
      */
     private var gateReachable = true
+
+    /**
+     * True while the Telegram attempt this screen was OPENED WITH is the only thing on it
+     * ([MODE_TELEGRAM_START]). Cancelling that attempt leaves nothing behind it: the gate's idle
+     * stack asks the question the caller's own button has already answered, so Back closes the
+     * screen from there instead of stranding the user on it. Cleared the moment the user starts an
+     * attempt himself or takes the gate's «Войти через сайт» — from then on the gate is a surface
+     * he has actually used, and Back belongs on it.
+     */
+    private var telegramEntry = false
 
     /** Set once the address has been wrong, after which it is validated live rather than on blur. */
     private var emailWasInvalid = false
@@ -145,16 +172,20 @@ class LoginActivity : BaseActivity() {
 
         linkMode = intent.getBooleanExtra(EXTRA_LINK, false)
         val mode = intent.getStringExtra(EXTRA_MODE)
-        gateReachable = !linkMode && mode != MODE_SITE
-        // WHICH surface opens is NOT the same question as whether the gate is behind it. Both
-        // MODE_SITE and link mode make Back leave the screen rather than pop to the gate — that is
-        // what [gateReachable] says — but only MODE_SITE starts on the form. Link mode starts on
-        // the GATE: that is where its CTA, its awaiting row and its success beat live, and its two
-        // «Войти по почте» buttons are hidden below precisely because the form has no part in it.
-        // Deriving the start page from gateReachable therefore opened «Привязать Telegram» on the
-        // email form, keyboard up, while startTelegramLogin() sent Telegram over the top of it and
-        // the awaiting row was never seen at all.
-        val startPage = if (gateReachable || linkMode) Page.GATE else Page.MAIL
+        telegramEntry = !linkMode && mode == MODE_TELEGRAM_START
+        gateReachable = !linkMode && !telegramEntry && mode != MODE_SITE
+        // WHICH surface opens is NOT the same question as whether the gate is behind it. All three
+        // of MODE_SITE, link mode and MODE_TELEGRAM_START make Back leave the screen rather than
+        // pop to the gate — that is what [gateReachable] says — but only MODE_SITE starts on the
+        // form. Link mode starts on the GATE: that is where its CTA, its awaiting row and its
+        // success beat live, and its two «Войти по почте» buttons are hidden below precisely
+        // because the form has no part in it. Deriving the start page from gateReachable therefore
+        // opened «Привязать Telegram» on the email form, keyboard up, while startTelegramLogin()
+        // sent Telegram over the top of it and the awaiting row was never seen at all.
+        // MODE_TELEGRAM_START starts on the GATE for the very same reason: the awaiting stack it
+        // is heading for is the gate's own, and it must be the gate's own, so that «Открыть
+        // Telegram», the poll and Back behave exactly as they do for a user-started attempt.
+        val startPage = if (gateReachable || linkMode || telegramEntry) Page.GATE else Page.MAIL
 
         // Already signed in and this is an ordinary sign-in: there is nothing to do here. Link mode
         // is the exception and the whole point — it is the signed-in user who attaches Telegram.
@@ -173,10 +204,13 @@ class LoginActivity : BaseActivity() {
         showPage(startPage, animate = false)
         observe()
 
-        // Link mode arrives from a tap that already said «Привязать Telegram», so it starts the
-        // flow itself instead of asking for the same tap twice. First creation only: a rotation
-        // must not mint a second token.
-        if (linkMode && savedInstanceState == null) viewModel.startTelegramLogin()
+        // Both of these arrive from a tap that has already named Telegram — «Привязать Telegram»
+        // on the Аккаунт row, «Войти через Telegram» on its signed-out block — so they start the
+        // flow themselves instead of asking for the same tap twice. It is done here, as part of
+        // opening, and not by firing a button after layout: the entry mode IS the attempt, so the
+        // machine has to be in it before the first frame is drawn rather than be nudged into it
+        // afterwards. First creation only: a rotation must not mint a second token.
+        if ((linkMode || telegramEntry) && savedInstanceState == null) viewModel.startTelegramLogin()
     }
 
     // ------------------------------------------------------------------ chrome
@@ -200,6 +234,14 @@ class LoginActivity : BaseActivity() {
      *
      * Every busy state therefore has a way out, and none of them leaves the screen while something
      * it started is still running.
+     *
+     * ONE STEP OF THAT LADDER IS MISSING WHEN THE ATTEMPT IS THE ENTRY ([MODE_TELEGRAM_START]).
+     * There is no idle stack under it to return to — the user chose Telegram on the Аккаунт tab,
+     * and the gate would put that same choice back in front of him, which is precisely the dead
+     * step this mode exists to remove. So the cancel still happens, in full and by the same call,
+     * and then the screen goes with it: one Back, one errand abandoned, and the tab he came from
+     * underneath. Everything the poll owns is released either way, so leaving is not a shortcut
+     * past the cleanup — it is what happens after it.
      */
     private fun setupBack() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -208,8 +250,10 @@ class LoginActivity : BaseActivity() {
                 when {
                     state is AuthUiState.TwoFactor -> viewModel.cancelTwoFactor()
 
-                    state is AuthUiState.TelegramAwaiting || state is AuthUiState.TelegramStarting ->
+                    state is AuthUiState.TelegramAwaiting || state is AuthUiState.TelegramStarting -> {
                         viewModel.cancelTelegramLogin()
+                        if (telegramEntry) SubPage.close(this@LoginActivity)
+                    }
 
                     page == Page.MAIL && gateReachable -> goToGate()
 
@@ -248,7 +292,14 @@ class LoginActivity : BaseActivity() {
             gate.btnGateEmailAlt.isVisible = false
         }
 
-        gate.btnGateTelegram.onSingleClick(Haptic.PRESS) { viewModel.startTelegramLogin() }
+        gate.btnGateTelegram.onSingleClick(Haptic.PRESS) {
+            // An attempt started HERE is the user's own, made on a gate he is looking at, so Back
+            // out of it belongs on that gate rather than out of the screen. Only ever reachable in
+            // [MODE_TELEGRAM_START] after the entry attempt has already failed and put the idle
+            // stack back on screen with the reason on it.
+            telegramEntry = false
+            viewModel.startTelegramLogin()
+        }
         gate.btnGateOpenTelegram.onSingleClick { reopenTelegram() }
         // Both «Войти через сайт» take the identical path. The idle one used to just swap the page,
         // which meant a tap during the token mint left the poll running: the user reached the form,
@@ -271,6 +322,13 @@ class LoginActivity : BaseActivity() {
         // form that is about to be destroyed.
         if (state is AuthUiState.Success) return
         if (state !is AuthUiState.Idle) viewModel.cancelTelegramLogin()
+        // The form is being pushed FROM the gate, by a button that lives on the gate, with the
+        // gate's own page transition. That makes the gate the surface behind it whatever the entry
+        // mode said — an entry that opened straight into the Telegram attempt has, by this tap,
+        // become an entry the user has navigated away from. Back reverses the push; it does not
+        // close the screen out from under a page the gate itself opened.
+        gateReachable = true
+        telegramEntry = false
         showPage(Page.MAIL)
     }
 
@@ -1094,6 +1152,17 @@ class LoginActivity : BaseActivity() {
 
         /** Open on the gate, where Telegram is already the primary action. */
         const val MODE_TELEGRAM = "telegram"
+
+        /**
+         * Open straight INTO the Telegram attempt: mint the token, hand the deep link to Telegram
+         * and sit on the gate's own awaiting stack while the poll runs.
+         *
+         * For a caller whose control already named the method — the Аккаунт tab's «Войти через
+         * Telegram» — where [MODE_TELEGRAM] would answer a tap by re-asking it. A caller that has
+         * NOT asked yet still wants [MODE_TELEGRAM]: the gate is the screen where the choice is
+         * made, and it is not going anywhere.
+         */
+        const val MODE_TELEGRAM_START = "telegram_start"
 
         /** true → attach Telegram to the session that is already signed in (surface E). */
         const val EXTRA_LINK = "link_telegram"
