@@ -24,13 +24,18 @@ class QSTileService : TileService() {
      */
     fun setState(state: Int) {
         qsTile?.icon = Icon.createWithResource(applicationContext, R.drawable.ic_stat_name)
-        if (state == Tile.STATE_INACTIVE) {
-            qsTile?.state = Tile.STATE_INACTIVE
-            qsTile?.label = getString(R.string.app_name)
-        } else if (state == Tile.STATE_ACTIVE) {
-            qsTile?.state = Tile.STATE_ACTIVE
-            qsTile?.label = CoreServiceManager.getRunningServerName()
-        }
+        // ПЛИТКА ВСЕГДА НАЗЫВАЕТСЯ ИМЕНЕМ ПРИЛОЖЕНИЯ, В ОБОИХ СОСТОЯНИЯХ.
+        //
+        // Включённая подписывалась именем сервера, и человек, ищущий в шторке «departament»,
+        // после включения переставал его там находить — плитка на его глазах превращалась в
+        // «Hybrid (Автовыбор)»: «можно ли сделать чтобы он оставался departament всегда, а вот
+        // уже в уведомлениях там и оставлять название выбранного сервера».
+        //
+        // Имя сервера при этом никуда не делось — оно заголовок уведомления, где ему и место:
+        // там есть строка нужной длины, флаг страны и таймер сессии. В плитке на него отведено
+        // два слова, и они уходили на то, чтобы стереть название продукта.
+        qsTile?.label = getString(R.string.app_name)
+        qsTile?.state = if (state == Tile.STATE_ACTIVE) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
 
         qsTile?.updateTile()
     }
