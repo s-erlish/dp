@@ -89,6 +89,12 @@ object NoticePolicy {
         R.string.import_sub_foreign,
         // Refreshing a подписка. Success is the new timestamp on the card; only failure speaks.
         R.string.notice_refresh_failed,
+        // …and the third outcome, which used to be filed as the second: a refresh with NOTHING to
+        // refresh — no подписки stored, or every one of them disabled. Not a failure (no request
+        // went out) and not a success, so rule 1 does not silence it, and without it «Обновить»
+        // is a dead button in exactly the state that most needs explaining. Both surfaces that
+        // refresh everything say it: `MainActivity.importConfigViaSub`, `SubSettingActivity.updateAll`.
+        R.string.subs_update_none,
         // The clipboard: the one outcome with no visible result of any kind.
         R.string.notice_copied,
         R.string.notice_copy_failed,

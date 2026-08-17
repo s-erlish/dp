@@ -1691,7 +1691,23 @@ class MainActivity : HelperBaseActivity(), MainHost {
                 // A refresh that produced NOTHING is the case with no visible answer, and it gets
                 // one sentence with a next step in it. `NoticePolicy` blocks the counter shape at
                 // the surface too, so the string cannot come back through another call site.
-                if (result.successCount == 0) toastError(R.string.notice_refresh_failed)
+                //
+                // «НИЧЕГО НЕ ЗАПРАШИВАЛОСЬ» IS NOT «НЕ УДАЛОСЬ». `successCount == 0` on its own was
+                // reported as a network failure, and it covers two states where not one request
+                // went out: no подписки stored at all, and every stored подписка skipped
+                // (`updateConfigViaSub` returns skipCount for one that is disabled or has no URL).
+                // Both told the user his connection was at fault, instantly, about a fetch that
+                // never happened — the same defect «Загрузить сервера» had, and the instant arrival
+                // of the message is the tell in both. Only a fetch that actually failed says so;
+                // when there was nothing to fetch, the answer is that there was nothing to fetch.
+                // `SubSettingActivity.updateAll` already branches this way on the same result.
+                when {
+                    result.failureCount > 0 && result.successCount == 0 ->
+                        toastError(R.string.notice_refresh_failed)
+
+                    result.successCount == 0 ->
+                        toast(R.string.subs_update_none)
+                }
                 if (result.configCount > 0) {
                     mainViewModel.reloadServerList()
                 }
