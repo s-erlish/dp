@@ -22,6 +22,7 @@ import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.ui.component.EmptyStateBinder
 import com.v2ray.ang.ui.component.RowBinder
+import com.v2ray.ang.ui.component.SelectPopup
 import com.v2ray.ang.ui.component.SkeletonBinder
 import com.v2ray.ang.ui.component.SubPage
 import com.v2ray.ang.ui.component.ToolbarBinder
@@ -55,9 +56,8 @@ import java.text.Collator
  * **The mode is one row, not two switches.** `PREF_PER_APP_PROXY` and `PREF_BYPASS_APPS` are two
  * booleans encoding three states, and the old screen showed them as two independent switches - one
  * of which was meaningless while the other was off, with the explanation hidden behind a second
- * tappable target that fired a toast. They are one `Row.Value` here, cycling «Все приложения» ->
- * «Только выбранные» -> «Кроме выбранных» in place. Both preferences keep their existing meaning
- * and their existing keys.
+ * tappable target that fired a toast. They are one `Row.Value` here, opening §6's select popup on
+ * all three modes. Both preferences keep their existing meaning and their existing keys.
  *
  * **NEITHER ROW ON THIS SCREEN CARRIES A SUBTITLE** (owner report 0.4.9: «там где режим, надо под
  * ним текст убрать… и у российских приложений тоже текст убери ниже»). Both explanations ran past
@@ -131,8 +131,10 @@ class PerAppProxyActivity : BaseActivity() {
     // ---------------------------------------------------------------- mode
 
     /**
-     * The three modes, in cycle order. The pair of booleans behind them is unchanged - this is a
-     * presentation of the existing preferences, not a new setting.
+     * The three modes, in the order the popup offers them - widest first, then the two narrowings.
+     * The pair of booleans behind them is unchanged; this is a presentation of the existing
+     * preferences, not a new setting, and [Mode.ordinal] is the index [SelectPopup] marks and
+     * returns.
      *
      * [hintRes] is no longer shown: the row lost its subtitle in 0.4.9 (see the class doc). It is
      * kept rather than deleted because it is the only thing still holding `perapp_mode_*_hint`
@@ -159,6 +161,21 @@ class PerAppProxyActivity : BaseActivity() {
         bindModeRow()
     }
 
+    /**
+     * «Режим» — handoff README §6, «Выбор из списка — окошко у значения».
+     *
+     * It used to CYCLE, and that is what the owner objected to: «у режима надо тоже сделать такую
+     * же всплывающую менюшку, как у днс пинга и у плюсика, чтобы можно было выбрать, а то кликом
+     * это странно». A tap advanced the value one step, so the two modes the user was not on cost
+     * one and two taps, the list of what was even available was never shown, and the row's promise
+     * («this changes here») was true while its behaviour («you may choose») was not. Every other
+     * value picker in the product - DNS, Пинг, Доменная стратегия, and the «+» on Главная - opens
+     * [SelectPopup]; this one now does too, with the current mode marked.
+     *
+     * `select_popup_w_default` and not a bespoke width: §6's width table measures the nine pickers
+     * on Настройки, and this «Режим» is not one of them - `select_popup_w_mode` was sized to «Только
+     * прокси», which is three characters shorter than «Только выбранные» (TOKENS.md).
+     */
     private fun bindModeRow() {
         val mode = currentMode()
         RowBinder.bind(
@@ -171,17 +188,26 @@ class PerAppProxyActivity : BaseActivity() {
             // tiles down the left edge is the generated-settings tell.
             glyph = R.drawable.ic_globe_24dp,
             value = getString(mode.labelRes),
-            // The unfold glyph is the promise that the value changes HERE - no screen, no dialog
-            // (22-components 8.1). Three options is exactly the count that grammar is for.
+            // The CARET, and now it means what it draws: a caret is «the list of values opens
+            // here», where a chevron would promise a screen. It also turns 180° while the popup
+            // is up, which is the half of §6's interaction the row itself owns.
             trailing = RowBinder.Trailing.Glyph(
                 icon = R.drawable.ic_arrow_drop_down,
                 contentDescription = null,
             ),
             onClick = {
-                val next = Mode.entries[(mode.ordinal + 1) % Mode.entries.size]
-                applyMode(next)
+                SelectPopup.show(
+                    anchor = binding.rowMode.root,
+                    options = Mode.entries.map { getString(it.labelRes) },
+                    selectedIndex = mode.ordinal,
+                    valueView = binding.rowMode.rowValue,
+                    caret = binding.rowMode.rowTrailingGlyph,
+                ) { picked -> applyMode(Mode.entries[picked]) }
             },
         )
+        // The card cannot clip (§11 grabl 4 - the popup would be sliced off at its bottom edge), so
+        // the two rows inside it carry the card's corners themselves.
+        RowBinder.edge(binding.rowMode.root, RowBinder.Edge.TOP)
     }
 
     // -------------------------------------------------------------- preset
@@ -212,6 +238,8 @@ class PerAppProxyActivity : BaseActivity() {
             R.string.perapp_ru_preset_installed,
             installed,
         )
+        // Second half of the un-clipped card above: this row is its bottom edge.
+        RowBinder.edge(binding.rowRuPreset.root, RowBinder.Edge.BOTTOM)
     }
 
     /**
