@@ -64,42 +64,70 @@ fun View.reducedMotion(): Boolean = !context.animationsEnabled()
  * OEM buzzes and the other is silent — and the app could not tell, because it was throwing the
  * request over the wall and never looking at what came back.
  *
- * `View.performHapticFeedback(constant)` is not "vibrate". It is a REQUEST, phrased in a vocabulary
- * the device firmware is free not to speak, and it answers with a Boolean. The framework
- * (`PhoneWindowManager.performHapticFeedback`) returns **false**, having played nothing at all, in
- * exactly four cases:
+ * `View.performHapticFeedback(constant)` is not "vibrate". It is a REQUEST to the platform's own
+ * touch-feedback pipeline, phrased in a vocabulary the firmware is free not to speak, and it answers
+ * with a Boolean. The framework (`PhoneWindowManager.performHapticFeedback`) returns **false**,
+ * having played nothing at all, in exactly four cases:
  *
  *  1. the view is not attached (`mAttachInfo == null`) — checked inside [View] before the IPC;
  *  2. the view's own `android:hapticFeedbackEnabled` is false — likewise checked in [View];
- *  3. `Settings.System.HAPTIC_FEEDBACK_ENABLED` is 0, i.e. **the user turned touch vibration off**;
+ *  3. `Settings.System.HAPTIC_FEEDBACK_ENABLED` is 0 — **system touch feedback is switched off**;
  *  4. the build's `getVibrationEffect(effectId)` switch has no case for the constant we passed and
  *     falls through to `default: return null` — **the OEM does not speak that word**.
  *
- * Case 4 is the split. `VIRTUAL_KEY` and `CLOCK_TICK` are ancient (API 3 and 21) but they are still
- * only *names*: the vibration behind them comes from an OEM-overlaid config, and One UI maps a
- * narrower set than MIUI does — `CLOCK_TICK` in particular resolves to `EFFECT_TEXTURE_TICK`, the
- * lightest thing the platform has and the first one a conservative OEM drops. `CONFIRM` (API 30,
- * the connect hero moment's word) is worse: on anything below API 30 it is a guaranteed no-op, and
- * `minSdk` here is 24. Every one of those failures returned false into a discarded value.
+ * Case 4 is a real hazard and is handled: `VIRTUAL_KEY` and `CLOCK_TICK` are ancient (API 3 and 21)
+ * but they are still only *names*, resolved through an OEM-overlaid config, and `CONFIRM` — the
+ * connect hero moment's word — arrived in API 30 against a `minSdk` of 24, so below that it was a
+ * guaranteed no-op. Each request now degrades to an older word before giving up.
  *
- * SO THE RETURN VALUE IS THE GATE, and it is the ONE thing that keeps this from double-buzzing.
- * Every `return false` in the framework happens *before* `mVibrator.vibrate(...)` — false is a
- * promise that nothing was played. On a device that already works (the owner's Xiaomi) the first
- * request answers true, [playHaptic] returns immediately, and the fallback below is dead code at
- * runtime. It is reached only after the platform has said, in its own words, that it did nothing.
+ * CASE 3 IS THE ONE ON THE OWNER'S GALAXY, and the device settled it rather than a guess:
+ * «Системная вибрация → Сенсорный ввод» is **OFF**, while «Интенсивность вибрации → Система» sits at
+ * roughly a third — NOT zero — and every other switch on that screen (набор номера, клавиатура
+ * Samsung, зарядка, жесты навигации, камера) is ON. And: «с такими настройками не было вибрации, а в
+ * incy и happ есть, то есть проблема в коде».
  *
- * WHAT THE FALLBACK DELIBERATELY DOES NOT DO is override the user. Cases 1–3 above are re-checked
- * in app space before a single motor pulse — an off-screen view, a view that opted out in XML, and
- * above all a person who switched touch vibration off in Settings get silence, because that is what
- * they asked for. `FLAG_IGNORE_GLOBAL_SETTING` would paper over case 3 and is exactly why it was
- * deprecated in API 33 and is ignored on new releases; it is not used here and must not be. Only
- * case 4 — the OEM not knowing the word — is compensated for, and it is compensated for by saying
- * the same thing in the only vocabulary every device understands: an explicit [VibrationEffect]
- * tagged `USAGE_TOUCH`, so the system still scales it by the user's own touch-feedback intensity.
+ * THOSE TWO CLIENTS ARE NOT CHEATING AND WE WERE NOT BEING VIRTUOUS. `HAPTIC_FEEDBACK_ENABLED` is
+ * the switch for the platform's OWN touch feedback — the pipeline `performHapticFeedback` routes
+ * through. It has never bound an app that drives the vibrator itself, and the One UI screen above is
+ * the proof of what it actually means: the keypad, the keyboard, the charger and the camera each
+ * carry their own switch, and «Сенсорный ввод» is one of them — not a verdict on everything that may
+ * ever buzz. Reading it as "this person wants no vibration from any app" was the mistake, and the
+ * first version of this file made it twice: it asked the system, was refused for case 3, then
+ * re-checked the same key in app space and refused itself. Two gates, one setting, fallback dead.
+ *
+ * SO THE TWO FEELS PART COMPANY HERE. This is the policy, and it is deliberate:
+ *
+ *  - [Feel.PRESS] — connect, disconnect, purchase confirm, destructive confirm, and [confirmHaptic].
+ *    A state change the user ASKED FOR and wants confirmed, in the same class as a call connecting
+ *    or a charger being plugged in: not touch feedback, and not what «Сенсорный ввод» governs. **It
+ *    plays with that toggle off.** It is also precisely what Incy and Happ buzz for.
+ *  - [Feel.TICK] — tab switch, switch toggle, carousel page. The incidental response to an ordinary
+ *    tap, which IS the definition of touch feedback. **It stays gated on the toggle.** A phone whose
+ *    owner turned system touch feedback off must not start buzzing under every row because a VPN
+ *    client decided its own taps were the exception.
+ *
+ * WHAT IS STILL HONOURED, for both feels: an off-screen view, a view that opted out with
+ * `android:hapticFeedbackEnabled`, a device with no motor, and the «Интенсивность вибрации» slider —
+ * which the fallback obeys twice over, by reading it and by tagging the effect `USAGE_TOUCH` so the
+ * platform scales it as well. `FLAG_IGNORE_GLOBAL_SETTING` is NOT used and must not be: it is a
+ * blunt override of every gate at once, which is why API 33 deprecated it and why new releases
+ * ignore it. Nothing here overrides the platform; [Feel.PRESS] simply stops asking a question that
+ * was never about it.
+ *
+ * THE RETURN VALUE IS STILL WHAT KEEPS THIS FROM DOUBLE-BUZZING. Every `return false` in the
+ * framework happens *before* `mVibrator.vibrate(...)`, so false is a promise that nothing was
+ * played. On a device that already works (the owner's Xiaomi, and any Samsung with «Сенсорный ввод»
+ * on) the first request answers true, [playHaptic] returns immediately, and everything below is dead
+ * code at runtime. It is reached only after the platform has said, in its own words, that it did
+ * nothing at all.
  */
 
 /**
  * Standard "button press" haptic. Use on primary taps/confirmations.
+ *
+ * WITH «Сенсорный ввод» OFF THIS STILL PLAYS. It confirms a state change the user asked for —
+ * connect, disconnect, payment, a destructive yes — which is not what that switch is a switch for.
+ * The «Интенсивность вибрации» slider still scales it and a muted motor still silences it.
  *
  * `KEYBOARD_TAP` is the second rung rather than a different feel: both it and `VIRTUAL_KEY` resolve
  * to `EFFECT_CLICK`, but `VIRTUAL_KEY` is historically wired to the navigation-BAR key haptic, which
@@ -111,6 +139,10 @@ fun View.pressHaptic() {
 
 /**
  * Light "tick" haptic. Use for scrubbing, stepping, or incremental selection.
+ *
+ * WITH «Сенсорный ввод» OFF THIS STAYS SILENT, on purpose. A tick answers a tap and nothing else,
+ * which is the exact thing that switch turns off; a client that buzzed under every row anyway would
+ * be louder than the system it is running in.
  *
  * `CONTEXT_CLICK` backs `CLOCK_TICK` up because it is the same weight one rung heavier —
  * `EFFECT_TICK` against `EFFECT_TEXTURE_TICK` — so a device that dropped the featherweight one still
@@ -128,6 +160,10 @@ fun View.tickHaptic() {
  * mapped it, the request is refused and this is [pressHaptic] — which is what 7.6 specifies for
  * connect anyway. Nothing is played twice: the second request is only made because the first
  * reported it played nothing.
+ *
+ * It therefore inherits [Feel.PRESS]'s policy, which is the whole point of the owner's report: the
+ * tunnel coming up is the one buzz he came looking for, and it now survives «Сенсорный ввод» being
+ * off exactly as it does in the two clients he compared against.
  */
 fun View.confirmHaptic() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
@@ -149,10 +185,14 @@ fun View.confirmHaptic() {
  *   wherever it exists.
  * @param millis the plain motor pulse for API 26–28, and the whole story below 26 where
  *   [VibrationEffect] does not exist yet. 20ms reads as a click, 12ms as a tick.
+ * @param isTouchFeedback whether this feel is the thing «Сенсорный ввод»
+ *   (`Settings.System.HAPTIC_FEEDBACK_ENABLED`) is a switch FOR. It is a statement about what the
+ *   feel means, not a permission flag: a tick answers a tap and is touch feedback by definition; a
+ *   press confirms a state change the user asked for and is not. Only the former is gated on it.
  */
-private enum class Feel(val predefined: Int, val millis: Long) {
-    PRESS(VibrationEffect.EFFECT_CLICK, 20L),
-    TICK(VibrationEffect.EFFECT_TICK, 12L),
+private enum class Feel(val predefined: Int, val millis: Long, val isTouchFeedback: Boolean) {
+    PRESS(VibrationEffect.EFFECT_CLICK, 20L, isTouchFeedback = false),
+    TICK(VibrationEffect.EFFECT_TICK, 12L, isTouchFeedback = true),
 }
 
 /**
@@ -164,23 +204,24 @@ private fun View.playHaptic(feel: Feel, vararg constants: Int) {
     for (constant in constants) {
         if (performHapticFeedback(constant)) return
     }
-    // The two gates [View] applies before it ever reaches the system. Re-checked here rather than
-    // assumed, so the fallback declines for the same reasons the request did.
-    if (!isAttachedToWindow || !isHapticFeedbackEnabled) return
-    if (!context.touchHapticsAllowed()) return
-    context.vibrateOnce(feel)
+    if (canVibrate(feel)) context.vibrateOnce(feel)
 }
 
 /**
- * The user's own answer, read rather than overridden.
+ * Everything the fallback still honours, in the order it is cheapest to check.
  *
- * `HAPTIC_FEEDBACK_ENABLED` is the toggle every OEM settings app writes — on One UI it is «Звуки и
- * вибрация → Системные звуки и вибрация → Вибрация при касании». `haptic_feedback_intensity` is the
- * separate slider Android 12 added beside it; it is `@SystemApi` on `Settings.System` so the key is
- * spelled out here, and a build that does not have it simply returns the default and is allowed.
+ * The first two are the gates [View] itself applies before the request ever reaches the system
+ * (cases 1 and 2 up top). They are re-checked rather than assumed, so an off-screen view and a view
+ * that opted out in XML get exactly the silence they asked for.
  *
- * When either says off, the fallback does not run. An app that vibrates after being told not to is
- * not fixing a bug, it is being one.
+ * The third is «Сенсорный ввод» — and it is asked ONLY about [Feel.TICK]. See the policy in the
+ * block comment above: it is the switch for the platform's touch feedback, a tick is touch feedback
+ * and a press is not, so a press does not ask a question that was never about it. This is not a
+ * bypass bolted on top; it is the one gate whose SCOPE was wrong.
+ *
+ * The fourth, the intensity slider, applies to both — a person who dragged «Интенсивность вибрации»
+ * to zero has said something about the motor itself, not about which app is allowed to reach it.
+ * `hasVibrator()` is the fifth and lives in [vibrateOnce], where the handle is.
  *
  * DEPRECATION is suppressed for one constant. `Settings.System.HAPTIC_FEEDBACK_ENABLED` is marked
  * deprecated because a third-party app may no longer WRITE it; reading it is still how the framework
@@ -189,9 +230,17 @@ private fun View.playHaptic(feel: Feel, vararg constants: Int) {
  * typed constant stays and the reason is written down instead.
  */
 @Suppress("DEPRECATION")
-private fun Context.touchHapticsAllowed(): Boolean {
-    val resolver = contentResolver
-    if (Settings.System.getInt(resolver, Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) == 0) return false
+private fun View.canVibrate(feel: Feel): Boolean {
+    if (!isAttachedToWindow || !isHapticFeedbackEnabled) return false
+    val resolver = context.contentResolver
+    if (feel.isTouchFeedback &&
+        Settings.System.getInt(resolver, Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) == 0
+    ) {
+        return false
+    }
+    // `haptic_feedback_intensity` is the slider Android 12 added; it is `@SystemApi` on
+    // `Settings.System`, so the key is spelled out below. A build without it returns the default and
+    // is allowed — absence of the setting is not a refusal.
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
     return Settings.System.getInt(resolver, HAPTIC_FEEDBACK_INTENSITY, INTENSITY_DEFAULT) != INTENSITY_OFF
 }
@@ -207,6 +256,15 @@ private fun Context.touchHapticsAllowed(): Boolean {
  * From API 31 the vibrator is reached through [VibratorManager] — on a multi-actuator device
  * `getSystemService(Vibrator::class.java)` and `getDefaultVibrator()` are not guaranteed to be the
  * same object, and the latter is the one the platform itself drives touch feedback with.
+ *
+ * THE ONE ASSUMPTION LEFT IN THIS FILE, and the first place to look if a Galaxy is still silent:
+ * `USAGE_TOUCH` is scaled by `VibrationSettings` from the INTENSITY setting, and in AOSP
+ * `HAPTIC_FEEDBACK_ENABLED` is read by `PhoneWindowManager` alone and never folds into it. If some
+ * OEM wires the toggle into the usage's intensity as well, the platform would drop this pulse for
+ * the same reason the request was refused and [Feel.PRESS] would still not play. The owner's own
+ * screen is the evidence against that — «жесты навигации» buzz on that phone, off the same slider,
+ * with «Сенсорный ввод» off — but it is evidence, not a guarantee. The fix if it ever bites is to
+ * choose a different usage here, NOT to reach for `FLAG_IGNORE_GLOBAL_SETTING`.
  *
  * DEPRECATION is suppressed for exactly two calls, each the only overload that exists below the API
  * that replaced it: `vibrate(VibrationEffect, AudioAttributes)` under 33 and `vibrate(long)` under 26.
