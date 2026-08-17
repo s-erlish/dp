@@ -496,6 +496,16 @@ object RowBinder {
         // R6: disabled is 0.38 on the WHOLE control, on both platforms.
         root.alpha = if (enabled) 1f else DISABLED_ALPHA
         root.isActivated = trailing is Trailing.Marker && trailing.selected
+        // ...and it lands instantly, like every other state written before a first draw. `bg_row`
+        // and its three edge variants are selectors with enterFadeDuration/exitFadeDuration, so the
+        // activated fill CROSS-FADES whenever it is written — including on a recycled row, where the
+        // holder arrives carrying the previous item's selection and dissolves it into this one's
+        // while the list scrolls. Five adapters bind rows through here.
+        //
+        // The press keeps its fade: those durations are motion_press_in / motion_press_out, and a
+        // press happens on a laid-out, drawn row long after this call. Same rule as the switch two
+        // slots down (@see restoreChecked) and the checkbox's own jump above.
+        root.jumpDrawablesToCurrentState()
 
         when {
             // An inert row keeps its background: `bg_row` only draws a pressed or focused state,

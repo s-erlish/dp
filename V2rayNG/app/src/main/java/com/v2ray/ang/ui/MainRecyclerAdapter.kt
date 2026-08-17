@@ -310,6 +310,19 @@ class MainRecyclerAdapter(
         val followsAServer = position > 0 && rows[position - 1] is Row.Server
         binding.infoContainer.isActivated = !selected && followsAServer
 
+        // AND BOTH OF THOSE STATES LAND INSTANTLY. `bg_server_row` is a selector with
+        // enterFadeDuration/exitFadeDuration, so every state written here CROSS-FADES — and a
+        // recycled row arrives holding the previous server's selection and separator, which means
+        // scrolling the list dissolved an accent frame and a hairline in and out of every row that
+        // came round. The fade is meaningless there: it is one server's look bleeding into another
+        // server's row.
+        //
+        // Nothing about the press is lost, and the press is what those two durations are named
+        // for (motion_press_in / motion_press_out). A press happens on a row that is already laid
+        // out and drawn, long after this bind; jumping here only refuses to animate a state the
+        // user did not ask for — the same rule the switches follow (@see restoreChecked).
+        binding.infoContainer.jumpDrawablesToCurrentState()
+
         // The most-tapped control in the product, and it was the one still on a raw listener.
         // The stamp lives on the view, so recycling carries the guard with the row. It does not
         // touch the deliberate repeatability of the reconnect offer — that is a fresh tap seconds
