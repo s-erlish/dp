@@ -26,8 +26,9 @@ import com.v2ray.ang.R
  *   `contentDescription` somebody forgot.
  * - **At most one action.** [bind] takes one, so a second one has nowhere to go; a screen that
  *   genuinely needs two puts them behind an overflow.
- * - **The hairline is the only permitted boundary**, it ships at alpha 0, and it fades in only once
- *   the content behind it has scrolled ([attachTo]). It never appears at rest.
+ * - **There is no boundary under the header at any scroll position.** The hairline the layout still
+ *   carries stays at alpha 0 for the screen's whole life; [attachTo] is the switch that used to
+ *   raise it, and it is deliberately a no-op. Read its note before reviving it.
  */
 object ToolbarBinder {
 
@@ -112,51 +113,28 @@ object ToolbarBinder {
     }
 
     /**
-     * Fades the hairline in when [scroller] has moved off the top and back out when it returns,
-     * over `motion_state` 220ms on `ease_standard` in and `motion_state_exit` 165ms out - exit is
-     * 75% of enter, here as everywhere.
+     * NO-OP, DELIBERATELY, AND THE CALLS ARE LEFT IN PLACE.
      *
-     * This is the only thing about the header that is allowed to change on scroll: no colour, no
-     * elevation, no shadow, no collapsing hero, no scroll-driven alpha on anything else
-     * (32-master-plan-android.md 7.4).
+     * This used to fade the hairline in once the content had scrolled off the top — the one thing
+     * about the header that was allowed to react to scroll (32-master-plan-android.md 7.4). The
+     * owner saw it on the device and rejected it: «появляется какая-то полоска под текстом журнал,
+     * так и в других вкладках наблюдается если вниз пролистать».
      *
-     * Call it once, from `onCreate`. A `RecyclerView` keeps every listener it is given, so calling
-     * it per data load stacks duplicates that all animate the same hairline.
+     * He is right that it is not the design's. §7's лекало is back control → title → optional note →
+     * cards, and neither the specification nor the prototype draws a boundary under the title at any
+     * scroll position. The line was ours, inherited from a Material habit, and it reads as a stray
+     * rule because the first thing under it — a search field, a card — already has an edge of its own.
+     *
+     * Kept as an empty function rather than deleted, and the hairline view kept at alpha 0 rather
+     * than removed, because 24 screens call this and `ToolbarSlots` resolves the id. Making the
+     * boundary come back is one line here, in one place, if it is ever wanted again.
      */
-    fun attachTo(root: View, scroller: RecyclerView) {
-        val hairline = ToolbarSlots.of(root).hairline
-        scroller.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                hairline.fade(recyclerView.canScrollVertically(-1))
-            }
-        })
-        hairline.fade(scroller.canScrollVertically(-1))
-    }
+    @Suppress("UNUSED_PARAMETER")
+    fun attachTo(root: View, scroller: RecyclerView) = Unit
 
     /** [attachTo], for a screen whose content is a `NestedScrollView` rather than a list. */
-    fun attachTo(root: View, scroller: NestedScrollView) {
-        val hairline = ToolbarSlots.of(root).hairline
-        scroller.setOnScrollChangeListener(
-            NestedScrollView.OnScrollChangeListener { view, _, _, _, _ ->
-                hairline.fade(view.canScrollVertically(-1))
-            }
-        )
-        hairline.fade(scroller.canScrollVertically(-1))
-    }
-
-    private fun View.fade(show: Boolean) {
-        val target = if (show) 1f else 0f
-        if (alpha == target) return
-        motion(snap = { alpha = target }) {
-            animate()
-                .alpha(target)
-                .setDuration(
-                    durationOf(if (show) R.integer.motion_state else R.integer.motion_state_exit)
-                )
-                .setInterpolator(curve(R.interpolator.ease_standard))
-                .start()
-        }
-    }
+    @Suppress("UNUSED_PARAMETER")
+    fun attachTo(root: View, scroller: NestedScrollView) = Unit
 }
 
 /** The toolbar's child views, resolved once from `view_toolbar.xml`. */
