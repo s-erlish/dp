@@ -754,11 +754,25 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         if (!isBindingInitialized) return
         val bar = Snackbar.make(binding.root, text, Snackbar.LENGTH_SHORT)
         (bar.view.layoutParams as? ViewGroup.MarginLayoutParams)?.let { lp ->
-            lp.bottomMargin += mainHost.listBottomInset
+            lp.bottomMargin += snackbarBottomOffset()
             bar.view.layoutParams = lp
         }
         bar.show()
     }
+
+    /**
+     * How far above the window's bottom edge a transient bar has to start.
+     *
+     * `listBottomInset` is the footprint of the bottom navigation — system inset + 56dp bar + air —
+     * and clearing it is right whenever that bar is on screen. ON THE START SCREEN THE BAR IS NOT
+     * THERE: the shell hides it in exactly the state [paintOnboardingShell] paints, so the same
+     * figure would float the bar ~96dp up into empty space. The three other bars in the shell
+     * (`MainActivity`, `AccountFragment`, `NoticePolicy`) already make this check by anchoring only
+     * to a visible nav; this is the same guard in the form this screen can state, since it is the
+     * one that knows it is drawing the onboarding shell.
+     */
+    private fun snackbarBottomOffset(): Int =
+        if (onboardingShell) 0 else mainHost.listBottomInset
 
     /**
      * A background load opened somewhere in the shell (a subscription refresh, an import, an
@@ -1848,13 +1862,11 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // NO AUTO-FALLBACK OBSERVER ANY MORE. «Переключаться на быстрейший сервер» is gone by the
         // owner's instruction — the setting was removed and the stored key is forced false on every
         // start — and this screen's half of it went with it: the post-connect health probe, its
-        // confirmation re-probe and the `fastConnectAction` handler that restarted the tunnel on
-        // somebody else's server. The app does not move the user off the server he picked.
+        // confirmation re-probe and the handler that restarted the tunnel on somebody else's
+        // server. The app does not move the user off the server he picked.
         //
         // What stays is everything that was never the fallback: the 30s latency probe
         // ([latencyRunnable]) that produces the «мс» figure, and the connect watchdog.
-        // `MainViewModel.autoFallbackUsed` / `fallbackInProgress` / `fastConnectAction` /
-        // `consumeFastConnectEvent` have no readers left anywhere — see the report.
 
         mainViewModel.isRunning.observe(viewLifecycleOwner) { isRunning ->
             // A definitive running/stopped state arrived (success or failure): the connect attempt
@@ -1974,7 +1986,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         val bar = Snackbar.make(binding.root, getString(R.string.home_sub_stale), Snackbar.LENGTH_LONG)
             .setAction(R.string.home_action_retry) { refreshAccountData() }
         (bar.view.layoutParams as? ViewGroup.MarginLayoutParams)?.let { lp ->
-            lp.bottomMargin += mainHost.listBottomInset
+            lp.bottomMargin += snackbarBottomOffset()
             bar.view.layoutParams = lp
         }
         bar.show()
