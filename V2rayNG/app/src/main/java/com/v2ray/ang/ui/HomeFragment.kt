@@ -23,7 +23,6 @@ import android.net.Uri
 import android.net.VpnService
 import android.os.Bundle
 import android.os.SystemClock
-import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -83,6 +82,7 @@ import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.ui.component.pressFeedback
 import com.v2ray.ang.util.AvatarManager
 import com.v2ray.ang.util.FlagUtil
+import com.v2ray.ang.util.confirmHaptic
 import com.v2ray.ang.util.reducedMotion
 import com.v2ray.ang.util.tickHaptic
 import com.v2ray.ang.viewmodel.AccountViewModel
@@ -3723,7 +3723,11 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * ring is NOT emitted at all, and the haptic still fires.
      */
     private fun playConfirm(ringTarget: Int, live: Boolean, haptic: Boolean) {
-        if (haptic) binding.connectFrame.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+        // `HapticFeedbackConstants.CONFIRM` is API 30 and `minSdk` is 24, so the raw call this used
+        // to be was silence on every older device and on every OEM build that never mapped the
+        // constant — the app's single most important buzz, refused and unnoticed. `confirmHaptic()`
+        // still asks for CONFIRM first and keeps that distinct feel wherever it exists.
+        if (haptic) binding.connectFrame.confirmHaptic()
         stopBreathing()
         tintRing(ringTarget, animate = live)
         // §4: the connected ring is «акцентное, медленное затухание яркости 5.5 с». It starts HERE,

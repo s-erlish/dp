@@ -36,6 +36,25 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!--
+      Touch haptics — the two feels in 32-master-plan-android.md 7.6 («Вибрация при касании»), and
+      nothing else. It is a normal permission: granted at install, never prompted for, and it does
+      not appear in the store listing's permission list.
+
+      Why it is needed at all, when `View.performHapticFeedback()` needs no permission: that call
+      asks the SYSTEM to vibrate on our behalf, and the system is free to refuse. It refuses when the
+      device firmware has no vibration mapped for the constant we named — which is why the same APK
+      buzzes on MIUI and is completely silent on One UI. `MotionUtils.playHaptic` reads the Boolean
+      that call returns and, only when it says nothing was played AND the user has touch feedback
+      switched on, repeats the request as an explicit VibrationEffect. That second path is ours, so
+      it is ours to declare.
+
+      It is deliberately NOT a licence to vibrate for anything else: no notification buzz, no error
+      shake, no alarm. Every use goes through `View.pressHaptic()` / `tickHaptic()` / `confirmHaptic()`,
+      which are gated on the user's own system setting and never on `FLAG_IGNORE_GLOBAL_SETTING`.
+    -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!--
       The self-updater's install step, and the ONLY thing this permission is used for:
       «Настройки → Проверить обновления» downloads departament's own APK from departament's own
       GitHub release and hands it to the system package installer
