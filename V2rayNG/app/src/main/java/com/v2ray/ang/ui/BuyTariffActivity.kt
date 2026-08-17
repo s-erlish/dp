@@ -494,8 +494,12 @@ class BuyTariffActivity : BaseActivity() {
         }
         optionRows[key] = rows
 
-        card.setOnClickListener { selectTariff(tariff) }
-        header.setOnClickListener { selectTariff(tariff) }
+        // Guarded, because the tap TOGGLES now: an ungated double tap on a tariff would open it
+        // and close it again, and the second half of that would look like the card refusing to
+        // open. Two targets, one action — the header sits inside the card and consumes the tap
+        // that lands on it, so only one of the two ever fires per press.
+        card.onSingleClick { selectTariff(tariff) }
+        header.onSingleClick { selectTariff(tariff) }
 
         parent.addView(card)
     }
@@ -513,14 +517,37 @@ class BuyTariffActivity : BaseActivity() {
     }
 
     /**
-     * Selecting a tariff is IDEMPOTENT. Tapping the tariff that is already selected used to return
-     * early, which was fine while the cards it had highlighted were still on screen — and useless
-     * once a re-render had replaced them, because the state said "selected" and nothing was
-     * painted. Now a repeat tap keeps the chosen option and simply re-applies the selection (D09).
+     * The tariff card's tap is a TOGGLE: «тарифы если раскрывать, то обратно скрывать нельзя
+     * почему-то». It could not be closed because a tap on the open card re-applied the same
+     * selection, so the disclosure had an opening move and no closing one.
+     *
+     * THE PROTOTYPE IS THE AUTHORITY HERE and it toggles too — `buildBuy` writes
+     * `toggle: () => this.setState({ plan: open ? null : p.key })`, i.e. tapping the open plan
+     * sets the open plan to NOTHING. §7's «Открыт всегда один тариф» is therefore the cap ("at
+     * most one at a time"), not a floor: zero open is a state the design draws.
+     *
+     * CLOSING RIDES THE SAME ANIMATION AS SWITCHING. [applySelection] hands every panel to
+     * [reveal] on every pass, and `reveal(panel, open = false)` is the very leg that already runs
+     * when the other tariff opens — it animates the height down over `motion_expand` and fades
+     * over `motion_popup_fade`. Closing the last open panel therefore costs no new code path and
+     * cannot regress into the instant collapse that was fixed before it.
+     *
+     * WHAT THE CLOSE TAKES WITH IT: the chosen term and the extra-device count, because they
+     * describe a tariff that is no longer on the table, and the checkout card, which
+     * [applySelection] hides as soon as either half of the pair is missing — an «Оплатить 1 290 ₽»
+     * under two closed cards would be charging for something the user cannot see.
+     *
+     * Re-selecting the tariff that is ALREADY selected stays idempotent for its original reason
+     * (D09): the branch below only fires from a tap, and a tap on the open card now means "close",
+     * which repaints exactly as completely as the re-apply did.
      */
     private fun selectTariff(tariff: TariffDto) {
         val key = tariffKey(tariff)
-        if (selectedTariffKey != key) {
+        if (selectedTariffKey == key) {
+            selectedTariffKey = null
+            selectedOptionKey = null
+            extraDevices = 0
+        } else {
             selectedTariffKey = key
             selectedOptionKey = null
             extraDevices = 0
@@ -1099,9 +1126,16 @@ class BuyTariffActivity : BaseActivity() {
         private const val STATE_PENDING_PAYMENT = "state_pending_payment"
         private const val STATE_AWAITING_ERROR = "state_awaiting_error"
 
+        /**
+         * THE FRACTION IS SEPARATED BY A COMMA. This screen printed «135.29 ₽» and «236.76 ₽» with
+         * a POINT, next to a ring on the account tab writing «2,0 ТБ» — one screen in two
+         * languages. The number is still composed under [Locale.US] (the grouping and the digit
+         * shapes must not follow a phone set to Farsi or Bengali) and only the decimal mark is
+         * swapped, which is what `SubscriptionPagerAdapter.formatBytes` already does.
+         */
         private fun formatMoney(amount: Double, currency: String): String {
             val n = if (amount % 1.0 == 0.0) amount.toLong().toString()
-            else String.format(Locale.US, "%.2f", amount)
+            else String.format(Locale.US, "%.2f", amount).replace('.', ',')
             return if (currency.isBlank()) n else "$n ${currencySymbol(currency)}"
         }
 
@@ -1124,8 +1158,9 @@ class BuyTariffActivity : BaseActivity() {
                 value /= 1024.0
                 idx++
             }
+            // Same comma as the money above and as the account tab's ring: «2,0 ТБ», never «2.0».
             val formatted = if (idx == 0) value.toLong().toString()
-            else String.format(Locale.US, "%.1f", value)
+            else String.format(Locale.US, "%.1f", value).replace('.', ',')
             return "$formatted ${units[idx]}"
         }
     }

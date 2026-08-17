@@ -16,6 +16,7 @@ import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.dto.PaymentDto
 import com.v2ray.ang.databinding.ActivityPaymentHistoryBinding
 import com.v2ray.ang.ui.adapter.PaymentsAdapter
+import com.v2ray.ang.ui.adapter.paymentsForHistory
 import com.v2ray.ang.ui.component.SubPage
 import com.v2ray.ang.ui.component.ToolbarBinder
 import com.v2ray.ang.ui.component.onSingleClick
@@ -57,9 +58,9 @@ class PaymentHistoryActivity : BaseActivity() {
             title = getString(R.string.history_title),
             activity = this,
         )
-        // The PAGE scrolls now, not the list (§7 wants the card to end where the operations
-        // do), so the hairline listens to the NestedScrollView the rows sit in.
-        ToolbarBinder.attachTo(binding.toolbar.root, binding.mainContent)
+        // The list is the scroller again (see activity_payment_history.xml: the NestedScrollView it
+        // used to sit in capped it at one viewport of rows), so the hairline listens to the list.
+        ToolbarBinder.attachTo(binding.toolbar.root, binding.rvPayments)
         binding.toolbar.toolbarNote.setText(R.string.account_hub_history_sub)
         binding.toolbar.toolbarNote.isVisible = true
 
@@ -74,6 +75,13 @@ class PaymentHistoryActivity : BaseActivity() {
         }
 
         binding.refreshLayout.setColorSchemeColors(resolveThemeColor(R.attr.iconTintBlue))
+        // SwipeRefreshLayout's automatic target is its first child, which is now the frame holding
+        // the list rather than the list itself — and a frame can never scroll, so the gesture would
+        // fire on a downward swipe taken halfway through the ledger. It is told where the top
+        // actually is instead.
+        binding.refreshLayout.setOnChildScrollUpCallback { _, _ ->
+            binding.rvPayments.canScrollVertically(-1)
+        }
         binding.refreshLayout.setOnRefreshListener {
             loaded = false
             // Explicit refresh: leave cache-only mode so a genuinely empty result can render.
@@ -90,15 +98,35 @@ class PaymentHistoryActivity : BaseActivity() {
             loaded = true
             showingCache = true
             binding.progressHistory.visibility = View.GONE
-            paymentsAdapter.submit(cached)
-            if (cached.isEmpty()) {
-                showEmptyBlock(getString(R.string.history_empty), withBuyCta = true)
-            } else {
-                hideEmptyBlock()
-            }
+            showPayments(cached)
         } else {
             showHistoryLoading()
             viewModel.loadPayments()
+        }
+    }
+
+    /**
+     * The one place the ledger reaches the screen, cache path and network path alike.
+     *
+     * [paymentsForHistory] is the owner's ruling — «оставить только те что в обработке и те, что
+     * успешны» — applied to the RAW list the API returned; nothing is dropped upstream of here, so
+     * the cache, the ViewModel and the account tab's «последний платёж» value all still see every
+     * operation the backend sent.
+     *
+     * AN EMPTY RESULT AFTER THE FILTER IS THE EMPTY STATE, not an error and not a blank screen.
+     * This is the fourth instance in this project of an expected answer being reported as a
+     * failure, and the filter makes it reachable in a new way: an account whose only operations
+     * were cancelled now legitimately has nothing to list, and «Платежей пока нет» with «Купить
+     * подписку» is the honest thing to say to it.
+     */
+    private fun showPayments(all: List<PaymentDto>) {
+        val shown = paymentsForHistory(all)
+        paymentsAdapter.submit(shown)
+        binding.rvPayments.isVisible = shown.isNotEmpty()
+        if (shown.isEmpty()) {
+            showEmptyBlock(getString(R.string.history_empty), withBuyCta = true)
+        } else {
+            hideEmptyBlock()
         }
     }
 
@@ -119,13 +147,11 @@ class PaymentHistoryActivity : BaseActivity() {
         loaded = true
         binding.refreshLayout.isRefreshing = false
         binding.progressHistory.visibility = View.GONE
-        paymentsAdapter.submit(list)
+        // The cache keeps the RAW list: it is shared with the account tab, whose «История платежей»
+        // row reads the most recent operation of any outcome, and narrowing it here would make one
+        // screen's display rule the whole app's data.
         AccountCache.putPayments(list)
-        if (list.isEmpty()) {
-            showEmptyBlock(getString(R.string.history_empty), withBuyCta = true)
-        } else {
-            hideEmptyBlock()
-        }
+        showPayments(list)
     }
 
     private fun renderError(error: ApiError?) {
@@ -136,6 +162,9 @@ class PaymentHistoryActivity : BaseActivity() {
         // Only surface the error banner in the empty area if we have nothing to show. The buy CTA
         // stays hidden here — this is an error, not a genuine "no payments yet" empty state.
         if (paymentsAdapter.itemCount == 0) {
+            // The card goes with it: an outlined box with nothing in it behind a centred sentence
+            // is the "empty state drawn on top of the list" look the card was moved to avoid.
+            binding.rvPayments.isVisible = false
             showEmptyBlock(getString(messageFor(error)), withBuyCta = false)
         }
         viewModel.clearError()

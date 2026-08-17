@@ -44,11 +44,22 @@
 
         <!-- Disclosure chevron: unified 22dp glyph (matches the group-header chevron).
              The 48dp box gives an interactive ≥48dp touch target; 13dp padding insets the
-             fitCenter glyph to 22dp so it reads at the same size as the section chevron. -->
+             fitCenter glyph to 22dp so it reads at the same size as the section chevron.
+
+             IT IS PULLED LEFT BY @dimen/optical_nudge_touch_target, and this is the same
+             arithmetic the sub-page back button already does (view_toolbar.xml): what the
+             eye lines a column up by is the GLYPH's edge, not the edge of the invisible
+             48dp box the glyph is centred in. Without the pull, the box starts on the
+             card's 16dp content gutter and the glyph therefore starts 13dp inside it —
+             visibly indented from the title, the traffic row and the notice below it,
+             which all begin on the gutter. «кнопку скрытия раскрытия серверов тоже нужно
+             левее подвинуть». The touch target keeps every one of its 48dp; only where
+             it is drawn moves. -->
         <ImageView
             android:id="@+id/btn_collapse"
             android:layout_width="48dp"
             android:layout_height="48dp"
+            android:layout_marginStart="@dimen/optical_nudge_touch_target"
             android:layout_marginEnd="@dimen/space_8"
             android:background="@drawable/bg_control_disc"
             android:clickable="true"
@@ -125,7 +136,23 @@
             android:visibility="gone"
             tools:visibility="visible" />
 
-        <!-- 3) Pin -->
+        <!-- 3) Pin — OFF THE CARD, and only off the card.
+
+             «кнопку закрепить у подписки нужно убрать полностью». Пиннинг as a FEATURE is
+             PORT-DELTA П-22 and stays whole: the flag on the подписка, the ordering it
+             drives (SettingsManager reads it), HomeFragment.toggleHomePin and the adapter's
+             handler are all untouched and all still compile against this id. What the owner
+             asked to lose is the affordance — a third disc on a card whose other two do
+             something to the подписка he can see, while this one only reordered a carousel
+             he most often has one page of.
+
+             `gone` and not deleted, because deleting the view would take the id with it and
+             then the tint/label writes in HomeFragment.bindMetaBar and the click in
+             HomeMetaPagerAdapter would have to be deleted too — i.e. the feature, not the
+             button. The one thing that DID have to change with it is the touch-target
+             expansion: an invisible view has a zero hit rect, and expandTouchTarget would
+             have grown that rect to 48dp around the card's top-left corner, straight over
+             the collapse chevron. See HomeMetaPagerAdapter.onCreateViewHolder. -->
         <ImageView
             android:id="@+id/btn_pin"
             android:layout_width="36dp"
@@ -135,6 +162,7 @@
             android:contentDescription="@string/sub_pin"
             android:focusable="true"
             android:padding="@dimen/space_8"
+            android:visibility="gone"
             app:srcCompat="@drawable/ic_pin_24dp"
             app:tint="?attr/colorOnSurfaceVariant" />
 

@@ -46,6 +46,20 @@ class AccountViewModel : ViewModel() {
     private val _subscriptions = MutableStateFlow<List<SubInfoDto>>(emptyList())
     val subscriptions: StateFlow<List<SubInfoDto>> = _subscriptions.asStateFlow()
 
+    /**
+     * False until the subscription list has RESOLVED at least once — succeeded or failed — as
+     * opposed to merely being empty.
+     *
+     * [subscriptions] cannot answer that question: its seed is `emptyList()` and it replays that
+     * seed to every new collector, so "not fetched yet" and "fetched, nothing there" are the same
+     * value. The account tab needs them apart. The profile is ONE request and the list is TWO, so
+     * the profile lands first almost every time, and a screen that treated the profile's arrival as
+     * "the load is over" concluded «нет активной подписки» for the second or so before the
+     * subscriptions caught up — the bordered card the owner sees flash in the ring's place.
+     */
+    private val _subsResolved = MutableStateFlow(false)
+    val subsResolved: StateFlow<Boolean> = _subsResolved.asStateFlow()
+
     // Cache of the last subscription fetch so we can re-merge the synthesized root when the profile
     // (which supplies the root's auto-renew flag + remnawave uuid) arrives after the sub list.
     private var lastPrimary: PrimarySubscriptionDto? = null
@@ -156,6 +170,10 @@ class AccountViewModel : ViewModel() {
             allResult.exceptionOrNull()?.let { report(it) }
                 ?: primaryResult.exceptionOrNull()?.let { report(it) }
         }
+        // Resolved either way — a failure is an answer too, and a screen waiting for this one must
+        // not wait forever on it. Set last, after the list (or the error) is already published, so
+        // a collector woken by this flag reads the state it describes.
+        _subsResolved.value = true
     }
 
     /**
@@ -583,6 +601,9 @@ class AccountViewModel : ViewModel() {
         lastPrimary = null
         lastAll = emptyList()
         hasSubData = false
+        // The next account's list has not resolved either, so the tab cold-loads for it instead of
+        // inheriting the previous session's "already answered".
+        _subsResolved.value = false
         _payments.value = emptyList()
         _deviceCount.value = null
         _importedGuids.value = emptyList()

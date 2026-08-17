@@ -31,6 +31,11 @@
     <string name="auth_gate_title">Вход в departament</string>
     <string name="auth_gate_body">Здесь будут подписка, устройства и платежи.</string>
     <string name="auth_btn_telegram">Войти через Telegram</string>
+    <!-- KEPT, AND NO LONGER ON A CONTROL. The owner's ruling takes e-mail, OTP, 2FA
+         and Google out of the INTERFACE — «вместо них одна кнопка «Войти через
+         сайт»» — so both places that offered this word now say @string/onb_login_site
+         instead. The string stays because nothing in this project is deleted for
+         being unused, and because the form it named is still in the build. -->
     <string name="auth_btn_email">Войти по почте</string>
     <string name="auth_awaiting_title">Ждём подтверждения в Telegram</string>
     <string name="auth_awaiting_body">Подтвердите вход в открывшемся приложении</string>
@@ -41,7 +46,14 @@
     <string name="auth_link_tg_body">Подтвердите привязку в Telegram. Аккаунт останется тем же.</string>
     <string name="auth_link_awaiting_body">Подтвердите привязку в открывшемся приложении</string>
 
-    <!-- ===================== B · вход по почте ===================== -->
+    <!-- ===================== B · вход через сайт ===================== -->
+    <!-- NEW (2026-08-17). The door into this surface is «Войти через сайт» on both
+         the start screen and the gate, so the surface behind it may not be headed
+         «Вход по почте» — one tap, two names for the same place, and the second one
+         is a method the owner has taken out of the interface. The fields below keep
+         their own labels: «Электронная почта» names a FIELD, not the way in. -->
+    <string name="auth_site_title">Вход через сайт</string>
+    <!-- Kept: the surface's previous heading. See @string/auth_btn_email. -->
     <string name="auth_email_title">Вход по почте</string>
     <string name="auth_email_label">Электронная почта</string>
     <string name="auth_email_placeholder">name@example.com</string>

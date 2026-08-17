@@ -14,9 +14,9 @@ import android.widget.EditText
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.annotation.DrawableRes
 import androidx.annotation.IdRes
 import androidx.appcompat.app.AlertDialog
-import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -45,6 +45,7 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SubscriptionUpdater
 import com.v2ray.ang.template.TemplateManager
+import com.v2ray.ang.ui.component.SelectPopup
 import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.util.FlagUtil
 import com.v2ray.ang.util.LogUtil
@@ -1003,42 +1004,63 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * link from the clipboard. Two items — see `menu_main.xml` for the owner's cut and for where
      * the four that used to sit under them went.
      *
-     * No group divider is set any more: there is one group, and a divider above the first item of
-     * the only group is a rule drawn under nothing.
+     * IT IS THE PRODUCT'S OWN FLYOUT NOW, not the platform's menu.
+     *
+     *     «где + на главной странице, там менюшка всплывающая не в таком же стиле, как условно в
+     *      настройках где нажимаешь на тюн или пинг или днс, надо там +- в таком же стиле сделать
+     *      менюшку всплывающую, чтобы сочеталось»
+     *
+     * `PopupMenu` is a platform surface and dresses itself: Material's own fill, its own corner,
+     * its own 8dp vertical padding, its own elevation and its own ripple — none of which any theme
+     * attribute in this app reaches, because a PopupMenu builds its window from
+     * `?attr/popupMenuStyle` and its rows from `?attr/textAppearanceLargePopupMenu`. Six settings
+     * rows away, the same gesture opens [SelectPopup]: a solid fill one step above the card,
+     * radius 16, a 1dp outline, and a reveal that is a clip from the top over 260ms with the
+     * opacity over 180. Two flyouts, one product.
+     *
+     * THE MENU RESOURCE IS STILL THE SOURCE, and that is deliberate. The two items, their strings,
+     * their glyphs and their ids stay in `menu_main.xml` with the owner's note about the four that
+     * were cut, and the dispatch stays in [onOptionsItemSelected] — this reads the resource and
+     * hands the chosen item straight back to it. Nothing about the add menu is now stated twice,
+     * and a `PopupMenu` is built only to borrow its [Menu] as a parser: it is never shown, never
+     * attached to a window and never given the anchor to position itself against.
      */
     private fun showImportMenu(anchor: android.view.View) {
-        val popup = androidx.appcompat.widget.PopupMenu(this, anchor)
-        popup.menuInflater.inflate(R.menu.menu_main, popup.menu)
-        // Icons in a PopupMenu are hidden unless forced, and the drawables ship in mixed
-        // black/white fills, so each item is tinted from the theme below.
-        popup.setForceShowIcon(true)
-        prepareMenu(popup.menu)
-        popup.setOnMenuItemClickListener { onOptionsItemSelected(it) }
-        popup.show()
+        val menu = androidx.appcompat.widget.PopupMenu(this, anchor).menu
+        menuInflater.inflate(R.menu.menu_main, menu)
+        val items = (0 until menu.size()).map { menu.getItem(it) }.filter { it.isVisible }
+        if (items.isEmpty()) return
+        SelectPopup.show(
+            anchor = anchor,
+            options = items.map { it.title.orEmpty() },
+            // NOT A VALUE PICKER. There is no "current" way of adding a подписка, so there is no
+            // check column: -1 takes the mark's 22dp back and gives it to the labels.
+            selectedIndex = -1,
+            widthRes = R.dimen.select_popup_w_add,
+            // …and the glyphs the platform menu only showed because setForceShowIcon asked it to.
+            // Two verbs, and the glyph is what tells them apart before the label is read.
+            icons = items.map { itemGlyph(it) },
+            offsetTopRes = R.dimen.select_popup_offset_top_add,
+            offsetRightRes = R.dimen.select_popup_offset_right_add,
+        ) { picked ->
+            onOptionsItemSelected(items[picked])
+        }
     }
 
     /**
-     * Tints the popup's glyphs from the theme. Nothing is conditionally hidden: every item in the
-     * menu resource has a live handler in [onOptionsItemSelected], which is the property that
-     * replaced the old "hide the group whose handlers are gone" pass.
+     * The drawable id behind a menu item's glyph.
+     *
+     * `MenuItem` hands out a resolved [android.graphics.drawable.Drawable] and not the id it was
+     * inflated from, so the two are mapped here rather than tinted in place as the PopupMenu
+     * needed. That is the better trade: SelectPopup tints its glyph from the layout
+     * (`?attr/colorOnSurfaceVariant`), so the tint follows the theme and the mono overlay by
+     * itself, and no drawable has to be mutated per open.
      */
-    private fun prepareMenu(menu: Menu) {
-        val neutral = themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
-        for (i in 0 until menu.size()) {
-            paintMenuItem(menu.getItem(i), neutral)
-        }
-    }
-
-    /** Tints one menu item's glyph from the theme. */
-    private fun paintMenuItem(item: MenuItem, color: Int) {
-        item.icon?.let { icon ->
-            val glyph = icon.mutate()
-            DrawableCompat.setTint(glyph, color)
-            // Disabled = 0.38 on the whole control (00-rules.md 7.1); the label is greyed by the
-            // menu itself, the glyph is not.
-            glyph.alpha = if (item.isEnabled) 255 else 97
-            item.icon = glyph
-        }
+    @DrawableRes
+    private fun itemGlyph(item: MenuItem): Int = when (item.itemId) {
+        R.id.import_qrcode -> R.drawable.ic_scan_24dp
+        R.id.import_clipboard -> R.drawable.ic_dl_copy
+        else -> 0
     }
 
     /**

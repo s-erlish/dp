@@ -11,8 +11,15 @@
   the gutter, the components and the type ramp, which is what makes them one
   product.
 
-  ONE FILLED ACCENT SURFACE: @id/btn_submit. Everything else here is a label, a
+  NO FILLED SURFACE: @id/btn_submit is the gate's contour pill, because «залитых
+  белых плашек в этом дизайне нет» and because a sign-in that changes button shape
+  between its two surfaces is two sign-ins. Everything else here is a label, a
   field or a row.
+
+  THE SCREEN IS «ВХОД ЧЕРЕЗ САЙТ», not «Вход по почте» — the owner's ruling folds
+  e-mail, OTP, 2FA and Google behind that one name. Nothing here is deleted: this
+  IS that form, the fields are the same fields, and it is still where MODE_SITE
+  lands. Only the word on the way in changed.
 
   THE LABEL LIVES ABOVE THE FIELD and is always visible — hintEnabled=false on
   the field style, so there is no floating-label notch and no label that vanishes
@@ -207,16 +214,29 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/space_24">
 
+                <!-- THE SAME CONTOUR PILL AS THE GATE'S, and for the same reason: there
+                     are no filled plates in this design. Its disabled and loading states
+                     come from Button.Secondary's own @color/btn_secondary_content, so
+                     R6's 0.38 and R8's "keep the width, drop the label" both still hold
+                     without a colour written here. -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_submit"
-                    style="@style/Widget.Departament.Button.Primary.Tall"
+                    style="@style/Widget.Departament.Button.Secondary.Tall"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/auth_btn_signin" />
+                    android:text="@string/auth_btn_signin"
+                    android:textAppearance="@style/TextAppearance.App.Button"
+                    app:backgroundTint="@color/ob_pill_container"
+                    app:cornerRadius="@dimen/radius_button"
+                    app:strokeColor="?attr/colorOutline"
+                    app:strokeWidth="@dimen/ob_stroke" />
 
+                <!-- On the page's own surface now, not on an accent fill: both the arc and
+                     the success check take ?attr/colorPrimary, which is what every other
+                     inline indicator in the app uses. -->
                 <com.google.android.material.progressindicator.CircularProgressIndicator
                     android:id="@+id/pb_submit"
-                    style="@style/Widget.Departament.Progress.Circular.Inline.OnAccent"
+                    style="@style/Widget.Departament.Progress.Circular.Inline"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
@@ -230,7 +250,7 @@
                     android:alpha="0"
                     android:importantForAccessibility="no"
                     android:src="@drawable/ic_fab_check"
-                    app:tint="?attr/colorOnPrimary" />
+                    app:tint="?attr/colorPrimary" />
             </FrameLayout>
 
             <!-- Only ever visible during the 2FA step, where it is the step's one

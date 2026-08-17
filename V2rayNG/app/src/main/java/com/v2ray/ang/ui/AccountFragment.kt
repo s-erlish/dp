@@ -392,6 +392,12 @@ class AccountFragment : Fragment() {
                 launch { viewModel.paymentInFlight.collect { renderTopUpBusy(it) } }
                 // Skeleton is driven by loading (+ the first-load gate) via renderHeroState.
                 launch { viewModel.loading.collect { renderHeroState() } }
+                // The OTHER half of the first-load gate, and it needs its own collector: when the
+                // list resolves to nothing, `subscriptions` republishes the same empty list, a
+                // StateFlow does not re-emit an equal value, and renderSubscriptions never runs —
+                // so without this the ring's slot would hold the skeleton forever on an account
+                // that genuinely has no подписка.
+                launch { viewModel.subsResolved.collect { renderHeroState() } }
                 launch { viewModel.error.collect { renderError(it) } }
                 // The tab's fragment is added once and then only shown/hidden, so it outlives the
                 // session. Without this, signing out (or a 401) would leave the previous account's
@@ -684,22 +690,44 @@ class AccountFragment : Fragment() {
      * reachable without a login now (someone who added a departament подписка from the
      * clipboard), and offering «Купить подписку» or «Выйти из аккаунта» to a visitor with no
      * account is offering controls that cannot work.
+     *
+     * THE COLD LOAD IS NOT OVER UNTIL THE SUBSCRIPTIONS HAVE ANSWERED, and that is the whole of
+     * «вместо кольца с трафиком появляется какой-то прямоугольник, потом только кольцо».
+     *
+     * The rectangle was never a skeleton. `group_sub_skeleton` is, and always was, the ring's own
+     * empty track at the ring's own 172dp — the fix the previous round made, and it holds. What the
+     * owner watched was the sequence: the profile is ONE request and the subscription list is TWO,
+     * so the profile lands first; [renderProfile] cleared `pendingFirstLoad` on its arrival;
+     * `subs` was still the seed `emptyList()` because nothing had come back for it yet — and this
+     * `when` fell straight through to EMPTY, which is a bordered card saying «нет активной
+     * подписки». Rectangle, in the ring's slot, for as long as the second and third requests took,
+     * and then the ring. The state machine was answering a question it did not have the data for.
+     *
+     * So the gate is now BOTH halves of the first load: the profile must have landed AND the list
+     * must have RESOLVED ([AccountViewModel.subsResolved] — resolved, not merely empty, which is a
+     * distinction the list flow itself cannot express). While either is outstanding the slot holds
+     * the ring, motionless, exactly as §5 asks. An error still ends the wait: [renderError] clears
+     * `pendingFirstLoad`, and a failed subscription fetch resolves the flag too.
      */
     private fun renderHeroState() {
         val subs = currentSubs
         val profile = latestProfile
         val error = viewModel.error.value
         val loading = viewModel.loading.value
-        val coldLoading = pendingFirstLoad || loading
+        val firstLoadPending = pendingFirstLoad || !viewModel.subsResolved.value
+        val coldLoading = firstLoadPending || loading
         val signedIn = AccountSession.isLoggedIn()
         val state = when {
             !signedIn -> Hero.SIGNED_OUT
             subs.isNotEmpty() -> Hero.CAROUSEL
-            coldLoading && profile == null -> Hero.SKELETON
+            coldLoading && (profile == null || firstLoadPending) -> Hero.SKELETON
             profile == null && error != null -> Hero.ERROR
             else -> Hero.EMPTY
         }
-        binding.groupSignedOut.isVisible = state == Hero.SIGNED_OUT
+        // The whole hero slot leaves in SIGNED_OUT: the sign-in block is no longer one of its
+        // children (it is the tab's own centred band now), so leaving the slot behind would keep
+        // its 20dp top margin in a composition whose entire point is being centred.
+        binding.heroSlot.isVisible = state != Hero.SIGNED_OUT
         binding.groupSubSkeleton.isVisible = state == Hero.SKELETON
         binding.groupSubEmpty.isVisible = state == Hero.EMPTY
         binding.groupSubCarousel.isVisible = state == Hero.CAROUSEL
@@ -708,6 +736,11 @@ class AccountFragment : Fragment() {
         // Everything that needs a session. GONE and not disabled: a greyed-out «Выйти из
         // аккаунта» still claims there is an account to leave.
         val sessionBands = state != Hero.SIGNED_OUT
+        // The sign-in offer and the two weighted spacers that float it are one unit: a spacer left
+        // behind would take its share of the viewport with nothing in it.
+        binding.groupSignedOut.isVisible = !sessionBands
+        binding.signedOutLead.isVisible = !sessionBands
+        binding.signedOutTrail.isVisible = !sessionBands
         binding.rowProfile.isVisible = sessionBands
         binding.llSubActions.isVisible = sessionBands
         binding.tvManageTitle.isVisible = sessionBands
@@ -1410,9 +1443,20 @@ private fun daysUntil(target: Ymd): Int {
     return Math.round((targetMs - todayMs).toDouble() / 86_400_000.0).toInt()
 }
 
+/**
+ * THE FRACTION IS SEPARATED BY A COMMA, because the interface is Russian and everything else on
+ * this tab already does it: the ring writes «2,0 ТБ» and «1,9 ТБ» from
+ * [SubscriptionPagerAdapter.formatBytes], which composes the number under an explicit locale and
+ * then swaps the point. A sum that came out «135.29 ₽» beside them is the single detail that makes
+ * a screen read as untranslated.
+ *
+ * The composition stays under [Locale.US] on purpose — the grouping and the digit shapes must not
+ * follow the phone's locale, which can be Farsi or Bengali — and only the decimal mark is swapped,
+ * which is the same two-step the byte formatter uses.
+ */
 private fun formatMoney(amount: Double, currency: String): String {
     val n = if (amount % 1.0 == 0.0) amount.toLong().toString()
-    else String.format(Locale.US, "%.2f", amount)
+    else String.format(Locale.US, "%.2f", amount).replace('.', ',')
     return "$n ${currencySymbol(currency)}"
 }
 

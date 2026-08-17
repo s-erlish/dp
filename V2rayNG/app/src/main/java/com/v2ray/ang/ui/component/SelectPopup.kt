@@ -55,6 +55,33 @@ import com.v2ray.ang.util.reducedMotion
  * navigation row carries: a chevron promises a screen, and this row does not open one. That is the
  * prototype's own distinction (`chev: pop ? CARET : CHEV`).
  *
+ * ## The SECOND shape: a list of actions
+ *
+ * «Добавить подписку» on Главная is the same flyout hung off an icon rather than a row, and it
+ * offers two VERBS instead of one value out of several. It used to be a platform [PopupMenu], which
+ * is the one surface in the product still wearing Material's own fill, corner, padding and press —
+ * «менюшка всплывающая не в таком же стиле, как условно в настройках». There is no second component
+ * for it, because the difference between the two shapes is three arguments:
+ *
+ * ```kotlin
+ * SelectPopup.show(
+ *     anchor = addButton,
+ *     options = labels,
+ *     icons = glyphs,                                   // one drawable per option
+ *     selectedIndex = -1,                               // nothing is "current" in an action list
+ *     widthRes = R.dimen.select_popup_w_add,
+ *     offsetTopRes = R.dimen.select_popup_offset_top_add,
+ *     offsetRightRes = R.dimen.select_popup_offset_right_add,
+ * ) { picked -> run(picked) }
+ * ```
+ *
+ * `selectedIndex = -1` takes the check column away (see `@layout/view_select_popup_item`), `icons`
+ * turns the leading glyph on, and the two offsets exist because the anchoring §6 states — top 48 /
+ * right 8 — is measured off a full-width SETTINGS ROW. Hung off a 48dp icon at the top of the
+ * screen, that same pair would drop the flyout on the anchor's own bottom edge and leave its right
+ * edge 4dp off the screen gutter. Everything else — the fill, the corner, the stroke, the reveal,
+ * the press, the dismissal, the Back handling — is the one description, which is the whole point.
+ *
  * ## What §6 asks for, and where each requirement is answered
  *
  * | §6 | Here |
@@ -98,13 +125,19 @@ object SelectPopup {
      * @param anchor the row the value belongs to. Its top-right corner is what the popup hangs off,
      *   and it is the view that lifts above its neighbours while the popup is open.
      * @param options the labels, in the order they are shown. Index is the contract with [onPick].
-     * @param selectedIndex the current value's index, or -1 when nothing is selected.
+     * @param selectedIndex the current value's index, or -1 for an ACTION list, which has no
+     *   current value and therefore no check column at all.
      * @param widthRes the CONTENT width, from the `select_popup_w_*` set — sized to the longest
      *   option so the body cannot reflow when the selection changes. Defaults to
      *   `select_popup_w_default` for the three pickers §6 gives no measurement for.
+     * @param icons one drawable per option, or null for the plain value list. A shorter list than
+     *   [options] leaves the remaining rows without a glyph rather than throwing.
      * @param valueView the row's value text. Dims to `colorOnSurfaceVariant` while the popup is
      *   open and returns to `colorOnSurface` when it closes.
      * @param caret the row's trailing caret. Turns 180° while the popup is open.
+     * @param offsetTopRes how far below the anchor's TOP edge the popup starts. §6's 48 is measured
+     *   off a settings row; an anchor of another height names its own.
+     * @param offsetRightRes how far in from the anchor's RIGHT edge the popup's right edge sits.
      * @param onPick fires with the chosen index; the popup has already closed. Not called when the
      *   user dismisses without choosing, and not called when the user re-picks the current value.
      */
@@ -113,8 +146,11 @@ object SelectPopup {
         options: List<CharSequence>,
         selectedIndex: Int,
         @DimenRes widthRes: Int = R.dimen.select_popup_w_default,
+        icons: List<Int>? = null,
         valueView: TextView? = null,
         caret: View? = null,
+        @DimenRes offsetTopRes: Int = R.dimen.select_popup_offset_top,
+        @DimenRes offsetRightRes: Int = R.dimen.select_popup_offset_right,
         onPick: (Int) -> Unit,
     ) {
         // Tapping the row that is already open closes it, which is what a user expects of a
@@ -137,11 +173,18 @@ object SelectPopup {
         val padding = res.getDimensionPixelSize(R.dimen.select_popup_padding)
         val stroke = res.getDimensionPixelSize(R.dimen.stroke_hairline)
 
-        val session = Session(anchor, popup, valueView, caret)
+        val session = Session(anchor, popup, valueView, caret, offsetTopRes, offsetRightRes)
 
         options.forEachIndexed { index, label ->
             popup.addView(
-                option(popup, label, index == selectedIndex, contentWidth) {
+                option(
+                    parent = popup,
+                    label = label,
+                    glyph = icons?.getOrNull(index),
+                    selected = index == selectedIndex,
+                    checkable = selectedIndex >= 0,
+                    width = contentWidth,
+                ) {
                     val chosen = index
                     dismiss()
                     if (chosen != selectedIndex) onPick(chosen)
@@ -186,7 +229,9 @@ object SelectPopup {
     private fun option(
         parent: ViewGroup,
         label: CharSequence,
+        glyph: Int?,
         selected: Boolean,
+        checkable: Boolean,
         width: Int,
         onClick: () -> Unit,
     ): View {
@@ -196,9 +241,24 @@ object SelectPopup {
 
         view.findViewById<TextView>(R.id.select_option_label).text = label
 
-        // The check slot never changes VISIBILITY, only alpha: hiding it would let the popup
-        // change width between one selection and the next, which is the reflow §6 forbids.
-        view.findViewById<ImageView>(R.id.select_option_check).alpha = if (selected) 1f else 0f
+        // The leading glyph: on for an action list, off for a value list. Tinted from the layout,
+        // so the two themes and the mono overlay reach it without a colour being named here.
+        // 0 counts as absent, so a mixed list — one option with a glyph, one without — leaves the
+        // slot empty on the second rather than drawing nothing at full size.
+        val glyphRes = glyph?.takeIf { it != 0 }
+        view.findViewById<ImageView>(R.id.select_option_glyph).apply {
+            if (glyphRes != null) setImageResource(glyphRes)
+            visibility = if (glyphRes != null) View.VISIBLE else View.GONE
+        }
+
+        // The check slot never changes VISIBILITY within one popup, only alpha: hiding it would let
+        // the popup change width between one selection and the next, which is the reflow §6
+        // forbids. A popup with NO selection at all is the one case where it goes — nothing can
+        // ever tick, so the column is holding 22dp open for a mark that is not coming.
+        view.findViewById<ImageView>(R.id.select_option_check).apply {
+            visibility = if (checkable) View.VISIBLE else View.GONE
+            alpha = if (selected) 1f else 0f
+        }
 
         view.isActivated = selected
         view.pressFeedback(R.anim.press_button)
@@ -251,6 +311,8 @@ object SelectPopup {
         val popup: ViewGroup,
         val valueView: TextView?,
         val caret: View?,
+        @DimenRes val offsetTopRes: Int,
+        @DimenRes val offsetRightRes: Int,
     ) {
         var catcher: View? = null
 
@@ -436,13 +498,16 @@ object SelectPopup {
             anchor.viewTreeObserver.addOnPreDrawListener(preDraw)
         }
 
-        /** §6: top 48dp below the row's top edge, right edge 8dp in from the row's right edge. */
+        /**
+         * §6: top 48dp below the row's top edge, right edge 8dp in from the row's right edge —
+         * unless the caller named another pair, which an anchor that is not a settings row does.
+         */
         private fun position(host: ViewGroup) {
             val bounds = Rect(0, 0, anchor.width, anchor.height)
             host.offsetDescendantRectToMyCoords(anchor, bounds)
             val res = anchor.resources
-            val top = res.getDimensionPixelSize(R.dimen.select_popup_offset_top)
-            val right = res.getDimensionPixelSize(R.dimen.select_popup_offset_right)
+            val top = res.getDimensionPixelSize(offsetTopRes)
+            val right = res.getDimensionPixelSize(offsetRightRes)
             val width = popup.width.takeIf { it > 0 } ?: popup.measuredWidth
             popup.translationX = (bounds.right - right - width).toFloat()
             popup.translationY = (bounds.top + top).toFloat()

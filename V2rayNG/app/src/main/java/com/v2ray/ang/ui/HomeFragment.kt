@@ -77,6 +77,7 @@ import com.v2ray.ang.ui.component.GateView
 import com.v2ray.ang.ui.component.Haptic
 import com.v2ray.ang.ui.component.HomeHandoff
 import com.v2ray.ang.ui.component.RunningAnimators
+import com.v2ray.ang.ui.component.SelectPopup
 import com.v2ray.ang.ui.component.SkeletonBinder
 import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.ui.component.pressFeedback
@@ -297,6 +298,16 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private var ringColor = 0
     private var ringAnimator: ValueAnimator? = null
 
+    /** Whether the active ring is currently the arc's track rather than a ring. @see dimRingTrack */
+    private var ringTrackDimmed = false
+
+    /**
+     * The last server name and flag this screen could resolve, so a live tunnel is never left with
+     * nothing to call itself. @see resolveState
+     */
+    private var lastServerName: String? = null
+    private var lastServerFlag: String? = null
+
     /** The negotiating breath: the outer rings swelling while the core talks to a server. */
     private var breathAnimator: ValueAnimator? = null
 
@@ -465,6 +476,13 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         const val RING_ALPHA_MID = 128 // ~50%
         const val OPAQUE = 255
 
+        // THE ACTIVE RING WHILE THE ARC IS ON IT. The prototype paints the negotiating ring
+        // `rgba(76,141,255,.30)` — the accent at 30% — and the travelling arc at full strength on
+        // top of it. The port painted both at full and they cancelled: a bright arc on a bright
+        // ring of the same hue is a ring, and the owner reported exactly that («надо цвет чутка
+        // темнее сделать чтобы был акцент и видно, что идёт анимация»). 30% of 255 is 77.
+        const val RING_ALPHA_TRACK = 77 // 30%, the prototype's own figure
+
         // The negotiating breath, on the two outer rings. Same 850ms reverse the old build breathed
         // the (now banned) halo glow with, moved onto the rings where it belongs.
         const val BREATH_PERIOD_MS = 850L
@@ -570,6 +588,16 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
+     * The three controls «Добавить подписку» can be hung off, and the only reason to name them is
+     * to close a flyout that belongs to this screen without closing one that does not.
+     */
+    private fun homeAnchors(): List<View> = listOf(
+        binding.btnHomeAdd,
+        binding.layoutGate.btnGatePrimary,
+        binding.layoutGate.btnGateSecondary,
+    )
+
+    /**
      * Re-reads what other entry points may have changed while this tab was up but not in front.
      * Hidden tabs stay RESUMED, so this also runs for a tab that is attached but not on screen —
      * which is exactly what makes it correct the moment it is shown again.
@@ -630,6 +658,11 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // The in-flight bar is INDEFINITE by construction, so it is the one surface that would
         // survive this screen if nothing took it down.
         Notice.clearProgress()
+        // «Добавить подписку» is a SelectPopup now, and SelectPopup is an object holding the one
+        // open flyout: an open one keeps its anchor, and therefore this fragment and its activity,
+        // alive past the view it was hung off. It is closed only when the anchor belongs to THIS
+        // screen — a popup opened from Настройки is that tab's to close.
+        if (homeAnchors().any { SelectPopup.isShowing(it) }) SelectPopup.dismiss()
         ringOuter = null
         ringMid = null
         ringInner = null
@@ -811,6 +844,33 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         val frame = binding.connectFrame
         ringColor = idleRingColor()
 
+        // THE FOURTH FACE OF «кольца уходят за невидимый квадрат», and the one the layout could not
+        // express. The owner's repro is exact: «при обычном подключении такого нет», only after
+        // closing the app from recents and coming back.
+        //
+        // Three causes for this defect were already known and all three are closed — a container
+        // that clips (clipChildren is off on connect_frame → home_content → home_tab_root), a
+        // hardware layer given to the container instead of to what moves (it goes on the two rings
+        // and comes off in doOnEnd AND doOnCancel), and a legacy view animation resolved by the
+        // parent (they are property animators now). This is the fourth: A VIEWGROUP WITH alpha < 1
+        // IS DRAWN THROUGH AN OFFSCREEN LAYER THE SIZE OF ITS OWN BOX, and children outside that
+        // box are cut off — `clipChildren` has nothing to do with it and cannot switch it off.
+        // (RenderProperties::promotedToLayer: alpha < 1 && hasOverlappingRendering.)
+        //
+        // Which is why it only ever showed on the restore path. §3's table fades this frame's alpha
+        // 0 → 1 over 720ms; the daemon answers the registration handshake inside that window; the
+        // answer used to be read as a live connect and fired the sonar — so the one moment the
+        // rings fly is the one moment the frame is mid-fade and therefore rasterised into a 214dp
+        // square. Press the button normally and the frame has been at alpha 1 for minutes.
+        //
+        // [entranceInFlight] keeps the confirmation out of that window; this line makes the box
+        // itself incapable of trimming the rings whatever else ever plays inside it. Nothing is
+        // given up: the children of this frame do not overlap — the three rings are its BACKGROUND
+        // at radius ≥ 84, the disc is 150 and the two sonar rings are invisible at rest — so
+        // per-child alpha and group alpha produce the same pixels here, and the renderer is simply
+        // told the truth. Public since API 24; minSdk is 24.
+        frame.forceHasOverlappingRendering(false)
+
         // THE THREE RINGS, at handoff §4's own insets: outer 0 / 1.5dp, middle 10dp / 1.5dp,
         // inner 22dp / 2dp. All three are layers of the frame's background — three empty views
         // would cost three measure passes to draw three ovals, and LayerDrawable insets are
@@ -933,7 +993,45 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         val activeStroke = resources.getDimensionPixelSize(R.dimen.stroke_emphasis)
         ringOuter?.setStroke(frameStroke, ColorUtils.setAlphaComponent(colour, RING_ALPHA_OUTER))
         ringMid?.setStroke(frameStroke, ColorUtils.setAlphaComponent(colour, RING_ALPHA_MID))
-        ringInner?.setStroke(activeStroke, colour)
+        // The active ring is the arc's TRACK while the arc is on it, and a track is quieter than
+        // what runs on it. @see dimRingTrack
+        val inner = if (ringTrackDimmed) {
+            ColorUtils.setAlphaComponent(colour, RING_ALPHA_TRACK)
+        } else {
+            colour
+        }
+        ringInner?.setStroke(activeStroke, inner)
+    }
+
+    /**
+     * THE RING HANDS ITS BRIGHTNESS TO THE THING THAT MOVES, for exactly as long as something is
+     * moving on it.
+     *
+     * The arc and the ring it travels were the same colour in every state that spins it — while the
+     * core negotiates, `connectActiveColor` is `#4C8DFF` and `colorAccentFigure` resolves to the
+     * same `#4C8DFF`; while a подписка refreshes on a live tunnel, both are `colorAccentFigure`
+     * outright. A bright arc laid over a bright ring of the same hue does not read as motion, and
+     * that is the owner's report: «он не ровно по линии вокруг кнопки крутится … надо цвет чутка
+     * темнее сделать чтобы был акцент и видно, что идёт анимация».
+     *
+     * The prototype never had the problem because it never draws both at full: its negotiating ring
+     * is `rgba(76,141,255,.30)` and its sweep is the accent. So the difference is restored where the
+     * design puts it — on the RING — and the arc keeps the accent it is tinted with. One rule, no
+     * new colour, and it works in all three themes because it is an alpha on whatever hue the state
+     * already resolved: blue on blue, white on white, and the mono figure on the mono figure.
+     *
+     * «Темнее» is what an alpha over this product's grounds actually does. In both dark themes 30 %
+     * of the hue over `#0B0D10` lands darker than the hue; in the light theme the track goes pale
+     * against a white ground, which is the same statement — quieter than the arc — spelled the way
+     * a light theme spells it.
+     *
+     * Restored the moment the arc stops, so a connected object is the full-strength accent ring §4
+     * asks for and an idle one is its muted static ring.
+     */
+    private fun dimRingTrack(dimmed: Boolean) {
+        if (ringTrackDimmed == dimmed) return
+        ringTrackDimmed = dimmed
+        applyRingColor(ringColor)
     }
 
     // ==================== THE ENTRANCE (handoff §3, «Сборка главной») ====================
@@ -953,11 +1051,23 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     fun holdEntrance() {
         if (!isBindingInitialized) return
         entrancePlayed = false
-        // AND IT STAYS HELD. Setting the start values once is not enough — see [entranceHeld]:
-        // every repaint that happens under the overlay writes resting values back over them, and
-        // the overlay's own exit is a fade, so what the fade uncovers is a finished screen.
-        entranceHeld = true
+        // THE ORDER OF THESE TWO LINES IS THE FIX, and reversing it is what let the owner see
+        // «появляется кнопка потом заново начинается анимация появления кнопок и серверов».
+        //
+        // [cancelEntrance] cancels the AnimatorSet, and an AnimatorSet that is RUNNING answers
+        // cancel() by calling its listeners — whose `onAnimationCancel` is [clearEntrance], which
+        // sets `entranceHeld = false`. Raising the flag first therefore lowered it again on any
+        // hold taken while an entrance was in flight, which is precisely the hold the flow takes:
+        // Главная assembles itself at launch, the user reaches the gate's «Войти через Telegram»
+        // and the overlay goes up over a table that is still playing. From then on the hold was a
+        // flag nobody was holding — [render] stopped re-priming, every repaint under the overlay
+        // wrote resting values, and the overlay's 520ms fade uncovered a finished screen. The frame
+        // that removed it then re-primed and played the whole table a second time.
+        //
+        // So: drop the animator first, and only then declare the hold. AND IT STAYS HELD after
+        // that — see [entranceHeld]; setting the start values once was never enough.
         cancelEntrance()
+        entranceHeld = true
         primeEntrance()
     }
 
@@ -1160,6 +1270,16 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         }
         binding.rvHomeServers.alpha = 0f
         binding.rvHomeServers.children.forEach { it.alpha = 0f }
+        // THE GATE BLOCK IS PARKED TOO, and it is not in the table above for a reason: it occupies
+        // the подписка slot's place and never appears with it, so it takes the slot's arrival
+        // rather than one of its own ([playEntrance] releases it with the rest).
+        //
+        // It has to be parked because the flow's release now waits for the server list, so there is
+        // a real interval in which the overlay is gone and the table has not started. Everything in
+        // the table is invisible there — and the gate, which was not, would have been the one thing
+        // on screen: on the Telegram path the state at that instant is «Загрузить серверы», i.e.
+        // this block with a button on it, flashed for as long as the fetch takes and then replaced.
+        binding.layoutGate.gate.alpha = 0f
     }
 
     /**
@@ -1185,6 +1305,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             it.alpha = 1f
             it.translationX = 0f
         }
+        // …and the gate block, which [primeEntrance] parks alongside them. paintSlot owns its
+        // VISIBILITY and its crossfade; this only ever hands its opacity back.
+        binding.layoutGate.gate.alpha = 1f
     }
 
     /** Drops the whole assemble — one handle for the set, one loop for the rows. */
@@ -1192,6 +1315,19 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         entranceAnimator?.cancel()
         entranceAnimator = null
     }
+
+    /**
+     * Whether §3's table is between its first frame and its last — the window in which this screen
+     * is not yet a screen the user has been shown.
+     *
+     * Two readers, and they want the same window for different reasons: the confirmation must not
+     * play in it (a state learned during the assemble is a restore, not an event), and the ring's
+     * sonar must not be emitted in it (the connect object is mid-fade there, and a ViewGroup with
+     * alpha < 1 composites its children into a layer the size of its own box — see
+     * [buildConnectObject]).
+     */
+    private fun entranceInFlight(): Boolean =
+        entranceHeld || entranceAnimator?.isRunning == true
 
     private fun wireConnect() {
         binding.connectFrame.onSingleClick(Haptic.PRESS) { handleConnectAction() }
@@ -1390,7 +1526,41 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             // animator back and re-armed the bug. Hence both lines below: strip the animator here,
             // once, and never let the transformer be set to null again (see setPageTransformer
             // below, which is now unconditional).
-            (getChildAt(0) as? RecyclerView)?.itemAnimator = null
+            //
+            // THE STRETCH GOES WITH IT, and it is the third report on this card: «сам тулбар
+            // подписки … почему-то можно растягивать и тянуть влево или вправо, надо убрать это».
+            // From Android 12 a RecyclerView answers a drag past its own edge with the stretch
+            // over-scroll — the whole page is pulled sideways and springs back. On a carousel of
+            // ONE there is nowhere to go, so every horizontal drag on the card is over-scroll and
+            // the card is rubber. It is set on the inner RecyclerView and not on the pager,
+            // because ViewPager2 forwards nothing of the sort — `android:overScrollMode` on the
+            // pager itself reaches a container that does not scroll.
+            //
+            // ALWAYS, not just at one подписка: a card that stretches at the ends of a real
+            // carousel is the same defect with a smaller repro. Swiping BETWEEN подписки is
+            // untouched — that is the pager's own scroll, not over-scroll.
+            //
+            // …AND THE PAGE STOPS BEING CUT OFF AT THE GUTTER, which is the third report on this
+            // one object: «когда листаешь несколько подписок, то видишь у них рамки появляются по
+            // бокам, хотя должно быть по другому, а не обрезаться».
+            //
+            // ViewPager2 lays its inner RecyclerView out INSIDE its own padding (ViewPager2.onLayout
+            // → measureChild), so the 16dp gutter above already makes a page narrower than the
+            // screen — that half was here. The neighbouring page is then laid out BESIDE it, i.e.
+            // outside the RecyclerView's own box, and a ViewGroup clips its children by default:
+            // the peeking card was chopped by a vertical line 16dp in from each screen edge, mid
+            // word. That straight cut is the «рамка» in his screenshot.
+            //
+            // ONE SWITCH, AND ONLY ON THE INNER RecyclerView. The pager itself keeps clipChildren
+            // ON, so the overflow is still trimmed at the pager's own bounds — the screen edges —
+            // and nothing here reaches a scroll container or the window root. That distinction is
+            // not academic: `SelectPopup.unclipAncestors` drew the settings screen through the
+            // status bar by walking one level too far, and this is the same walk with one step.
+            (getChildAt(0) as? RecyclerView)?.let { inner ->
+                inner.itemAnimator = null
+                inner.overScrollMode = View.OVER_SCROLL_NEVER
+                inner.clipChildren = false
+            }
             // Neighbour cards peek past the 16dp gutter; a 12dp gap keeps them from touching. With
             // one подписка every page sits at position 0, so the transformer applies a zero offset
             // and costs nothing — which is why it can safely be permanent.
@@ -1477,7 +1647,25 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         buildHomeMetaDots(count)
         updateHomeMetaDots(homeMetaPage)
         binding.llHomeMetaDots.isVisible = many
+        applyHomeMetaSwipe(many)
         measureHomeMetaHeight()
+    }
+
+    /**
+     * THE CARD IS ONLY DRAGGABLE WHEN THERE IS SOMEWHERE TO DRAG IT.
+     *
+     * «сам тулбар подписки где вся инфа о ней на главной почему-то можно растягивать и тянуть влево
+     * или вправо, надо убрать это чтобы нельзя было тянуть никуда» — and with one подписка that is
+     * literally true: the pager has a single page, so every horizontal drag on the card ends where
+     * it started, having moved the one thing on the screen the user cannot act on.
+     *
+     * THE CAROUSEL ITSELF STAYS (PORT-DELTA П-10). This is the input flag and nothing else: past one
+     * подписка the swipe, the dots and the haptic all come back exactly as they were, and the flag
+     * is written on every rebuild rather than once at construction, so adding the second подписка
+     * turns the gesture on in the same pass that adds its dot.
+     */
+    private fun applyHomeMetaSwipe(many: Boolean) {
+        binding.vpHomeMeta.isUserInputEnabled = many
     }
 
     /**
@@ -1876,8 +2064,32 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             // Play the signature confirm/reverse ONLY on a genuine live transition — a connect the
             // user just triggered (connectInProgress), or a real running-state flip. Never on the
             // LiveData replay at launch (prev == null, no connect in progress), which jumps to end.
+            //
+            // …AND NEVER ON THE HANDSHAKE ANSWER EITHER, which is the half that was missing and the
+            // whole of «если быть подключенным, закрыть приложение из вкладок и вернуться назад, то
+            // опять появляются границы, появляется анимация у кнопки вибрация».
+            //
+            // Swiping the task away kills the process; the tunnel is a foreground service and does
+            // not die with it. On the next launch `MainViewModel.startListenBroadcast` publishes
+            // `isRunning = false` — a PLACEHOLDER, and it says so in its own comment («the screen
+            // has to paint something while the handshake is in flight») — and only then asks the
+            // daemon, which answers `MSG_STATE_RUNNING` a few hundred ms later. Two emissions,
+            // false then true, and the second one is a textbook flip: `prevRunning != isRunning`.
+            // So every cold start on a live tunnel buzzed the phone and fired the confirmation
+            // sonar at a user who had pressed nothing — the exact thing the comment in paintConnect
+            // says must not happen («which must not buzz the phone in the user's pocket»).
+            //
+            // The discriminator is the ENTRANCE. §3's table is running from the moment this screen
+            // is created until ~1.3s later, and the daemon's answer lands inside that window every
+            // time; more to the point, until the table has finished the user has not been SHOWN the
+            // connect object at all, so nothing that arrives while it plays can be a transition he
+            // is watching. It is the screen learning what was already true, and that is a state to
+            // arrive in, not an event to celebrate. A tunnel raised from the tile or the
+            // notification while Главная is genuinely on screen is past the entrance and still
+            // animates.
             val prevRunning = lastRunningState
-            val liveTransition = connectInProgress || (prevRunning != null && prevRunning != isRunning)
+            val liveTransition = connectInProgress ||
+                (prevRunning != null && prevRunning != isRunning && !entranceInFlight())
 
             // A start that ends in "not running" while a connect was in flight is a FAILURE, and it
             // is reported on the screen rather than as a toast that has already gone.
@@ -2103,14 +2315,40 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // line while there is one, and the selection names it when there is not. On any state where
         // nothing is running the two are the same value anyway.
         val running = mainViewModel.runningGuid?.takeIf { tunnelRunning || disconnecting }
-        val named = running ?: selected
-        val profile = named?.let { MmkvManager.decodeServerConfig(it) }
-        val serverName = profile?.remarks
+        // …AND IT FALLS BACK TO THE SELECTION WHEN THE RUNNING GUID DOES NOT DECODE.
+        //
+        // `running ?: selected` picked the guid and then decoded once, so a running guid that no
+        // longer names a stored profile produced NO profile at all instead of dropping through to
+        // the selection. That happens for real and it happens on a schedule: every подписка refresh
+        // deletes the profiles it replaces and writes new guids, so an hourly auto-update on a live
+        // tunnel leaves `runningGuid` pointing at a record that is gone. The connect wave closed
+        // the same hole for the SELECTED server — `getSelectServer` returns null for a vanished
+        // profile — and this is the other half of it.
+        //
+        // What the user saw: «он пишет подключено вместо названия сервера». With no name, the line
+        // under the ledger fell through to its own state word and printed the pill's sentence a
+        // second time, in a second typeface, where the server's identity belongs. Intermittent,
+        // because it needs a refresh to land between one guid and the next.
+        val profile = running?.let { MmkvManager.decodeServerConfig(it) }
+            ?: selected?.let { MmkvManager.decodeServerConfig(it) }
+        val resolvedName = profile?.remarks
             ?.takeIf { it.isNotBlank() }
             // The leading country flag is the tile beside the name, never text inside it.
             ?.let { FlagUtil.stripLeadingFlag(it).trim() }
             ?.takeIf { it.isNotEmpty() }
-        val serverFlag = profile?.let { FlagUtil.resolveFlag(it) }
+        val resolvedFlag = profile?.let { FlagUtil.resolveFlag(it) }
+        // THE LAST NAME THIS SCREEN COULD RESOLVE, kept for the window in which it can resolve
+        // none. The two guids are written by different actors — the daemon reports the tunnel it
+        // raised, the store is rewritten by whatever refreshed it — so there is an instant on a live
+        // tunnel where neither answers. Holding the name the user was already reading is the honest
+        // thing to show there: the traffic has not changed servers, only the record naming it has.
+        if (resolvedName != null) {
+            lastServerName = resolvedName
+            lastServerFlag = resolvedFlag
+        }
+        val holdName = tunnelRunning || disconnecting || connectLoading
+        val serverName = resolvedName ?: lastServerName.takeIf { holdName }
+        val serverFlag = if (resolvedName != null) resolvedFlag else lastServerFlag.takeIf { holdName }
 
         // A sync that produced servers is a sync that succeeded; the request is spent.
         if (serverCount > 0) syncRequested = false
@@ -2518,6 +2756,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // dropping it mid-turn. The `sweepRunning` edge is what keeps the entrance one-shot.
         if (sweeping) showSweep() else hideSweep()
         sweepRunning = sweeping
+        // The ring under the arc steps down to the prototype's 30% for as long as the arc is on it,
+        // so the movement reads. Set BEFORE the tint below, which is what repaints the stroke.
+        dimRingTrack(sweeping)
 
         // THE ONE BREATH LEFT. Negotiating owns the ring alphas at 850ms and says "working on it";
         // every other state is still, because §4 gives the object exactly one other motion — the
@@ -2615,20 +2856,26 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             else -> name
         }
         // The fallback line, for every state with no server to name. Each one keeps a string the
-        // two-line stack already used, so nothing is lost by collapsing them into one row, and the
-        // line is NEVER empty in a state that has something to say.
+        // two-line stack already used, so nothing is lost by collapsing them into one row.
         //
         // ERROR takes the RECOVERY and not the verdict: the object above it is already red, so
         // «Не удалось подключиться» would spend the only line restating a colour, while «Нажмите,
         // чтобы повторить» spends it on the way out. State plus action, one channel each.
+        //
+        // THE FOUR TUNNEL STATES FALL BACK TO NOTHING, AND THAT IS THE POINT. «Подключаемся…» ·
+        // «Отключаемся…» · «Не подключено» · «Подключено» are the STATUS PILL's own four words,
+        // eleven dp above this line — printing one of them here says the same thing twice, in two
+        // typefaces, in the slot the user reads the server's name out of. That is what he caught:
+        // «он пишет подключено вместо названия сервера». They were only ever reachable when the
+        // name could not be resolved, which resolveState now makes very nearly impossible (it falls
+        // back to the selection, and then to the last name it knew); this is the floor under that,
+        // and an empty identity is better than a false one. The row keeps its height either way —
+        // an empty TextView still lays out one line box — so nothing below it moves.
         val fallback: CharSequence = when (state.conn) {
             Conn.ERROR -> getString(R.string.home_detail_retry)
             Conn.NO_SERVER -> getString(R.string.home_detail_pick_server)
             Conn.GATED -> getString(gateStatusWord(state))
-            Conn.CONNECTING -> getString(R.string.home_status_connecting)
-            Conn.DISCONNECTING -> getString(R.string.home_status_disconnecting)
-            Conn.DISCONNECTED -> getString(R.string.home_status_disconnected)
-            Conn.CONNECTED -> getString(R.string.home_status_connected)
+            Conn.CONNECTING, Conn.DISCONNECTING, Conn.DISCONNECTED, Conn.CONNECTED -> ""
         }
         val detail: CharSequence = identity ?: fallback
         val colour = when {

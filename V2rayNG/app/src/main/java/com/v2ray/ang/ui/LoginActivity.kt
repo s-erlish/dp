@@ -61,14 +61,24 @@ import kotlinx.coroutines.launch
  * one has a hierarchy and a machine:
  *
  * ```
- * A · the gate            «Войти через Telegram»  ← the screen's ONE filled accent
- *     │                   «Войти по почте»          quiet, and the only other thing here
+ * A · the gate            «Войти через Telegram»  ← contour pill, Telegram glyph #2AABEE
+ *     │                   «Войти через сайт»        the same pill, muted glyph
  *     └ awaiting          the universal 56dp ledger row, not a centred hero spinner
  *
- * B · «Вход по почте»     email + password → «Войти»
+ * B · «Вход через сайт»   email + password → «Войти»
  *     ├ 2FA               replaces the password slot; six cells over one real field
  *     └ two rows          «Создать аккаунт» / «Восстановить пароль» → departament.site
  * ```
+ *
+ * **The redesign pass (2026-08-17).** The owner opened this screen and found the version that
+ * predates the handoff: a back chevron pointing right, a filled white «Войти через Telegram» and a
+ * text «Войти по почте». All three are gone. The back glyph was never this screen's own — every
+ * icon button in the app wears `@anim/press_icon`, whose resting item animates `scaleX` to 1.0 and
+ * so undid the `scaleX="-1"` mirror both headers used; it is a real `ic_chevron_left` now. There
+ * are no filled surfaces left here: every action is the start screen's 52dp contour pill, so the
+ * two sign-in surfaces a user can meet look like one product. And «Войти по почте» is off the
+ * screen — the owner's ruling folds e-mail, OTP, 2FA and Google into one «Войти через сайт», which
+ * opens this very form. Nothing was deleted to do it.
  *
  * **Every method that worked before still works**, through the same entry points: a plain launch
  * lands on A, [EXTRA_MODE] = [MODE_SITE] lands straight on B, [MODE_TELEGRAM] lands on A (where
@@ -240,9 +250,14 @@ class LoginActivity : BaseActivity() {
 
         gate.btnGateTelegram.onSingleClick(Haptic.PRESS) { viewModel.startTelegramLogin() }
         gate.btnGateOpenTelegram.onSingleClick { reopenTelegram() }
-        // Both «Войти по почте» take the identical path. The idle one used to just swap the page,
+        // Both «Войти через сайт» take the identical path. The idle one used to just swap the page,
         // which meant a tap during the token mint left the poll running: the user reached the form,
         // and a second later Telegram opened over it on its own.
+        //
+        // The ids still say `email` because they always did and an @+id is wired to logic, not to
+        // copy; the LABEL is the owner's «Войти через сайт», set in the layout. What is behind them
+        // is untouched: the e-mail form, its OTP step and its 2FA are all still in the build and
+        // still reachable — they have simply stopped being a door the interface names.
         gate.btnGateEmail.onSingleClick { goToMail() }
         gate.btnGateEmailAlt.onSingleClick { goToMail() }
     }
@@ -740,7 +755,7 @@ class LoginActivity : BaseActivity() {
         val outgoing = if (target == Page.MAIL) binding.gate.root else binding.mail.root
 
         binding.toolbar.toolbarTitle.text =
-            if (target == Page.MAIL) getString(R.string.auth_email_title) else ""
+            if (target == Page.MAIL) getString(R.string.auth_site_title) else ""
         // NestedScrollView takes a scroll listener by assignment, so re-attaching per page swaps
         // the hairline's source instead of stacking a second listener, and re-syncs it on the spot.
         ToolbarBinder.attachTo(binding.toolbar.root, incoming)

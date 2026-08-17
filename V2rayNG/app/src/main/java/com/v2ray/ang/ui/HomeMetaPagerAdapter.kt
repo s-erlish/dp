@@ -119,17 +119,23 @@ class HomeMetaPagerAdapter(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT,
         )
-        // The four action discs draw at 36dp because that is what the design draws, and they are
-        // TAPPED at 48dp because that is the floor nothing in the product goes under (CLAUDE.md,
+        // The action discs draw at 36dp because that is what the design draws, and they are TAPPED
+        // at 48dp because that is the floor nothing in the product goes under (CLAUDE.md,
         // PORT-DELTA П-29). The neighbouring @id/btn_collapse is a real 48dp view and needed
-        // nothing; these four keep their drawn size and grow only the hit rect.
+        // nothing; these keep their drawn size and grow only the hit rect.
+        //
+        // @id/btn_pin IS NOT IN THIS LIST ANY MORE, and leaving it here would have been the whole
+        // cost of hiding it. expandTouchTarget reads `getHitRect`, and a GONE child of a
+        // LinearLayout is never laid out, so its rect is (0,0,0,0) — the grow would then register a
+        // 48x48 delegate at the ROW'S OWN ORIGIN, which is where the collapse chevron is drawn, and
+        // a CompositeTouchDelegate offers the event to it first. The card's disclosure would have
+        // toggled a pin. A hidden control claims no touch area at all.
         //
         // HERE AND NOT IN onBindViewHolder: the delegate is registered on the PARENT, so a call
         // per bind would stack a fresh one on the row every time a page was recycled.
         listOf(
             binding.btnPing,
             binding.btnRefresh,
-            binding.btnPin,
             binding.btnTelegram,
         ).forEach { it.expandTouchTarget() }
         return VH(binding)

@@ -26,6 +26,7 @@
   WHAT IS HERE THAT §5 DOES NOT MENTION, AND STAYS. The handoff was written without
   knowing what the tab already does, so its silence is a gap and never an order:
     · `tv_pending`     — the "payment is being processed" hint after a checkout;
+    · `group_signed_out` — the sign-in offer, for a visitor with a подписка and no account;
     · `group_sub_*`    — skeleton / empty / error, the three states beside the ring;
     · `ll_sub_dots`    — page dots, shown from two подписки up;
     · «Способы входа»  — which account the sign-in is tied to;
@@ -206,6 +207,121 @@
              UserProfileDto.referralCode, /client/referral-stats is still called, and
              the copy string still exists — only this tab stopped displaying it. -->
 
+        <!-- ============ ПРЕДЛОЖЕНИЕ ВОЙТИ ============
+             «когда подписка добавлена без аккаунта, то предложение во вкладке аккаунт
+             где типа войти в акк и тд, надо сделать как на начальной странице дизайн по
+             входу там те же кнопочки по сайту и телеграму, нужно проработать тут
+             предложение о входе и взять кнопки с начальной страницы и сделать посередине
+             также, а не наверху».
+
+             IT IS THE START SCREEN'S BLOCK, NOT A CARD IN THE RING'S SLOT. It used to be
+             the fifth child of the hero FrameLayout — a bordered card, pinned to the top
+             of the tab, with two buttons inside it. Nothing about that said "this is the
+             same offer you already saw on first run", and a box round the only thing on
+             a screen is a box round the screen.
+
+             WHAT IS TAKEN FROM layout_home_empty.xml, and it is the look and the
+             composition, not the markup: the same 52dp contour pill at radius_button with
+             a 1.5dp @dimen/ob_stroke and no fill (@color/ob_pill_container puts the
+             background step under the finger and nothing at rest), the same Telegram glyph
+             in the brand's own #2AABEE, the same left-aligned heading over a ≤290dp
+             sub-line, and the same pair of weighted spacers.
+
+             WHAT IS NOT TAKEN: the shield in its rings, and «Другие способы». The shield
+             announces a first run and this is not one — the visitor already has a
+             подписка, they are standing on the tab it belongs to. «Другие способы» has
+             nothing left to hide: the two doors ARE the two doors, so folding one of them
+             away would cost a tap to reveal a list of one.
+
+             3 ABOVE, 4 BELOW — the split fragment_home.xml and layout_auth_gate.xml both
+             use, and for the same reason: an even split parks the block on the
+             mathematical centre, 3:4 puts it a touch above the optical one, where the eye
+             lands and the thumb already is. They are composition, not left-over room:
+             @id/scroll_root is fillViewport, so a short viewport (landscape, split screen,
+             font scale 200%) collapses both to nothing and the column scrolls instead.
+             AccountFragment.renderHeroState shows and hides all three together — a spacer
+             left behind would take its share of the viewport with nothing in it. -->
+        <Space
+            android:id="@+id/signed_out_lead"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="3"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/group_signed_out"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/screen_gutter"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:accessibilityHeading="true"
+                android:maxLines="2"
+                android:text="@string/auth_gate_title"
+                android:textAppearance="@style/TextAppearance.App.Headline" />
+
+            <!-- ≤290dp, like the start screen's: a sentence that runs the full width of a
+                 phone reads as a paragraph, and this one is a caption. -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_8"
+                android:maxWidth="@dimen/ob_sub_max_width"
+                android:text="@string/auth_gate_body"
+                android:textAppearance="@style/TextAppearance.App.Body"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <!-- TELEGRAM FIRST, exactly as on the start screen — the same two doors in the
+                 same order, so someone who has seen one recognises the other. The glyph
+                 carries Telegram's blue and the label does not: a second brand's hue marks
+                 the method, it does not get to spend this product's accent. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_signed_out_telegram"
+                style="@style/Widget.Departament.Button.Secondary.Tall"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_24"
+                android:text="@string/onb_login_telegram"
+                android:textAppearance="@style/TextAppearance.App.Button"
+                app:backgroundTint="@color/ob_pill_container"
+                app:cornerRadius="@dimen/radius_button"
+                app:icon="@drawable/ic_telegram_24dp"
+                app:iconTint="@color/telegram_brand"
+                app:strokeColor="?attr/colorOutline"
+                app:strokeWidth="@dimen/ob_stroke" />
+
+            <!-- The owner's ruling, folded into one control: e-mail, OTP, 2FA and Google
+                 are not carried into the interface, and «Войти через сайт» is what stands
+                 for all of them. The code behind them is untouched — this button opens
+                 LoginActivity.MODE_SITE, which is where that form still lives. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_signed_out_site"
+                style="@style/Widget.Departament.Button.Secondary.Tall"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_14"
+                android:text="@string/onb_login_site"
+                android:textAppearance="@style/TextAppearance.App.Button"
+                app:backgroundTint="@color/ob_pill_container"
+                app:cornerRadius="@dimen/radius_button"
+                app:icon="@drawable/ic_ob_site"
+                app:iconTint="?attr/colorOnSurfaceVariant"
+                app:strokeColor="?attr/colorOutline"
+                app:strokeWidth="@dimen/ob_stroke" />
+        </LinearLayout>
+
+        <Space
+            android:id="@+id/signed_out_trail"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="4"
+            android:visibility="gone" />
+
         <!-- Payment-processing hint (shown while re-polling after a checkout). -->
         <TextView
             android:id="@+id/tv_pending"
@@ -220,21 +336,36 @@
             android:visibility="gone" />
 
         <!-- ============ 2. Кольцо трафика ============
-             Five mutually-exclusive children, toggled by AccountFragment.renderHeroState:
-             the ring carousel when there are подписки, and the skeleton / empty / error /
-             signed-out states beside it. Only the carousel is §5; the rest are states the
-             tab already had (П-30) and they keep the ring's slot so nothing reflows.
+             FOUR mutually-exclusive children, toggled by AccountFragment.renderHeroState:
+             the ring carousel when there are подписки, and the skeleton / empty / error
+             states beside it. Only the carousel is §5; the rest are states the tab already
+             had (П-30) and they keep the ring's slot so nothing reflows. The signed-out
+             offer used to be a fifth child here and is now the tab's own centred band
+             above, so this whole slot goes with the session — see @id/hero_slot.
 
-             THE RING'S FOOTPRINT IS A CONSTANT. The owner watched the tab open with no
-             ring, then a ring, then a shudder, then the real one — three states where there is one object. Two things caused it and
-             both are gone: the skeleton was 228dp tall (a disc plus two text bars) against
-             the carousel's 172, so the hand-off moved everything under it by 56dp; and the
-             skeleton's alpha was pulsed 0.45↔1.0 forever, which IS the shudder. What is
-             left is the ring's own empty track, at the ring's own size, held still — so the
-             hand-off changes the FILL and nothing else. Both children measure exactly 172dp,
-             so the slot cannot resize between them; no minHeight is needed to hold it, and
-             adding one would only pad the three CARD states out to a height they do not have. -->
+             THE RING'S FOOTPRINT IS A CONSTANT, and «оно всегда там статично должно быть
+             пока информация не подгрузится» has cost three passes to satisfy because it
+             had three separate causes:
+
+               1. the skeleton was 228dp tall (a disc plus two text bars) against the
+                  carousel's 172, so the hand-off moved everything under it by 56dp;
+               2. the skeleton's alpha was pulsed 0.45↔1.0 forever, which IS the shudder;
+               3. the skeleton STOPPED TOO EARLY. The profile answers before the
+                  subscription list does, and the state machine read the profile's arrival
+                  as "loaded" — so between the two answers this slot showed @id/group_sub_
+                  empty, a bordered card, which is the «прямоугольник» that appeared where
+                  the ring should have been. The gate now waits for both halves; see
+                  AccountFragment.renderHeroState.
+
+             What is left is the ring's own empty track, at the ring's own size, held still —
+             so the hand-off changes the FILL and nothing else. Both children measure exactly
+             172dp and both centre it on the same axis (the skeleton by gravity, the page by
+             layout_gravity inside a pager whose left and right padding are equal), so the
+             slot cannot resize between them and the disc cannot move; no minHeight is needed
+             to hold it, and adding one would only pad the two CARD states out to a height
+             they do not have. -->
         <FrameLayout
+            android:id="@+id/hero_slot"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_20">
@@ -371,80 +502,6 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/space_16"
                         android:text="@string/account_retry" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- (e) SIGNED OUT. The tab is reachable now for someone who has a departament
-                 подписка from the clipboard but has never signed in, so it has to answer
-                 «what is this tab for» instead of drawing an account with no data in it.
-                 Same card lekalo as (b) and (d) — radius_card, hairline, space_16.
-
-                 TWO WAYS IN AND NOTHING ELSE. E-mail, OTP, 2FA and Google stay out of the
-                 interface by the owner's ruling; MODE_SITE's own form carries «Создать
-                 аккаунт», so registration comes with the second button rather than as a
-                 third one. The hierarchy repeats the start screen's on purpose: Telegram
-                 first there, Telegram first here.
-
-                 Both are the account's ONE button shape — 48dp, radius_button, contour at
-                 stroke_frame, no fill — so «Войти», «Пополнить», «Продлить» and «Оплатить»
-                 are one language. -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/group_signed_out"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="@dimen/screen_gutter"
-                android:visibility="gone"
-                app:cardBackgroundColor="?attr/colorSurface"
-                app:cardCornerRadius="@dimen/radius_card"
-                app:cardElevation="0dp"
-                app:strokeColor="?attr/colorOutlineVariant"
-                app:strokeWidth="@dimen/stroke_hairline"
-                tools:visibility="visible">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="@dimen/space_16">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="@string/auth_gate_title"
-                        android:textAppearance="@style/TextAppearance.App.Title" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_4"
-                        android:text="@string/auth_gate_body"
-                        android:textAppearance="@style/TextAppearance.App.Body"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_signed_out_telegram"
-                        style="@style/Widget.Departament.Button.Tertiary"
-                        android:layout_width="match_parent"
-                        android:layout_height="@dimen/btn_height"
-                        android:layout_marginTop="@dimen/space_16"
-                        android:text="@string/onb_login_telegram"
-                        android:textAppearance="@style/TextAppearance.App.Button"
-                        app:cornerRadius="@dimen/radius_button"
-                        app:strokeColor="?attr/colorPrimary"
-                        app:strokeWidth="@dimen/stroke_frame" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btn_signed_out_site"
-                        style="@style/Widget.Departament.Button.Tertiary"
-                        android:layout_width="match_parent"
-                        android:layout_height="@dimen/btn_height"
-                        android:layout_marginTop="@dimen/space_8"
-                        android:text="@string/onb_login_site"
-                        android:textAppearance="@style/TextAppearance.App.Button"
-                        android:textColor="?attr/colorOnSurface"
-                        app:cornerRadius="@dimen/radius_button"
-                        app:strokeColor="?attr/colorPrimary"
-                        app:strokeWidth="@dimen/stroke_frame" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
         </FrameLayout>
