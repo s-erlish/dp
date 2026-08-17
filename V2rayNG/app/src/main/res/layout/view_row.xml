@@ -301,10 +301,35 @@
 
          An explicit width and height also retire the style's 48dp minWidth/minHeight
          for this instance (an EXACTLY spec ignores them), which is what stops the
-         touch minimum from setting the ROW's height: «Версия» and «Идентификатор»
+         touch minimum from setting the ROW's height: «Версия» и «Идентификатор»
          stood 8dp taller than the tiled rows under them for no reason a reader could
-         see. The 22dp icon stays centred — MaterialButton derives the icon's offset
-         from the box, and the style's symmetric padding cancels out of it.
+         see.
+
+         THE PADDING IS WRITTEN HERE BECAUSE THE ICON IS NOT CENTRED WITHOUT IT, and
+         that is the third round of «кнопки левее / правее» in one sentence. A
+         MaterialButton whose iconGravity is `start` — the library default, and nothing
+         in this chain overrides it — sets iconLeft to 0 and lets TextView draw the
+         compound drawable at paddingLeft. Widget.Material3.Button.IconButton's padding
+         is m3_btn_icon_only_default_padding, TEN, so 10 + 22 + 10 is 42 in a box that
+         measures 36: the glyph sat at 10 with 4dp behind it instead of 7 and 7, i.e.
+         3dp right of centre, and BOTH pulls below therefore landed 3dp past the line
+         they were measured for. On «О приложении» that is a copy button whose ink
+         stopped at 13 beside a chevron's at 16, in one card — exactly the difference
+         the owner keeps photographing. @dimen/row_action_glyph_air is (36 − 22) / 2
+         and it pins the glyph for good, the way view_toolbar.xml already pins the back
+         arrow's; the library moving its own number again cannot reach this slot.
+
+         AND THE PLATE IS INSET SO IT CANNOT REACH THE CARD'S EDGE. Once «⋮»'s ink is
+         on the gutter its 36dp box is FLUSH with the row's end edge, and the press
+         plate fills the box, so the plate's edge was the card's edge — it covered the
+         card's hairline and the card's own 20dp clip cut the last of it flat: «вот
+         зажал три точки, а там фон залазит за рамки». The box may not move (the ink
+         is where the owner asked for it) and the target may not shrink, so what
+         changes is what is PAINTED in the box: @dimen/row_action_plate_inset leaves a
+         28dp disc concentric with the glyph and 4dp clear of the card on the worst
+         glyph. Four insets and not two — a horizontal-only inset makes the drawable
+         36×28 and GradientDrawable then clamps the pill to half the shorter side, i.e.
+         a stadium where the design says disc (see the note on the style).
 
          ITS END MARGIN IS STILL NOT ZERO AT RUNTIME: 36 leaves 7dp of air beside the
          glyph and each glyph leaves its own, so RowBinder.alignInkToGutter pulls per
@@ -316,6 +341,14 @@
         android:layout_width="@dimen/row_action_size"
         android:layout_height="@dimen/row_action_size"
         android:layout_marginStart="@dimen/space_12"
+        android:insetBottom="@dimen/row_action_plate_inset"
+        android:insetLeft="@dimen/row_action_plate_inset"
+        android:insetRight="@dimen/row_action_plate_inset"
+        android:insetTop="@dimen/row_action_plate_inset"
+        android:paddingStart="@dimen/row_action_glyph_air"
+        android:paddingTop="@dimen/row_action_glyph_air"
+        android:paddingEnd="@dimen/row_action_glyph_air"
+        android:paddingBottom="@dimen/row_action_glyph_air"
         android:visibility="gone"
         app:icon="@drawable/ic_copy"
         tools:ignore="ContentDescription"
