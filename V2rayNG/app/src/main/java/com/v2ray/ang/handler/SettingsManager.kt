@@ -752,7 +752,19 @@ object SettingsManager {
         ensureDefaultValue(AppConfig.PREF_DOMESTIC_DNS, AppConfig.DNS_DIRECT)
         ensureDefaultValue(AppConfig.PREF_DELAY_TEST_URL, AppConfig.DELAY_TEST_URL)
         ensureDefaultValue(AppConfig.PREF_PING_METHOD, PingMethod.PROXIED_REAL_DELAY.prefValue)
-        ensureDefaultValue(AppConfig.PREF_UI_MODE_NIGHT, "2") // Incy-style dark by default
+        // «в оформлении надо чтобы 1 была кнопка как в системе и чтобы оно включалось по умолчанию».
+        //
+        // "0" is FOLLOW_SYSTEM (setNightMode above). It was "2", pinned dark, and that value is the
+        // reason the app could never follow the phone: ensureDefaultValue writes on first launch
+        // whenever the key is absent, so "nothing has been chosen yet" stopped existing after the
+        // very first run and setNightMode's own "0" fallback became unreachable code.
+        //
+        // ONLY FRESH INSTALLS MOVE. ensureDefaultValue writes nothing over an existing value, so
+        // anyone already running keeps exactly what they have. That is also the honest limit of
+        // this change: a user who never opened the row and a user who deliberately chose «Тёмная»
+        // both hold "2" and cannot be told apart, so migrating the existing ones would be
+        // indistinguishable from overriding a deliberate choice. It is not attempted.
+        ensureDefaultValue(AppConfig.PREF_UI_MODE_NIGHT, "0")
         ensureDefaultValue(AppConfig.PREF_IP_API_URL, AppConfig.IP_API_URL)
         ensureDefaultValue(AppConfig.PREF_HEV_TUNNEL_RW_TIMEOUT, AppConfig.HEVTUN_RW_TIMEOUT)
         ensureDefaultValue(AppConfig.PREF_MUX_CONCURRENCY, "8")
