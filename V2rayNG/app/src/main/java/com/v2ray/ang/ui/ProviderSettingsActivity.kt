@@ -33,7 +33,12 @@ import com.v2ray.ang.util.HttpUtil
  *  1. ОБНОВЛЕНИЕ    — auto-update toggle + update notification toggle.
  *  2. ПРИ ЗАПУСКЕ    — update-on-launch / ping-on-launch / ping-on-update toggles.
  *  3. СЕТЬ           — HWID toggle + the User-Agent this app sends (a read-out, not a control).
- *  4. СПИСОК СЕРВЕРОВ — server list sort order (single choice).
+ *
+ * «СПИСОК СЕРВЕРОВ» БОЛЬШЕ НЕТ: «убери кнопку сортировка серверов и текст выше "список серверов"
+ * вообще убери функцию». Секция состояла из одной строки, поэтому вместе со строкой ушёл и её
+ * заголовок. Механика сортировки не удалена — [SettingsManager.applyServerSortOrder],
+ * `AppConfig.SERVER_SORT_*` и строки `ps_sort_*` на месте и в сборке; у них просто больше нет
+ * читателя на экране.
  *
  * **EVERY ROW HERE IS ONE HEIGHT, 60dp, and neither half of that was free.** Owner report 0.4.9,
  * «в настройках подписок такая же тема с высотой, надо фиксить»: four rows carried an unbounded
@@ -77,13 +82,6 @@ class ProviderSettingsActivity : BaseActivity() {
         private const val ALPHA_DISABLED = 0.38f
     }
 
-    /** Sort-order values persisted for the server list. */
-    private val sortValues = arrayOf(
-        AppConfig.SERVER_SORT_DEFAULT,
-        AppConfig.SERVER_SORT_PING,
-        AppConfig.SERVER_SORT_NAME
-    )
-
     override fun onCreate(savedInstanceState: Bundle?) {
         SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
@@ -124,12 +122,12 @@ class ProviderSettingsActivity : BaseActivity() {
         // clickable/focusable/press so it is not a TalkBack or D-pad stop either. [editUserAgent]
         // below is kept, unreferenced, on purpose; its own comment says why.
 
-        // СПИСОК СЕРВЕРОВ
-        // The row that OPENS something is guarded; a doubled tap on it stacked two окошка выбора.
-        // The toggle rows above keep a raw listener on purpose: they flip a stored boolean and
-        // repaint their own switch, so a doubled tap lands back exactly where it started and there
-        // is nothing to duplicate.
-        binding.rowSortOrder.onSingleClick { pickSortOrder() }
+        // СОХРАНЁННЫЙ ПОРЯДОК ПРИВОДИТСЯ К ИСХОДНОМУ, И ЭТО НЕ УБОРКА, А ИСПРАВЛЕНИЕ.
+        // Снять управление и оставить значение лежать значило бы запереть всех, у кого выбрано
+        // «По пингу» или «По имени», в этом порядке навсегда: экрана, чтобы вернуть, больше нет.
+        // Сбрасывается ровно один раз — при следующем заходе значение уже исходное и ветка не
+        // выполняется, так что это не переписывание чужого выбора на каждом открытии.
+        resetServerSortOrder()
 
         bindState()
     }
@@ -159,8 +157,6 @@ class ProviderSettingsActivity : BaseActivity() {
 
         binding.switchSendHwid.restoreChecked(SettingsManager.isSendHwid())
         binding.valueUserAgent.text = currentUserAgent()
-
-        binding.valueSortOrder.text = getString(sortLabelRes(currentSortOrder()))
     }
 
     // ---------------- ОБНОВЛЕНИЕ ----------------
@@ -305,34 +301,24 @@ class ProviderSettingsActivity : BaseActivity() {
         return invalid
     }
 
-    // ---------------- СПИСОК СЕРВЕРОВ ----------------
+    // ---------------- порядок серверов ----------------
 
-    private fun currentSortOrder(): String = SettingsManager.getServerSortOrder()
-
-    private fun sortLabelRes(value: String): Int = when (value) {
-        AppConfig.SERVER_SORT_PING -> R.string.ps_sort_ping
-        AppConfig.SERVER_SORT_NAME -> R.string.ps_sort_name
-        else -> R.string.ps_sort_default
-    }
-
-    private fun pickSortOrder() {
-        val entries = sortValues.map { getString(sortLabelRes(it)) }
-        val idx = sortValues.indexOf(currentSortOrder()).coerceAtLeast(0)
-        SelectPopup.show(
-            anchor = binding.rowSortOrder,
-            options = entries,
-            selectedIndex = idx,
-            valueView = binding.valueSortOrder,
-            caret = binding.caretSortOrder,
-        ) { which ->
-            MmkvManager.encodeSettings(AppConfig.PREF_SERVER_SORT_ORDER, sortValues[which])
-            // Order lives in storage, so reorder now — the servers list renders what is stored
-            // and never re-sorts on its own. It also holds its rows from before this screen was
-            // opened, so ask it to rebuild; otherwise the new order only shows after a restart.
-            SettingsManager.applyServerSortOrder()
-            SettingsChangeManager.makeSetupGroupTab()
-            bindState()
-        }
+    /**
+     * Возвращает список серверов к исходному порядку, если он был изменён, и делает это один раз.
+     *
+     * Управление сортировкой снято с экрана по указанию владельца. Само хранимое значение при этом
+     * никуда не девается, и вот это как раз и было бы дефектом: у того, кто когда-то выбрал «По
+     * пингу», список остался бы отсортированным по пингу навсегда, без единого способа вернуть —
+     * тихая необратимая настройка хуже отсутствующей.
+     *
+     * Ветка отрабатывает только когда есть что менять, поэтому со второго захода она не делает
+     * ничего и не спорит с пользователем на каждом открытии экрана.
+     */
+    private fun resetServerSortOrder() {
+        if (SettingsManager.getServerSortOrder() == AppConfig.SERVER_SORT_DEFAULT) return
+        MmkvManager.encodeSettings(AppConfig.PREF_SERVER_SORT_ORDER, AppConfig.SERVER_SORT_DEFAULT)
+        SettingsManager.applyServerSortOrder()
+        SettingsChangeManager.makeSetupGroupTab()
     }
 
     // ---------------- helpers ----------------

@@ -47,10 +47,8 @@
        sit at its own 32dp track. Not a fixed height, and a switch has no text to
        clip: at font scale 200% the text column overtakes the tile and the row grows.
 
-  ONE ROW OPENS THE SELECT POPUP, not a dialog: «Сортировка серверов» is one of the
-  nine §6 names, so it carries the CARET (@drawable/ic_arrow_drop_down) instead of a
-  chevron — a chevron promises a screen and it opens none — and it has a
-  @id/caret_sort_order the popup can turn 180°.
+  «СПИСОК СЕРВЕРОВ» УБРАН ЦЕЛИКОМ по указанию владельца — см. комментарий на месте,
+  где стоял раздел. Ни одна строка ресурсов при этом не удалена.
 
   «User-Agent» IS Row.Fact NOW: it reports, it does not lead anywhere. See the
   comment on @id/row_user_agent. «Интервал обновления» is gone from this screen
@@ -426,66 +424,17 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- ==================== СПИСОК СЕРВЕРОВ ==================== -->
-            <TextView
-                style="@style/SettingsSectionLabel"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/ps_section_server_list" />
+            <!-- «СПИСОК СЕРВЕРОВ» СНЯТ ПО УКАЗАНИЮ ВЛАДЕЛЬЦА: «убери кнопку сортировка
+                 серверов и текст выше "список серверов" вообще убери функцию».
 
-            <com.google.android.material.card.MaterialCardView
-                style="@style/Widget.Departament.CardSection"
-                android:clipChildren="false"
-                android:clipToPadding="false">
+                 Раздел был одной карточкой с одной строкой, поэтому вместе со строкой уходит и
+                 заголовок — секция из ноля строк это заголовок, под которым ничего нет.
 
-                <LinearLayout
-                    style="@style/Widget.Departament.CardSection.Body"
-                    android:clipChildren="false"
-                    android:clipToPadding="false">
+                 Ни одна строка ресурсов не удалена: ps_section_server_list, ps_sort_order,
+                 ps_sort_default/_ping/_name остаются в strings_provider.xml, у них просто больше
+                 нет читателя. Порядок серверов теперь всегда тот, что задан по умолчанию — см.
+                 ProviderSettingsActivity, где сохранённое значение приводится к нему. -->
 
-                    <!-- Сортировка серверов — §6 «окошко у значения» -->
-                    <!-- The card's only row, and the card cannot clip: all four corners here. -->
-                    <LinearLayout
-                        android:id="@+id/row_sort_order"
-                        style="@style/Widget.Departament.Row"
-                        android:background="@drawable/bg_row_only"
-                        android:baselineAligned="false">
-
-                        <ImageView
-                            style="@style/Widget.Departament.Tile"
-                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
-                            android:layout_marginEnd="@dimen/space_16"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_ps_sort" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginEnd="@dimen/space_12"
-                            android:layout_weight="1"
-                            android:text="@string/ps_sort_order"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:id="@+id/value_sort_order"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle"
-                            tools:text="По пингу" />
-
-                        <ImageView
-                            android:id="@+id/caret_sort_order"
-                            android:layout_width="@dimen/glyph_18"
-                            android:layout_height="@dimen/glyph_18"
-                            android:layout_marginStart="@dimen/space_4"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_arrow_drop_down"
-                            app:tint="?attr/colorOnSurfaceVariant" />
-                    </LinearLayout>
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </LinearLayout>
