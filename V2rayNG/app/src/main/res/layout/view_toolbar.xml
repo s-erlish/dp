@@ -28,13 +28,13 @@
   stadium, and the title started at 72 rather than the 52 below. An icon-only control has
   no text to grow with the font scale, so an exact 48 costs nothing here.
 
-  Owner report 0.4.9, «эту кнопку нужно сделать чуть левее»: the control now sits FLUSH
-  with the screen edge and its glyph at 12, four dp left of §7's nominal 16. §7's
-  «−10dp влево» exists so the GLYPH lands on the gutter rather than the edge of its
-  touch target; the owner asked for a touch more, and the target reaching the screen
-  edge is a Fitts's-law gain rather than a cost. The invariant that matters downstream
-  still holds: the glyph ends at 36 and the title's marginStart space_4 lands it at 52,
-  16 clear of the glyph, exactly as before.
+  Owner reports 0.4.9 and «кнопка назад опять съехала, надо ее левее»: the control sits
+  FLUSH with the screen edge, and @dimen/toolbar_back_plate_inset_lead splits its 20dp of
+  inset 6/14 so the glyph sits at 8 and its INK starts on 16 — §7's nominal gutter, the
+  line the page title starts on, and the same 16 the trailing action stops on. The box
+  does not move to do it, so all 48dp of the target stay on screen and the screen edge is
+  still part of it. The invariant downstream holds: the glyph box ends at 32 and the
+  title's marginStart space_4 lands the title at 52.
 
   THE TRAILING ACTION IS ON THE GUTTER NOW, and its box no longer leaves the screen to
   get there. @dimen/toolbar_plate_inset_lead splits the slot's 20dp of inset 16/4, which
@@ -45,11 +45,10 @@
   target on screen and the press disc 4dp clear of the window. «вот нашел что плюсик
   сверху он левее, надо правее опять сделать».
 
-  THE BACK ARROW STAYS AT 20 and that is a decision, not an oversight. Its ink is 20
-  from the leading edge against the action's 16 on the other side, so the header is 4dp
-  asymmetric — read the note on @id/toolbar_back for why 20 is the number that keeps
-  its 48dp target whole and why the text under it is not the thing it should be
-  levelled with.
+  THE HEADER IS SYMMETRIC NOW: 16 on the leading side, 16 on the trailing one, and a
+  48dp target on each. It was 4dp out for one round, deliberately, on the argument that
+  16 could not be reached without pushing part of the back control off the screen — read
+  the note on @id/toolbar_back for why that argument was answerable and how.
 
   56 IS A MINIMUM, NEVER A HEIGHT. At font scale 200% a 16sp title needs ~34dp of
   line box and this bar grows to hold it. android:layout_height="56dp" on anything
@@ -97,27 +96,32 @@
              res/values/strings_ui_polish.xml — the toolbar belongs to no single screen,
              so its one string lives in the cross-cutting file rather than a screen's.
 
-             WHY ITS INK STAYS AT 20 WHILE THE ACTION MOVED TO 16. The two are not the
-             same problem read in a mirror:
+             ITS INK IS ON 16 NOW, and the objection the last round raised against that
+             is answered rather than overruled. «кнопка назад опять съехала, надо ее
+             левее» — the third ask on this one control.
 
-             1. The box is FLUSH with the screen edge (owner report 0.4.9, «эту кнопку
-                нужно сделать чуть левее»), so all 48dp of the target is on screen and
-                the leading edge of the screen is part of it — a Fitts's-law gain the
-                trailing action cannot have. Moving the ink to 16 needs the box at −4,
-                which leaves 44dp touchable: a 14.2 regression on the one control every
-                sub-page must always answer, bought for 4dp.
-             2. What it would be levelling with is TEXT, and a text box on the 16dp
-                gutter starts its INK a dp or two inside it. The arrow at 20 is ~2.5dp
-                off the title's first stroke, not 4, and at 16 it would overshoot to the
-                left of it. The trailing slot has no such slack: it is compared with the
-                card edges and the row glyphs directly under it, which stop on 16 exactly.
+             The refusal was: the box is FLUSH with the screen edge, so all 48dp of the
+             target is on screen and the edge itself is part of it (a Fitts's-law gain
+             the trailing action cannot have), whereas ink on 16 needs the box at −4 and
+             leaves 44dp touchable — a 14.2 regression on the one control every sub-page
+             must always answer. That was sound about a box dragged by its MARGIN, and it
+             is the only tool the argument considered.
 
-             So the header is 4dp asymmetric on purpose. If the owner asks for this
-             arrow again, the move is layout_marginStart −4 here and in
-             view_sub_header.xml, plus expandTouchTarget(56) in ToolbarBinder to give
-             back the 4dp of target — not a change to any number in dimens.xml.
+             The box does not have to move. @dimen/toolbar_back_plate_inset_lead splits
+             the slot's 20dp of inset 6/14, and an inset split moves the GLYPH and its
+             press disc together inside a box that stays exactly where it is:
 
-             WHAT DID CHANGE FOR IT is the box and the press plate. The box is an EXACT
+                 glyph centre = 24 + (6 − 14) / 2 = 20 from the box's leading edge
+                 ink          = 20 − 12 + 8 = 16      (ic_chevron_left's ink is x 8…16.8 of 24)
+                 plate        = 6…34, six dp of clearance, concentric with the glyph
+
+             So the ink lands on the gutter AND the box is still 0…48 against the screen
+             edge: the whole target, the Fitts's-law gain, and no TouchDelegate. Point 2
+             of the old note — that the arrow is being levelled with TEXT, whose box is
+             on 16 but whose ink starts a dp inside — stands as an observation and is
+             overruled by the owner asking twice; §7's own лекало puts this glyph on 16.
+
+             WHAT ALSO CHANGED is the box and the press plate. The box is an EXACT
              48 now instead of wrap_content: a MaterialButton with no text still measures
              a line box, so this control was laid out 68 wide and 64 tall, its «28dp disc»
              was really a 48×44 stadium, and the title beside it started at 72 rather than
@@ -135,6 +139,8 @@
             android:layout_width="@dimen/view_height_dp48"
             android:layout_height="@dimen/view_height_dp48"
             android:contentDescription="@string/cd_back"
+            android:insetLeft="@dimen/toolbar_back_plate_inset_lead"
+            android:insetRight="@dimen/toolbar_back_plate_inset_trail"
             app:icon="@drawable/ic_chevron_left" />
 
         <!-- Shown ONLY when the back control is hidden, so a tab screen's title still

@@ -411,6 +411,29 @@
     <dimen name="toolbar_plate_inset_trail">4dp</dimen>
 
     <!--
+        THE BACK ARROW'S SPLIT: 6 in front, 14 behind, the same 20 the other way round.
+
+        «кнопка назад опять съехала, надо ее левее» — the third time this control has been
+        asked to move, and the round before this one refused on the grounds that its ink
+        could not reach 16 without pushing 4dp of a 48dp target off the screen. That was
+        true of a box being dragged by its MARGIN. It is not true of a box that stays put
+        while the inset split carries the glyph inside it: the box is still flush with the
+        screen edge and still an exact 48, so every dp of the target is reachable and the
+        screen edge itself is still part of it.
+
+            glyph centre  = 24 + (insetLeft − insetRight) / 2 = 24 − 4 = 20 from the box's edge
+            ink           = 20 − 12 + 8 = 16     (ic_chevron_left's ink is x 8…16.8 of 24)
+            plate         = 20 ± 14 = 6…34,       so 6dp of clearance and concentric with the glyph
+
+        SIXTEEN IS NOW BOTH SIDES. The trailing action's ink stops 16 from the other edge,
+        so the header is symmetric for the first time, and the arrow starts on the same
+        line as the page title under it (@dimen/screen_gutter on @id/toolbar_title), which
+        is what the owner has been pointing at.
+    -->
+    <dimen name="toolbar_back_plate_inset_lead">6dp</dimen>
+    <dimen name="toolbar_back_plate_inset_trail">14dp</dimen>
+
+    <!--
         THE TOOLBAR ACTION'S OPTICAL NUDGE, per glyph. Read ToolbarBinder.alignInkToGutter for
         the arithmetic; these are its two results.
 

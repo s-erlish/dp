@@ -39,18 +39,19 @@
   arithmetic is in @style/Widget.Departament.Button.Icon.Toolbar.
 
   And the lead-in is GONE, on owner report 0.4.9: «эту кнопку нужно сделать чуть
-  левее». The 48dp target is flush with the screen edge and the glyph sits at 12,
-  four dp left of §7's nominal 16 — the whole target on screen, nothing clipped,
-  and the arrow reads as belonging to the edge of the page rather than floating
-  inside it. view_toolbar.xml carries the identical change, so the back affordance
-  still does not move between the two headers.
+  левее». The 48dp target is flush with the screen edge — the whole target on screen,
+  nothing clipped, and the arrow reads as belonging to the edge of the page rather
+  than floating inside it. view_toolbar.xml carries the identical change, so the back
+  affordance still does not move between the two headers.
 
-  THE ACTION IS ON 16 AND THE ARROW'S INK IS ON 20, deliberately. The trailing slot
-  is compared with the card edges and the row glyphs directly beneath it, which stop
-  on 16 exactly; the arrow is compared with a TITLE, whose box is on 16 but whose ink
-  starts a dp or two inside it, and moving the arrow's ink to 16 would push 4dp of its
-  48dp target off the screen. The full argument is on @id/toolbar_back in
-  view_toolbar.xml, including what to change if the owner asks for the arrow again.
+  BOTH SIDES ARE ON 16 NOW, which is §7's лекало and the third time the owner has asked
+  for this arrow: «кнопка назад опять съехала, надо ее левее». Its 20dp of inset is split
+  6/14 (@dimen/toolbar_back_plate_inset_lead), and an inset split moves the GLYPH and its
+  press disc together WITHOUT moving the box — so the ink reaches the gutter, the arrow
+  starts on the same line as the 24sp title below it, and the box is still 0…48 against
+  the screen edge with every dp of it touchable. The header used to be 4dp asymmetric on
+  the argument that those two could not both be had; the argument and its answer are on
+  @id/toolbar_back in view_toolbar.xml.
 
   56 IS A MINIMUM ON THE BAR AND THE TITLE HAS NO HEIGHT AT ALL. At font scale
   200% a 24sp headline needs ~50dp of line box; every text box here is
@@ -115,13 +116,19 @@
              view_toolbar.xml. wrap_content measured a line box this control has no text
              for, so it stood 68 wide and 64 tall and dragged the whole bar to 68; the
              press plate inside it was a 48×44 stadium rather than the 28dp disc every
-             comment here promises. -->
+             comment here promises.
+
+             AND THE 6/14 INSET SPLIT IS WHAT PUTS ITS INK ON 16 while the box stays flush
+             with the screen edge — the whole of «кнопка назад опять съехала, надо ее
+             левее», with the 48dp target intact. @dimen/toolbar_back_plate_inset_lead. -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/toolbar_back"
             style="@style/Widget.Departament.Button.Icon.Toolbar"
             android:layout_width="@dimen/view_height_dp48"
             android:layout_height="@dimen/view_height_dp48"
             android:contentDescription="@string/cd_back"
+            android:insetLeft="@dimen/toolbar_back_plate_inset_lead"
+            android:insetRight="@dimen/toolbar_back_plate_inset_trail"
             app:icon="@drawable/ic_chevron_left" />
 
         <!-- ToolbarBinder shows this when a screen passes no activity, i.e. has no
