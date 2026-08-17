@@ -137,7 +137,18 @@
          takes 12 from the text column, because each of those is a second thing to read
          and it needs the air. A bare GLYPH — chevron, caret, state marker — takes 4:
          it is punctuation on the row, not a second column, and 12 in front of it opens
-         a gutter down the right edge of a card that has no value anywhere in it. -->
+         a gutter down the right edge of a card that has no value anywhere in it.
+
+         WHAT THE SLOT ENDS ON IS THE 16dp GUTTER, AND FOR A GLYPH THAT MEANS ITS INK.
+         Everything else on the row is measured to that line — the text column, the
+         card's content edge, the screen's — so a trailing element that stops 6dp short
+         of it is adrift even when its box is perfectly placed: «также кнопки не
+         доделал… надо их сделать нормально правее». An object with a boundary of its
+         own (row_check_box's bordered box, row_switch's track, row_action's button)
+         aligns by that boundary and takes no correction; a bare glyph has no boundary,
+         so its last painted pixel IS its edge and it carries a negative end margin
+         worth exactly its own empty air. Five glyphs, five numbers, all measured off
+         the drawables in values/tokens_row_action.xml. -->
 
     <!-- 12dp: a value is text to be read, so it gets the full gap. -->
 
@@ -157,12 +168,24 @@
 
     <!-- State marker: this item is the current selection. Not an action (8.1). The slot
          is ALWAYS reserved and selection moves its alpha, so choosing an item never
-         reflows the list (22-components 18.1). -->
+         reflows the list (22-components 18.1).
+
+         THE END MARGIN IS NEGATIVE, and every glyph below carries one too. The box
+         already ends on the row's 16dp padding; what the eye lines a column up by is
+         the last painted PIXEL, and ic_action_done leaves 2.25dp of its viewport empty
+         on that side, so without the pull the tick stops 18.25dp from the edge while
+         the chevron in the next card stops at 22 and the text column ends at 16. The
+         number is this glyph's own air and nothing else — the arithmetic for all five
+         is on values/tokens_row_action.xml. It is written HERE, next to the `src` it
+         was measured from, because this slot's drawable is declared in this file:
+         nothing at runtime can put a different glyph in it and inherit a pull that
+         does not fit. -->
     <ImageView
         android:id="@+id/row_marker"
         android:layout_width="@dimen/glyph_18"
         android:layout_height="@dimen/glyph_18"
         android:layout_marginStart="@dimen/space_4"
+        android:layout_marginEnd="@dimen/row_glyph_nudge_check"
         android:importantForAccessibility="no"
         android:src="@drawable/ic_action_done"
         android:tint="?attr/colorPrimary"
@@ -170,12 +193,27 @@
         tools:visibility="visible" />
 
     <!-- Tapping pushes a screen. Swap the src for the expand or cycle glyph when the
-         promise changes (8.1); the size and the tone stay. -->
+         promise changes (8.1); the size and the tone stay.
+
+         THE BIGGEST PULL OF THE FIVE, 6dp: ic_chevron_right is one stroke drawn in a
+         viewport that also has to hold the arrow's other three sides, so a quarter of
+         its width on the trailing side is empty. This is the glyph the product has
+         most of and the one that made the misalignment invisible for two rounds —
+         with nothing beside it to be compared with, a chevron 6dp inside the gutter
+         just looks like the gutter.
+
+         RowBinder.Trailing.Expand ROTATES this view 90°, which swings the ink's own
+         edges: the caret then reaches 3.45dp inside the box instead of 6, i.e. 2.55dp
+         past the gutter. It is left alone on purpose. The resting angle is what a
+         column of rows is read by, the rotation is a draw-time transform, and chasing
+         it would mean writing a layout parameter on every frame of a 220ms
+         animation — a reflow to fix a tenth of a millimetre. -->
     <ImageView
         android:id="@+id/row_chevron"
         android:layout_width="@dimen/glyph_18"
         android:layout_height="@dimen/glyph_18"
         android:layout_marginStart="@dimen/space_4"
+        android:layout_marginEnd="@dimen/row_glyph_nudge_chevron"
         android:importantForAccessibility="no"
         android:src="@drawable/ic_chevron_right"
         android:tint="?attr/colorOnSurfaceVariant"
@@ -184,7 +222,15 @@
 
     <!-- Tapping changes the value in place: no screen, no dialog. The caller sets the
          glyph (the cycle affordance wants ic_unfold_more, which res/drawable does not
-         carry yet), so there is no src here to be wrong. -->
+         carry yet), so there is no src here to be wrong.
+
+         AND THEREFORE NO END MARGIN HERE EITHER. The two slots above pull themselves
+         because this file declares what is in them; this one is filled by
+         RowBinder.Trailing.Glyph, so its pull is applied on every bind by
+         RowBinder.alignInkToGutter, which knows the glyph. A glyph that function has
+         never seen gets NO pull — the slot then draws exactly where it drew before
+         any of this existed, which is the one safe answer to an icon nobody has
+         measured. -->
     <ImageView
         android:id="@+id/row_trailing_glyph"
         android:layout_width="@dimen/glyph_18"
@@ -241,19 +287,34 @@
          two targets doing different things is the layout_subscription_meta_bar
          mistake. android:contentDescription is MANDATORY and states the ACTION.
 
-         ITS END MARGIN IS NOT ZERO AT RUNTIME, and this is the one slot in the file
-         where that is true. The glyphs above are 18dp ImageViews whose box sits on
-         the row's 16dp end padding; this is a 48dp touch minimum with a 22dp icon
-         centred in it, so 13dp of the box is air on the trailing side and the ink
-         lands 10 to 16dp further in than a chevron's — «они улетели куда-то влево».
-         RowBinder.alignInkToGutter pulls the box back per glyph on every bind (the
-         two glyphs that reach this slot differ by 6.4dp between themselves), which
-         is why the correction is not written here. The 48dp target keeps all 48. -->
+         IT IS THE ONE TRAILING SLOT THAT IS SIZED HERE, and the size is the fix.
+         @style/Widget.Departament.Button.Icon is a 48dp touch minimum holding a 22dp
+         icon, so 13dp of the box is air before the glyph starts and its ink lands 10
+         to 16dp further in than a chevron's — «они улетели куда-то влево». One round
+         answered that by pulling the box, which works until the target is the gutter:
+         «⋮» would need -22.17 and the last 6.17 of it hangs outside the row, where
+         the box is clipped and the press plate is shorn. So the box is laid out at
+         @dimen/row_action_size instead — 36, the size the подписка card's action
+         discs draw at — and the 48dp target is restored by RowBinder with the same
+         TouchDelegate those discs use. Drawn size and touched size were never obliged
+         to be the same number; 00-rules.md 14.2 is about the second one.
+
+         An explicit width and height also retire the style's 48dp minWidth/minHeight
+         for this instance (an EXACTLY spec ignores them), which is what stops the
+         touch minimum from setting the ROW's height: «Версия» and «Идентификатор»
+         stood 8dp taller than the tiled rows under them for no reason a reader could
+         see. The 22dp icon stays centred — MaterialButton derives the icon's offset
+         from the box, and the style's symmetric padding cancels out of it.
+
+         ITS END MARGIN IS STILL NOT ZERO AT RUNTIME: 36 leaves 7dp of air beside the
+         glyph and each glyph leaves its own, so RowBinder.alignInkToGutter pulls per
+         glyph on every bind. The correction is not written here because the icon is
+         the caller's. -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/row_icon_action"
         style="@style/Widget.Departament.Button.Icon"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="@dimen/row_action_size"
+        android:layout_height="@dimen/row_action_size"
         android:layout_marginStart="@dimen/space_12"
         android:visibility="gone"
         app:icon="@drawable/ic_copy"

@@ -5,6 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.annotation.DimenRes
 import androidx.annotation.DrawableRes
 import androidx.core.view.AccessibilityDelegateCompat
 import androidx.core.view.ViewCompat
@@ -26,6 +27,11 @@ import com.v2ray.ang.R
  * ```
  * [ 16 gutter ][ 40 tile r12, 22 glyph ][ 12 ][ text column, weight 1 ][ 12 ][ ONE trailing ][ 16 ]
  * ```
+ *
+ * That closing 16 is a line and not a margin: it is where the text column stops and where the
+ * card's content edge is, so a trailing GLYPH is measured to its last painted pixel and not to its
+ * box ([alignInkToGutter]). A trailing OBJECT with a boundary of its own - a switch, a checkbox, a
+ * button with a label - is measured to that boundary, like every other object in the product.
  *
  * This binder owns the row's CONTENT and its STATE, and it enforces the three things geometry
  * cannot:
@@ -182,9 +188,14 @@ object RowBinder {
         data class Marker(val selected: Boolean) : Trailing
 
         /**
-         * A 40dp icon button performing the action in place; the row itself is inert.
+         * An icon button performing the action in place; the row itself is inert.
          * [contentDescription] is not optional, and it names the ACTION rather than the object -
          * «Скопировать код», not «Код».
+         *
+         * It DRAWS at `@dimen/row_action_size` 36 and is TAPPED at 48 ([restoreTouchTarget]): a
+         * 48dp box cannot put a narrow glyph's ink on the row's gutter without hanging its press
+         * plate outside the card, and it made every row carrying one 8dp taller than its
+         * neighbours.
          */
         data class IconAction(
             @param:DrawableRes val icon: Int,
@@ -296,48 +307,103 @@ object RowBinder {
     }
 
     /**
-     * Puts [Trailing.IconAction]'s INK on the row's end gutter, which its box cannot do on its own.
+     * Puts the trailing glyph's INK on the row's 16dp end gutter, which its box cannot do on its
+     * own.
      *
-     * The trailing slot holds one of several objects and they are not the same KIND of object.
-     * `row_chevron` and `row_trailing_glyph` are 18dp `ImageView`s whose box sits on the row's 16dp
-     * end padding; `row_icon_action` is a `MaterialButton` carrying a 48dp touch minimum, and its
-     * 22dp icon is optically centred in that box, so 13dp of it is air before the icon starts.
-     * Same card, same slot, three different distances from the edge — «дальше баги по кнопкам 1-3
-     * скрины, они улетели куда-то влево».
+     * THE LINE IS THE GUTTER AND NOT A CONTROL, which is what the first two rounds of this got
+     * wrong. The slot holds one of several objects and they are not the same KIND of object:
+     * `row_chevron`, `row_trailing_glyph` and `row_marker` are 18dp `ImageView`s whose box already
+     * ends on the row's `paddingEnd`, while `row_icon_action` is a `MaterialButton` whose 22dp icon
+     * is centred in a larger box. Levelling them with each other closed the difference the owner
+     * could see — «дальше баги по кнопкам 1-3 скрины, они улетели куда-то влево» — and left the
+     * whole family 6dp inside the line the text column, the card's content edge and the screen all
+     * end on. He came back: «надо их правее также поставить правильно».
      *
-     * The datum is the chevron's ink, 22dp in from the row's end edge: it is the trailing control
-     * the product has most of, and it is the one on «О приложении» the owner did NOT name while
-     * naming the copy buttons beside it.
-     *
-     * ONE NUMBER CANNOT SERVE BOTH GLYPHS, which is the trap [ToolbarBinder.alignInkToGutter] hit
-     * first. Every glyph here is a 24-unit viewport drawn at 22dp, and the two that reach this slot
-     * fill it by very different amounts:
+     * ONE NUMBER CANNOT SERVE THEM, which is the trap [ToolbarBinder.alignInkToGutter] hit first.
+     * Every glyph in this set is a 24-unit viewport and they fill it by very different amounts, so
+     * the correction belongs to the GLYPH and is applied here, at the one place that knows which
+     * glyph is going in:
      *
      * ```
-     *                       ink within the 24 viewport     ink lands at
-     *   ic_copy                     x 2 … 21                  31.75
-     *   ic_more_vert_24dp           x 10 … 14                 38.17
+     *                       ink of 24 units    drawn at    empty air    pull
+     *   ic_chevron_right        7.2 … 16         18dp        6.00      -6.00
+     *   ic_arrow_drop_down        7 … 17         18dp        5.25      -5.25
+     *   ic_action_done            3 … 21         18dp        2.25      -2.25
+     *   ic_copy                   2 … 21         22dp        2.75      -9.75   (+7 box)
+     *   ic_more_vert_24dp        10 … 14         22dp        9.17     -16.00   (+7 box)
      * ```
      *
-     * So the correction belongs to the glyph and is applied here, at the one place that knows which
-     * glyph is going in. The numbers and their arithmetic are on the two dimensions in
-     * `values/tokens_row_action.xml`; neither costs a pixel of touch target, and both travel through
-     * padding the row already owns, so nothing is clipped.
+     * The numbers and their arithmetic are on the dimensions in `values/tokens_row_action.xml`. The
+     * two slots whose drawable `view_row.xml` declares itself carry their pull in that file instead,
+     * three lines under the `src` it was measured from; these two are the ones a CALLER fills.
      *
-     * A glyph this function does not know about is reset to no nudge rather than left alone — these
+     * A glyph this function does not know about is reset to no pull rather than left alone — these
      * rows are recycled by five adapters, and a stale margin from the previous holder's icon would
-     * outlive the icon that earned it.
+     * outlive the icon that earned it. No pull is also the only honest default: it draws the slot
+     * exactly where it drew before any of this existed.
      */
-    private fun MaterialButton.alignInkToGutter(@DrawableRes icon: Int) {
-        val params = layoutParams as? ViewGroup.MarginLayoutParams ?: return
-        val value = when (icon) {
-            R.drawable.ic_more_vert_24dp -> resources.getDimensionPixelSize(R.dimen.row_action_nudge_overflow)
-            R.drawable.ic_copy -> resources.getDimensionPixelSize(R.dimen.row_action_nudge_wide)
+    private fun MaterialButton.alignInkToGutter(@DrawableRes icon: Int) = pullInk(
+        when (icon) {
+            R.drawable.ic_more_vert_24dp -> R.dimen.row_action_nudge_overflow
+            R.drawable.ic_copy -> R.dimen.row_action_nudge_wide
             else -> 0
         }
+    )
+
+    /** [alignInkToGutter] for the 18dp slot, i.e. the same glyphs at ×0.75 instead of ×0.9167. */
+    private fun ImageView.alignInkToGutter(@DrawableRes icon: Int) = pullInk(
+        when (icon) {
+            R.drawable.ic_chevron_right -> R.dimen.row_glyph_nudge_chevron
+            R.drawable.ic_arrow_drop_down -> R.dimen.row_glyph_nudge_caret
+            R.drawable.ic_action_done -> R.dimen.row_glyph_nudge_check
+            else -> 0
+        }
+    )
+
+    /**
+     * Writes one pull, or clears it when [nudge] is 0.
+     *
+     * A negative end margin on the row's LAST visible child does not move that child directly —
+     * `LinearLayout` places a child from what came before it. It shortens `mTotalLength` during
+     * measure, which hands the same dp to the weight-1 text column, which then pushes everything
+     * after it along by exactly that much. The slot ends up in the row's own end padding, where
+     * there is nothing to collide with and nothing clips.
+     */
+    private fun View.pullInk(@DimenRes nudge: Int) {
+        val params = layoutParams as? ViewGroup.MarginLayoutParams ?: return
+        val value = if (nudge == 0) 0 else resources.getDimensionPixelSize(nudge)
         if (params.marginEnd == value) return
         params.marginEnd = value
         layoutParams = params
+    }
+
+    /**
+     * Gives [Trailing.IconAction] back the 48dp it stopped DRAWING (00-rules.md 14.2).
+     *
+     * `view_row.xml` lays that button out at `@dimen/row_action_size` 36 so its ink can reach the
+     * gutter without the box leaving the row; the touch area does not shrink with it. This is the
+     * `layout_subscription_meta_bar` pattern verbatim — 36dp discs tapped at 48 — and it is
+     * [expandTouchTarget] and its `CompositeTouchDelegate` doing the work, not a third copy of them.
+     *
+     * THE ASK IS 60 AND NOT 48, and the extra 12 is not slack. [expandTouchTarget] grows a hit rect
+     * symmetrically about the control, and the row's own edge then trims whatever falls outside it:
+     * once «⋮»'s ink is on the gutter its box is flush with that edge, so its centre is 18dp from
+     * it and a 48dp square centred there would need 6dp the row does not have. Asking for 60 grows
+     * the rect 12dp on each side, the row keeps the 12 on the inside, and 36 + 12 is the 48 the
+     * floor wants. The copy glyph, whose box stops 6.25dp short of the edge, ends up with 54 —
+     * harmless, because a row showing this control is inert by construction (22-components 8.4) and
+     * there is nothing in that strip for the delegate to take a tap away from.
+     *
+     * ONCE PER VIEW, NOT PER BIND: the delegate is registered on the PARENT and the composite that
+     * holds several only ever grows, so [R.id.tag_row_action_touch] stamps the view with the glyph
+     * its rect was measured for. A row recycled between the two glyphs earns a second rect, 6.25dp
+     * over from the first; both point at this same button, so the older one can only widen the
+     * target, never mis-aim it.
+     */
+    private fun MaterialButton.restoreTouchTarget(@DrawableRes icon: Int) {
+        if (getTag(R.id.tag_row_action_touch) == icon) return
+        setTag(R.id.tag_row_action_touch, icon)
+        expandTouchTarget(TOUCH_TARGET_ASK_DP)
     }
 
     /**
@@ -465,6 +531,7 @@ object RowBinder {
 
             is Trailing.Glyph -> with(slots.trailingGlyph) {
                 setImageResource(trailing.icon)
+                alignInkToGutter(trailing.icon)
                 contentDescription = trailing.contentDescription
                 importantForAccessibility = if (trailing.contentDescription == null) {
                     View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -513,6 +580,7 @@ object RowBinder {
                 setIconResource(trailing.icon)
                 contentDescription = trailing.contentDescription
                 alignInkToGutter(trailing.icon)
+                restoreTouchTarget(trailing.icon)
                 onSingleClick(action = trailing.onClick)
             }
 
@@ -626,6 +694,13 @@ object RowBinder {
 
     private const val DISABLED_ALPHA = 0.38f
     private const val EXPANDED_DEGREES = 90f
+
+    /**
+     * What [restoreTouchTarget] asks [expandTouchTarget] for: 36dp of drawn button, 12dp of grown
+     * rect on the side the row's edge does not take, and the 48dp floor is met. It is a dp count
+     * and not a `@dimen` because that is the unit the helper takes.
+     */
+    private const val TOUCH_TARGET_ASK_DP = 60
     private const val SWITCH_CLASS = "android.widget.Switch"
     private const val CHECKBOX_CLASS = "android.widget.CheckBox"
 }
