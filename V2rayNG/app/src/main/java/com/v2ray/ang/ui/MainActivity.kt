@@ -365,6 +365,12 @@ class MainActivity : HelperBaseActivity(), MainHost {
     }
 
     private val requestActivityLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        // FIRST, AND BEFORE ANY EARLY RETURN. A sign-in through «Войти через сайт» parks Главная on
+        // the way out (see launchAuthScreen); this is the only place it can be let go, and the hold
+        // also silences notices through NoticePolicy. Skipping it on one branch would leave the tab
+        // parked and the app mute for the rest of the process — which is why it is not written after
+        // the two consume* branches below, one of which returns.
+        releaseAuthHandoff()
         if (SettingsChangeManager.consumeRecreateUi()) {
             recreate()
             return@registerForActivityResult
@@ -825,8 +831,31 @@ class MainActivity : HelperBaseActivity(), MainHost {
         requestActivityLauncher.launch(intent)
     }
 
+    /**
+     * THE SIGN-IN THAT IS NOT A FLOW STILL GETS THE FLOW'S HAND-OFF.
+     *
+     * `GateView`'s Telegram and clipboard paths park Главная and let it go once its данные are in.
+     * `LoginActivity` — «Войти через сайт», and now the account tab's own two buttons — had neither
+     * half: it launched, came back, and Главная was simply there, so its rows arrived after the
+     * screen exactly as they used to on the other two paths. Same shape, same defect, one path late.
+     *
+     * The hold is taken here and released in [requestActivityLauncher] on EVERY outcome, including a
+     * cancelled sign-in — where [revealHome] finds nothing pending and lets go in the same frame.
+     */
     override fun launchAuthScreen(intent: Intent) {
+        authHandoffPending = true
+        holdHomeEntrance()
         requestActivityLauncher.launch(intent)
+    }
+
+    /** Whether [launchAuthScreen] is holding Главная for a sign-in that has not come back yet. */
+    private var authHandoffPending = false
+
+    /** Lets Главная go after a sign-in, if one was holding it. Idempotent. */
+    private fun releaseAuthHandoff() {
+        if (!authHandoffPending) return
+        authHandoffPending = false
+        revealHome { }
     }
 
     /**
