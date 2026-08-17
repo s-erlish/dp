@@ -53,4 +53,25 @@
     -->
     <dimen name="optical_nudge_touch_target">-10dp</dimen>
 
+    <!--
+        THE GAP AFTER THAT SAME BOX, and it is the other half of the pull above.
+
+        The pull moves where the glyph is DRAWN; it does not make the box narrower. The
+        chevron's 48dp box still ends 13dp past the right edge of its 22dp glyph, so a
+        title laid out against the BOX begins 13dp further right than it looks — on top of
+        whatever gap was asked for. With space_8 that made a 21dp trench between the glyph
+        and the first letter of the подписка's name where the design asks for 16, and the
+        owner read it as exactly that: «ник подписки … должно было сместится тоже левее
+        вместе с этой кнопкой … чем много пустого пространства оставлять».
+
+        16 (the design's gap after a leading element, view_row.xml) − 13 (the box's overhang
+        past its glyph) = 3. So the OPTICAL gap is the design's 16 and the number here is
+        what is left after the box's own overhang is paid for.
+
+        Not a spacing step either, for the same reason as the pull: it is one arithmetic
+        result, valid for a 22dp glyph in a 48dp box, and it moves only if the box or the
+        glyph does.
+    -->
+    <dimen name="space_after_touch_target">3dp</dimen>
+
 </resources>

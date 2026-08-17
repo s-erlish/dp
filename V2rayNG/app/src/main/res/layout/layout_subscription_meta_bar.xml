@@ -28,6 +28,8 @@
     android:layout_marginEnd="@dimen/screen_gutter"
     android:layout_marginBottom="@dimen/space_4"
     android:background="@drawable/bg_card_inert"
+    android:clipChildren="false"
+    android:clipToPadding="false"
     android:orientation="vertical"
     android:paddingStart="@dimen/space_16"
     android:paddingTop="@dimen/space_12"
@@ -35,10 +37,27 @@
     android:paddingBottom="@dimen/space_12">
 
     <!-- Row 1: chevron + (title + subtitle) + actions (Ping -> Refresh -> Pin). Telegram moved
-         to the bottom support row's right corner, opposite Поддержка. -->
+         to the bottom support row's right corner, opposite Поддержка.
+
+         clipChildren IS OFF ON THIS ROW, AND clipToPadding ON THE CARD ABOVE IT, because the
+         chevron is laid out at a NEGATIVE start margin and its press plate is the size of its
+         whole 48dp box. This row's own left edge is the card's 16dp content gutter, so the
+         10dp the chevron is pulled past it put the left slice of that plate outside the row —
+         and a ViewGroup clips its children by default. The owner held the control down to
+         photograph it: «зажал кнопку скрытия раскрытия серверов … там обрезается фон при
+         нажатии». A round plate with one side sheared flat reads as a rendering fault.
+
+         BOTH switches are needed and neither goes further. clipChildren=false lets the row
+         draw outside itself; the card still has clipToPadding=true, which would re-cut the
+         plate on the same line, so that goes too. The card's own BOUNDS still clip, and the
+         plate lives 6dp inside them — the overflow is contained by the card and reaches no
+         scroll container and no window root. That last distinction is not academic here:
+         SelectPopup.unclipAncestors drew the settings screen through the status bar by walking
+         one level too far, and this is that walk stopped at the right level. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:clipChildren="false"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -54,13 +73,21 @@
              visibly indented from the title, the traffic row and the notice below it,
              which all begin on the gutter. «кнопку скрытия раскрытия серверов тоже нужно
              левее подвинуть». The touch target keeps every one of its 48dp; only where
-             it is drawn moves. -->
+             it is drawn moves.
+
+             AND THE END MARGIN PAYS FOR THE SAME OVERHANG on the other side. The pull moved
+             the glyph, not the box: the box still runs 13dp past the glyph's right edge, so
+             a title spaced off the BOX starts 13dp further right than it looks. space_8 made
+             that a 21dp trench — «много пустого пространства». @dimen/space_after_touch_target
+             is the design's 16 with the overhang taken out; the arithmetic is written on the
+             token. -->
+
         <ImageView
             android:id="@+id/btn_collapse"
             android:layout_width="48dp"
             android:layout_height="48dp"
             android:layout_marginStart="@dimen/optical_nudge_touch_target"
-            android:layout_marginEnd="@dimen/space_8"
+            android:layout_marginEnd="@dimen/space_after_touch_target"
             android:background="@drawable/bg_control_disc"
             android:clickable="true"
             android:contentDescription="@string/title_servers"
