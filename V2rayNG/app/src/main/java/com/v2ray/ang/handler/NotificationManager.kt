@@ -35,6 +35,13 @@ object NotificationManager {
     private const val QUERY_INTERVAL_MS = 3000L
 
     private var lastQueryTime = 0L
+
+    /**
+     * The rate last actually written into the shade, so an unchanged one is not re-posted.
+     * Cleared whenever [mBuilder] is replaced — a new builder carries no speed line yet.
+     * @see updateSpeedNotificationOnce
+     */
+    private var lastPushedSpeed: Pair<Long, Long>? = null
     private var mBuilder: NotificationCompat.Builder? = null
     private var speedNotificationJob: Job? = null
     private var mNotificationManager: NotificationManager? = null
@@ -47,11 +54,9 @@ object NotificationManager {
         if (MmkvManager.decodeSettingsBool(AppConfig.PREF_SPEED_ENABLED) != true) return
         if (speedNotificationJob != null || CoreServiceManager.isRunning() == false) return
 
-        var lastZeroSpeed = false
-
         speedNotificationJob = CoroutineScope(Dispatchers.IO).launch {
             while (isActive) {
-                lastZeroSpeed = updateSpeedNotificationOnce(lastZeroSpeed)
+                updateSpeedNotificationOnce()
                 delay(QUERY_INTERVAL_MS)
             }
         }
@@ -112,6 +117,7 @@ object NotificationManager {
             // startForeground() call. Fall back to a minimal, always-valid notification.
             LogUtil.e(AppConfig.TAG, "showNotification: rich notification build failed, using fallback", e)
             mBuilder = null
+            lastPushedSpeed = null
             buildFallbackNotification(service, channelId)
         }
 
@@ -197,8 +203,10 @@ object NotificationManager {
 
         mBuilder = builder
         // The rate reads zero until the first tick lands, three seconds in — honest, and it means
-        // the expanded height never changes under the user's thumb by growing a line.
+        // the expanded height never changes under the user's thumb by growing a line. The memo is
+        // set to match, so an idle tunnel's first tick has nothing new to say and stays silent.
         applySpeed(builder, service, 0L, 0L)
+        lastPushedSpeed = 0L to 0L
         return builder.build()
     }
 
@@ -225,6 +233,7 @@ object NotificationManager {
         service.stopForeground(Service.STOP_FOREGROUND_REMOVE)
 
         mBuilder = null
+        lastPushedSpeed = null
         speedNotificationJob?.cancel()
         speedNotificationJob = null
         mNotificationManager = null
@@ -279,6 +288,7 @@ object NotificationManager {
         val service = getService() ?: return
         applySpeed(builder, service, downPerSec, upPerSec)
         getNotificationManager()?.notify(NOTIFICATION_ID, builder.build())
+        lastPushedSpeed = downPerSec to upPerSec
     }
 
     /** The expanded view's one line: «↓ 1,2 MB/s   ↑ 240 KB/s». */
@@ -313,10 +323,26 @@ object NotificationManager {
     /**
      * Updates the speed notification once.
      * Queries traffic stats, separates proxy and direct, and updates the notification.
-     * @param lastZeroSpeed The previous zero speed state.
-     * @return The current zero speed state.
+     *
+     * ## A NOTIFICATION THAT SAYS THE SAME THING IS NOT RE-POSTED
+     *
+     * This runs every [QUERY_INTERVAL_MS] for as long as a tunnel is up — 1200 rounds an hour, and
+     * a tunnel is up for hours — and it used to end every single one of them with a
+     * `NotificationManager.notify()`, i.e. a binder round trip into system_server that re-inflates
+     * the row, whether or not a digit had changed. On an idle tunnel every one of those posted the
+     * identical «↓ 0 B/s ↑ 0 B/s».
+     *
+     * Upstream had a guard for exactly this and this fork kept only its plumbing: `lastZeroSpeed`
+     * was threaded in and out of this function and never branched on. It is replaced by the
+     * stronger form of the same idea — remember the pair actually pushed, and post only when the
+     * new one differs — which also covers a steady rate, not just a zero one. [showNotification]
+     * clears the memo when it rebuilds the builder, so a fresh row always gets its line back.
+     *
+     * THE BROADCAST IS NOT GUARDED, and must not be: `MSG_STATE_SPEED_UPDATE` is Главная's only
+     * source for the two figures, it is a local broadcast rather than a system call, and swallowing
+     * it would freeze the strip on the last rate the tunnel ever saw.
      */
-    private fun updateSpeedNotificationOnce(lastZeroSpeed: Boolean): Boolean {
+    private fun updateSpeedNotificationOnce() {
         val queryTime = System.currentTimeMillis()
         val sinceLastQueryIn = (queryTime - lastQueryTime)
 
@@ -324,36 +350,24 @@ object NotificationManager {
         if (sinceLastQueryIn < QUERY_INTERVAL_MS) {
             LogUtil.w(AppConfig.TAG, "Query interval too short: ${sinceLastQueryIn}ms, skipping")
             lastQueryTime = queryTime
-            return lastZeroSpeed
+            return
         }
         val sinceLastQueryInSeconds = sinceLastQueryIn / 1000.0
 
+        // THE DIRECT SIDE IS NOT SUMMED ANY MORE. Upstream separates proxied from direct traffic
+        // because it reports both; this product reports one rate — what went through the tunnel —
+        // and the direct pair was accumulated on every tick, over every outbound the core knows,
+        // and then read by nothing but a "is everything zero" test that itself had no reader.
         var proxyUplink = 0L
         var proxyDownlink = 0L
-        var directUplink = 0L
-        var directDownlink = 0L
 
         CoreServiceManager.queryAllOutboundTrafficStats().forEach { stat ->
-            when {
-                stat.tag == AppConfig.TAG_DIRECT -> {
-                    when (stat.direction) {
-                        AppConfig.UPLINK -> directUplink += stat.value
-                        AppConfig.DOWNLINK -> directDownlink += stat.value
-                    }
-                }
-
-                stat.tag.startsWith(AppConfig.TAG_PROXY) -> {
-                    when (stat.direction) {
-                        AppConfig.UPLINK -> proxyUplink += stat.value
-                        AppConfig.DOWNLINK -> proxyDownlink += stat.value
-                    }
-                }
+            if (!stat.tag.startsWith(AppConfig.TAG_PROXY)) return@forEach
+            when (stat.direction) {
+                AppConfig.UPLINK -> proxyUplink += stat.value
+                AppConfig.DOWNLINK -> proxyDownlink += stat.value
             }
         }
-
-        val proxyTotal = proxyUplink + proxyDownlink
-        val directTotal = directUplink + directDownlink
-        val zeroSpeed = proxyTotal + directTotal == 0L
 
         // ONE TICK, TWO CONSUMERS. The rate goes to Главная's ledger and, since the owner asked for
         // it, to the expanded notification — from the SAME measurement at the SAME interval. Adding
@@ -362,11 +376,10 @@ object NotificationManager {
             val downPerSec = (proxyDownlink / sinceLastQueryInSeconds).toLong()
             val upPerSec = (proxyUplink / sinceLastQueryInSeconds).toLong()
             MessageUtil.sendMsg2UI(svc, AppConfig.MSG_STATE_SPEED_UPDATE, longArrayOf(downPerSec, upPerSec))
-            pushSpeed(downPerSec, upPerSec)
+            if (downPerSec to upPerSec != lastPushedSpeed) pushSpeed(downPerSec, upPerSec)
         }
 
         lastQueryTime = queryTime
-        return zeroSpeed
     }
 
     /**
