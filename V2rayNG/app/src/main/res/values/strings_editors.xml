@@ -41,6 +41,12 @@
     <string name="perapp_mode_all">Все приложения</string>
     <string name="perapp_mode_selected">Только выбранные</string>
     <string name="perapp_mode_except">Кроме выбранных</string>
+    <!-- NOT DISPLAYED since 0.4.9. The «Режим» row lost its subtitle on owner report - these
+         three ran to «Отмеченные — напрямую, остальные…» in the row's two lines, and a sentence
+         clipped mid-clause promises an explanation it does not give. They are kept, and kept next
+         to the mode each belongs to (PerAppProxyActivity.Mode.hintRes still names them), for the
+         day one of them is wanted somewhere it can be read whole - the actions sheet, a help
+         screen. Do not wire them back into the row. -->
     <string name="perapp_mode_all_hint">Через VPN идут все приложения</string>
     <string name="perapp_mode_selected_hint">Отмеченные — через прокси, остальные напрямую</string>
     <string name="perapp_mode_except_hint">Отмеченные — напрямую, остальные через прокси</string>
@@ -59,9 +65,13 @@
     <string name="perapp_empty_line">Ни одно установленное приложение не запрашивает доступ в сеть.</string>
     <string name="perapp_error_title">Не удалось загрузить список</string>
     <string name="perapp_error_line">Проверьте, что приложению разрешено читать список программ, и повторите.</string>
-    <!-- «Российские приложения» — the named bypass preset. The subtitle states the CONSEQUENCE
-         («идут напрямую, мимо VPN»), never the mechanism, and the count is of what is actually on
-         this phone so the row is honest about how much it is doing. -->
+    <!-- «Российские приложения» — the named bypass preset. The count is of what is actually on
+         this phone, so the row is honest about how much it is doing.
+         perapp_ru_preset_hint is NOT DISPLAYED since 0.4.9: it is a list of seven, and the row
+         showed «Госуслуги, банки, Mir Pay, Ozon, Wildberries, Яндекс, операторы — и…», naming four
+         members and hiding the rest. It has NO READER now, in Kotlin or in a layout. Kept because
+         it is the only written statement of what the набор is for, and because the place it
+         belongs is a sheet or a help line where it can be read whole - not a two-line row. -->
     <string name="perapp_ru_preset">Российские приложения</string>
     <string name="perapp_ru_preset_hint">Госуслуги, банки, Mir Pay, Ozon, Wildberries, Яндекс, операторы — идут напрямую, мимо VPN</string>
     <string name="perapp_ru_preset_installed">Установлено на этом устройстве: %1$d</string>

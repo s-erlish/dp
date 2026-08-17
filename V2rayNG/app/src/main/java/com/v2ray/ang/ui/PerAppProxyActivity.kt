@@ -56,8 +56,17 @@ import java.text.Collator
  * booleans encoding three states, and the old screen showed them as two independent switches - one
  * of which was meaningless while the other was off, with the explanation hidden behind a second
  * tappable target that fired a toast. They are one `Row.Value` here, cycling «Все приложения» ->
- * «Только выбранные» -> «Кроме выбранных» in place, with the subtitle stating what the current mode
- * actually does. Both preferences keep their existing meaning and their existing keys.
+ * «Только выбранные» -> «Кроме выбранных» in place. Both preferences keep their existing meaning
+ * and their existing keys.
+ *
+ * **NEITHER ROW ON THIS SCREEN CARRIES A SUBTITLE** (owner report 0.4.9: «там где режим, надо под
+ * ним текст убрать… и у российских приложений тоже текст убери ниже»). Both explanations ran past
+ * the row's two lines and arrived as «Отмеченные — напрямую, остальные…» and «Госуслуги, банки, Mir
+ * Pay, Ozon, Wildberries, Яндекс, операторы — и…»: a subtitle clipped mid-sentence promises an
+ * explanation and then withholds it, which is strictly worse than the row that never offered one.
+ * The value «Кроме выбранных» is the mode's own name and already says it, and the набор's contents
+ * are one tap away behind «Показать приложения набора» in the actions sheet. Both rows are §6's
+ * 61dp «без подписи» height now instead of 77.
  */
 class PerAppProxyActivity : BaseActivity() {
 
@@ -124,6 +133,12 @@ class PerAppProxyActivity : BaseActivity() {
     /**
      * The three modes, in cycle order. The pair of booleans behind them is unchanged - this is a
      * presentation of the existing preferences, not a new setting.
+     *
+     * [hintRes] is no longer shown: the row lost its subtitle in 0.4.9 (see the class doc). It is
+     * kept rather than deleted because it is the only thing still holding `perapp_mode_*_hint`
+     * together with the mode it belongs to — the strings survive the removal on purpose, and a
+     * hint that has drifted away from its mode is worse than no hint at all when one is wanted
+     * again (the sheet in [showListActions] is where it would go).
      */
     private enum class Mode(val labelRes: Int, val hintRes: Int) {
         ALL(R.string.perapp_mode_all, R.string.perapp_mode_all_hint),
@@ -149,7 +164,8 @@ class PerAppProxyActivity : BaseActivity() {
         RowBinder.bind(
             root = binding.rowMode.root,
             title = getString(R.string.perapp_mode_row),
-            subtitle = getString(mode.hintRes),
+            // NO SUBTITLE (0.4.9). «Отмеченные — напрямую, остальные…» never fitted, and the value
+            // on the right of this same row is the mode's name, which is the short form of it.
             // The prototype's «Режим обхода» carries the globe and the row under it a different
             // glyph: §5.3 makes a group tiled only when its glyphs DIFFER, and two identical
             // tiles down the left edge is the generated-settings tell.
@@ -173,16 +189,19 @@ class PerAppProxyActivity : BaseActivity() {
     /**
      * The «Российские приложения» row: one switch, applying and un-applying a NAMED set.
      *
-     * The subtitle says what the набор does to traffic, and the value says how many of its apps are
-     * actually on this phone — a preset that lists forty packages and matches three should say so
-     * rather than implying it is doing forty apps' worth of work.
+     * NO SUBTITLE (0.4.9). «Госуслуги, банки, Mir Pay, Ozon, Wildberries, Яндекс, операторы — идут
+     * напрямую, мимо VPN» is a list, and a list clipped at «— и…» after two lines names four of its
+     * members and hides the rest, which reads as an incomplete promise rather than a summary. The
+     * набор's real contents stay one tap away, in full and with real icons, behind «Показать
+     * приложения набора». The accessible name below still says how many of its apps this phone
+     * actually has — a preset that lists forty packages and matches three should say so rather than
+     * implying it is doing forty apps' worth of work.
      */
     private fun bindPresetRow() {
         val installed = appsAll.count { RussianAppsPreset.contains(it.packageName) }
         RowBinder.bind(
             root = binding.rowRuPreset.root,
             title = getString(R.string.perapp_ru_preset),
-            subtitle = getString(R.string.perapp_ru_preset_hint),
             glyph = R.drawable.ic_per_apps_24dp,
             trailing = RowBinder.Trailing.Toggle(
                 checked = RussianAppsPreset.isApplied(),
