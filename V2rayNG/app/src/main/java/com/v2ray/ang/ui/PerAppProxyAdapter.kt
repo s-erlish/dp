@@ -113,6 +113,7 @@ class PerAppProxyAdapter(
         RecyclerView.ViewHolder(binding.root)
 
     override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+        super.onViewRecycled(holder)
         // A row that has left the viewport must not still be waiting on an icon: the PackageManager
         // lookup behind it is the one piece of work in this list that outlives a bind.
         (holder as? AppViewHolder)?.cancelIconLoad()
