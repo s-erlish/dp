@@ -276,6 +276,18 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private var offline = false
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
+    /**
+     * The manager the callback above was registered ON, kept so it can be unregistered.
+     *
+     * [unregisterNetworkCallback] used to look the service up through `context`, which is null the
+     * moment the fragment is detached — and it dropped its handle on the callback BEFORE finding
+     * out. A callback that is never unregistered is held by the system, and it holds this fragment
+     * through `postOffline`, so the whole destroyed hierarchy stayed reachable and the system went
+     * on delivering connectivity events to it. The manager is an application-scoped singleton, so
+     * holding it costs nothing and cannot leak an Activity.
+     */
+    private var connectivityForCallback: ConnectivityManager? = null
+
     /** How many background loads the shell has open — a subscription refresh, an import, an export. */
     private var backgroundLoads = 0
 
@@ -2629,8 +2641,11 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * the network goes and disappear the moment it returns, without the user touching anything.
      */
     private fun observeNetwork() {
-        val manager = requireContext().getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            ?: return
+        // The APPLICATION context: this registration outlives nothing it should, but the manager it
+        // is made against has to be reachable from [unregisterNetworkCallback], which runs while
+        // the fragment may already be detached. @see connectivityForCallback
+        val manager = requireContext().applicationContext
+            .getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
         offline = !hasInternet(manager)
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) = postOffline(false)
@@ -2638,8 +2653,12 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             override fun onUnavailable() = postOffline(true)
         }
         networkCallback = callback
+        connectivityForCallback = manager
         runCatching { manager.registerDefaultNetworkCallback(callback) }
-            .onFailure { networkCallback = null }
+            .onFailure {
+                networkCallback = null
+                connectivityForCallback = null
+            }
     }
 
     private fun postOffline(value: Boolean) {
@@ -2659,9 +2678,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
 
     private fun unregisterNetworkCallback() {
         val callback = networkCallback ?: return
+        val manager = connectivityForCallback
         networkCallback = null
-        val manager = context?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
-        runCatching { manager.unregisterNetworkCallback(callback) }
+        connectivityForCallback = null
+        runCatching { manager?.unregisterNetworkCallback(callback) }
     }
 
     // ==================== Resolve ====================
@@ -2778,19 +2798,73 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     private fun resolveSubscription(): Sub {
         if (BackendConfig.isConfigured() && AccountSession.isLoggedIn()) {
             if (!subsResolved) return Sub.Unknown
-            val active = accountSubs.firstOrNull() ?: return Sub.None
+            val active = activeAccountSub() ?: return Sub.None
             val until = parseIsoMillis(active.expireAtIso) ?: return Sub.Active(null)
             return classifyExpiry(until, active.isTrial)
         }
         // No account: the подписка's own `userinfo` expiry is the only truth available. Panels
         // sometimes send a huge timestamp instead of 0 for "never", which reads as an active
         // subscription with no date — which is exactly what Sub.Active(null) draws.
-        val expireSeconds = MmkvManager.decodeSubscriptions()
-            .mapNotNull { it.subscription.expire.takeIf { e -> e > 0L } }
-            .minOrNull()
-            ?: return Sub.None
+        val expireSeconds = localExpirySeconds() ?: return Sub.None
         if (expireSeconds >= UNLIMITED_EXPIRE_SECONDS) return Sub.Active(null)
         return classifyExpiry(expireSeconds * 1000L, trial = false)
+    }
+
+    /**
+     * The account's ACTIVE подписка, asked for by TYPE and not by position.
+     *
+     * `accountSubs` is merged from two endpoints — `/client/subscription`, which is what identifies
+     * the active one, and `/client/subscription/all`, the only source of the secondaries — and the
+     * merge puts the root first WHEN IT HAS A ROOT TO PUT THERE. On the round where the first of
+     * those answers late, or with a payload whose shape cannot be read, the list simply STARTS with
+     * a secondary, and `firstOrNull()` then handed a secondary's `expireAtIso` to [classifyExpiry]
+     * and let it speak for the whole account. An old secondary is exactly how «подписка истекла»
+     * appeared over a подписка that had not expired at all.
+     *
+     * Falling back to the first entry keeps the previous answer for the case it was written for —
+     * an account whose root is its only подписка — while a list with genuinely no root still
+     * describes something rather than nothing. Deliberately the same rule, by the same key, as
+     * `AccountFragment.activeSub()`: the two surfaces must not disagree about which подписка the
+     * account HAS.
+     */
+    private fun activeAccountSub(): SubInfoDto? =
+        accountSubs.firstOrNull { it.type.equals(SubscriptionSyncManager.TYPE_ROOT, ignoreCase = true) }
+            ?: accountSubs.firstOrNull()
+
+    /**
+     * The expiry that describes THIS INSTALL, out of the подписки stored locally.
+     *
+     * IT USED TO BE `minOrNull()` — THE OLDEST DATE ON THE DEVICE — and that is a verdict handed to
+     * whichever подписка is furthest gone. One подписка pasted by hand a year ago, one trial that
+     * lapsed, one провайдер the user stopped paying for: any of them, sitting in the store beside a
+     * perfectly live подписка, made Главная announce «Подписка истекла» over a working tunnel. It is
+     * the local half of the same false verdict [activeAccountSub] fixes for the account half, and it
+     * is the half that speaks whenever the session is not available — which is precisely the window
+     * the owner was looking at.
+     *
+     * Three tiers, most specific first:
+     *
+     *  1. **The подписка the SELECTED server came from.** That is the one carrying the traffic, so
+     *     it is the one the screen is about. Nothing else on this screen has a better claim.
+     *  2. **The live one that lasts longest.** With no selection to go on, an active подписка is
+     *     what the user has; an expired one beside it is history.
+     *  3. **The most recent expiry**, when every подписка really has lapsed. The screen still says
+     *     «истекла», and now it names the date the user will recognise instead of the oldest one on
+     *     the device.
+     */
+    private fun localExpirySeconds(): Long? {
+        val subs = MmkvManager.decodeSubscriptions()
+        val nowSeconds = System.currentTimeMillis() / 1000L
+
+        mainViewModel.findSubscriptionIdBySelect()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { id -> subs.firstOrNull { it.guid == id } }
+            ?.subscription?.expire?.takeIf { it > 0L }
+            ?.let { return it }
+
+        val dated = subs.mapNotNull { it.subscription.expire.takeIf { e -> e > 0L } }
+        if (dated.isEmpty()) return null
+        return dated.filter { it > nowSeconds }.maxOrNull() ?: dated.max()
     }
 
     private fun classifyExpiry(untilMs: Long, trial: Boolean): Sub {
