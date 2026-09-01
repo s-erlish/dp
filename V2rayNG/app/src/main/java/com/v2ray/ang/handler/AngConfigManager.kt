@@ -7,7 +7,6 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.AuthTokenStore
 import com.v2ray.ang.auth.BackendConfig
-import com.v2ray.ang.core.CoreConfigManager
 import com.v2ray.ang.dto.SubscriptionUpdateResult
 import com.v2ray.ang.dto.UrlContentRequest
 import com.v2ray.ang.dto.entities.ProfileItem
@@ -127,31 +126,6 @@ object AngConfigManager {
             LogUtil.e(AppConfig.TAG, "Failed to share config as QR code", e)
             return null
         }
-    }
-
-    /**
-     * Shares the full content of the configuration to the clipboard.
-     *
-     * @param context The context.
-     * @param guid The GUID of the configuration.
-     * @return The result code.
-     */
-    fun shareFullContent2Clipboard(context: Context, guid: String?): Int {
-        try {
-            if (guid == null) return -1
-            // Block full-config export for managed/hidden profiles.
-            if (TemplateManager.isLocked(guid)) return -1
-            val result = CoreConfigManager.getV2rayConfig(context, guid)
-            if (result.status) {
-                Utils.setClipboard(context, result.content)
-            } else {
-                return -1
-            }
-        } catch (e: Exception) {
-            LogUtil.e(AppConfig.TAG, "Failed to share full content to clipboard", e)
-            return -1
-        }
-        return 0
     }
 
     /**

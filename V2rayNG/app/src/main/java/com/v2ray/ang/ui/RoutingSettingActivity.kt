@@ -293,7 +293,6 @@ class RoutingSettingActivity : HelperBaseActivity() {
 
         override fun onRemove(guid: String, position: Int) {}
 
-        override fun onShare(url: String) {}
 
         override fun onRefreshData() {
             refreshData()

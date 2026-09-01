@@ -296,7 +296,6 @@ class UserAssetActivity : HelperBaseActivity() {
                 .show()
         }
 
-        override fun onShare(url: String) {}
 
         override fun onRefreshData() {
             refreshData()

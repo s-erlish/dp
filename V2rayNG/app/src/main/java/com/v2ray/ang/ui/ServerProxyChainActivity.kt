@@ -246,7 +246,6 @@ class ServerProxyChainActivity : BaseActivity() {
             refreshEmptyState()
         }
 
-        override fun onShare(url: String) {}
 
         override fun onRefreshData() {
             refreshEmptyState()

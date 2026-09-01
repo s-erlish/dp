@@ -505,25 +505,6 @@
     <string name="title_webdav_pass">Пароль</string>
     <string name="title_webdav_remote_path">Удалённый путь (необязательно)</string>
 
-    <string-array name="share_method">
-        <item>QR-код</item>
-        <item>Экспорт в буфер обмена</item>
-        <item>Экспорт конфигурации в буфер обмена</item>
-    </string-array>
-
-    <string-array name="share_method_more">
-        <item>QR-код</item>
-        <item>Экспорт в буфер обмена</item>
-        <item>Экспорт конфигурации в буфер обмена</item>
-        <item>Изменить</item>
-        <item>Удалить</item>
-    </string-array>
-
-    <string-array name="share_sub_method">
-        <item>QR-код</item>
-        <item>Экспорт в буфер обмена</item>
-    </string-array>
-
     <string-array name="mode_entries">
         <item>VPN</item>
         <item>Прокси</item>

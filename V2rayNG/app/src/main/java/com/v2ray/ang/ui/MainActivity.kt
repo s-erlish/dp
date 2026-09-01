@@ -320,8 +320,6 @@ class MainActivity : HelperBaseActivity(), MainHost {
      */
     private var navScrimBaseHeight = 0
 
-    private val shareMethod: Array<out String> by lazy { resources.getStringArray(R.array.share_method) }
-    private val shareMethodMore: Array<out String> by lazy { resources.getStringArray(R.array.share_method_more) }
 
     // Cached easing curves (loaded once) so the imperative nav motion rides the same ease-out tempo
     // as the declarative res/interpolator + res/anim resources. No bounce.
@@ -1475,27 +1473,10 @@ class MainActivity : HelperBaseActivity(), MainHost {
 
     // ---- Per-server actions (moved from GroupServerFragment) ----
 
-    private fun shareServer(guid: String, profile: ProfileItem, position: Int, shareOptions: List<String>, skip: Int) {
-        AlertDialog.Builder(this).setItems(shareOptions.toTypedArray()) { _, i ->
-            try {
-                when (i + skip) {
-                    0 -> showQRCode(guid)
-                    1 -> share2Clipboard(guid)
-                    2 -> shareFullContent(guid)
-                    3 -> editServer(guid, profile)
-                    4 -> removeServer(guid, position)
-                    else -> {}
-                }
-            } catch (e: Exception) {
-                LogUtil.e(AppConfig.TAG, "Error when sharing server", e)
-            }
-        }.show()
-    }
-
     private fun showQRCode(guid: String) {
         val ivBinding = ItemQrcodeBinding.inflate(layoutInflater)
         ivBinding.ivQcode.setImageBitmap(AngConfigManager.share2QRCode(guid))
-        ivBinding.ivQcode.contentDescription = shareMethod.firstOrNull() ?: "QR Code"
+        ivBinding.ivQcode.contentDescription = getString(R.string.title_qr_code)
         AlertDialog.Builder(this).setView(ivBinding.root).show()
     }
 
@@ -1506,15 +1487,6 @@ class MainActivity : HelperBaseActivity(), MainHost {
     private fun share2Clipboard(guid: String) {
         if (AngConfigManager.share2Clipboard(this, guid) == 0) toast(R.string.notice_copied)
         else toastError(R.string.notice_copy_failed)
-    }
-
-    private fun shareFullContent(guid: String) {
-        lifecycleScope.launch(Dispatchers.IO) {
-            val result = AngConfigManager.shareFullContent2Clipboard(this@MainActivity, guid)
-            launch(Dispatchers.Main) {
-                if (result == 0) toast(R.string.notice_copied) else toastError(R.string.notice_copy_failed)
-            }
-        }
     }
 
     private fun editServer(guid: String, profile: ProfileItem) {
@@ -1643,30 +1615,10 @@ class MainActivity : HelperBaseActivity(), MainHost {
 
     private inner class ActivityAdapterListener : MainAdapterListener {
         override fun onEdit(guid: String, position: Int) {}
-        override fun onShare(url: String) {}
         override fun onRefreshData() {}
         override fun onRemove(guid: String, position: Int) { removeServer(guid, position) }
         override fun onEdit(guid: String, position: Int, profile: ProfileItem) { editServer(guid, profile) }
         override fun onSelectServer(guid: String) { setSelectServer(guid) }
-        override fun onShare(guid: String, profile: ProfileItem, position: Int, more: Boolean) {
-            // Managed/hidden profile: expose only removal; block QR/share/full-config/edit.
-            if (TemplateManager.isLocked(profile)) {
-                shareServer(
-                    guid, profile, position,
-                    listOf(getString(R.string.template_locked_action_remove)), skip = 4
-                )
-                return
-            }
-            val isCustom = profile.configType.isComplexType()
-            val (shareOptions, skip) = if (more) {
-                val options = if (isCustom) shareMethodMore.asList().takeLast(3) else shareMethodMore.asList()
-                options to if (isCustom) 2 else 0
-            } else {
-                val options = if (isCustom) shareMethod.asList().takeLast(1) else shareMethod.asList()
-                options to if (isCustom) 2 else 0
-            }
-            shareServer(guid, profile, position, shareOptions, skip)
-        }
     }
 
     /**

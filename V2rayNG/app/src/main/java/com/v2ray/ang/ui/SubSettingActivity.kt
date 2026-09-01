@@ -253,7 +253,6 @@ class SubSettingActivity : BaseActivity() {
             confirmRemove(guid, SubSettingRecyclerAdapter.displayName(this@SubSettingActivity, item))
         }
 
-        override fun onShare(url: String) = showQrCode(url)
 
         override fun onRefreshData() {
             refreshData()
