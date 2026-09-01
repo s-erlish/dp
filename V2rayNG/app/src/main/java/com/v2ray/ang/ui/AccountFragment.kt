@@ -53,9 +53,11 @@ import com.v2ray.ang.util.AvatarManager
 import com.v2ray.ang.util.reducedMotion
 import com.v2ray.ang.viewmodel.AccountViewModel
 import com.v2ray.ang.viewmodel.MainViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Locale
 
@@ -1544,13 +1546,29 @@ class AccountFragment : Fragment() {
         }
     }
 
+    /**
+     * The picked photo is decoded, down-sampled and re-compressed to JPEG before it is stored, and
+     * ALL of that used to run on the main thread — on whatever a modern camera produces, i.e. tens
+     * of megapixels read through a ContentResolver. That is the frame budget for a dropped
+     * hundred-odd milliseconds at best and an ANR at worst, for a cosmetic action.
+     *
+     * It moves to IO, and the result comes back on the main thread to paint. The gallery has
+     * already closed by the time this runs, so nothing on screen is waiting on it; the picker's
+     * read grant is one-shot but it lasts for the life of this callback's coroutine, which is what
+     * the copy needs. `viewLifecycleOwner` scopes it, so a tab torn down mid-copy simply stops.
+     */
     private fun onAvatarPicked(uri: Uri?) {
         if (uri == null) return
-        if (AvatarManager.saveCustomAvatar(requireContext(), uri)) {
-            AvatarManager.applyAvatar(viewLifecycleOwner.lifecycleScope, requireContext(), binding.imgAvatar, binding.tvAvatarInitial, latestProfile)
-            toast(R.string.account_avatar_updated)
-        } else {
-            toastError(R.string.account_avatar_error)
+        val context = requireContext().applicationContext
+        viewLifecycleOwner.lifecycleScope.launch {
+            val saved = withContext(Dispatchers.IO) { AvatarManager.saveCustomAvatar(context, uri) }
+            val b = _binding ?: return@launch
+            if (saved) {
+                AvatarManager.applyAvatar(viewLifecycleOwner.lifecycleScope, requireContext(), b.imgAvatar, b.tvAvatarInitial, latestProfile)
+                toast(R.string.account_avatar_updated)
+            } else {
+                toastError(R.string.account_avatar_error)
+            }
         }
     }
 
