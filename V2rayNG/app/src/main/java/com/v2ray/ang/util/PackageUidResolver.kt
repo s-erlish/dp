@@ -21,11 +21,6 @@ object PackageUidResolver {
         }
     }
 
-    fun uidsToPackageNames(uids: List<String>): List<String> {
-        if (uids.isEmpty()) return emptyList()
-        return packageUidCache.filterValues { it in uids }.keys.toList()
-    }
-
     fun uidToPackageName(uid: String): String? {
         return packageUidCache.entries.firstOrNull { it.value == uid }?.key
     }

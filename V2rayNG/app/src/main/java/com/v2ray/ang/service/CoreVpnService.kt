@@ -486,8 +486,6 @@ class CoreVpnService : VpnService(), ServiceControl {
             tun2SocksService = TProxyService(
                 context = applicationContext,
                 vpnInterface = mInterface,
-                isRunningProvider = { isRunning },
-                restartCallback = { runTun2socks() }
             )
         } else {
             if (MmkvManager.decodeSettingsBool(AppConfig.PREF_USE_HEV_TUNNEL, true)) {

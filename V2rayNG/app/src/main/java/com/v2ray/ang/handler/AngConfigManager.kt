@@ -110,34 +110,6 @@ object AngConfigManager {
     }
 
     /**
-     * Shares non-custom configurations to the clipboard.
-     *
-     * @param context The context.
-     * @param serverList The list of server GUIDs.
-     * @return The number of configurations shared.
-     */
-    fun shareNonCustomConfigsToClipboard(context: Context, serverList: List<String>): Int {
-        try {
-            val sb = StringBuilder()
-            for (guid in serverList) {
-                val url = shareConfig(guid)
-                if (TextUtils.isEmpty(url)) {
-                    continue
-                }
-                sb.append(url)
-                sb.appendLine()
-            }
-            if (sb.count() > 0) {
-                Utils.setClipboard(context, sb.toString())
-            }
-            return sb.lines().count() - 1
-        } catch (e: Exception) {
-            LogUtil.e(AppConfig.TAG, "Failed to share non-custom configs to clipboard", e)
-            return -1
-        }
-    }
-
-    /**
      * Shares the configuration as a QR code.
      *
      * @param guid The GUID of the configuration.

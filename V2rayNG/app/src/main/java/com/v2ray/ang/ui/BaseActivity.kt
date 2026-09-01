@@ -9,17 +9,13 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
-import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
-import androidx.recyclerview.widget.DividerItemDecoration
-import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
-import com.v2ray.ang.helper.CustomDividerItemDecoration
 import com.v2ray.ang.util.MyContextWrapper
 import com.v2ray.ang.util.Utils
 
@@ -32,7 +28,6 @@ import com.v2ray.ang.util.Utils
  * - Provide convenient overloads of `setContentViewWithToolbar` to attach child layouts or
  *   view-binding roots into the base container and initialize the toolbar.
  * - Expose a global in-layout `ProgressBar` (cached) with `showLoading()` / `hideLoading()` helpers.
- * - Provide a helper to add a custom divider to RecyclerViews.
  * - Wrap base context according to user locale settings.
  */
 abstract class BaseActivity : AppCompatActivity() {
@@ -89,31 +84,6 @@ abstract class BaseActivity : AppCompatActivity() {
      */
     override fun attachBaseContext(newBase: Context?) {
         super.attachBaseContext(MyContextWrapper.wrap(newBase ?: return, SettingsManager.getLocale()))
-    }
-
-    /**
-     * Adds a custom divider drawable to the provided RecyclerView.
-     *
-     * This is a convenience helper that constructs a [CustomDividerItemDecoration]
-     * using the given drawable resource id and adds it to the RecyclerView.
-     *
-     * @param recyclerView the target RecyclerView
-     * @param context the context used to resolve resources (may be activity or application context)
-     * @param drawableResId the drawable resource id to use as the divider
-     * @param orientation one of [DividerItemDecoration.VERTICAL] or [DividerItemDecoration.HORIZONTAL]
-     *
-     * @throws IllegalArgumentException if the drawable resource cannot be found
-     */
-    protected fun addCustomDividerToRecyclerView(recyclerView: RecyclerView, context: Context?, drawableResId: Int, orientation: Int = DividerItemDecoration.VERTICAL) {
-        // Get the drawable from resources
-        val drawable = ContextCompat.getDrawable(context!!, drawableResId)
-        requireNotNull(drawable) { "Drawable resource not found" }
-
-        // Create a DividerItemDecoration with the specified orientation
-        val dividerItemDecoration = CustomDividerItemDecoration(drawable, orientation)
-
-        // Add the divider to the RecyclerView
-        recyclerView.addItemDecoration(dividerItemDecoration)
     }
 
     /**
