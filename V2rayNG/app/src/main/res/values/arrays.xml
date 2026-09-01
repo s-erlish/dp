@@ -49,7 +49,6 @@
     <string-array name="mode_type_grpc" translatable="false">
         <item>gun</item>
         <item>multi</item>
-        <!--Hide this option until core support it       <item>guna</item>-->
     </string-array>
 
     <string-array name="streamsecuritys" translatable="false">
@@ -60,13 +59,6 @@
         <item />
         <item>tls</item>
         <item>reality</item>
-    </string-array>
-
-    <string-array name="fragment_packets" translatable="false">
-        <item>tlshello</item>
-        <item>1-2</item>
-        <item>1-3</item>
-        <item>1-5</item>
     </string-array>
 
     <string-array name="streamsecurity_utls" translatable="false">
@@ -105,31 +97,7 @@
         <item>IPOnDemand</item>
     </string-array>
 
-    <string-array name="core_loglevel" translatable="false">
-        <item>debug</item>
-        <item>info</item>
-        <item>warning</item>
-        <item>error</item>
-        <item>none</item>
-    </string-array>
-
-    <string-array name="mode_value" translatable="false">
-        <item>VPN</item>
-        <item>Proxy only</item>
-    </string-array>
     
-    <string-array name="browser_dialer_mode_value" translatable="false">
-        <item>Disable</item>
-        <item>OkHttp</item>
-        <item>WebView</item>
-    </string-array>
-
-    <string-array name="hev_tunnel_loglevel" translatable="false">
-        <item>error</item>
-        <item>warn</item>
-        <item>info</item>
-        <item>debug</item>
-    </string-array>
 
     <string-array name="flows" translatable="false">
         <item />
@@ -151,87 +119,11 @@
         <item>ru</item>
     </string-array>
 
-    <string-array name="mux_xudp_quic_value" translatable="false">
-        <item>reject</item>
-        <item>allow</item>
-        <item>skip</item>
-    </string-array>
-
-    <string-array name="ui_mode_night_value" translatable="false">
-        <item>0</item>
-        <item>1</item>
-        <item>2</item>
-    </string-array>
-
-    <string-array name="color_theme">
-        <item>@string/color_theme_blue</item>
-        <item>@string/color_theme_mono</item>
-    </string-array>
-
-    <string-array name="color_theme_value" translatable="false">
-        <item>blue</item>
-        <item>mono</item>
-    </string-array>
-
-    <string-array name="ping_method_entries">
-        <item>@string/ping_method_real</item>
-        <item>@string/ping_method_http</item>
-        <item>@string/ping_method_tcp</item>
-        <item>@string/ping_method_icmp</item>
-    </string-array>
-
-    <string-array name="ping_method_values" translatable="false">
-        <item>real</item>
-        <item>http</item>
-        <item>tcp</item>
-        <item>icmp</item>
-    </string-array>
-
-    <string-array name="outbound_tag" translatable="false">
-        <item>proxy</item>
-        <item>direct</item>
-        <item>block</item>
-    </string-array>
-
     <string-array name="xhttp_mode" translatable="false">
         <item>auto</item>
         <item>packet-up</item>
         <item>stream-up</item>
         <item>stream-one</item>
     </string-array>
-
-    <string-array name="vpn_bypass_lan_value" translatable="false">
-        <item>0</item>
-        <item>1</item>
-        <item>2</item>
-    </string-array>
-
-    <string-array name="vpn_interface_address_value" translatable="false">
-        <item>0</item>
-        <item>1</item>
-        <item>2</item>
-        <item>3</item>
-        <item>4</item>
-        <item>5</item>
-        <item>6</item>
-    </string-array>
-
-    <!-- Literal IPv4 subnets shown as-is; nothing here is copy. -->
-    <string-array name="vpn_interface_address" translatable="false">
-        <item>10.10.14.x</item>
-        <item>10.1.0.x</item>
-        <item>10.0.0.x</item>
-        <item>172.31.0.x</item>
-        <item>172.20.0.x</item>
-        <item>172.16.0.x</item>
-        <item>192.168.100.x</item>
-    </string-array>
-
-    <string-array name="outbound_domain_resolve_method_value" translatable="false">
-        <item>0</item>
-        <item>1</item>
-        <item>2</item>
-    </string-array>
-
 
 </resources>
