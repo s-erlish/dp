@@ -408,7 +408,14 @@ class MainActivity : HelperBaseActivity(), MainHost {
         // never runs, so the row is stuck on «0 KB/s». Enabled here, in the shell, because it has to
         // be true before ANY connect — including one started from the quick-settings tile, which
         // never opens a tab.
-        MmkvManager.encodeSettings(AppConfig.PREF_SPEED_ENABLED, true)
+        //
+        // Read before write: this is `onCreate`, so it also runs on every rotation and on every
+        // theme or language recreate, and the flag has been `true` since the first launch. An
+        // unconditional `encode` on a MULTI_PROCESS_MODE store is an mmap append plus the store's
+        // cross-process lock, for a value that never changes again.
+        if (!MmkvManager.decodeSettingsBool(AppConfig.PREF_SPEED_ENABLED, false)) {
+            MmkvManager.encodeSettings(AppConfig.PREF_SPEED_ENABLED, true)
+        }
 
         // All servers are shown in one flat, provider-grouped list (no subscription tabs).
         mainViewModel.subscriptionId = ""
