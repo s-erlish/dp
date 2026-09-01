@@ -416,6 +416,24 @@ object HttpUtil {
         }
     }
 
+    /**
+     * **The one client every request in this file is cut from.**
+     *
+     * `OkHttpClient()` is not a request object; it is a pool. Each instance owns a `Dispatcher`, a
+     * `ConnectionPool`, a `RouteDatabase` — and, the expensive one, its own lazily built
+     * `SSLSocketFactory` and `X509TrustManager`, which means loading and parsing the platform trust
+     * store on the first HTTPS call each instance makes. [buildOkHttpClient] used to mint a fresh
+     * one PER REQUEST, and `getUrlContentWithUserAgent*` mint one per REDIRECT HOP as well, so a
+     * subscription behind one redirect paid for two of everything and could not reuse so much as a
+     * TLS session between the two legs of its own fetch.
+     *
+     * `newBuilder()` hands the per-call settings (timeouts, proxy, redirects) their own client
+     * while sharing all of that — which is exactly the split OkHttp is designed around. Nothing
+     * about a request changes: the proxy and the timeouts are still set per call below, and this
+     * root has neither.
+     */
+    private val sharedClient: OkHttpClient by lazy { OkHttpClient() }
+
     private fun buildOkHttpClient(
         timeout: Int,
         httpPort: Int,
@@ -423,7 +441,7 @@ object HttpUtil {
         proxyPassword: String?,
         followRedirects: Boolean
     ): OkHttpClient {
-        val builder = OkHttpClient.Builder()
+        val builder = sharedClient.newBuilder()
             .connectTimeout(timeout.toLong(), TimeUnit.MILLISECONDS)
             .readTimeout(timeout.toLong(), TimeUnit.MILLISECONDS)
             .followRedirects(followRedirects)

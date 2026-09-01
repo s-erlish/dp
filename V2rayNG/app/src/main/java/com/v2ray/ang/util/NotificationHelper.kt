@@ -14,14 +14,12 @@ import com.v2ray.ang.enums.NotificationChannelType
  * Unified notification helper for different notification channels.
  * Supports both regular notifications and foreground service notifications.
  *
- * Performance: NotificationManager is cached. Builder is created once per update.
- * Safe for high-frequency updates (100+ times/second).
+ * Performance: the NotificationManager is cached; every post builds its own builder.
  */
 object NotificationHelper {
 
-    // Cached instances for performance
+    // Cached instance for performance
     private var cachedNotificationManager: NotificationManager? = null
-    private val builderCache = mutableMapOf<Int, NotificationCompat.Builder>()
 
     /**
      * Notify with a regular notification (non-foreground).
@@ -40,32 +38,6 @@ object NotificationHelper {
         ensureChannelCreated(channelType, context)
         val notificationManager = getNotificationManager(context)
         val builder = buildNotificationBuilder(channelType, context, title, content)
-        notificationManager.notify(channelType.notificationId, builder.build())
-    }
-
-    /**
-     * Update an existing notification's content.
-     * Optimized for high-frequency updates (100+/sec).
-     * Reuses cached Builder to minimize allocation overhead.
-     *
-     * @param channelType The notification channel type
-     * @param context The context
-     * @param content The new content text
-     */
-    fun updateNotification(
-        channelType: NotificationChannelType,
-        context: Context,
-        content: String
-    ) {
-        val notificationManager = getNotificationManager(context)
-
-        // Get or create builder from cache
-        val builder = builderCache.getOrPut(channelType.notificationId) {
-            buildNotificationBuilder(channelType, context, "", content)
-        }
-
-        // Update only the content text (fast operation)
-        builder.setContentText(content)
         notificationManager.notify(channelType.notificationId, builder.build())
     }
 
@@ -89,21 +61,23 @@ object NotificationHelper {
     }
 
     /**
-     * Stop the foreground notification for a service, and forget the builder that drove it.
+     * Stop the foreground notification for a service.
      *
-     * The cache used to outlive the notification: a second batch reused the builder the first one
-     * left behind, so whatever text was last written stayed on the row until something overwrote
-     * it. Dropping it here means the next start builds a fresh, empty one.
+     * THE BUILDER CACHE THIS USED TO CLEAR IS GONE, and it had been empty for some time: the only
+     * thing that ever put a builder in it was `updateNotification`, an "optimised for 100+ updates
+     * a second" path from upstream that lost its last caller when the latency batch stopped
+     * pushing its own tally into the shade (`CoreTestService.handleWorkerEvent`). Every notify here
+     * builds a fresh builder, so there is nothing left to forget — and the stale-text defect the
+     * cache used to cause cannot come back.
      *
      * @param service The service to stop foreground on
      */
     fun stopForeground(service: Service) {
         service.stopForeground(Service.STOP_FOREGROUND_REMOVE)
-        builderCache.clear()
     }
 
     /**
-     * Cancel a notification and clean up cached builder.
+     * Cancel a notification.
      *
      * @param channelType The notification channel type
      * @param context The context
@@ -113,7 +87,6 @@ object NotificationHelper {
         context: Context
     ) {
         getNotificationManager(context).cancel(channelType.notificationId)
-        builderCache.remove(channelType.notificationId)  // Clean up cache
     }
 
     // ====== Private helper methods ======

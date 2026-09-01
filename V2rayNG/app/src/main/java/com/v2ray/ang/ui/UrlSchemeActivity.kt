@@ -89,8 +89,12 @@ class UrlSchemeActivity : BaseActivity() {
 
             "disconnect", "close" -> CoreServiceManager.stopVService(this)
 
+            // `isTunnelUp`, NEVER `isRunning`: this Activity runs in the UI process, where the
+            // core controller has never started anything and answers «не подключено» for the life
+            // of the app. So `depv://toggle` only ever connected — it could not see the tunnel it
+            // was being asked to switch off. @see CoreServiceManager.isTunnelUp
             "toggle" -> {
-                if (CoreServiceManager.isRunning()) {
+                if (CoreServiceManager.isTunnelUp()) {
                     CoreServiceManager.stopVService(this)
                 } else {
                     CoreServiceManager.startVServiceFromToggle(this)
@@ -156,7 +160,10 @@ class UrlSchemeActivity : BaseActivity() {
     private fun importRoutingRules(json: String, apply: Boolean) {
         lifecycleScope.launch(Dispatchers.IO) {
             val result = SettingsManager.resetRoutingRulesets(json)
-            if (result && apply && CoreServiceManager.isRunning()) {
+            // Same cross-process reading as `toggle` above: asked with `isRunning` this was always
+            // false, so `onadd` saved the rules and never applied them to the live core — the one
+            // thing that distinguishes it from `add`. @see CoreServiceManager.isTunnelUp
+            if (result && apply && CoreServiceManager.isTunnelUp()) {
                 MessageUtil.sendMsg2Service(this@UrlSchemeActivity, AppConfig.MSG_STATE_RESTART, "")
             }
             withContext(Dispatchers.Main) {

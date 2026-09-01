@@ -12,11 +12,17 @@ import java.io.File
 /**
  * Manages the tun2socks process that handles VPN traffic
  */
+/**
+ * `isRunningProvider` and `restartCallback` USED TO BE CONSTRUCTOR PARAMETERS HERE and neither was
+ * ever read. Upstream v2rayNG ran tun2socks as a child PROCESS and needed both: a watchdog thread
+ * asked "is the service still meant to be up" and, if the process had died on its own, called back
+ * to start it again. This fork drives hev-socks5-tunnel through JNI in-process, so there is no
+ * process to outlive us and nothing to restart — the two lambdas were captured, stored and never
+ * consulted, one of them holding `CoreVpnService::runTun2socks`.
+ */
 class TProxyService(
     private val context: Context,
     private val vpnInterface: ParcelFileDescriptor,
-    private val isRunningProvider: () -> Boolean,
-    private val restartCallback: () -> Unit
 ) : Tun2SocksControl {
     companion object {
         @JvmStatic

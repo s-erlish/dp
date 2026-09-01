@@ -23,8 +23,6 @@ import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SubscriptionNaming
-import com.v2ray.ang.helper.ItemTouchHelperAdapter
-import com.v2ray.ang.helper.ItemTouchHelperViewHolder
 import com.v2ray.ang.template.TemplateManager
 import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.ui.component.pressFeedback
@@ -34,7 +32,7 @@ import com.v2ray.ang.viewmodel.MainViewModel
 class MainRecyclerAdapter(
     private val mainViewModel: MainViewModel,
     private val adapterListener: MainAdapterListener?
-) : RecyclerView.Adapter<MainRecyclerAdapter.BaseViewHolder>(), ItemTouchHelperAdapter {
+) : RecyclerView.Adapter<MainRecyclerAdapter.BaseViewHolder>() {
     companion object {
         private const val VIEW_TYPE_HEADER = 0
         private const val VIEW_TYPE_ITEM = 1
@@ -90,6 +88,7 @@ class MainRecyclerAdapter(
         this.subs = newSubs
         this.showHeaders = showHeaders
         val targetGuid = if (index in this.servers.indices) this.servers[index].guid else null
+        pruneCustomProtoCache(index < 0)
         rebuildRows()
 
         // Selection can have been changed by something that owns no list — a subscription import,
@@ -101,12 +100,6 @@ class MainRecyclerAdapter(
 
         val flat = targetGuid?.let { flatPositionOf(it) } ?: -1
         if (flat >= 0 && !selectionChanged) notifyItemChanged(flat) else notifyDataSetChanged()
-    }
-
-    /** Backward-compatible shim: flat list, no section headers. */
-    @SuppressLint("NotifyDataSetChanged")
-    fun setData(newData: MutableList<ServersCache>?, position: Int = -1) {
-        setSections(newData ?: emptyList(), emptyList(), showHeaders = false, index = position)
     }
 
     private fun rebuildRows() {
@@ -374,6 +367,36 @@ class MainRecyclerAdapter(
     // A `null` value is cached too (config has no single identifiable outbound → show "Custom").
     private val customProtoCache = HashMap<String, CustomProtoInfo?>()
 
+    /** The guid set [customProtoCache] was last aligned to. @see pruneCustomProtoCache */
+    private var cachedProtoGuids: Set<String> = emptySet()
+
+    /**
+     * THE PARSE CACHE NEVER FORGOT A GUID, and a подписка refresh is what made that matter.
+     *
+     * A refresh deletes every profile of a провайдер and mints a new guid for each replacement, so
+     * once one has run not a single cached key names a server that still exists — and the entries
+     * stayed, a fresh set per refresh, for the life of the adapter. Главная's list belongs to a tab
+     * the shell hides rather than replaces, so that life is the whole session.
+     *
+     * Dropping the whole map when the guid SET changes also settles the second question — whether a
+     * cached value can still be trusted. A подписка refresh, an import and a delete all move the
+     * set, and those are the paths that replace a profile's CONTENT; what is left over is editing
+     * one profile in place, which keeps its guid and is the one case this cannot see.
+     *
+     * Checked only on a structural rebuild, and against the set rather than on every call, because
+     * the other caller is a SINGLE-ROW refresh — one per server of a bulk latency check, arriving
+     * several times a second — and a list whose rows have not moved must not pay to re-read them.
+     *
+     * @param structural true when the whole list was rebuilt rather than one row refreshed.
+     */
+    private fun pruneCustomProtoCache(structural: Boolean) {
+        if (!structural) return
+        val live = servers.mapTo(HashSet(servers.size)) { it.guid }
+        if (live == cachedProtoGuids) return
+        cachedProtoGuids = live
+        customProtoCache.clear()
+    }
+
     private fun customProtoInfo(guid: String): CustomProtoInfo? {
         if (customProtoCache.containsKey(guid)) return customProtoCache[guid]
         val info = try {
@@ -393,14 +416,6 @@ class MainRecyclerAdapter(
         }
         customProtoCache[guid] = info
         return info
-    }
-
-    /** Removes a server row by guid and rebuilds the flat list. */
-    @SuppressLint("NotifyDataSetChanged")
-    fun removeServerSub(guid: String, position: Int = -1) {
-        servers = servers.filterNot { it.guid == guid }
-        rebuildRows()
-        notifyDataSetChanged()
     }
 
     /** Refreshes the two rows involved in a selection change (guids). */
@@ -450,33 +465,28 @@ class MainRecyclerAdapter(
         positions.distinct().forEach { notifyItemChanged(it) }
     }
 
-    open class BaseViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        fun onItemSelected() {
-            itemView.setBackgroundColor(Color.LTGRAY)
-        }
-
-        fun onItemClear() {
-            itemView.setBackgroundColor(0)
-        }
-    }
+    /**
+     * THE DRAG CONTRACT IS OFF THIS FILE, and every piece of it was inert.
+     *
+     * This adapter used to implement `ItemTouchHelperAdapter` and its holder
+     * `ItemTouchHelperViewHolder`, which between them are five methods: `onItemMove` (returned
+     * `false`), `onItemMoveCompleted` and `onItemDismiss` (empty), and the holder's
+     * `onItemSelected` / `onItemClear` — the grey wash a dragged row wore, painted as a raw
+     * `Color.LTGRAY` over a row whose whole look is `@drawable/bg_server_row`.
+     *
+     * All five are called by `SimpleItemTouchHelperCallback`, and NO `ItemTouchHelper` is attached
+     * to Главная's list (see `HomeFragment.setupServerList`) — reordering there belongs to the
+     * провайдер, not the finger. The three screens that DO drag keep the interfaces and their own
+     * adapters; this one was carrying a contract nobody could invoke.
+     */
+    open class BaseViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView)
 
     class MainViewHolder(val itemMainBinding: ItemRecyclerMainBinding) :
-        BaseViewHolder(itemMainBinding.root), ItemTouchHelperViewHolder
+        BaseViewHolder(itemMainBinding.root)
 
     class HeaderViewHolder(val binding: ItemSectionHeaderBinding) :
         BaseViewHolder(binding.root)
 
     class FooterViewHolder(val itemFooterBinding: ItemRecyclerFooterBinding) :
         BaseViewHolder(itemFooterBinding.root)
-
-    // Drag is disabled in the grouped all-servers list (see impl doc): no ItemTouchHelper is
-    // attached, so these are inert. Kept to satisfy the ItemTouchHelperAdapter contract.
-    override fun onItemMove(fromPosition: Int, toPosition: Int): Boolean = false
-
-    override fun onItemMoveCompleted() {
-        // do nothing
-    }
-
-    override fun onItemDismiss(position: Int) {
-    }
 }

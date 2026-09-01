@@ -26,6 +26,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.v2ray.ang.R
+import com.v2ray.ang.auth.AccountSession
 import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.dto.PaymentInitDto
 import com.v2ray.ang.auth.dto.PaymentOutcome
@@ -209,6 +210,20 @@ class BuyTariffActivity : BaseActivity() {
             renderState()
         }
         viewModel.loadPublicConfig()
+        // THE CATALOGUE IS PUBLIC, THE ACCOUNT IS NOT. `loadTariffs` and `loadPublicConfig` above
+        // answer to anyone; `/client/profile` and `/client/subscription*` need a token, and asked
+        // without one they are a round trip that can only come back 401. Nothing here reads the
+        // result in that state either — «Текущий» marks the tariff the ACCOUNT owns and there is no
+        // account. @see loadAccountState
+        loadAccountState()
+    }
+
+    /**
+     * The two authenticated loads this screen wants, asked for only when there is a session to ask
+     * with. Both are latest-wins in the ViewModel, so calling this again is free.
+     */
+    private fun loadAccountState() {
+        if (!AccountSession.isLoggedIn()) return
         viewModel.refreshProfile()
         // What the account already owns, for «Текущий».
         viewModel.loadSubscriptions()
@@ -1031,11 +1046,17 @@ class BuyTariffActivity : BaseActivity() {
      */
     private fun startPaymentPolling() {
         if (pollJob?.isActive == true) return
+        // A POLL WITHOUT A SESSION IS TEN REQUESTS THAT CANNOT BE ANSWERED. Both endpoints below
+        // are authenticated, and the hint over them promises news about an account nobody is signed
+        // in to — so there is nothing to wait for and nothing to show. @see loadAccountState
+        if (!AccountSession.isLoggedIn()) {
+            pendingPayment = false
+            return
+        }
         tvPending.visibility = View.VISIBLE
         pollJob = lifecycleScope.launch {
             repeat(5) {
-                viewModel.refreshProfile()
-                viewModel.loadSubscriptions()
+                loadAccountState()
                 delay(8000L)
             }
             pendingPayment = false

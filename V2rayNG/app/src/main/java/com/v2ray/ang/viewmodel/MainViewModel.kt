@@ -12,7 +12,6 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.v2ray.ang.AngApplication
 import com.v2ray.ang.AppConfig
-import com.v2ray.ang.R
 import com.v2ray.ang.dto.GroupMapItem
 import com.v2ray.ang.dto.SubscriptionUpdateResult
 import com.v2ray.ang.dto.TestServiceMessage
@@ -24,7 +23,6 @@ import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.isGroupType
 import com.v2ray.ang.template.TemplateManager
 import com.v2ray.ang.util.JsonUtil
-import com.v2ray.ang.extension.matchesPattern
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
@@ -46,15 +44,27 @@ import kotlinx.coroutines.sync.withPermit
 import com.v2ray.ang.enums.PingMethod
 import kotlinx.coroutines.withContext
 import java.util.Collections
-import java.util.regex.PatternSyntaxException
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var serverList = mutableListOf<String>() // MmkvManager.decodeServerList()
     var subscriptionId: String = MmkvManager.decodeSettingsString(AppConfig.CACHE_SUBSCRIPTION_ID, "").orEmpty()
-    var keywordFilter = ""
 
-    // Protocol filter for the Servers tab chips ("Все" = null). Applied in updateCache().
-    var protocolFilter: com.v2ray.ang.enums.EConfigType? = null
+    /**
+     * THE TWO OTHER FILTERS THAT USED TO NARROW [serversCache] ARE GONE, and the reason is the same
+     * for both: the surface that set them is gone and nothing has set them since.
+     *
+     * `keywordFilter` was the Серверы tab's search box and `protocolFilter` its protocol chips.
+     * With the tab removed, `filterConfig()` and `applyProtocolFilter()` had no callers, so both
+     * fields held their initial value for the life of the process — and every reader of them was a
+     * branch that could only ever go one way, including a `Regex` compiled per rebuild against a
+     * string that was always empty.
+     *
+     * **[serversCache] IS A VIEW AND [subscriptionId] IS THE ONE THING THAT STILL NARROWS IT.** That
+     * distinction is the one to keep: a filtered-to-zero cache is not an empty store, and code that
+     * mistakes the two takes the whole bottom navigation off screen (see
+     * `MainActivity.updateBottomNavVisibility`). A search added here later must not be able to
+     * reintroduce that.
+     */
     val serversCache = mutableListOf<ServersCache>()
     val isRunning by lazy { MutableLiveData<Boolean>() }
 
@@ -271,55 +281,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Swaps the positions of two servers.
-     * @param fromPosition The initial position of the server.
-     * @param toPosition The target position of the server.
-     */
-    fun swapServer(fromPosition: Int, toPosition: Int) {
-        if (subscriptionId.isEmpty()) {
-            return
-        }
-
-        Collections.swap(serverList, fromPosition, toPosition)
-        Collections.swap(serversCache, fromPosition, toPosition)
-
-        MmkvManager.encodeServerList(serverList, subscriptionId)
-    }
+    // `swapServer()` USED TO STAND HERE: the drag-to-reorder write behind
+    // `MainRecyclerAdapter.onItemMove`. That adapter answers the move `false` and no
+    // `ItemTouchHelper` is attached to Главная's list, so nothing has been able to reach this since
+    // the Серверы tab went. The provider's own order is what the list shows, and
+    // `SettingsManager.applyServerSortOrder` is what rewrites it.
 
     /**
-     * Updates the cache of servers.
+     * Updates the cache of servers: every profile of [subscriptionId] (or of the whole store when
+     * it is blank), decoded once, in the stored order.
+     *
+     * The keyword and protocol branches that used to sit inside this loop are gone with the fields
+     * that fed them — @see [serversCache].
      */
     @Synchronized
     fun updateCache() {
         serversCache.clear()
-        val kw = keywordFilter.trim()
-        val searchRegex = try {
-            if (kw.isNotEmpty()) Regex(kw, setOf(RegexOption.IGNORE_CASE)) else null
-        } catch (e: PatternSyntaxException) {
-            null // Fallback to literal search if regex is invalid
-        }
         for (guid in serverList) {
             val profile = MmkvManager.decodeServerConfig(guid) ?: continue
-            // Protocol filter (Servers tab chips). Null = "Все" (show every protocol).
-            val pf = protocolFilter
-            if (pf != null && profile.configType != pf) continue
-            if (kw.isEmpty()) {
-                serversCache.add(ServersCache(guid, profile))
-                continue
-            }
-
-            val remarks = profile.remarks
-            val description = profile.description.orEmpty()
-            val server = profile.server.orEmpty()
-            val protocol = profile.configType.name
-            if (remarks.matchesPattern(searchRegex, kw)
-                || description.matchesPattern(searchRegex, kw)
-                || server.matchesPattern(searchRegex, kw)
-                || protocol.matchesPattern(searchRegex, kw)
-            ) {
-                serversCache.add(ServersCache(guid, profile))
-            }
+            serversCache.add(ServersCache(guid, profile))
         }
     }
 
@@ -504,7 +484,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 TestServiceMessage(
                     key = AppConfig.MSG_MEASURE_CONFIG_START,
                     subscriptionId = subscriptionId,
-                    serverGuids = if (keywordFilter.isNotEmpty()) serversCopy.map { it.guid } else emptyList()
+                    // Empty = "let the service resolve the set from subscriptionId", which is what
+                    // this has always sent: the explicit list was only ever built for a keyword
+                    // filter, and there is none. @see serversCache
+                    serverGuids = emptyList()
                 )
             )
         }
@@ -569,51 +552,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Do not reintroduce a "pick the fastest for the user" path here. The failure mode is the one
     // the owner objected to: the app quietly moving him off the сервер he chose.
 
-    /**
-     * Changes the subscription ID.
-     * @param id The new subscription ID.
-     */
-    fun subscriptionIdChanged(id: String) {
-        if (subscriptionId != id) {
-            subscriptionId = id
-            MmkvManager.encodeSettings(AppConfig.CACHE_SUBSCRIPTION_ID, subscriptionId)
-        }
-        reloadServerList()
-    }
-
-    /**
-     * Gets the subscriptions.
-     * @param context The context.
-     * @return A pair of lists containing the subscription IDs and remarks.
-     */
-    fun getSubscriptions(context: Context): List<GroupMapItem> {
-        val subscriptions = MmkvManager.decodeSubscriptions()
-        if (subscriptionId.isNotEmpty()
-            && !subscriptions.map { it.guid }.contains(subscriptionId)
-        ) {
-            subscriptionIdChanged("")
-        }
-
-        val groups = mutableListOf<GroupMapItem>()
-        if (MmkvManager.decodeSettingsBool(AppConfig.PREF_GROUP_ALL_DISPLAY)) {
-            groups.add(
-                GroupMapItem(
-                    id = "",
-                    remarks = context.getString(R.string.filter_config_all)
-                )
-            )
-        }
-        // Pinned subscriptions come first (stable sort preserves original order otherwise).
-        subscriptions.sortedByDescending { it.subscription.pinned }.forEach { sub ->
-            groups.add(
-                GroupMapItem(
-                    id = sub.guid,
-                    remarks = sub.subscription.remarks
-                )
-            )
-        }
-        return groups
-    }
+    // `subscriptionIdChanged()` and `getSubscriptions()` USED TO STAND HERE, and they went
+    // together: the second built the подписка picker's rows and was the only caller of the first.
+    // Both belonged to the Серверы tab's group selector, which the owner removed — Главная shows
+    // every server in one provider-grouped list and its карусель is built from [getProviderGroups].
+    // `subscriptionId` itself stays: it is still what narrows the cache, and the shell writes it.
 
     /**
      * Gets the position of a server by its GUID.
@@ -641,7 +584,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun removeAllServer(): Int {
         val count =
-            if (subscriptionId.isEmpty() && keywordFilter.isEmpty()) {
+            if (subscriptionId.isEmpty()) {
                 MmkvManager.removeAllServer()
             } else {
                 val serversCopy = serversCache.toList()
@@ -674,7 +617,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * @return The number of removed servers.
      */
     fun removeInvalidServer(): Int {
-        val candidates = if (subscriptionId.isEmpty() && keywordFilter.isEmpty()) {
+        val candidates = if (subscriptionId.isEmpty()) {
             MmkvManager.decodeAllServerList()
         } else {
             serversCache.map { it.guid }
@@ -733,45 +676,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Filters the configuration by a keyword.
-     * @param keyword The keyword to filter by.
-     */
-    fun filterConfig(keyword: String) {
-        if (keyword == keywordFilter) {
-            return
-        }
-        keywordFilter = keyword
-        reloadServerList()
-    }
+    // `filterConfig()`, `applyProtocolFilter()` and `availableProtocols()` USED TO STAND HERE.
+    // They were the Серверы tab's search box and its protocol chips — the writers behind the two
+    // filter fields described on [serversCache] — and they lost their surface with the tab. Nothing
+    // has called any of them since, so the filters they set could only ever hold their initial
+    // value.
 
-    /**
-     * Sets the protocol filter (Servers tab chips) and reloads the list.
-     * @param type The protocol to keep, or null for "Все" (all protocols).
-     */
-    fun applyProtocolFilter(type: com.v2ray.ang.enums.EConfigType?) {
-        if (protocolFilter == type) return
-        protocolFilter = type
-        reloadServerList()
-    }
-
-    /**
-     * Distinct protocol types present in the full (unfiltered) server list,
-     * used to build the Servers tab filter chips. Order follows first appearance.
-     */
-    fun availableProtocols(): List<com.v2ray.ang.enums.EConfigType> {
-        val result = mutableListOf<com.v2ray.ang.enums.EConfigType>()
-        for (guid in serverList) {
-            val type = MmkvManager.decodeServerConfig(guid)?.configType ?: continue
-            if (!result.contains(type)) result.add(type)
-        }
-        return result
-    }
-
-    /**
-     * Real subscription groups (providers), pinned-first, used as section headers
-     * on the Servers tab. Excludes the synthetic "All" pseudo-group.
-     */
     /**
      * The подписки the user actually has, pinned first.
      *
