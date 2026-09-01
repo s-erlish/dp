@@ -48,7 +48,6 @@ object SettingsManager {
         // «Российские приложения» mimo VPN, on out of the box — but only on an install whose
         // per-app routing nobody has touched. See RussianAppsPreset.seedOnFirstRun.
         RussianAppsPreset.seedOnFirstRun()
-        //ensureDefaultSubscription()
         initRoutingRulesets(context)
         migrateServerListToSubscriptions()
         migrateHysteria2PinSHA256()
@@ -790,16 +789,24 @@ object SettingsManager {
      * сервер…», measured every сервер and restarted the tunnel on whichever answered fastest. The
      * user's own choice was overridden, and the first they knew of it was the sentence.
      *
-     * How it is off: the switch that armed it is gone from the settings screen, and this writes its
-     * key `false` on every start — so an install that already stored `true`, or one restored from a
-     * backup that carried it, is switched off too, and the health check is never armed at all. Not
-     * a one-shot migration on purpose: the value must not be able to come back from anywhere.
+     * How it is off: the switch that armed it is gone from the settings screen, and this puts its
+     * key back to `false` on every start where it is not already `false` — so an install that
+     * stored `true`, or one restored from a backup that carried it, is switched off too, and the
+     * health check is never armed at all. Not a one-shot migration on purpose: the value must not
+     * be able to come back from anywhere.
+     *
+     * IT NO LONGER WRITES WHEN THERE IS NOTHING TO WRITE. The unconditional `encode` put the same
+     * `false` into a MULTI_PROCESS_MODE store at every launch — an mmap append plus the store's
+     * cross-process lock, on the startup path, for a value that has not changed since the build
+     * that retired the feature. Reading first is one lookup, and on every install past the first
+     * launch that is the whole cost.
      *
      * What is NOT touched, because the owner asked for the switching to go and nothing else
      * (`PORT-DELTA.md` П-26): the latency measurement itself, all four check methods, «обновить»,
      * the 30-second probe that draws the «мс» figure on Главная, and picking a сервер by hand.
      */
     private fun retireAutoFallback() {
+        if (!MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_FALLBACK, false)) return
         MmkvManager.encodeSettings(AppConfig.PREF_AUTO_FALLBACK, false)
     }
 

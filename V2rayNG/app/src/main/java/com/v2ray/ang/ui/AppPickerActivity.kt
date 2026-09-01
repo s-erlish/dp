@@ -1,6 +1,5 @@
 package com.v2ray.ang.ui
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -63,6 +62,7 @@ class AppPickerActivity : BaseActivity() {
     private val selectedPackages = LinkedHashSet<String>()
     private val adapter by lazy {
         PerAppProxyAdapter(
+            scope = lifecycleScope,
             isSelected = selectedPackages::contains,
             onToggle = { packageName ->
                 if (!selectedPackages.remove(packageName)) selectedPackages.add(packageName)
@@ -122,20 +122,18 @@ class AppPickerActivity : BaseActivity() {
         super.finish()
     }
 
-    @SuppressLint("UseCompatLoadingForDrawables")
-    private fun createSpecialItemUnidentified(): AppInfo {
-        val icon = requireNotNull(
-            getDrawable(android.R.drawable.ic_menu_help)
-                ?: getDrawable(android.R.drawable.sym_def_app_icon)
-        ) { "No fallback drawable available" }
-        return AppInfo(
-            appName = getString(R.string.perapp_unknown_app),
-            packageName = AppConfig.UNIDENTIFIED_PACKAGE,
-            appIcon = icon,
-            isSystemApp = false,
-            isSelected = 0
-        )
-    }
+    /**
+     * The «неопознанные приложения» pseudo-entry: traffic from a uid no installed package claims.
+     *
+     * It no longer carries a drawable of its own — `AppIconLoader` answers this package with the
+     * platform help glyph, on the same path every other row uses.
+     */
+    private fun createSpecialItemUnidentified(): AppInfo = AppInfo(
+        appName = getString(R.string.perapp_unknown_app),
+        packageName = AppConfig.UNIDENTIFIED_PACKAGE,
+        isSystemApp = false,
+        isSelected = 0
+    )
 
     private fun loadApps() {
         loadFailed = false

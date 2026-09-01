@@ -2,7 +2,6 @@ package com.v2ray.ang.ui
 
 import android.os.Bundle
 import android.text.TextUtils
-import android.view.View
 import androidx.activity.viewModels
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
@@ -75,6 +74,7 @@ class PerAppProxyActivity : BaseActivity() {
     private val viewModel: PerAppProxyViewModel by viewModels()
     private val adapter by lazy {
         PerAppProxyAdapter(
+            scope = lifecycleScope,
             isSelected = viewModel::contains,
             onToggle = { packageName ->
                 viewModel.toggle(packageName)

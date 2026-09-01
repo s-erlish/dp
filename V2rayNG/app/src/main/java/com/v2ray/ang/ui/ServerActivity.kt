@@ -196,7 +196,6 @@ class ServerActivity : BaseActivity() {
 
                 et_request_host?.text = Utils.getEditable(
                     when (networks[position]) {
-                        //"quic" -> config?.quicSecurity
                         NetworkType.GRPC.type -> config?.authority
                         else -> config?.host
                     }.orEmpty()
@@ -204,7 +203,6 @@ class ServerActivity : BaseActivity() {
                 et_path?.text = Utils.getEditable(
                     when (networks[position]) {
                         NetworkType.KCP.type -> config?.seed
-                        //"quic" -> config?.quicKey
                         NetworkType.GRPC.type -> config?.serviceName
                         else -> config?.path
                     }.orEmpty()
@@ -525,7 +523,6 @@ class ServerActivity : BaseActivity() {
         if (config.subscriptionId.isEmpty() && !subscriptionId.isNullOrEmpty()) {
             config.subscriptionId = subscriptionId.orEmpty()
         }
-        //LogUtil.i(AppConfig.TAG, JsonUtil.toJsonPretty(config) ?: "")
         MmkvManager.encodeServerConfig(editGuid, config)
         if (isRunning) {
             SettingsChangeManager.makeRestartService()

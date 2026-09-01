@@ -38,6 +38,8 @@ import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.util.HttpUtil
 import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
@@ -155,13 +157,12 @@ class DepartamentApiClientImpl(
         val url = urlOf(BackendConfig.Endpoints.telegramLoginCheck)
             .addQueryParameter("token", token)
             .build()
-        val resp = execute(Request.Builder().url(url).get().build())
-        resp.use {
-            return when (it.code) {
+        return exchange(Request.Builder().url(url).get().build()) { resp ->
+            when (resp.code) {
                 404 -> TelegramCheckResult.NotYet
                 410 -> TelegramCheckResult.Expired
                 in 200..299 -> {
-                    val raw = parse(it.body?.string().orEmpty(), TelegramCheckResponseDto::class.java)
+                    val raw = parse(resp.body.string(), TelegramCheckResponseDto::class.java)
                     val jwt = raw.token
                     val client = raw.client
                     if (raw.confirmed && !jwt.isNullOrBlank() && client != null) {
@@ -170,7 +171,7 @@ class DepartamentApiClientImpl(
                         TelegramCheckResult.NotYet
                     }
                 }
-                else -> throw mapError(it.code)
+                else -> throw mapError(resp.code)
             }
         }
     }
@@ -216,10 +217,9 @@ class DepartamentApiClientImpl(
     override suspend fun getSubscriptionQr(remnawaveUuid: String): ByteArray {
         ensureConfigured()
         val url = urlOf(BackendConfig.Endpoints.subscriptionQr).addQueryParameter("uuid", remnawaveUuid).build()
-        val resp = execute(Request.Builder().url(url).get().build())
-        resp.use {
-            if (!it.isSuccessful) throw mapError(it.code)
-            return it.body?.bytes() ?: throw ApiError.Parse()
+        return exchange(Request.Builder().url(url).get().build()) { resp ->
+            if (!resp.isSuccessful) throw mapError(resp.code)
+            resp.body.bytes()
         }
     }
 
@@ -246,14 +246,13 @@ class DepartamentApiClientImpl(
     override suspend fun getDevices(remnawaveUuid: String): DevicesResult {
         ensureConfigured()
         val url = urlOf(BackendConfig.Endpoints.devices).addQueryParameter("uuid", remnawaveUuid).build()
-        val resp = execute(Request.Builder().url(url).get().build())
-        resp.use {
-            val body = it.body?.string().orEmpty()
-            if (!it.isSuccessful) throw mapError(it.code, sanitizeBody(body))
+        return exchange(Request.Builder().url(url).get().build()) { resp ->
+            val body = resp.body.string()
+            if (!resp.isSuccessful) throw mapError(resp.code, sanitizeBody(body))
             // Keep the raw (sanitized) body so the UI can surface a diagnostic when the parsed
             // list is empty but the subscription reports connected devices (shape mismatch).
             val devices = parse(body, DevicesDto::class.java).devices()
-            return DevicesResult(devices, it.code, sanitizeBody(body).orEmpty())
+            DevicesResult(devices, resp.code, sanitizeBody(body).orEmpty())
         }
     }
 
@@ -336,41 +335,61 @@ class DepartamentApiClientImpl(
         return call(req, cls)
     }
 
-    private suspend fun <T> call(request: Request, cls: Class<T>): T {
-        val resp = execute(request)
-        resp.use {
-            val body = it.body?.string().orEmpty()
-            if (!it.isSuccessful) throw mapError(it.code, sanitizeBody(body))
-            return parse(body, cls)
-        }
+    private suspend fun <T> call(request: Request, cls: Class<T>): T = exchange(request) { resp ->
+        val body = resp.body.string()
+        if (!resp.isSuccessful) throw mapError(resp.code, sanitizeBody(body))
+        parse(body, cls)
     }
 
-    private suspend fun <T> callType(request: Request, type: Type): T {
-        val resp = execute(request)
-        resp.use {
-            val body = it.body?.string().orEmpty()
-            if (!it.isSuccessful) throw mapError(it.code, sanitizeBody(body))
-            return parseType(body, type)
-        }
+    private suspend fun <T> callType(request: Request, type: Type): T = exchange(request) { resp ->
+        val body = resp.body.string()
+        if (!resp.isSuccessful) throw mapError(resp.code, sanitizeBody(body))
+        parseType(body, type)
     }
 
-    private suspend fun executeVoid(request: Request) {
-        val resp = execute(request)
-        resp.use {
-            if (!it.isSuccessful) throw mapError(it.code)
-        }
+    private suspend fun executeVoid(request: Request) = exchange(request) { resp ->
+        if (!resp.isSuccessful) throw mapError(resp.code)
     }
 
-    /** Executes the call on IO, mapping transport failures to [ApiError]. Caller must close. */
-    private suspend fun execute(request: Request): Response = withContext(Dispatchers.IO) {
-        try {
-            http.newCall(request).execute()
-        } catch (e: SocketTimeoutException) {
-            throw ApiError.Timeout
-        } catch (e: IOException) {
-            throw ApiError.Network(e)
+    /**
+     * **Одно место, где живёт весь сетевой обмен — и всё оно на [Dispatchers.IO].**
+     *
+     * ЧИТАТЬ ТЕЛО ОТВЕТА — ТОЖЕ СЕТЕВАЯ РАБОТА. The old `execute()` hopped to IO for
+     * `newCall().execute()` and returned the `Response` to the caller — and `execute()` returns as
+     * soon as the RESPONSE HEADERS are in. Everything after it — `body.string()`, which reads the
+     * payload off the socket, and the Gson parse of that payload — ran back on the caller's
+     * dispatcher. `AccountRepository` has no `withContext` anywhere and every ViewModel calls it
+     * from `viewModelScope`, i.e. `Dispatchers.Main.immediate`, so THE BODY OF EVERY ACCOUNT
+     * REQUEST WAS READ AND PARSED ON THE MAIN THREAD: `/client/profile`, `/subscription/all`,
+     * `/client/subscription`, `/client/payments`, the tariff catalog, the payment poll's six
+     * rounds. The block is handed the still-open response and runs on IO with it, so the read and
+     * the parse land where the call already was.
+     *
+     * IT IS ALSO CANCELLABLE NOW, which the old shape could not be. A blocking `execute()` inside
+     * `withContext` ignores cancellation: the coroutine unwinds, the socket does not, and the
+     * request runs to completion on a blocked IO thread with nobody left to read the answer. Two
+     * screens ask for the same account data at the same moment by design (Главная and Аккаунт both
+     * refresh on resume) and the ViewModel's latest-wins cancels the older job — which until now
+     * threw away the ANSWER while still paying for the REQUEST. The completion handler cancels the
+     * OkHttp call itself, and [ensureActive] makes sure the resulting «Canceled» IOException
+     * unwinds as a cancellation rather than being reported to the user as a network failure.
+     */
+    private suspend fun <T> exchange(request: Request, read: (Response) -> T): T =
+        withContext(Dispatchers.IO) {
+            val call = http.newCall(request)
+            val onCancel = coroutineContext[Job]?.invokeOnCompletion { if (it != null) call.cancel() }
+            try {
+                call.execute().use(read)
+            } catch (e: SocketTimeoutException) {
+                ensureActive()
+                throw ApiError.Timeout
+            } catch (e: IOException) {
+                ensureActive()
+                throw ApiError.Network(e)
+            } finally {
+                onCancel?.dispose()
+            }
         }
-    }
 
     private fun mapError(code: Int, detail: String? = null): ApiError = when (code) {
         // Only 401 means "authentication failed / token expired". 403 (Forbidden) is a permission

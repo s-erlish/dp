@@ -21,6 +21,10 @@ import com.v2ray.ang.enums.NotificationChannelType
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.MessageUtil
 import com.v2ray.ang.util.NotificationHelper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -28,6 +32,22 @@ object SubscriptionUpdater {
 
     /** Launch-time work runs once per process, not on every activity recreate. */
     private val launchTasksRun = AtomicBoolean(false)
+
+    /**
+     * Where the scheduling runs, which is NOT the caller's thread.
+     *
+     * Both callers hand this the main thread at the worst possible moment: `MainActivity.onCreate`,
+     * before the first frame, and `BootReceiver.onReceive`, inside a broadcast's ten-second budget.
+     * And the work is not cheap — every подписка is read and parsed out of MMKV, then
+     * `RemoteWorkManager.getInstance()` builds WorkManager's whole apparatus (a Room database, a
+     * two-thread executor, a `JobScheduler` binder call) and each enqueue binds the
+     * `RemoteWorkManagerService`, which STARTS THE `:bg` PROCESS. None of that has a deadline, and
+     * none of it draws anything.
+     *
+     * The process-wide object owns the scope on purpose: the schedule must survive the activity
+     * that asked for it, and a Routine cancelled halfway leaves a подписка with no timer behind it.
+     */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     // -------------------------------------------------------------------------
     // Public API — the only methods external callers should ever use
@@ -53,24 +73,41 @@ object SubscriptionUpdater {
                 ExistingPeriodicWorkPolicy.KEEP
             }
 
-        MmkvManager.decodeSubscriptions().forEach { sub ->
-            scheduleOne(
-                context = context,
-                subId = sub.guid,
-                shouldRun = sub.subscription.autoUpdate,
-                existingWorkPolicy = existingWorkPolicy
-            )
-        }
-        LogUtil.i(
-            AppConfig.TAG,
-            "SubscriptionUpdater: sync complete forceReschedule=$forceReschedule"
-        )
-
         // The default mode is the app's launch/boot entry point (see above), which is also where
         // the provider screen's "at launch" promises have to be kept. A settings change reschedules
         // with forceReschedule=true and must not replay them.
-        if (!forceReschedule) {
-            runLaunchTasks(context)
+        val launchTasks = !forceReschedule && launchTasksRun.compareAndSet(false, true)
+
+        // THE ORDERING STAYS ON THE CALLER'S THREAD, and only the ordering. `MainActivity.onCreate`
+        // loads the server list on the line after this call, so a sort that landed later would
+        // repaint a list the user had already been shown. On the default order — which is what the
+        // provider screen now leaves every install on — it is one settings read and a return.
+        if (launchTasks) {
+            SettingsManager.applyServerSortOrder()
+        }
+
+        scope.launch {
+            MmkvManager.decodeSubscriptions().forEach { sub ->
+                scheduleOne(
+                    context = context,
+                    subId = sub.guid,
+                    shouldRun = sub.subscription.autoUpdate,
+                    existingWorkPolicy = existingWorkPolicy
+                )
+            }
+            LogUtil.i(
+                AppConfig.TAG,
+                "SubscriptionUpdater: sync complete forceReschedule=$forceReschedule"
+            )
+
+            if (launchTasks) {
+                if (SettingsManager.isUpdateSubscriptionOnLaunch()) {
+                    updateAllNow(context)
+                }
+                if (SettingsManager.isPingOnLaunch()) {
+                    requestLatencyTest(context)
+                }
+            }
         }
     }
 
@@ -102,25 +139,6 @@ object SubscriptionUpdater {
     // -------------------------------------------------------------------------
 
     private fun taskName(subId: String) = "${AppConfig.SUBSCRIPTION_UPDATE_TASK_NAME}_$subId"
-
-    /**
-     * The work the provider screen promises "at launch": server ordering, an immediate refresh of
-     * every subscription and a latency test, each behind its own switch.
-     */
-    private fun runLaunchTasks(context: Context) {
-        if (!launchTasksRun.compareAndSet(false, true)) return
-
-        // Latencies measured late in the previous session reach the stored order only here, which
-        // runs before the host activity loads the list.
-        SettingsManager.applyServerSortOrder()
-
-        if (SettingsManager.isUpdateSubscriptionOnLaunch()) {
-            updateAllNow(context)
-        }
-        if (SettingsManager.isPingOnLaunch()) {
-            requestLatencyTest(context)
-        }
-    }
 
     /**
      * Enqueues an immediate one-shot refresh of every enabled subscription, leaving the periodic

@@ -1,6 +1,7 @@
 package com.v2ray.ang.ui
 
 import android.annotation.SuppressLint
+import android.graphics.drawable.Drawable
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.core.view.isVisible
@@ -11,6 +12,10 @@ import com.v2ray.ang.databinding.ItemEditorSectionBinding
 import com.v2ray.ang.databinding.ViewRowLineBinding
 import com.v2ray.ang.dto.AppInfo
 import com.v2ray.ang.ui.component.RowBinder
+import com.v2ray.ang.util.AppIconLoader
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 /**
  * The app list of «Прокси по приложениям» and of the routing rule's app picker (A-18, A-19).
@@ -33,6 +38,7 @@ import com.v2ray.ang.ui.component.RowBinder
  * to reimplement the row.
  */
 class PerAppProxyAdapter(
+    private val scope: CoroutineScope,
     private val isSelected: (String) -> Boolean,
     private val onToggle: (String) -> Unit,
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
@@ -106,8 +112,22 @@ class PerAppProxyAdapter(
     private class SectionViewHolder(val binding: ItemEditorSectionBinding) :
         RecyclerView.ViewHolder(binding.root)
 
+    override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+        super.onViewRecycled(holder)
+        // A row that has left the viewport must not still be waiting on an icon: the PackageManager
+        // lookup behind it is the one piece of work in this list that outlives a bind.
+        (holder as? AppViewHolder)?.cancelIconLoad()
+    }
+
     private inner class AppViewHolder(val binding: ViewRowLineBinding) :
         RecyclerView.ViewHolder(binding.root) {
+
+        private var iconJob: Job? = null
+
+        fun cancelIconLoad() {
+            iconJob?.cancel()
+            iconJob = null
+        }
 
         fun bind(app: AppInfo, divided: Boolean) {
             binding.rowDivider.isVisible = divided
@@ -128,12 +148,43 @@ class PerAppProxyAdapter(
                     onCheckedChange = { onToggle(app.packageName) },
                 ),
             )
-            // The launcher icon is already coloured; the binder's neutral tint would flatten it to
-            // a grey silhouette, so it is cleared here rather than never applied - a recycled row
-            // that showed the placeholder must not keep that tint. The slot comes from the view
-            // binding rather than a second findViewById sweep: this list is 200 rows on a real
-            // device and it is scrolled fast.
-            binding.row.rowTile.setImageDrawable(app.appIcon)
+            // THE ICON IS FETCHED HERE, NOT CARRIED BY THE LIST. `AppInfo` used to hold a decoded
+            // launcher bitmap per installed app, all of them resident for as long as the screen was
+            // open; the row asks for its own and the rest are never decoded. @see AppIconLoader
+            //
+            // A cached icon is applied in this same frame, so a scroll back up does not blink
+            // through the placeholder. Only a miss goes to the PackageManager, and it does that off
+            // the main thread.
+            cancelIconLoad()
+            val context = binding.root.context
+            val cached = AppIconLoader.cached(context, app.packageName)
+            if (cached != null) {
+                showIcon(cached)
+                return
+            }
+            // Until it arrives the row keeps the tinted placeholder RowBinder just put there, so
+            // the 40dp tile and the 68dp text origin never move.
+            val packageName = app.packageName
+            iconJob = scope.launch {
+                val icon = AppIconLoader.load(context, packageName) ?: return@launch
+                // The holder may have been rebound to a different app while the lookup ran.
+                if (bindingAdapterPosition == RecyclerView.NO_POSITION) return@launch
+                (entries.getOrNull(bindingAdapterPosition) as? Entry.App)
+                    ?.takeIf { it.info.packageName == packageName }
+                    ?: return@launch
+                showIcon(icon)
+            }
+        }
+
+        /**
+         * The launcher icon is already coloured; the binder's neutral tint would flatten it to a
+         * grey silhouette, so it is cleared here rather than never applied - a recycled row that
+         * showed the placeholder must not keep that tint. The slot comes from the view binding
+         * rather than a second findViewById sweep: this list is 200 rows on a real device and it is
+         * scrolled fast.
+         */
+        private fun showIcon(icon: Drawable) {
+            binding.row.rowTile.setImageDrawable(icon)
             ImageViewCompat.setImageTintList(binding.row.rowTile, null)
         }
     }

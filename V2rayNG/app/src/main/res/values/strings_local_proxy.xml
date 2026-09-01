@@ -39,7 +39,6 @@
     <string name="lp_copy">Копировать</string>
     <string name="lp_show_password">Показать пароль</string>
     <string name="lp_hide_password">Скрыть пароль</string>
-    <string name="lp_copied">Скопировано</string>
     <string name="lp_creds_reset">Имя пользователя и пароль обновлены</string>
 
     <!-- Локальный прокси -->

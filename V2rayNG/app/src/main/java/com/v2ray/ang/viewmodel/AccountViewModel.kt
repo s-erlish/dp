@@ -24,9 +24,13 @@ import com.v2ray.ang.util.AvatarManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -116,8 +120,36 @@ class AccountViewModel : ViewModel() {
         _error.value = null
     }
 
+    /**
+     * **Отказ ДАННЫХ АККАУНТА — как событие, а не как состояние.**
+     *
+     * [error] is a conflated [StateFlow] and it has to stay one: `AccountFragment.renderHeroState`
+     * reads `error.value` to decide whether the hero shows its error card. But this ViewModel is
+     * shared by TWO screens now (Главная and Аккаунт), and a conflated state cannot be consumed
+     * twice: whichever collector ran first called `clearError()` and the other one, waking to read
+     * the LATEST value, found `null` and never learned anything had failed. Most [ApiError]s are
+     * singleton `object`s besides, so a second identical failure would not even re-emit.
+     *
+     * This stream carries the failures of the two loads Главная actually depends on — the profile
+     * and the подписки — to every collector, once each, with no consumption and no conflation. It
+     * is deliberately NOT everything [error] carries: тарифы, платежи, устройства and публичная
+     * конфигурация are loaded by the Аккаунт tab alone, and Главная must not raise «данные подписки
+     * устарели» because the payment history did not load.
+     */
+    private val _accountDataErrors = MutableSharedFlow<ApiError>(
+        extraBufferCapacity = 8,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val accountDataErrors: SharedFlow<ApiError> = _accountDataErrors.asSharedFlow()
+
     private fun report(t: Throwable?) {
         _error.value = t as? ApiError ?: t?.let { ApiError.Network(it) }
+    }
+
+    /** [report], plus an announcement on [accountDataErrors]. For the profile and подписки only. */
+    private fun reportAccountData(t: Throwable?) {
+        report(t)
+        _error.value?.let { _accountDataErrors.tryEmit(it) }
     }
 
     // region loads
@@ -140,7 +172,7 @@ class AccountViewModel : ViewModel() {
                     // even if the profile finished loading after the subscription list.
                     if (hasSubData) _subscriptions.value = mergeSubscriptions(lastPrimary, lastAll, it)
                 }
-                .onFailure { report(it) }
+                .onFailure { reportAccountData(it) }
         }
     }
 
@@ -173,7 +205,7 @@ class AccountViewModel : ViewModel() {
             // Nothing was learned. Surface the error and leave the published list exactly as it
             // was — replacing it with the empty one this run produced would state «нет активной
             // подписки» on the strength of a dropped connection.
-            (allResult.exceptionOrNull() ?: primaryResult.exceptionOrNull())?.let { report(it) }
+            (allResult.exceptionOrNull() ?: primaryResult.exceptionOrNull())?.let { reportAccountData(it) }
             _subsResolved.value = true
             return
         }

@@ -4,7 +4,6 @@
   Kept in a separate file to avoid merge collisions with concurrent UI work in strings.xml.
 -->
 <resources>
-
     <!-- Shared -->
     <string name="tv_pairing_qr_desc">QR-код сопряжения</string>
 
@@ -33,5 +32,4 @@
     <string name="tv_send_unauthorized">Код истёк. Покажите новый код на телевизоре и повторите.</string>
     <string name="tv_send_unreachable">Не удалось связаться с телевизором. Убедитесь, что оба устройства находятся в одной сети Wi-Fi без изоляции клиентов (гостевые сети часто блокируют это).</string>
     <string name="tv_send_failed">Не удалось передать. Повторите попытку.</string>
-
 </resources>

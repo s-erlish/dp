@@ -1,21 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  The shell's own strings: the bottom-navigation tabs and the dialogs MainActivity puts up itself.
-  Everything a tab draws lives in that tab's file.
-
-  Russian, sentence case, «подписка» never «провайдер», departament always lowercase.
-
-  One round of orphans was cleared out of this file: «Войти через сайт» / «Управление аккаунтом»,
-  the old home account card's labels. That card now draws from `strings_home.xml`
-  (`home_account_title` / `home_account_subtitle`) and the sign-in screen from `strings_auth.xml`
-  (`auth_btn_email`, `auth_btn_telegram`), so these two named nothing. No affordance went with them:
-  only the duplicate wording did.
-
-  The «Привязать Telegram» banner's pair was cleared in the SAME pass and that was wrong — the
-  banner had been removed, and a dismissible offer a pasted-подписка user could act on went with it.
-  Owner rule, 2026-08-02: an element that was on screen and is now gone is a regression. Both
-  strings are back below, and so is the banner (`fragment_home.xml`, `HomeFragment.paintLinkCta`).
--->
 <resources>
     <!-- Bottom-nav tab, visible only when signed in. -->
     <string name="bottom_nav_account">Аккаунт</string>
@@ -39,17 +22,11 @@
          a typed link, a hand-built server, a config file. -->
     <string name="add_other_methods_title">Другие способы добавления</string>
 
-    <!-- ==================== What an import says back ====================
-         Every one of these was a Russian literal inside MainActivity.kt. Copy lives in resources,
-         so it can be reviewed against the register and translated, and so nobody has to read
-         Kotlin to find out what the app says. -->
-
     <!-- Inline errors on the «Ввести ссылку» field, shown before the dialog closes. -->
     <string name="import_link_required">Вставьте ссылку подписки или конфигурацию сервера</string>
     <string name="import_link_invalid">Не похоже на ссылку или конфигурацию. Пример: https://departament.site/sub или vless://…</string>
 
     <!-- Outcomes of an import, from the precise one to the blunt one. -->
-    <string name="import_servers_added">Серверы добавлены: %1$d</string>
     <string name="import_sub_empty">Не удалось загрузить серверы подписки</string>
     <string name="import_sub_duplicate">Подписка уже добавлена</string>
     <string name="import_sub_foreign">Эта ссылка не от departament. Используйте подписку из нашего бота.</string>

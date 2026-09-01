@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
     <!-- Экран «Настройки подписок» (ProviderSettingsActivity).
 
          Владелец называет эту сущность подпиской, а не провайдером: слово
@@ -21,53 +20,10 @@
     <string name="ps_section_update">Обновление</string>
     <string name="ps_section_startup">При запуске</string>
     <string name="ps_section_network">Сеть</string>
-    <string name="ps_section_server_list">Список серверов</string>
-
-    <!-- ПОДПИСИ СТРОК ЭТОГО ЭКРАНА НЕ ПОКАЗЫВАЮТСЯ с 0.4.9. НИ ОДНА НЕ УДАЛЕНА.
-
-         Владелец: «в настройках подписок такая же тема с высотой, надо фиксить».
-         Здесь было хуже, чем на вкладке: у подписей не стоял maxLines, поэтому
-         «Показывать уведомление после обновления подписки» занимала две строки, а
-         «Отправлять идентификатор устройства при обновлении подписки» — три, и ряд
-         вырастал до 95dp рядом с 60dp соседом. Подписи сняты в разметке
-         (activity_provider_settings.xml), в месте вызова, как и на вкладке.
-
-         Читателя нет ни у одной — ни в Kotlin, ни в разметке. Оставлены, потому что
-         уточнение это не удаление: ps_send_hwid_sub единственный говорит, ЧТО
-         именно уходит на сервер, и если это надо сказать, то говорить надо там, где
-         текст прочтут целиком (пояснение под заголовком экрана, @id/toolbar_note),
-         а не второй строкой в ряду. Обратно в двустрочную строку не возвращать. -->
 
     <!-- Обновление -->
     <string name="ps_auto_update">Автообновление</string>
-    <string name="ps_auto_update_sub">Автоматически обновлять подписки</string>
     <string name="ps_notify_updates">Уведомлять об обновлениях</string>
-    <string name="ps_notify_updates_sub">Показывать уведомление после обновления подписки</string>
-
-    <!-- ИНТЕРВАЛ ОБНОВЛЕНИЯ СНЯТ С ЭТОГО ЭКРАНА с 0.4.9 («он уже и так вынесен в
-         общий список настроек»), поэтому ps_interval, ps_no_subs_value и пять
-         ps_interval_* ниже читателей больше не имеют. НИ ОДНА НЕ УДАЛЕНА.
-
-         Снято именно как ДУБЛЬ, и это проверено до снятия: здешний выбор и
-         «Автообновление подписки» на вкладке Настроек писали одно и то же —
-         SubscriptionItem.updateInterval и .autoUpdate у каждой подписки плюс
-         SubscriptionUpdater.sync(). Отдельного ключа у экрана нет. Уцелевший вход —
-         SettingsTabFragment.pickSubAutoUpdate(), и он же умеет «Выключено».
-
-         Разница в наборах значений одна: здесь предлагалось «2 ч», на вкладке —
-         «3 часа». Уже сохранённые 120 минут не теряются: оба экрана падают на общий
-         settings_sub_auto_update_minutes, и вкладка покажет «120 мин».
-         ps_no_subs_value говорил, ПОЧЕМУ строки выключены, когда подписок нет; на
-         вкладке ту же мысль говорит settings_sub_auto_update_none теми же словами. -->
-    <string name="ps_interval">Интервал обновления</string>
-    <string name="ps_no_subs_value">Нет подписок</string>
-
-    <!-- Интервалы -->
-    <string name="ps_interval_1h">1 ч</string>
-    <string name="ps_interval_2h">2 ч</string>
-    <string name="ps_interval_6h">6 ч</string>
-    <string name="ps_interval_12h">12 ч</string>
-    <string name="ps_interval_24h">24 ч</string>
 
     <!-- При запуске -->
     <string name="ps_update_on_launch">Обновлять подписки при запуске</string>
@@ -76,7 +32,6 @@
 
     <!-- Сеть -->
     <string name="ps_send_hwid">Отправлять HWID</string>
-    <string name="ps_send_hwid_sub">Отправлять идентификатор устройства при обновлении подписки</string>
 
     <!-- ps_user_agent остаётся заголовком строки, но строка больше ничего не
          открывает: «убери возможность настройки user agent, чтобы жил было
@@ -89,14 +44,4 @@
     <string name="ps_user_agent">User-Agent</string>
     <string name="ps_user_agent_hint">User-Agent для запросов подписки</string>
     <string name="ps_user_agent_error">В заголовке нельзя передать кириллицу и другие не-ASCII символы. Оставьте латиницу, цифры и знаки.</string>
-
-    <!-- Список серверов -->
-    <string name="ps_sort_order">Сортировка серверов</string>
-    <string name="ps_sort_default">По умолчанию</string>
-    <string name="ps_sort_ping">По пингу</string>
-    <string name="ps_sort_name">По имени</string>
-
-    <!-- Общие -->
-    <string name="ps_value_off">Выкл</string>
-
 </resources>
