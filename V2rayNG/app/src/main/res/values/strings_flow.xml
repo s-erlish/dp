@@ -6,7 +6,6 @@
   подписки не показывается ни в одном из них.
 -->
 <resources>
-
     <!-- Поток «Войти через Telegram». -->
     <string name="flow_tg_0_title">Открываем Telegram</string>
     <string name="flow_tg_0_note">Подтвердите вход в приложении</string>
@@ -28,5 +27,4 @@
     <string name="flow_clip_3_title">Подписка добавлена</string>
     <string name="flow_clip_3_note">Сервера готовы</string>
     <string name="flow_clip_toast">Подписка добавлена</string>
-
 </resources>

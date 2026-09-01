@@ -1,15 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Russian strings for the Account / Payments screen (AccountFragment).
-  Kept separate from the shared strings.xml on purpose.
--->
 <resources>
-    <string name="account_title">Аккаунт</string>
-
     <!-- Hub -->
-    <string name="account_profile_title">Ваш аккаунт</string>
     <string name="account_balance_inline">%1$s</string>
-    <string name="account_sub_summary_title">Ваша подписка</string>
     <string name="account_manage_title">Управление</string>
     <string name="account_hub_devices">Устройства</string>
     <string name="account_hub_devices_sub">Управление устройствами</string>
@@ -19,38 +11,24 @@
     <string name="account_hub_history_sub">Все ваши операции</string>
 
     <!-- Header / balance -->
-    <string name="account_balance">Баланс</string>
     <string name="account_top_up">Пополнить</string>
-    <string name="account_referral">Реф-код %1$s</string>
     <!-- DEAD: no reference in any .kt/.xml (checked 2026-07-26). Delete with 24.2, do not translate. -->
-    <string name="account_telegram">Telegram: \@%1$s</string>
-    <string name="account_no_telegram">Telegram не привязан</string>
-    <string name="account_copy_referral">Скопировать код</string>
     <string name="account_referral_copied">Реферальный код скопирован</string>
 
     <!-- Subscriptions -->
     <string name="account_subs_header">Мои подписки</string>
-    <string name="account_subs_empty">Подписки пока нет</string>
     <!-- «departament» is lower case in every string on both platforms — owner ruling B2. -->
     <string name="account_no_subscription">Купите тариф, чтобы подключаться к серверам departament.</string>
     <string name="account_empty_title">Подписки пока нет</string>
     <string name="account_error_load_title">Не удалось загрузить данные</string>
     <string name="account_retry">Повторить</string>
-    <string name="account_expires">Действует до %1$s</string>
-    <string name="account_devices">Устройства: %1$s / %2$s</string>
     <!-- The SAME row when the live connected count is not known for this подписка.
          GET /client/subscription/all does not carry one (SubscriptionDtos: «NOT present on
          /all — always 0 from this endpoint»), and only the ACTIVE подписка has a
          /client/devices call behind it, so every secondary card was printing the root's
          figure as if it were its own. The allowance is real and stays; the usage is not
          known and is not invented. -->
-    <string name="account_devices_limit">Устройства: до %1$s</string>
-    <string name="account_traffic">Трафик: %1$s / %2$s</string>
     <string name="account_unlimited">∞</string>
-    <!-- DEAD: no reference in any .kt/.xml (checked 2026-07-26). Also ALL-CAPS, which copy law 9.2
-         forbids; left verbatim so the deletion in 24.2 is a clean removal, not a copy edit. -->
-    <string name="account_trial_badge">ПРОБНЫЙ</string>
-    <string name="account_auto_renew">Автопродление</string>
 
     <!-- The subscription card's own controls, brought across from the desktop's AccountView.
          «Продлить» is shown on a perpetual подписка too — owner ruling, «она должна быть и при
@@ -63,9 +41,6 @@
     <string name="account_sub_autorenew_failed">Не удалось изменить автопродление</string>
     <!-- The traffic meter on the subscription card. Unlimited plans state the figure used and
          say so, because a bar with no ceiling encodes nothing. -->
-    <string name="account_meter_traffic">Трафик</string>
-    <string name="account_meter_traffic_of">%1$s из %2$s</string>
-    <string name="account_meter_traffic_unlimited">%1$s · безлимит</string>
     <string name="account_meter_traffic_over">Лимит исчерпан</string>
     <!-- The подписка carries no traffic payload — every secondary подписка, whose endpoint
          does not return one. The meter STAYS and says so: a card with a hole where the
@@ -102,50 +77,15 @@
          Not «Почта»: the e-mail is what the row REPORTS, the site is the way in. -->
     <string name="account_login_site">Сайт</string>
 
-    <!-- Tariffs -->
-    <string name="account_tariffs_header">Тарифы</string>
-    <string name="account_tariffs_empty">Тарифы недоступны</string>
-    <!-- DEAD: no reference in any .kt/.xml (checked 2026-07-26); kept only until 24.2 deletes it. -->
-    <string name="account_price_option">%1$d дн. · %2$s</string>
-    <string name="account_option_duration">%1$d дн.</string>
-    <string name="account_tariff_devices">Устройства: %1$d</string>
-    <string name="account_tariff_traffic">Трафик: %1$s</string>
-
-    <!-- Actions -->
-    <string name="account_actions_header">Действия</string>
-    <string name="account_active_sub">Активная подписка: %1$s</string>
-    <string name="account_active_sub_none">Выберите подписку выше</string>
-    <string name="account_upgrade">Улучшить тариф</string>
-    <string name="account_upgrade_title">Выберите новый тариф</string>
-    <string name="account_upgrade_no_sub">Сначала выберите подписку</string>
-    <string name="account_add_devices">Добавить устройства</string>
-    <string name="account_add_devices_count">Доп. устройства: %1$d</string>
-    <string name="account_add_devices_limit">Достигнут лимит устройств</string>
-    <string name="account_promo_hint">Промокод</string>
-    <string name="account_promo_check">Проверить</string>
-    <string name="account_promo_discount">Скидка %1$d%%</string>
-    <string name="account_promo_free_days">Бесплатно %1$d дн.</string>
-    <string name="account_promo_invalid">Промокод недействителен</string>
-    <string name="account_trial">Активировать пробный период</string>
-    <string name="account_trial_activated">Пробный период активирован</string>
-
     <!-- Payments history -->
-    <string name="account_payments_header">История платежей</string>
-    <string name="account_payments_empty">Платежей пока нет</string>
-    <string name="account_payments_more">Показать ещё</string>
     <string name="account_payment_pending">Платёж обрабатывается…</string>
 
-    <!-- ============ The hero time block (23-account-rework.md 1.2 / 4.3) ============
-         One silhouette, three temperatures: the label names the state, the figure and the word
-         beside it carry it, and the detail line appears only while a day count is worth reading.
-         The month word is always UI-face Russian — the figure face has no Cyrillic at all. -->
     <!-- The healthy state's whole sentence, and it is the DESIGN'S sentence, word for word:
          handoff §5.3 writes «Действует до 04.06.2099» under the tariff name. It replaces
          «Активна до 4 июня 2099» in that one branch only — the urgent branches keep the split
          label/figure silhouette, because the design draws no urgent state to copy from and the
          colour that rides on the figure is the tab's only expiry warning. -->
     <string name="account_time_valid_until">Действует до %1$s</string>
-    <string name="account_time_active">Активна до</string>
     <string name="account_time_left">Осталось</string>
     <string name="account_time_today">Истекает</string>
     <string name="account_time_expired">Истекла</string>
@@ -220,24 +160,6 @@
     <string name="account_error_generic">Что-то пошло не так. Повторите попытку.</string>
     <string name="account_checkout_no_browser">Не удалось открыть страницу оплаты. Попробуйте другой способ оплаты.</string>
 
-    <!--
-      Payment error dialog.
-
-      THESE TWO STRINGS TOOK ARGUMENTS THEY HAD NO PLACEHOLDERS FOR, so `String.format` dropped
-      both of them and the dialog said «Платёж не прошёл» and nothing else — for every failure,
-      identically. Lint has been reporting it as StringFormatInvalid ×4
-      (AccountFragment / BuyTariffActivity); the owner is testing payments with real money, and an
-      error that cannot tell a declined card from a dead gateway costs him the diagnosis every time.
-
-      They carry their arguments now:
-        %1$s — the code, for quoting to support («402», «timeout», «network»);
-        %2$s — the backend's own sanitised reason, when it sent one.
-
-      This does NOT reopen copy law 9.4. The reason still leads with what the user can DO, the raw
-      body is never dumped, and a failure with no reason still reads as a sentence rather than as a
-      status line. What changed is that the dialog stopped withholding the one fact that identifies
-      the failure.
-    -->
     <!-- The label a money button wears while its charge is in flight. One control, one word,
          both billing surfaces — a control that is working says so, and stops taking taps (D10). -->
     <string name="account_pay_in_progress">Оплата…</string>
@@ -258,7 +180,6 @@
 
          Two bodies because the tab has two truthful shapes here (00-rules.md 15): signing out
          drops a live tunnel, and saying so when there is no tunnel would be noise. -->
-    <string name="account_group_signin">Аккаунт и вход</string>
     <string name="account_row_logout">Выйти</string>
     <string name="account_logout_title">Выйти из аккаунта?</string>
     <string name="account_logout_body">Подписка останется активной. Серверы подписки исчезнут из приложения. Чтобы вернуться, войдите снова.</string>

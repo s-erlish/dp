@@ -10,7 +10,6 @@
   @string/home_gate_add_subscription «Добавить подписку».
 -->
 <resources>
-
     <!-- Заголовок начального экрана. 24sp/700. -->
     <string name="onb_title">Приветствуем!</string>
 
@@ -35,5 +34,4 @@
     <!-- Единственный вход в LoginActivity с начального экрана: e-mail, OTP, 2FA и
          Google остаются в проекте, но перестают быть путём по умолчанию. -->
     <string name="onb_login_site">Войти через сайт</string>
-
 </resources>

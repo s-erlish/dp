@@ -1,30 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  ============================================================================
-  AUTH COPY — 14-auth.md §11.
-  ============================================================================
-
-  Russian, because values/ IS the master locale (M-42): departament ships one
-  language and this folder is where it lives. The picker offers Системный and
-  Русский, and both resolve here — there is no second folder to keep in step and
-  no locale that could leave a Russian app wearing an English sign-in screen.
-
-  COPY LAW (00-rules.md 9.2, 9.4): sentence case, no ALL-CAPS, no em/en dash, no
-  three-dot sequence, «ёлочки», no final period on a label or a button, full
-  stops only inside error sentences and body copy. Every error names the cause
-  AND the fix, and never carries an HTTP code or a response body.
-
-  The old file's keys went with the screen that used them: auth_title,
-  auth_tg_headline, auth_tg_desc, auth_site_headline, auth_site_desc,
-  auth_btn_site, auth_register_site, auth_awaiting, auth_restart,
-  auth_fields_required (the CTA is disabled until the form is valid, so it could
-  never fire) and auth_err_dialog_title (the debug diagnostic dialog is deleted,
-  not release-gated — 14-auth.md 13.3). Verified 2026-07-26: nothing outside
-  LoginActivity + activity_login.xml referenced any of them.
--->
 <resources>
-
-    <!-- ===================== A · the gate ===================== -->
     <!-- THE OWNER'S WORDING, 2026-08-17: «вместо вход в департамент напиши вход в
          аккаунт». One string, two readers — the gate (layout_auth_gate.xml) and the
          Аккаунт tab's signed-out block (activity_account.xml) — which is why it is
@@ -43,7 +18,6 @@
          сайт»» — so both places that offered this word now say @string/onb_login_site
          instead. The string stays because nothing in this project is deleted for
          being unused, and because the form it named is still in the build. -->
-    <string name="auth_btn_email">Войти по почте</string>
     <string name="auth_awaiting_title">Ждём подтверждения в Telegram</string>
     <string name="auth_awaiting_body">Подтвердите вход в открывшемся приложении</string>
     <string name="auth_open_telegram">Открыть Telegram</string>
@@ -53,7 +27,6 @@
     <string name="auth_link_tg_body">Подтвердите привязку в Telegram. Аккаунт останется тем же.</string>
     <string name="auth_link_awaiting_body">Подтвердите привязку в открывшемся приложении</string>
 
-    <!-- ===================== B · вход через сайт ===================== -->
     <!-- NEW (2026-08-17). The door into this surface is «Войти через сайт» on both
          the start screen and the gate, so the surface behind it may not be headed
          «Вход по почте» — one tap, two names for the same place, and the second one
@@ -61,7 +34,6 @@
          their own labels: «Электронная почта» names a FIELD, not the way in. -->
     <string name="auth_site_title">Вход через сайт</string>
     <!-- Kept: the surface's previous heading. See @string/auth_btn_email. -->
-    <string name="auth_email_title">Вход по почте</string>
     <string name="auth_email_label">Электронная почта</string>
     <string name="auth_email_placeholder">name@example.com</string>
     <string name="auth_password_label">Пароль</string>
@@ -104,7 +76,6 @@
     <string name="auth_err_link_telegram_missing">Telegram не установлен. Установите приложение и повторите привязку.</string>
     <string name="auth_err_browser_missing">Не нашли браузер, чтобы открыть сайт. Зайдите на departament.site с другого устройства.</string>
 
-    <!-- ===================== a11y ===================== -->
     <!-- R8: a loading control keeps its width, drops its label and announces
          itself as «<подпись>, загрузка». 22-components.md 20.1 wants a shared
          @string/state_loading; values/strings.xml belongs to another wave, so the

@@ -1,23 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  ============================================================================
-  THE SUB-SCREEN EDITORS. Every string the settings and server sub-pages show.
-  24-tab-conformance.md A-18 to A-36, 00-rules.md 9.
-  ============================================================================
-
-  These screens used to speak in four registers at once: upstream English left in
-  values/, Russian hard-coded in Kotlin, «**» glued onto a system app's name by
-  String.format, and menu titles that never appear anywhere a finger can reach. One
-  file, one register: Russian, sentence case, formal «вы», hyphen never a dash, no
-  emoji, no final period on a label, a period only where a sentence ends.
-
-  Naming: the prefix is the screen, so a row's copy is findable from the layout that
-  shows it - perapp_, routing_ed_, subs_, asset_, log_, about_, upd_, backup_, srv_.
-  The shared empty and retry grammar is `editor_*` and every screen reuses it rather
-  than writing its own «Ничего не найдено».
--->
 <resources>
-
     <!-- ==================================================================
          SHARED - the empty, error and search grammar of 24-tab-conformance 0.4
          ================================================================== -->
@@ -73,7 +55,6 @@
          it is the only written statement of what the набор is for, and because the place it
          belongs is a sheet or a help line where it can be read whole - not a two-line row. -->
     <string name="perapp_ru_preset">Российские приложения</string>
-    <string name="perapp_ru_preset_hint">Госуслуги, банки, Mir Pay, Ozon, Wildberries, Яндекс, операторы — идут напрямую, мимо VPN</string>
     <string name="perapp_ru_preset_installed">Установлено на этом устройстве: %1$d</string>
     <string name="perapp_ru_preset_show">Показать приложения набора</string>
     <string name="perapp_ru_preset_show_off">Показать все приложения</string>
@@ -81,7 +62,6 @@
     <string name="perapp_ru_preset_empty_line">На этом устройстве нет приложений из набора. Он ничего не изменит, пока вы не установите хотя бы одно.</string>
     <string name="perapp_ru_preset_pending">Набор применён. Изменения вступят в силу при следующем подключении.</string>
     <string name="perapp_picker_title">Выбор приложений</string>
-    <string name="perapp_picker_done">Готово</string>
     <string name="perapp_picker_selected">Выбрано: %1$d</string>
 
     <!-- ==================================================================
@@ -92,13 +72,6 @@
     <string name="routing_import_confirm">Текущие правила будут заменены набором из этого источника. Продолжить?</string>
     <string name="routing_section_rules">Настройки правил маршрутизации</string>
     <string name="routing_section_actions">Наборы и обмен</string>
-    <string name="routing_rule_on">Включено</string>
-    <!-- БЕЗ ЧИТАТЕЛЯ с 0.4.9 и намеренно не удалена. Вела подпись правила маршрутизации, когда
-         правило выключено, и повторяла собой переключатель, стоящий в той же строке:
-         «если отключить то почему-то пишется выключено, там такого быть не должно». Строка
-         остаётся на случай, если состояние понадобится там, где управления рядом нет — но в
-         строку с переключателем её возвращать не надо. См. RoutingSettingRecyclerAdapter.summarise. -->
-    <string name="routing_rule_off">Выключено</string>
     <!-- The accessible name of the rule row's own switch, restored from 5e8cd54's chk_enable.
          It names the ACTION on the object, because the row already says which rule it is. -->
     <string name="routing_rule_enabled_cd">Включить правило</string>
@@ -161,7 +134,6 @@
     <string name="subs_updated">Обновлено %1$s</string>
     <string name="subs_never_updated">Ещё не обновлялась</string>
     <string name="subs_action_edit">Изменить</string>
-    <string name="subs_action_share">Поделиться ссылкой</string>
     <string name="subs_action_qrcode">Показать QR-код</string>
     <string name="subs_action_copy">Скопировать ссылку</string>
     <string name="subs_action_delete">Удалить подписку</string>
@@ -243,10 +215,8 @@
     <string name="log_action_copy">Копировать</string>
     <string name="log_action_share">Поделиться файлом</string>
     <string name="log_action_clear">Очистить</string>
-    <string name="log_copy_hint">Долгое нажатие копирует строку</string>
     <string name="log_level_error">Ошибка</string>
     <string name="log_level_warn">Внимание</string>
-    <string name="log_level_info">Инфо</string>
     <string name="log_cleared">Журнал очищен</string>
     <string name="log_share_failed">Не удалось подготовить файл журнала</string>
 
@@ -260,9 +230,6 @@
     <string name="about_version_cd">Скопировать версию</string>
     <string name="about_package">Идентификатор</string>
     <string name="about_package_cd">Скопировать идентификатор</string>
-    <string name="about_core">Ядро</string>
-    <string name="about_url_schemes">Схемы URL-адресов</string>
-    <string name="about_log">Журнал</string>
     <string name="about_check_update">Проверить обновления</string>
     <string name="about_source_code">Исходный код</string>
     <string name="about_feedback">Обратная связь</string>
@@ -368,9 +335,6 @@
     <!-- ==================================================================
          A-13 servers/server/{guid} - формы серверов
          ================================================================== -->
-    <string name="srv_section_main">Основное</string>
-    <string name="srv_section_transport">Транспорт</string>
-    <string name="srv_section_security">Шифрование</string>
     <string name="srv_section_members">Участники цепочки</string>
     <string name="srv_delete">Удалить сервер</string>
     <string name="srv_delete_confirm">Удалить сервер? Отменить это действие нельзя.</string>
@@ -389,10 +353,7 @@
     <string name="srv_group_sub">Подписка</string>
     <string name="srv_group_filter">Фильтр серверов</string>
     <string name="srv_group_filter_hint">Оставьте пустым, чтобы взять все серверы подписки</string>
-    <string name="srv_group_empty_title">В группе нет серверов</string>
-    <string name="srv_group_empty_line">Добавьте серверы, чтобы группа заработала.</string>
     <string name="srv_custom_title">Своя конфигурация</string>
-    <string name="srv_config_hint">Вставьте JSON-конфигурацию целиком</string>
     <string name="srv_config_invalid">Конфигурация не разобрана. Проверьте JSON и повторите.</string>
     <string name="srv_name_required">Укажите название сервера</string>
 
@@ -419,7 +380,6 @@
     <string name="subs_update_result">Серверов: %1$d · обновлено: %2$d, с ошибкой: %3$d, пропущено: %4$d</string>
 
     <string name="asset_copy_failed">Не удалось скопировать файл</string>
-    <string name="asset_download_done">Обновлено файлов: %1$d</string>
 
     <string name="scheme_import_done">Импорт выполнен</string>
     <string name="scheme_import_failed">Не удалось импортировать</string>
@@ -430,5 +390,4 @@
     <string name="srv_chain_invalid_members">Эти серверы нельзя использовать в цепочке: %1$s</string>
     <string name="srv_config_label">Конфигурация</string>
     <string name="srv_config_note">Порт входящего подключения должен совпадать с настройками приложения.</string>
-
 </resources>

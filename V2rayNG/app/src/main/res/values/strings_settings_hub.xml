@@ -1,29 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
     <!-- Строки вкладки настроек (SettingsTabFragment + fragment_settings_tab.xml).
 
          Словарь: то, что раньше называлось «провайдером», везде называется
          подпиской; departament пишется строчными. -->
 
     <string name="settings_local_proxy">Локальный прокси</string>
-    <string name="settings_local_proxy_sub">Порт, логин и пароль, доступ по сети</string>
 
     <string name="settings_provider">Настройки подписок</string>
-    <!-- НЕ ПОКАЗЫВАЕТСЯ с 0.4.9, НЕ УДАЛЕНО. Из девяти подписей вкладки эта была
-         самой длинной и на 360dp переносилась на вторую строку, поднимая ряд с 60dp
-         до 76 — тот самый разнобой высот, о котором написал владелец. Читателя нет
-         ни в Kotlin, ни в разметке. Оставлено: три слова довольно точно называют
-         три карточки экрана, который строка открывает, и там им место — заголовком
-         или пояснением под ним, а не второй строкой в ряду.
-         В двустрочную строку не возвращать. -->
-    <string name="settings_provider_sub">Автообновление, сеть, список серверов</string>
-
-    <!-- Список подписок (SubSettingActivity). Экран умеет добавлять, обновлять,
-         включать и удалять подписку, и до этой волны на него не вело ничего:
-         поэтому подписку нельзя было удалить с телефона. -->
-    <string name="settings_subs_list">Список подписок</string>
-    <string name="settings_subs_list_sub">Добавить, обновить, удалить</string>
 
     <!-- Подзаголовок строки «Другие способы добавления». Заголовок берётся из
          @string/add_other_methods_title — той же строки, что стоит в шапке
@@ -34,15 +18,8 @@
          (OWNER C1); три остальных способа — ссылка, сервер вручную, файл
          конфигурации — переехали в MainActivity.showAdvancedAddMethods() и до этой
          строки не вызывались ниоткуда. Способы не удалены, у них сменился вход. -->
-    <string name="settings_add_other_sub">Вставить ссылку, создать сервер, импортировать файл</string>
 
     <string name="settings_url_scheme">Схемы URL-адресов</string>
-    <!-- НЕ ПОКАЗЫВАЕТСЯ с 0.4.9, НЕ УДАЛЕНО, читателя нет. Влезала в одну строчку и
-         сама по себе ряд не растила — снята вместе с остальными восемью, потому что
-         вкладка с подписями у части строк и без них у остальных это тот же разнобой,
-         просто в другом месте списка. Экран UrlSchemeListActivity перечисляет сами
-         команды, то есть говорит это подробнее и по делу. -->
-    <string name="settings_url_scheme_sub">Быстрые команды depv://</string>
 
     <!-- Режим подключения. Названия и порядок заданы владельцем: TUN, Proxy,
          TUN + Proxy. Значения латиницей, поэтому translatable="false".
@@ -50,7 +27,6 @@
            Proxy       - PREF_MODE = «Proxy only»
            TUN + Proxy - PREF_MODE = VPN, PREF_PROXY_SHARING = true -->
     <string name="settings_mode_value_tun" translatable="false">TUN</string>
-    <string name="settings_mode_value_proxy" translatable="false">Proxy</string>
     <string name="settings_mode_value_tun_proxy" translatable="false">TUN + Proxy</string>
 
     <!-- Оформление (выбор темы: светлая / тёмная / чёрно-белая) -->
@@ -61,11 +37,8 @@
 
     <!-- IPv6 -->
     <string name="settings_ipv6">IPv6</string>
-    <string name="settings_ipv6_sub">Включить IPv6-адресацию в туннеле</string>
 
     <!-- Постоянный VPN и блокировка трафика без VPN -->
-    <string name="settings_always_on">Постоянный VPN и блокировка</string>
-    <string name="settings_always_on_sub">Подключаться всегда и блокировать трафик без VPN</string>
     <string name="settings_always_on_hint">Включите постоянный VPN и блокировку без VPN в системных настройках</string>
     <string name="settings_always_on_unavailable">На этом устройстве нет системных настроек VPN</string>
 
@@ -95,5 +68,4 @@
         <item>9.9.9.9</item>
         <item></item>
     </string-array>
-
 </resources>
