@@ -75,6 +75,7 @@ class PerAppProxyActivity : BaseActivity() {
     private val viewModel: PerAppProxyViewModel by viewModels()
     private val adapter by lazy {
         PerAppProxyAdapter(
+            scope = lifecycleScope,
             isSelected = viewModel::contains,
             onToggle = { packageName ->
                 viewModel.toggle(packageName)
