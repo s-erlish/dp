@@ -48,7 +48,6 @@ object SettingsManager {
         // «Российские приложения» mimo VPN, on out of the box — but only on an install whose
         // per-app routing nobody has touched. See RussianAppsPreset.seedOnFirstRun.
         RussianAppsPreset.seedOnFirstRun()
-        //ensureDefaultSubscription()
         initRoutingRulesets(context)
         migrateServerListToSubscriptions()
         migrateHysteria2PinSHA256()

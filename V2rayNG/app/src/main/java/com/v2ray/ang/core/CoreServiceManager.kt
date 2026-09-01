@@ -198,7 +198,6 @@ object CoreServiceManager {
      * @param context The context from which the service is stopped.
      */
     fun stopVService(context: Context) {
-        //context.toast(R.string.toast_services_stop)
         MessageUtil.sendMsg2Service(context, AppConfig.MSG_STATE_STOP, "")
     }
 
@@ -351,9 +350,6 @@ object CoreServiceManager {
 
         // refresh socks port when enabled dynamic socks port
         SettingsManager.refreshRuntimeSocksPort()
-
-//        val result = V2rayConfigUtil.getV2rayConfig(context, guid)
-//        if (!result.status) error(result.errorMessage.ifBlank { "Failed to get V2Ray config" })
 
         if (MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING)) {
             context.toast(R.string.toast_warning_pref_proxysharing_short)
