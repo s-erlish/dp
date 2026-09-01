@@ -2832,39 +2832,31 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             ?: accountSubs.firstOrNull()
 
     /**
-     * The expiry that describes THIS INSTALL, out of the подписки stored locally.
+     * The expiry of the ПОДПИСКИ, КОТОРАЯ СЕЙЧАС ВЕЗЁТ ТРАФИК, and of no other подписка on the
+     * device — the date that подписка's own server sent in its `subscription-userinfo` header.
      *
-     * IT USED TO BE `minOrNull()` — THE OLDEST DATE ON THE DEVICE — and that is a verdict handed to
-     * whichever подписка is furthest gone. One подписка pasted by hand a year ago, one trial that
-     * lapsed, one провайдер the user stopped paying for: any of them, sitting in the store beside a
-     * perfectly live подписка, made Главная announce «Подписка истекла» over a working tunnel. It is
-     * the local half of the same false verdict [activeAccountSub] fixes for the account half, and it
-     * is the half that speaks whenever the session is not available — which is precisely the window
-     * the owner was looking at.
+     * ЭТО НЕ АГРЕГАТ, И БЫТЬ ИМ НЕ ДОЛЖНО. Two earlier shapes of this function each computed the
+     * verdict from the whole store: first `minOrNull()` — the oldest date on the device — and then
+     * a three-tier fallback that, with no selection to go on, reached for «the live one that lasts
+     * longest» and then for «the most recent expiry». Both answered a question nobody asked. The
+     * store holds every подписка the device has ever seen: one pasted by hand a year ago, one trial
+     * that lapsed, one провайдер the user stopped paying for. Any of them, standing beside a
+     * perfectly live подписка, could put «Подписка истекла» on Главная over a working tunnel — the
+     * screen was reading somebody else's date. Owner: «истекла брать по дате, которая даётся, как по
+     * логике и работает».
      *
-     * Three tiers, most specific first:
+     * So there is exactly one source now: the подписка the SELECTED server was imported from. If
+     * nothing is selected, or that подписка carries no date, there is NO ACTIVE ПОДПИСКА TO SPEAK
+     * FOR and the screen returns [Sub.None] — no verdict at all, rather than a verdict borrowed
+     * from a record that is not the one in use.
      *
-     *  1. **The подписка the SELECTED server came from.** That is the one carrying the traffic, so
-     *     it is the one the screen is about. Nothing else on this screen has a better claim.
-     *  2. **The live one that lasts longest.** With no selection to go on, an active подписка is
-     *     what the user has; an expired one beside it is history.
-     *  3. **The most recent expiry**, when every подписка really has lapsed. The screen still says
-     *     «истекла», and now it names the date the user will recognise instead of the oldest one on
-     *     the device.
+     * It also reads ONE record instead of the whole store. [resolveSubscription] runs inside
+     * `resolveState()`, i.e. on every `render()`, and the old shape decoded and JSON-parsed every
+     * подписка on the device each time; this decodes one string and parses one object.
      */
     private fun localExpirySeconds(): Long? {
-        val subs = MmkvManager.decodeSubscriptions()
-        val nowSeconds = System.currentTimeMillis() / 1000L
-
-        mainViewModel.findSubscriptionIdBySelect()
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { id -> subs.firstOrNull { it.guid == id } }
-            ?.subscription?.expire?.takeIf { it > 0L }
-            ?.let { return it }
-
-        val dated = subs.mapNotNull { it.subscription.expire.takeIf { e -> e > 0L } }
-        if (dated.isEmpty()) return null
-        return dated.filter { it > nowSeconds }.maxOrNull() ?: dated.max()
+        val subId = mainViewModel.findSubscriptionIdBySelect()?.takeIf { it.isNotEmpty() } ?: return null
+        return MmkvManager.decodeSubscription(subId)?.expire?.takeIf { it > 0L }
     }
 
     private fun classifyExpiry(untilMs: Long, trial: Boolean): Sub {
