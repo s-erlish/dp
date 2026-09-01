@@ -808,12 +808,31 @@ class AccountFragment : Fragment() {
         // whole card per render to arrive at a number the layout already knew.
 
         renderDevicesRowValue()
-        // Fetch the REAL connected-device count for the active (first/root) sub and pre-warm
-        // AccountCache so the Devices sub-screen opens instantly. Cache-first inside.
-        list.firstOrNull()?.remnawaveUuid?.takeIf { it.isNotBlank() }?.let { viewModel.loadDevices(it) }
+        // Fetch the REAL connected-device count for the ACTIVE sub and pre-warm AccountCache so the
+        // Devices sub-screen opens instantly. Cache-first inside.
+        activeSub()?.remnawaveUuid?.takeIf { it.isNotBlank() }?.let { viewModel.loadDevices(it) }
 
         renderHeroState()
     }
+
+    /**
+     * The account's ACTIVE подписка, asked for by type rather than by position.
+     *
+     * The merge puts the root first, so `first()` was right — until the round where it is not.
+     * `/client/subscription` is what identifies the active подписка and `/client/subscription/all`
+     * is the only source of the secondaries; when the first of those answers with a payload whose
+     * shape we cannot read, the merge has no root to place and the list STARTS with a secondary.
+     * Everything that then asked for «первая» silently described the wrong подписка: the device
+     * allowance «N / M» came from a secondary's slots, and the uuid the Devices screen was
+     * pre-warmed with was that secondary's too.
+     *
+     * Falling back to the first entry keeps the old answer for the case it was written for — an
+     * account whose root simply is the only подписка — while a list that genuinely has no root
+     * still describes something rather than nothing.
+     */
+    private fun activeSub(): SubInfoDto? =
+        currentSubs.firstOrNull { it.type.equals(SubscriptionSyncManager.TYPE_ROOT, ignoreCase = true) }
+            ?: currentSubs.firstOrNull()
 
     /**
      * Fills the management «Устройства» row's trailing «N / M» slot from the active подписка, or
@@ -827,7 +846,7 @@ class AccountFragment : Fragment() {
      * `deviceCount`), so the value appears the instant it is known.
      */
     private fun renderDevicesRowValue() {
-        val sub = currentSubs.firstOrNull()
+        val sub = activeSub()
         val usedDevices = viewModel.deviceCount.value
         if (sub == null || usedDevices == null) {
             binding.tvRowValueDevices.visibility = View.GONE

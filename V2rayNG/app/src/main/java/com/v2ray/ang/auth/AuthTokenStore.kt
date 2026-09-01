@@ -40,6 +40,8 @@ object AuthTokenStore {
     private const val ID = "departament_auth"
 
     private const val KEY_TOKEN = "token"
+
+    /** Erase-only: never written any more, still removed so an older build's value cannot linger. */
     private const val KEY_EXPIRES_AT = "expires_at"
     private const val KEY_USER = "user_json"
     private const val KEY_DEVICE_ID = "device_id"
@@ -268,11 +270,23 @@ object AuthTokenStore {
         null
     }
 
-    /** Persists a new session. No refresh token in this backend. */
-    fun saveSession(token: String, expiresAt: Long? = null, user: UserProfileDto? = null) {
+    /**
+     * Persists a new session. No refresh token in this backend.
+     *
+     * AND NO EXPIRY EITHER, deliberately. The parameter that used to be here was never passed by
+     * any caller and could not have been: nothing in the auth payloads carries an expiry —
+     * [com.v2ray.ang.auth.dto.AuthResult] is a token and a profile — so the value written would
+     * have been invented here. Half a check is worse than none: a client-side deadline that guessed
+     * short signs a user out of a session the backend would still have honoured, which is the
+     * failure this whole area is being repaired for. The token's death is learned the one way it
+     * can be learned truthfully — a 401 from the identity endpoint, see
+     * [AccountRepository.refreshProfile]. [KEY_EXPIRES_AT] survives as an erase-only key so a value
+     * an older build left on disk is still cleared by [clearSession] / [clear].
+     */
+    fun saveSession(token: String, user: UserProfileDto? = null) {
         val store = store() ?: return
         store.encode(KEY_TOKEN, token)
-        if (expiresAt != null) store.encode(KEY_EXPIRES_AT, expiresAt) else store.remove(KEY_EXPIRES_AT)
+        store.remove(KEY_EXPIRES_AT)
         if (user != null) store.encode(KEY_USER, JsonUtil.toJson(user)) else store.remove(KEY_USER)
     }
 
@@ -296,12 +310,32 @@ object AuthTokenStore {
 
     fun isLoggedIn(): Boolean = !getToken().isNullOrBlank()
 
+    /**
+     * The same question as [isLoggedIn], but able to say "I do not know".
+     *
+     * null means the store could not be opened — a Keystore that is briefly busy, an unseal that
+     * has to be retried — as opposed to "there is no token here". [isLoggedIn] flattens the two
+     * into false because most callers want a gate and a gate has to pick a side. The one caller
+     * that must NOT flatten them is [AccountSession]'s seed: it runs once per process and its
+     * answer is cached for the process's whole life, so a false read taken during a two-second
+     * retry window used to leave the app showing a signed-out account with the token, the profile
+     * and the подписки all sitting on disk, until the user killed and reopened it.
+     */
+    fun isLoggedInOrUnknown(): Boolean? {
+        val store = store() ?: return null
+        return !store.decodeString(KEY_TOKEN).isNullOrBlank()
+    }
+
     /** uuid -> local subscription guid map of subscriptions owned by the auth flow. */
     fun getManagedGuids(): MutableMap<String, String> {
         val json = store()?.decodeString(KEY_MANAGED_GUIDS) ?: return mutableMapOf()
         return try {
             gson.fromJson(json, mapType) ?: mutableMapOf()
         } catch (e: Exception) {
+            // An empty map here is not harmless: the import reads it as "nothing is managed yet"
+            // and mints a fresh guid for every подписка, leaving the rows the old map pointed at
+            // on the device with nothing keyed to them. Say so rather than lose it silently.
+            LogUtil.w(AppConfig.TAG, "Managed-subscription map unreadable: ${e.message}")
             mutableMapOf()
         }
     }

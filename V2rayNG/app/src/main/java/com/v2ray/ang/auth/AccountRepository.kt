@@ -63,21 +63,40 @@ class AccountRepository(
     // Profile
     //
     // getMe() is the authoritative identity check: it is the ONLY endpoint whose 401 reliably
-    // means the JWT is dead (expired/revoked). A 401 here — and only here — wipes the local
+    // means the JWT is dead (expired/revoked). A 401 here — and only here — ends the local
     // session so an expired 7-day token self-heals into a logged-out state. Every other failure
     // (network, 403, 5xx, or a 401 on some other endpoint) leaves the session intact.
     suspend fun refreshProfile(): Result<UserProfileDto> {
+        // A 401 IS ONLY AN ANSWER ABOUT THE TOKEN THAT WAS ACTUALLY SENT.
+        //
+        // The Bearer header is attached by an OkHttp interceptor that reads [AuthTokenStore], and
+        // that store is allowed to answer "not right now": a Keystore that is briefly busy makes
+        // [AuthTokenStore.store] null, and null is documented to read exactly like a signed-out
+        // device. The request then goes out with NO Authorization header at all, the backend
+        // answers 401 because it must, and the old code read that as «этот токен мёртв» and ended
+        // a session whose token was sitting on disk, intact, the whole time. From the outside that
+        // is «вылетает аккаунт» — at random, with the подписки still there, healing itself on the
+        // next launch when the store opens again.
+        //
+        // The same hole is open to any caller that reaches this without a session: the payment
+        // polls in AccountFragment / BuyTariffActivity re-ask for the profile every 8 seconds for
+        // ~40, and neither re-checks that the user is still signed in between rounds.
+        //
+        // So the token is read BEFORE the call and the verdict is conditioned on it. No token
+        // sent, no verdict about a token: the failure surfaces as a plain error and the session is
+        // left alone for the next attempt, which is the one that can actually prove anything.
+        val sentToken = !AuthTokenStore.getToken().isNullOrBlank()
         return try {
             val profile = api.getMe()
             AccountSession.updateProfile(profile)
             Result.success(profile)
         } catch (e: ApiError.Unauthorized) {
-            AccountSession.endSession()
+            if (sentToken) AccountSession.endSession()
             Result.failure(e)
         } catch (e: ApiError) {
             Result.failure(e)
         } catch (e: CancellationException) {
-            // Cancellation is not an auth failure — do NOT wipe the session; rethrow to unwind.
+            // Cancellation is not an auth failure — do NOT end the session; rethrow to unwind.
             throw e
         } catch (e: Exception) {
             Result.failure(ApiError.Network(e))
@@ -104,6 +123,13 @@ class AccountRepository(
      *
      * A failure of one is survivable; the import runs on whatever answered. Only when both fail is
      * this a failure, and then nothing is imported and nothing is pruned.
+     *
+     * **A run that lost `/all` may not delete anything**, and that is what `prune` carries. `/all`
+     * is the only endpoint that lists the SECONDARY подписки; the summary describes the active one
+     * and nothing else. So when `/all` was the endpoint that failed, the candidate list is exactly
+     * one item — the root — and the reconcile step used to read that as «остальные подписки
+     * удалены»: every secondary was cancelled and removed, its серверы with it, because one of two
+     * endpoints had a bad minute. Surviving a partial outage is why both are asked at all.
      */
     suspend fun autoImportSubscriptions(): Result<List<String>> {
         val allResult = guard { api.getSubscriptionAll() }
@@ -119,7 +145,7 @@ class AccountRepository(
             primary = primaryResult.getOrNull(),
             all = allResult.getOrNull()?.items.orEmpty(),
         )
-        return guard { subs.importAll(candidates) }
+        return guard { subs.importAll(candidates, prune = allResult.isSuccess) }
     }
 
     /**

@@ -167,17 +167,31 @@ class AccountViewModel : ViewModel() {
         val allResult = repo.loadSubscriptions()
         val primaryResult = repo.loadPrimarySubscription()
 
-        val all = allResult.getOrNull()?.items ?: emptyList()
-        val primary = primaryResult.getOrNull()
-        val merged = mergeSubscriptions(primary, all, _profile.value)
-
-        if (merged.isNotEmpty() || allResult.isSuccess) {
-            applyMerged(primary, all, _profile.value)
-        } else {
-            // Both calls failed and we have nothing to show: surface the primary error.
-            allResult.exceptionOrNull()?.let { report(it) }
-                ?: primaryResult.exceptionOrNull()?.let { report(it) }
+        if (allResult.isFailure && primaryResult.isFailure) {
+            // Nothing was learned. Surface the error and leave the published list exactly as it
+            // was — replacing it with the empty one this run produced would state «нет активной
+            // подписки» on the strength of a dropped connection.
+            (allResult.exceptionOrNull() ?: primaryResult.exceptionOrNull())?.let { report(it) }
+            _subsResolved.value = true
+            return
         }
+
+        // A FAILED ENDPOINT KEEPS ITS LAST ANSWER; ONLY A REPLY REPLACES ONE.
+        //
+        // The two endpoints describe different halves of the account and either can fail on its
+        // own. Reading a failure as an empty half is what made the Главная card lie: it decides the
+        // whole подписка state from `accountSubs.first()`, and that first entry is the ACTIVE
+        // подписка only because the merge puts it there. Lose `/client/subscription` for one round
+        // — a timeout, a 502 — and the merge had no root to place, so the list started with a
+        // SECONDARY подписка and the screen reported that one's expiry as the account's:
+        // «Подписка истекла» over a live, paid подписка whose date the app had had a second ago.
+        // Same story on this tab, where the hero time block reads the same first entry.
+        //
+        // An empty REPLY still empties its half — that is the backend saying the подписка is gone,
+        // and it must show. Only a failure is held.
+        val all = allResult.getOrNull()?.items ?: lastAll
+        val primary = primaryResult.getOrNull() ?: lastPrimary
+        applyMerged(primary, all, _profile.value)
         // Resolved either way — a failure is an answer too, and a screen waiting for this one must
         // not wait forever on it. Set last, after the list (or the error) is already published, so
         // a collector woken by this flag reads the state it describes.
@@ -375,13 +389,19 @@ class AccountViewModel : ViewModel() {
     /** Fetch + import all subscriptions; publishes the local guids and refreshes the sub list. */
     fun autoImportSubscriptions(onImported: (List<String>) -> Unit = {}) = viewModelScope.launch {
         _loading.value = true
-        repo.autoImportSubscriptions()
-            .onSuccess { onImported(it) }
-            .onFailure { report(it) }
-        // Publish through the same merge path as loadSubscriptions so the active/primary sub
-        // renders (never the raw un-merged /all list) and lastPrimary/lastAll/hasSubData stay set.
-        fetchAndApplySubscriptions()
-        _loading.value = false
+        try {
+            repo.autoImportSubscriptions()
+                .onSuccess { onImported(it) }
+                .onFailure { report(it) }
+            // Publish through the same merge path as loadSubscriptions so the active/primary sub
+            // renders (never the raw un-merged /all list) and lastPrimary/lastAll/hasSubData stay set.
+            fetchAndApplySubscriptions()
+        } finally {
+            // In a `finally` because the screen can go while the two fetches are in flight, and a
+            // cancelled coroutine that skipped this left the tab's skeleton pulsing over data that
+            // had already arrived — for as long as the ViewModel lived.
+            _loading.value = false
+        }
     }
 
     // endregion
