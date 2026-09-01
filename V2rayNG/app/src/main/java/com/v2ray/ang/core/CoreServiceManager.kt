@@ -31,6 +31,7 @@ import com.v2ray.ang.util.MessageUtil
 import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import libv2ray.CoreCallbackHandler
 import libv2ray.CoreController
@@ -60,6 +61,12 @@ object CoreServiceManager {
      * [KEY_SESSION_STARTED_AT] and for the same reason: the core lives in `:RunSoLibV2RayDaemon`.
      */
     private const val KEY_PAUSED = "cache_tunnel_paused"
+
+    /**
+     * How long a `MSG_STATE_RESTART` waits between the stop and the start it queues behind it, so
+     * the old core has released its ports before the new one asks for them.
+     */
+    private const val RESTART_GAP_MS = 500L
 
     private val coreController: CoreController = CoreNativeManager.newCoreController(CoreCallback())
     private val mMsgReceive = ReceiveMessageHandler()
@@ -164,6 +171,38 @@ object CoreServiceManager {
      * @return True if the service is running, false otherwise.
      */
     fun isRunning() = coreController.isRunning
+
+    /**
+     * **Is a tunnel up — asked from a process that does not own the core.**
+     *
+     * [isRunning] asks `coreController`, and `coreController` is a field of THIS object — which
+     * means one instance per process. The core lives in `:RunSoLibV2RayDaemon`; in the UI process
+     * the controller is a fresh Go object that has never been handed a config, so its `isRunning`
+     * is `false` and stays `false` for the life of the app, however long the tunnel has been up.
+     *
+     * Everything in the daemon (the плитка, the two shortcut activities, `CoreVpnService`'s own
+     * duplicate-start guard) is right to keep asking [isRunning]. What was wrong is the handful of
+     * UI-process callers that asked the same question and were told «нет» every time:
+     *
+     *  - `depv://toggle` therefore only ever CONNECTED — it could not see a live tunnel to stop;
+     *  - `depv://routing/onadd` imported the rules and never applied them to the running core;
+     *  - Настройки never said «переподключение» after a change that needs one.
+     *
+     * The answer they need is already on disk, in MULTI_PROCESS_MODE, stamped on either side of
+     * the core loop by [markSessionStarted] / [markSessionStopped]: a session instant exists
+     * exactly while a tunnel does. [isRunning] is still consulted first because inside the daemon
+     * it is the stricter truth — during a teardown the stamp is cleared before `stopLoop()`
+     * finishes, and the core is still up until it does.
+     *
+     * A PAUSED TUNNEL ANSWERS «нет», which is the same answer [isRunning] gives and the same one
+     * the плитка and Главная give: пауза takes the tunnel down. @see isPaused
+     *
+     * The one way this can be stale is a daemon killed outright, which never runs
+     * [markSessionStopped]; the sticky restart that follows brings the tunnel back and re-stamps
+     * it. Do NOT use this in the service start guards — there a stale «yes» would refuse the very
+     * reconnect that repairs the state.
+     */
+    fun isTunnelUp(): Boolean = coreController.isRunning || sessionStartedAt() > 0L
 
     /**
      * **The tunnel is down and the way back is one tap in the shade.**
@@ -752,10 +791,25 @@ object CoreServiceManager {
                 }
 
                 AppConfig.MSG_STATE_RESTART -> {
+                    // THE HALF-SECOND BETWEEN THE STOP AND THE START IS A WAIT, NOT A BLOCK.
+                    //
+                    // `onReceive` runs on the daemon's MAIN thread, and `Thread.sleep(500)` here
+                    // held it — with `stopService()`'s own `Thread.sleep(100)` inside the same
+                    // call, 600ms of a main thread that is also the one `CoreVpnService` answers
+                    // `onStartCommand` on and the one the shade's actions arrive on. A receiver
+                    // that does not return promptly is also the shape Android counts towards
+                    // «Приложение не отвечает».
+                    //
+                    // `delay` on the main dispatcher gives up the thread instead of holding it, so
+                    // the pause is the same 500ms and the start still runs where it always did —
+                    // on the main thread, which is what `startVService`'s failure toast needs.
                     LogUtil.i(AppConfig.TAG, "StartCore-Manager: Restart service")
+                    val service = serviceControl.getService()
                     serviceControl.stopService()
-                    Thread.sleep(500L)
-                    startVService(serviceControl.getService())
+                    CoroutineScope(Dispatchers.Main).launch {
+                        delay(RESTART_GAP_MS)
+                        startVService(service)
+                    }
                 }
 
                 AppConfig.MSG_MEASURE_DELAY -> {
