@@ -7,6 +7,8 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.dto.PaymentDto
+import com.v2ray.ang.auth.dto.PaymentOutcome
+import com.v2ray.ang.auth.dto.paymentOutcomeOf
 import com.v2ray.ang.databinding.ItemPaymentBinding
 import java.util.Locale
 
@@ -98,6 +100,11 @@ class PaymentsAdapter : RecyclerView.Adapter<PaymentsAdapter.VH>() {
  * gone (a settled sum is stated at full strength), whether it went wrong (the one case that still
  * earns a colour) and whether the operation belongs on this screen at all.
  *
+ * The WORDS themselves are no longer read here: [paymentOutcomeOf], beside the DTOs that carry the
+ * field, is the app's one reading of a raw status, and this table maps its answer to a label and a
+ * colour. The balance purchase reads the same function to decide whether it may say «Оплачено», so
+ * one operation cannot be settled on one screen and pending on another.
+ *
  * [labelRes] 0 means the backend sent something this build does not know; the raw value is printed
  * rather than swallowed, and it is treated as unsettled, which is the safe direction — a sum shown
  * at full strength is a claim that it was charged.
@@ -120,20 +127,20 @@ private data class PaymentState(
     val listed: Boolean,
 )
 
-private fun statusStyle(status: String): PaymentState = when (status.lowercase(Locale.US)) {
-    "paid", "success", "succeeded", "completed", "confirmed" ->
+private fun statusStyle(status: String): PaymentState = when (paymentOutcomeOf(status)) {
+    PaymentOutcome.SETTLED ->
         PaymentState(R.string.account_status_paid, settled = true, failed = false, listed = true)
 
-    "pending", "processing", "new", "created", "waiting", "in_progress" ->
+    PaymentOutcome.PENDING ->
         PaymentState(R.string.account_status_pending, settled = false, failed = false, listed = true)
 
-    "failed", "error", "declined", "rejected" ->
+    PaymentOutcome.FAILED ->
         PaymentState(R.string.account_status_failed, settled = false, failed = true, listed = false)
 
-    "canceled", "cancelled", "expired" ->
+    PaymentOutcome.CANCELED ->
         PaymentState(R.string.account_status_canceled, settled = false, failed = false, listed = false)
 
-    else -> PaymentState(0, settled = false, failed = false, listed = true)
+    PaymentOutcome.UNKNOWN -> PaymentState(0, settled = false, failed = false, listed = true)
 }
 
 /**

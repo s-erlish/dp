@@ -36,6 +36,7 @@ import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.SubscriptionSyncManager
 import com.v2ray.ang.auth.dto.PaymentDto
 import com.v2ray.ang.auth.dto.PaymentInitDto
+import com.v2ray.ang.auth.dto.PaymentOutcome
 import com.v2ray.ang.auth.dto.PaymentRequestDto
 import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.auth.dto.UserProfileDto
@@ -581,9 +582,17 @@ class AccountFragment : Fragment() {
         latestProfile = null
         currentSubs = emptyList()
         selectedSubIndex = 0
-        // The signed-out block is about to come back; a reason left over from the last sign-in
-        // attempt would be the first thing on it and would be describing nothing.
-        showSignedOutError(null)
+        // The signed-out block is about to come back, and it says WHY when there is a why. A
+        // session the user ended explains itself — they tapped «Выйти» and confirmed it. One the
+        // server ended does not: the seven-day token simply ran out, and without a line about it
+        // the tab just goes blank and the account appears to have fallen off. The sentence also
+        // carries the fact that matters most here, that nothing was deleted along with it.
+        //
+        // Otherwise null, because a reason left over from the last sign-in attempt would be the
+        // first thing on the block and would be describing nothing.
+        showSignedOutError(
+            if (AccountSession.consumeTokenDeathNotice()) R.string.auth_err_session_expired else null
+        )
         subAdapter.submit(emptyList())
         binding.llSubDots.removeAllViews()
         binding.llSubDots.isVisible = false
@@ -1390,8 +1399,15 @@ class AccountFragment : Fragment() {
         }
         if (viewModel.paymentInFlight.value) return
         if (id == PaymentMethodSheet.ID_BALANCE) {
-            viewModel.payWithBalance(PaymentRequestDto(amount = amount, currency = "RUB")) {
-                toastSuccess(R.string.account_top_up_success)
+            viewModel.payWithBalance(PaymentRequestDto(amount = amount, currency = "RUB")) { outcome ->
+                // «Баланс пополнён» is a claim that the money moved, so it is said only when the
+                // backend says so. A payment the provider is still settling gets its own line —
+                // the reload below then brings the real figure in when it lands.
+                if (outcome == PaymentOutcome.PENDING) {
+                    toast(R.string.account_pay_pending)
+                } else {
+                    toastSuccess(R.string.account_top_up_success)
+                }
                 viewModel.refreshProfile()
                 viewModel.loadSubscriptions()
             }

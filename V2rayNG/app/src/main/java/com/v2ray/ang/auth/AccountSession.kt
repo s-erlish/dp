@@ -88,7 +88,36 @@ object AccountSession {
         if (jwt.isBlank()) throw ApiError.Parse()
         AuthTokenStore.saveSession(jwt, user = profile)
         sessionKnown = true
+        tokenDeathPending = false
         _state.value = AccountState.LoggedIn(profile)
+    }
+
+    /**
+     * Set when the SERVER ended the session and cleared when the user did, so the screen that comes
+     * back can tell the two apart. @see consumeTokenDeathNotice
+     */
+    @Volatile
+    private var tokenDeathPending = false
+
+    /**
+     * **Did the session end on its own?** True exactly once after a token death, false after an
+     * explicit sign-out and after every read.
+     *
+     * The seven-day JWT cannot be refreshed — this backend issues no refresh endpoint and the app
+     * keeps no credentials to sign in again with — so the token WILL die, and until now it did so
+     * in complete silence: the tab blanked, the signed-out block came back with its reason line
+     * explicitly cleared, and the user was left to work out that they had been signed out at all,
+     * let alone why. «Вылетает аккаунт» is partly this: not the sign-out, the absence of a sentence
+     * about it.
+     *
+     * One-shot, because it describes a transition and not a state: the next thing the user does on
+     * that screen is start a new sign-in, and a reason still standing under it would be describing
+     * the previous attempt.
+     */
+    fun consumeTokenDeathNotice(): Boolean {
+        if (!tokenDeathPending) return false
+        tokenDeathPending = false
+        return true
     }
 
     /** Refresh the cached profile (e.g. after GET /client/auth/me). */
@@ -116,6 +145,9 @@ object AccountSession {
      */
     fun endSession() {
         sessionKnown = true
+        // The user did not ask for this, so the screen that comes back has to say why. @see
+        // consumeTokenDeathNotice
+        tokenDeathPending = true
         AuthTokenStore.clearSession()
         // Eagerly, not on the next read: [AccountCache] only evicts when something asks it for a
         // value while signed out, and signing straight back in performs no such read. The payments
@@ -139,6 +171,8 @@ object AccountSession {
      */
     suspend fun wipe() {
         sessionKnown = true
+        // An explicit sign-out explains itself; nothing is owed to the screen afterwards.
+        tokenDeathPending = false
         subs.removeAllManaged()
         check(AuthTokenStore.clear()) { "auth store unavailable: the session was not cleared" }
         AccountCache.invalidateAll()

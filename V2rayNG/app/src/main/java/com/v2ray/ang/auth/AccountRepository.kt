@@ -15,6 +15,8 @@ import com.v2ray.ang.auth.dto.SubscriptionAllDto
 import com.v2ray.ang.auth.dto.TariffCatalogDto
 import com.v2ray.ang.auth.dto.UpgradeQuoteDto
 import com.v2ray.ang.auth.dto.UserProfileDto
+import com.v2ray.ang.AppConfig
+import com.v2ray.ang.util.LogUtil
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -91,7 +93,10 @@ class AccountRepository(
             AccountSession.updateProfile(profile)
             Result.success(profile)
         } catch (e: ApiError.Unauthorized) {
-            if (sentToken) AccountSession.endSession()
+            if (sentToken) {
+                logTokenDeath()
+                AccountSession.endSession()
+            }
             Result.failure(e)
         } catch (e: ApiError) {
             Result.failure(e)
@@ -101,6 +106,36 @@ class AccountRepository(
         } catch (e: Exception) {
             Result.failure(ApiError.Network(e))
         }
+    }
+
+    /**
+     * One log line at the moment a session dies, saying whether the token had actually reached the
+     * expiry it carries.
+     *
+     * The owner's position is that «токен всегда должен быть, пока нет выхода из аккаунта», so a
+     * weekly sign-out is a defect — but the two shapes of that defect need opposite repairs, and
+     * nothing outside the app can tell them apart. A 401 that arrives AT the token's own `exp` is
+     * the seven-day term simply running out, and only the panel can fix that (a longer term, or a
+     * refresh endpoint; this backend exposes neither today). A 401 that arrives BEFORE `exp` is the
+     * panel revoking the session early — another sign-in, a password change, a restart that dropped
+     * its keys — which is a different conversation entirely.
+     *
+     * Neither the token nor any claim but the instant reaches the log. @see
+     * AuthTokenStore.tokenExpiresAtSeconds
+     */
+    private fun logTokenDeath() {
+        val expiresAt = AuthTokenStore.tokenExpiresAtSeconds()
+        if (expiresAt == null) {
+            LogUtil.i(AppConfig.TAG, "Session ended: the identity endpoint refused the token (no exp claim to compare)")
+            return
+        }
+        val remaining = expiresAt - System.currentTimeMillis() / 1000
+        val verdict = if (remaining > 0) {
+            "revoked EARLY, ${remaining}s before its own exp"
+        } else {
+            "expired on time, ${-remaining}s past its own exp"
+        }
+        LogUtil.i(AppConfig.TAG, "Session ended: the identity endpoint refused the token — $verdict")
     }
 
     // Subscriptions

@@ -32,11 +32,55 @@ data class PaymentInitDto(
     val orderId: String = "",
 )
 
-/** Returned by a balance (wallet) payment that settles immediately. */
+/**
+ * Returned by a balance (wallet) payment.
+ *
+ * «Settles immediately» is what the endpoint is FOR, not what it promises: the reply is a status,
+ * and the status is the answer. Read it with [paymentOutcomeOf] — a 2xx alone says the request was
+ * accepted, never that the money moved.
+ */
 data class PaymentResultDto(
     val status: String = "",
     val orderId: String = "",
 )
+
+/** What a raw backend payment status means to this app. @see paymentOutcomeOf */
+enum class PaymentOutcome {
+    /** The money moved. */
+    SETTLED,
+
+    /** Accepted, not yet settled — the provider or the bank still has it. */
+    PENDING,
+
+    /** It did not go through. */
+    FAILED,
+
+    /** It was called off; nothing happened and nothing will. */
+    CANCELED,
+
+    /** A word this build does not know. Callers decide the safe direction for their own case. */
+    UNKNOWN,
+}
+
+/**
+ * THE APP'S ONE READING OF A RAW BACKEND PAYMENT STATUS.
+ *
+ * It lives here, beside the two DTOs that carry the field ([PaymentDto.status] and
+ * [PaymentResultDto.status]), because two readers need it and neither may own it: the history
+ * screen renders these words, and the balance purchase decides on them whether it may say
+ * «Оплачено». A second `when` over the same spellings is how one screen ends up calling a status
+ * settled while the other calls it pending, on the same operation.
+ *
+ * The spellings are the set `ui/adapter/PaymentsAdapter.kt` accumulated against the live backend;
+ * that file now maps this outcome to its label and colour rather than re-deriving it.
+ */
+fun paymentOutcomeOf(status: String): PaymentOutcome = when (status.trim().lowercase(java.util.Locale.US)) {
+    "paid", "success", "succeeded", "completed", "confirmed" -> PaymentOutcome.SETTLED
+    "pending", "processing", "new", "created", "waiting", "in_progress" -> PaymentOutcome.PENDING
+    "failed", "error", "declined", "rejected" -> PaymentOutcome.FAILED
+    "canceled", "cancelled", "expired" -> PaymentOutcome.CANCELED
+    else -> PaymentOutcome.UNKNOWN
+}
 
 /**
  * GET /client/payments

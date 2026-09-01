@@ -3,6 +3,7 @@ package com.v2ray.ang.auth
 import android.os.Build
 import android.os.SystemClock
 import android.provider.Settings
+import android.util.Base64
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.tencent.mmkv.MMKV
@@ -325,6 +326,43 @@ object AuthTokenStore {
         val store = store() ?: return null
         return !store.decodeString(KEY_TOKEN).isNullOrBlank()
     }
+
+    /**
+     * **DIAGNOSTICS ONLY: when the stored JWT says it expires**, in epoch seconds, or null when
+     * there is no token or it carries no readable `exp`.
+     *
+     * NOTHING MAY GATE ON THIS, and that is not a style preference. A client-side deadline that
+     * guesses short signs a user out of a session the backend would still have honoured — the exact
+     * failure this file's neighbours are being repaired for — and a token's real fate is the
+     * backend's to decide: it can be revoked early (a sign-in elsewhere, a password change) or
+     * honoured late. The only truthful test remains a 401 from the identity endpoint.
+     *
+     * What it IS for is answering, from a user's «Журнал», the question nobody can answer from the
+     * outside: does the 401 arrive when the token says it should, or before? The owner's position
+     * is that «токен всегда должен быть, пока нет выхода из аккаунта», and the two cases need
+     * different repairs — a token that dies at `exp` needs the panel to issue a longer one or a
+     * refresh endpoint, while one that dies early is the panel revoking sessions for a reason the
+     * client cannot see. [AccountRepository.refreshProfile] logs this at the moment a session ends.
+     *
+     * The claim is read straight out of the JWT's own middle segment (base64url JSON). NOTHING OF
+     * THE TOKEN IS RETURNED OR LOGGED — only the instant.
+     */
+    fun tokenExpiresAtSeconds(): Long? {
+        val token = getToken()?.takeIf { it.isNotBlank() } ?: return null
+        val payload = token.split('.').getOrNull(1)?.takeIf { it.isNotBlank() } ?: return null
+        return try {
+            val json = String(
+                Base64.decode(payload, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING),
+                Charsets.UTF_8,
+            )
+            EXP_CLAIM.find(json)?.groupValues?.getOrNull(1)?.toLongOrNull()
+        } catch (e: Throwable) {
+            null
+        }
+    }
+
+    /** `"exp": 1788220800` — a bare second-precision epoch, which is what RFC 7519 defines. */
+    private val EXP_CLAIM = Regex("\"exp\"\\s*:\\s*(\\d{9,12})")
 
     /** uuid -> local subscription guid map of subscriptions owned by the auth flow. */
     fun getManagedGuids(): MutableMap<String, String> {
