@@ -19,7 +19,6 @@ import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
-import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -76,7 +75,13 @@ class AccountFragment : Fragment() {
     private var _binding: ActivityAccountBinding? = null
     private val binding get() = _binding!!
 
-    private val viewModel: AccountViewModel by viewModels()
+    /**
+     * ACTIVITY-SCOPED, so this is the very instance Главная is already using — see
+     * `HomeFragment.accountViewModel`. Both tabs live at once (they are hidden, never replaced) and
+     * both refresh on resume; with one instance apiece that was two identical account fetches per
+     * foreground. It also means this tab opens onto data that is already there.
+     */
+    private val viewModel: AccountViewModel by activityViewModels()
 
     /**
      * The shell's shared server state, scoped to the ACTIVITY — the same instance the Главная and

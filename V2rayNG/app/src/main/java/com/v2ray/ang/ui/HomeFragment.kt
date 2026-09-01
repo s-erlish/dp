@@ -38,7 +38,7 @@ import androidx.core.view.children
 import androidx.core.view.doOnPreDraw
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
-import androidx.fragment.app.viewModels
+import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -185,8 +185,18 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * The account's subscriptions, the same `SubInfoDto` list Аккаунт renders — one truth, two
      * surfaces. It is also what gives the subscription card its NAME: when a подписка came from the
      * account, the nickname the account returns is what the card shows.
+     *
+     * **ACTIVITY-SCOPED, AND THAT IS THE POINT: ONE INSTANCE, NOT TWO.** «One truth, two surfaces»
+     * was true of the DATA and false of the object — this was `by viewModels()` and so was
+     * `AccountFragment`'s, so each tab had its own [AccountViewModel] with its own repository, its
+     * own jobs and its own copy of the account. The tabs are `add`ed and only ever hidden, so both
+     * were RESUMED at once and both refreshed on every resume: `/client/profile`,
+     * `/subscription/all` and `/client/subscription` went out TWICE within milliseconds of each
+     * other, every time the app came to the foreground, and the second answer overwrote the first.
+     * Sharing the instance also means the Аккаунт tab opens onto the profile and подписки Главная
+     * has already fetched, instead of cold-loading its skeleton on first visit.
      */
-    private val accountViewModel: AccountViewModel by viewModels()
+    private val accountViewModel: AccountViewModel by activityViewModels()
 
     private var accountSubs: List<SubInfoDto> = emptyList()
     private var subsResolved = false
@@ -2498,12 +2508,14 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         }
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                accountViewModel.error.collect { error ->
-                    if (error == null) return@collect
-                    // Consumed here, so the same failure is not re-reported on every recomposition
-                    // of this collector. This ViewModel is fragment-scoped, so clearing it cannot
-                    // take an error away from Аккаунт.
-                    accountViewModel.clearError()
+                // AN EVENT STREAM, NOT THE `error` STATE — because the ViewModel is shared with
+                // Аккаунт now. The old collector CONSUMED the state (`clearError()`) so that a
+                // collector restart would not re-raise a stale bar; two screens cannot both consume
+                // one conflated value, and whichever got there first would have silently swallowed
+                // the other's error. `accountDataErrors` is delivered to every collector once, and
+                // carries only the two loads Главная depends on — a payments failure on the Аккаунт
+                // tab is not «данные подписки устарели». @see AccountViewModel.accountDataErrors
+                accountViewModel.accountDataErrors.collect {
                     accountResolved = true
                     subsResolved = true
                     subsError = true
