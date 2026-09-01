@@ -972,23 +972,52 @@ object AngConfigManager {
                 MmkvManager.encodeSubscription(it.guid, it.subscription)
             }
 
+            // ============================================================================
+            // AN EXPIRED ПОДПИСКА DOES NOT ANSWER WITH SERVERS, AND THIS IS WHERE THAT MATTERS.
+            // ============================================================================
+            //
+            // When the term is over the panel replies with a NOTICE instead of the list: a single
+            // entry pointing at a host whose only job is to say «подписка истекла». Nothing below
+            // could tell that apart from a list of one. `parseBatchConfig` parses it, counts one
+            // config, calls `MmkvManager.removeServerViaSubid` — which deletes every real сервер of
+            // this подписка AND clears the selected one — and then saves the notice in their place.
+            // The user is left with one fake «локация» in the list, quite possibly selected, that
+            // the app will happily try to connect through; the серверы it replaced are gone from
+            // the device and only a renewal brings them back.
+            //
+            // The подписка's own `subscription-userinfo` header is the authoritative statement, it
+            // arrives ON THIS RESPONSE, and it is what the app already stores as the expiry it
+            // draws. So it is read BEFORE the body and it decides whether the body is a list at
+            // all. An expired подписка keeps everything it had — серверы, selection, name — and its
+            // metadata is still written, which is what makes Главная say «Подписка истекла» and
+            // offer «Продлить». That is the whole intended behaviour: the session is not touched
+            // (a 401 from the identity endpoint is the only thing that ends one), nothing is
+            // deleted, and the way out is on screen.
+            //
+            // The account's own JWT and this подписка's credentials are unrelated, so this is the
+            // only signal available on the refresh path — and it is also the only one the hand-added
+            // подписки have, which come through here too.
+            val userInfo = SubscriptionUserInfo.parse(result?.subscriptionUserInfo)
+            if (userInfo != null && userInfo.isExpired()) {
+                applySubUserInfo(it.subscription, userInfo)
+                applySubDirectives(it.subscription, result)
+                it.subscription.lastUpdated = System.currentTimeMillis()
+                MmkvManager.encodeSubscription(it.guid, it.subscription)
+                LogUtil.i(
+                    AppConfig.TAG,
+                    "Subscription term is over: the answer is a notice, keeping the stored servers"
+                )
+                // Not a failure — nothing went wrong and nothing needs retrying — and not a
+                // success either, because no config was imported. `skipCount` is already the
+                // bucket for «ничего не запрашивалось», and the screens branch on it that way.
+                return SubscriptionUpdateResult(skipCount = 1)
+            }
+
             val count = parseConfigViaSub(configText, it.guid, false)
             if (count > 0) {
                 // Persist traffic/expiry metadata from the subscription-userinfo header, if present.
-                SubscriptionUserInfo.parse(result?.subscriptionUserInfo)?.let { info ->
-                    it.subscription.uploadUsed = info.upload
-                    it.subscription.downloadUsed = info.download
-                    it.subscription.totalTraffic = info.total
-                    it.subscription.expire = info.expire
-                    it.subscription.userInfoUpdated = System.currentTimeMillis()
-                }
-                // Persist Happ/Incy-style directives (announce banner, support/website buttons).
-                // null header = leave unchanged; "0" = clear; "base64:.." = decoded.
-                decodeSubDirective(result?.announce)?.let { v -> it.subscription.announce = v }
-                decodeSubDirective(result?.supportUrl)?.let { v -> it.subscription.supportUrl = v }
-                decodeSubDirective(result?.webPageUrl)?.let { v -> it.subscription.webPageUrl = v }
-                // Real subscription title sent by the provider (used as the meta-bar heading).
-                decodeSubDirective(result?.profileTitle)?.let { v -> it.subscription.profileTitle = v }
+                userInfo?.let { info -> applySubUserInfo(it.subscription, info) }
+                applySubDirectives(it.subscription, result)
                 // Adopt that provider title as the подписка's stored name too, but only while the
                 // подписка is still unnamed — a name that identifies THIS подписка must never be
                 // clobbered.
@@ -1018,6 +1047,37 @@ object AngConfigManager {
             LogUtil.e(AppConfig.TAG, "Failed to update config via subscription", e)
             return SubscriptionUpdateResult(failureCount = 1)
         }
+    }
+
+    /**
+     * Copies the parsed `subscription-userinfo` figures onto the подписка.
+     *
+     * Extracted because two branches of [updateConfigViaSub] need it and they must not diverge: an
+     * expired подписка imports nothing, but its traffic and its expiry are exactly what the screens
+     * then draw to explain why — writing them on the success path alone would have left the app
+     * silent about the one state it most needs to name.
+     */
+    private fun applySubUserInfo(sub: SubscriptionItem, info: SubscriptionUserInfo) {
+        sub.uploadUsed = info.upload
+        sub.downloadUsed = info.download
+        sub.totalTraffic = info.total
+        sub.expire = info.expire
+        sub.userInfoUpdated = System.currentTimeMillis()
+    }
+
+    /**
+     * Persists the Happ/Incy-style directives (announce banner, support/website buttons, provider
+     * title). null header = leave unchanged; "0" = clear; "base64:.." = decoded.
+     *
+     * Applied on the expired path too, and that is the point of it being shared: `announce` and
+     * `support-url` are how a панель explains an expired подписка and where it sends the user to
+     * renew, so the one response that carries a reason must not be the one whose reason is dropped.
+     */
+    private fun applySubDirectives(sub: SubscriptionItem, result: HttpUtil.UrlContentResult?) {
+        decodeSubDirective(result?.announce)?.let { v -> sub.announce = v }
+        decodeSubDirective(result?.supportUrl)?.let { v -> sub.supportUrl = v }
+        decodeSubDirective(result?.webPageUrl)?.let { v -> sub.webPageUrl = v }
+        decodeSubDirective(result?.profileTitle)?.let { v -> sub.profileTitle = v }
     }
 
     /**

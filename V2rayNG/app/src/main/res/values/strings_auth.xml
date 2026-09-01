@@ -96,6 +96,8 @@
     <string name="auth_err_tg_timeout">Мы не дождались подтверждения. Начните заново.</string>
     <string name="auth_err_not_configured">Вход сейчас недоступен. Повторите попытку позже.</string>
     <string name="auth_err_generic">Что-то пошло не так. Повторите попытку.</string>
+    <!-- Семидневный токен кончился сам: подписки и серверы при этом НЕ удаляются. -->
+    <string name="auth_err_session_expired">Сессия истекла — войдите снова. Подписки и серверы остались на устройстве.</string>
     <string name="auth_err_telegram_missing">Telegram не установлен. Войдите по почте.</string>
     <!-- The same failure during «Привязать Telegram», where «войдите по почте» would be nonsense:
          that account is already signed in, and Telegram is the only thing this errand needs. -->

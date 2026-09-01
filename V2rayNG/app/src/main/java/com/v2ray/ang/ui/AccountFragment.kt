@@ -36,6 +36,7 @@ import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.SubscriptionSyncManager
 import com.v2ray.ang.auth.dto.PaymentDto
 import com.v2ray.ang.auth.dto.PaymentInitDto
+import com.v2ray.ang.auth.dto.PaymentOutcome
 import com.v2ray.ang.auth.dto.PaymentRequestDto
 import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.auth.dto.UserProfileDto
@@ -53,9 +54,11 @@ import com.v2ray.ang.util.AvatarManager
 import com.v2ray.ang.util.reducedMotion
 import com.v2ray.ang.viewmodel.AccountViewModel
 import com.v2ray.ang.viewmodel.MainViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Locale
 
@@ -579,9 +582,17 @@ class AccountFragment : Fragment() {
         latestProfile = null
         currentSubs = emptyList()
         selectedSubIndex = 0
-        // The signed-out block is about to come back; a reason left over from the last sign-in
-        // attempt would be the first thing on it and would be describing nothing.
-        showSignedOutError(null)
+        // The signed-out block is about to come back, and it says WHY when there is a why. A
+        // session the user ended explains itself — they tapped «Выйти» and confirmed it. One the
+        // server ended does not: the seven-day token simply ran out, and without a line about it
+        // the tab just goes blank and the account appears to have fallen off. The sentence also
+        // carries the fact that matters most here, that nothing was deleted along with it.
+        //
+        // Otherwise null, because a reason left over from the last sign-in attempt would be the
+        // first thing on the block and would be describing nothing.
+        showSignedOutError(
+            if (AccountSession.consumeTokenDeathNotice()) R.string.auth_err_session_expired else null
+        )
         subAdapter.submit(emptyList())
         binding.llSubDots.removeAllViews()
         binding.llSubDots.isVisible = false
@@ -808,12 +819,31 @@ class AccountFragment : Fragment() {
         // whole card per render to arrive at a number the layout already knew.
 
         renderDevicesRowValue()
-        // Fetch the REAL connected-device count for the active (first/root) sub and pre-warm
-        // AccountCache so the Devices sub-screen opens instantly. Cache-first inside.
-        list.firstOrNull()?.remnawaveUuid?.takeIf { it.isNotBlank() }?.let { viewModel.loadDevices(it) }
+        // Fetch the REAL connected-device count for the ACTIVE sub and pre-warm AccountCache so the
+        // Devices sub-screen opens instantly. Cache-first inside.
+        activeSub()?.remnawaveUuid?.takeIf { it.isNotBlank() }?.let { viewModel.loadDevices(it) }
 
         renderHeroState()
     }
+
+    /**
+     * The account's ACTIVE подписка, asked for by type rather than by position.
+     *
+     * The merge puts the root first, so `first()` was right — until the round where it is not.
+     * `/client/subscription` is what identifies the active подписка and `/client/subscription/all`
+     * is the only source of the secondaries; when the first of those answers with a payload whose
+     * shape we cannot read, the merge has no root to place and the list STARTS with a secondary.
+     * Everything that then asked for «первая» silently described the wrong подписка: the device
+     * allowance «N / M» came from a secondary's slots, and the uuid the Devices screen was
+     * pre-warmed with was that secondary's too.
+     *
+     * Falling back to the first entry keeps the old answer for the case it was written for — an
+     * account whose root simply is the only подписка — while a list that genuinely has no root
+     * still describes something rather than nothing.
+     */
+    private fun activeSub(): SubInfoDto? =
+        currentSubs.firstOrNull { it.type.equals(SubscriptionSyncManager.TYPE_ROOT, ignoreCase = true) }
+            ?: currentSubs.firstOrNull()
 
     /**
      * Fills the management «Устройства» row's trailing «N / M» slot from the active подписка, or
@@ -827,7 +857,7 @@ class AccountFragment : Fragment() {
      * `deviceCount`), so the value appears the instant it is known.
      */
     private fun renderDevicesRowValue() {
-        val sub = currentSubs.firstOrNull()
+        val sub = activeSub()
         val usedDevices = viewModel.deviceCount.value
         if (sub == null || usedDevices == null) {
             binding.tvRowValueDevices.visibility = View.GONE
@@ -1369,8 +1399,15 @@ class AccountFragment : Fragment() {
         }
         if (viewModel.paymentInFlight.value) return
         if (id == PaymentMethodSheet.ID_BALANCE) {
-            viewModel.payWithBalance(PaymentRequestDto(amount = amount, currency = "RUB")) {
-                toastSuccess(R.string.account_top_up_success)
+            viewModel.payWithBalance(PaymentRequestDto(amount = amount, currency = "RUB")) { outcome ->
+                // «Баланс пополнён» is a claim that the money moved, so it is said only when the
+                // backend says so. A payment the provider is still settling gets its own line —
+                // the reload below then brings the real figure in when it lands.
+                if (outcome == PaymentOutcome.PENDING) {
+                    toast(R.string.account_pay_pending)
+                } else {
+                    toastSuccess(R.string.account_top_up_success)
+                }
                 viewModel.refreshProfile()
                 viewModel.loadSubscriptions()
             }
@@ -1525,13 +1562,29 @@ class AccountFragment : Fragment() {
         }
     }
 
+    /**
+     * The picked photo is decoded, down-sampled and re-compressed to JPEG before it is stored, and
+     * ALL of that used to run on the main thread — on whatever a modern camera produces, i.e. tens
+     * of megapixels read through a ContentResolver. That is the frame budget for a dropped
+     * hundred-odd milliseconds at best and an ANR at worst, for a cosmetic action.
+     *
+     * It moves to IO, and the result comes back on the main thread to paint. The gallery has
+     * already closed by the time this runs, so nothing on screen is waiting on it; the picker's
+     * read grant is one-shot but it lasts for the life of this callback's coroutine, which is what
+     * the copy needs. `viewLifecycleOwner` scopes it, so a tab torn down mid-copy simply stops.
+     */
     private fun onAvatarPicked(uri: Uri?) {
         if (uri == null) return
-        if (AvatarManager.saveCustomAvatar(requireContext(), uri)) {
-            AvatarManager.applyAvatar(viewLifecycleOwner.lifecycleScope, requireContext(), binding.imgAvatar, binding.tvAvatarInitial, latestProfile)
-            toast(R.string.account_avatar_updated)
-        } else {
-            toastError(R.string.account_avatar_error)
+        val context = requireContext().applicationContext
+        viewLifecycleOwner.lifecycleScope.launch {
+            val saved = withContext(Dispatchers.IO) { AvatarManager.saveCustomAvatar(context, uri) }
+            val b = _binding ?: return@launch
+            if (saved) {
+                AvatarManager.applyAvatar(viewLifecycleOwner.lifecycleScope, requireContext(), b.imgAvatar, b.tvAvatarInitial, latestProfile)
+                toast(R.string.account_avatar_updated)
+            } else {
+                toastError(R.string.account_avatar_error)
+            }
         }
     }
 

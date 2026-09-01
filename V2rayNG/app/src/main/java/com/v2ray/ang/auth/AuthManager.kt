@@ -81,7 +81,17 @@ class AuthManager(
             }
             when (result) {
                 is TelegramCheckResult.Confirmed -> {
-                    AccountSession.onAuthenticated(result.token, result.client)
+                    // Persisting can now REFUSE the reply (a blank jwt is not a session), and this
+                    // flow is collected straight into `viewModelScope.launch` / `lifecycleScope`
+                    // with no catch around it — an exception thrown here would not be a failed
+                    // login, it would be a crash on the sign-in screen. It becomes the same
+                    // rendered error every other failure on this flow becomes.
+                    try {
+                        AccountSession.onAuthenticated(result.token, result.client)
+                    } catch (e: ApiError) {
+                        emit(LoginState.Error(e))
+                        return@flow
+                    }
                     emit(LoginState.Success(result.client))
                     return@flow
                 }

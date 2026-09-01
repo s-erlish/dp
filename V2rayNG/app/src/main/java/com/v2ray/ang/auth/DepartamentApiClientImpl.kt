@@ -104,11 +104,30 @@ class DepartamentApiClientImpl(
             chain.proceed(builder.build())
         }
 
-        private fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
-            .addInterceptor(authInterceptor)
-            .build()
+        /**
+         * ONE client for the whole app, and it has to be one.
+         *
+         * `defaultClient()` was the default value of a constructor parameter, so every
+         * `DepartamentApiClientImpl()` built a fresh [OkHttpClient] — and one is built per
+         * [AccountRepository], which is itself constructed per ViewModel and ad hoc at several call
+         * sites (`AccountRepository().autoImportSubscriptions()` runs on every sign-in and on every
+         * «Загрузить серверы»). Each client carries its own connection pool, its own dispatcher
+         * thread pool and its own idle-cleanup thread, none of which are shut down when the caller
+         * goes; nothing is shared either, so every account screen paid for a fresh TCP+TLS
+         * handshake against a host the app already had a warm connection to.
+         *
+         * `by lazy` because building it touches OkHttp's own initialisation, and this object is
+         * loaded from the interceptor path on a background thread.
+         */
+        private val sharedClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(20, TimeUnit.SECONDS)
+                .addInterceptor(authInterceptor)
+                .build()
+        }
+
+        private fun defaultClient(): OkHttpClient = sharedClient
     }
 
     // region public

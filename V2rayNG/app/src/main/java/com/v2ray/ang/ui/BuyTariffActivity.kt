@@ -28,6 +28,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.dto.PaymentInitDto
+import com.v2ray.ang.auth.dto.PaymentOutcome
 import com.v2ray.ang.auth.dto.PaymentRequestDto
 import com.v2ray.ang.auth.dto.PriceOptionDto
 import com.v2ray.ang.auth.dto.TariffDto
@@ -940,10 +941,22 @@ class BuyTariffActivity : BaseActivity() {
         )
 
         if (methodId == PaymentMethodSheet.ID_BALANCE) {
-            viewModel.payWithBalance(req) {
+            viewModel.payWithBalance(req) { outcome ->
                 awaitingPaymentError = false
-                toastSuccess(R.string.buy_success)
-                finish()
+                // «Подписка оплачена» and closing the screen is a claim the подписка now exists.
+                // The backend answers with a settlement status and it is read now (see
+                // AccountViewModel.payWithBalance): a charge the provider is still settling says so
+                // and the screen STAYS, so the user can watch it land instead of returning to a tab
+                // that has not changed. A refusal never reaches here at all — it comes back as the
+                // payment-error dialog.
+                if (outcome == PaymentOutcome.PENDING) {
+                    toast(R.string.account_pay_pending)
+                    viewModel.refreshProfile()
+                    viewModel.loadSubscriptions()
+                } else {
+                    toastSuccess(R.string.buy_success)
+                    finish()
+                }
             }
         } else {
             viewModel.buy(req) { init ->

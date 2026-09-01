@@ -3,6 +3,7 @@ package com.v2ray.ang.auth
 import android.os.Build
 import android.os.SystemClock
 import android.provider.Settings
+import android.util.Base64
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.tencent.mmkv.MMKV
@@ -40,6 +41,8 @@ object AuthTokenStore {
     private const val ID = "departament_auth"
 
     private const val KEY_TOKEN = "token"
+
+    /** Erase-only: never written any more, still removed so an older build's value cannot linger. */
     private const val KEY_EXPIRES_AT = "expires_at"
     private const val KEY_USER = "user_json"
     private const val KEY_DEVICE_ID = "device_id"
@@ -268,11 +271,23 @@ object AuthTokenStore {
         null
     }
 
-    /** Persists a new session. No refresh token in this backend. */
-    fun saveSession(token: String, expiresAt: Long? = null, user: UserProfileDto? = null) {
+    /**
+     * Persists a new session. No refresh token in this backend.
+     *
+     * AND NO EXPIRY EITHER, deliberately. The parameter that used to be here was never passed by
+     * any caller and could not have been: nothing in the auth payloads carries an expiry —
+     * [com.v2ray.ang.auth.dto.AuthResult] is a token and a profile — so the value written would
+     * have been invented here. Half a check is worse than none: a client-side deadline that guessed
+     * short signs a user out of a session the backend would still have honoured, which is the
+     * failure this whole area is being repaired for. The token's death is learned the one way it
+     * can be learned truthfully — a 401 from the identity endpoint, see
+     * [AccountRepository.refreshProfile]. [KEY_EXPIRES_AT] survives as an erase-only key so a value
+     * an older build left on disk is still cleared by [clearSession] / [clear].
+     */
+    fun saveSession(token: String, user: UserProfileDto? = null) {
         val store = store() ?: return
         store.encode(KEY_TOKEN, token)
-        if (expiresAt != null) store.encode(KEY_EXPIRES_AT, expiresAt) else store.remove(KEY_EXPIRES_AT)
+        store.remove(KEY_EXPIRES_AT)
         if (user != null) store.encode(KEY_USER, JsonUtil.toJson(user)) else store.remove(KEY_USER)
     }
 
@@ -296,12 +311,69 @@ object AuthTokenStore {
 
     fun isLoggedIn(): Boolean = !getToken().isNullOrBlank()
 
+    /**
+     * The same question as [isLoggedIn], but able to say "I do not know".
+     *
+     * null means the store could not be opened — a Keystore that is briefly busy, an unseal that
+     * has to be retried — as opposed to "there is no token here". [isLoggedIn] flattens the two
+     * into false because most callers want a gate and a gate has to pick a side. The one caller
+     * that must NOT flatten them is [AccountSession]'s seed: it runs once per process and its
+     * answer is cached for the process's whole life, so a false read taken during a two-second
+     * retry window used to leave the app showing a signed-out account with the token, the profile
+     * and the подписки all sitting on disk, until the user killed and reopened it.
+     */
+    fun isLoggedInOrUnknown(): Boolean? {
+        val store = store() ?: return null
+        return !store.decodeString(KEY_TOKEN).isNullOrBlank()
+    }
+
+    /**
+     * **DIAGNOSTICS ONLY: when the stored JWT says it expires**, in epoch seconds, or null when
+     * there is no token or it carries no readable `exp`.
+     *
+     * NOTHING MAY GATE ON THIS, and that is not a style preference. A client-side deadline that
+     * guesses short signs a user out of a session the backend would still have honoured — the exact
+     * failure this file's neighbours are being repaired for — and a token's real fate is the
+     * backend's to decide: it can be revoked early (a sign-in elsewhere, a password change) or
+     * honoured late. The only truthful test remains a 401 from the identity endpoint.
+     *
+     * What it IS for is answering, from a user's «Журнал», the question nobody can answer from the
+     * outside: does the 401 arrive when the token says it should, or before? The owner's position
+     * is that «токен всегда должен быть, пока нет выхода из аккаунта», and the two cases need
+     * different repairs — a token that dies at `exp` needs the panel to issue a longer one or a
+     * refresh endpoint, while one that dies early is the panel revoking sessions for a reason the
+     * client cannot see. [AccountRepository.refreshProfile] logs this at the moment a session ends.
+     *
+     * The claim is read straight out of the JWT's own middle segment (base64url JSON). NOTHING OF
+     * THE TOKEN IS RETURNED OR LOGGED — only the instant.
+     */
+    fun tokenExpiresAtSeconds(): Long? {
+        val token = getToken()?.takeIf { it.isNotBlank() } ?: return null
+        val payload = token.split('.').getOrNull(1)?.takeIf { it.isNotBlank() } ?: return null
+        return try {
+            val json = String(
+                Base64.decode(payload, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING),
+                Charsets.UTF_8,
+            )
+            EXP_CLAIM.find(json)?.groupValues?.getOrNull(1)?.toLongOrNull()
+        } catch (e: Throwable) {
+            null
+        }
+    }
+
+    /** `"exp": 1788220800` — a bare second-precision epoch, which is what RFC 7519 defines. */
+    private val EXP_CLAIM = Regex("\"exp\"\\s*:\\s*(\\d{9,12})")
+
     /** uuid -> local subscription guid map of subscriptions owned by the auth flow. */
     fun getManagedGuids(): MutableMap<String, String> {
         val json = store()?.decodeString(KEY_MANAGED_GUIDS) ?: return mutableMapOf()
         return try {
             gson.fromJson(json, mapType) ?: mutableMapOf()
         } catch (e: Exception) {
+            // An empty map here is not harmless: the import reads it as "nothing is managed yet"
+            // and mints a fresh guid for every подписка, leaving the rows the old map pointed at
+            // on the device with nothing keyed to them. Say so rather than lose it silently.
+            LogUtil.w(AppConfig.TAG, "Managed-subscription map unreadable: ${e.message}")
             mutableMapOf()
         }
     }

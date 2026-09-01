@@ -13,10 +13,10 @@ import com.v2ray.ang.auth.dto.PaymentDto
  * Timestamps use [SystemClock.elapsedRealtime] (monotonic since boot) rather than wall-clock time,
  * so a user changing the device clock can't make a stale entry look fresh (or vice-versa).
  *
- * The cache is tied to the logged-in session: every read first checks [AccountSession]; if the user
- * is logged out the whole cache is dropped and reads miss. Logout (or a 401 that calls
- * [AccountSession.wipe]) therefore transparently invalidates everything on the next access, and
- * [invalidateAll] is exposed for callers that want to clear it eagerly.
+ * The cache is tied to the logged-in session: reads AND writes both check [AccountSession], and
+ * [AccountSession.wipe] / [AccountSession.endSession] clear it at the moment the session goes.
+ * A lazy evict on the next read was not enough on its own — signing straight back in as somebody
+ * else performs no read while signed out — so both halves are in place.
  *
  * Designed generically ([get]/[put]) so profile, subscriptions, tariffs, … can be added later by
  * introducing a new key + typed helper without touching the core.
@@ -30,9 +30,20 @@ object AccountCache {
 
     private val entries = HashMap<String, Entry>()
 
-    /** Stores [value] under [key], stamping it with the current monotonic time. */
+    /**
+     * Stores [value] under [key], stamping it with the current monotonic time.
+     *
+     * Ignored while signed out. A request started before a sign-out can land after it — the
+     * payment poll re-asks every 8s for ~48 — and seeding the cache from that late reply would
+     * hand the previous account's data to whoever signs in next, since the payments entry is
+     * keyed globally rather than per user.
+     */
     @Synchronized
     fun put(key: String, value: Any?) {
+        if (!AccountSession.isLoggedIn()) {
+            entries.clear()
+            return
+        }
         entries[key] = Entry(value, SystemClock.elapsedRealtime())
     }
 

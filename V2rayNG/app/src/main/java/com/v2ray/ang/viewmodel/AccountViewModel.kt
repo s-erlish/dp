@@ -9,7 +9,9 @@ import com.v2ray.ang.auth.AccountSession
 import com.v2ray.ang.auth.ApiError
 import com.v2ray.ang.auth.dto.PaymentDto
 import com.v2ray.ang.auth.dto.PaymentInitDto
+import com.v2ray.ang.auth.dto.PaymentOutcome
 import com.v2ray.ang.auth.dto.PaymentRequestDto
+import com.v2ray.ang.auth.dto.paymentOutcomeOf
 import com.v2ray.ang.auth.dto.PrimarySubscriptionDto
 import com.v2ray.ang.auth.dto.PromoDto
 import com.v2ray.ang.auth.dto.PublicConfigDto
@@ -167,17 +169,31 @@ class AccountViewModel : ViewModel() {
         val allResult = repo.loadSubscriptions()
         val primaryResult = repo.loadPrimarySubscription()
 
-        val all = allResult.getOrNull()?.items ?: emptyList()
-        val primary = primaryResult.getOrNull()
-        val merged = mergeSubscriptions(primary, all, _profile.value)
-
-        if (merged.isNotEmpty() || allResult.isSuccess) {
-            applyMerged(primary, all, _profile.value)
-        } else {
-            // Both calls failed and we have nothing to show: surface the primary error.
-            allResult.exceptionOrNull()?.let { report(it) }
-                ?: primaryResult.exceptionOrNull()?.let { report(it) }
+        if (allResult.isFailure && primaryResult.isFailure) {
+            // Nothing was learned. Surface the error and leave the published list exactly as it
+            // was — replacing it with the empty one this run produced would state «нет активной
+            // подписки» on the strength of a dropped connection.
+            (allResult.exceptionOrNull() ?: primaryResult.exceptionOrNull())?.let { report(it) }
+            _subsResolved.value = true
+            return
         }
+
+        // A FAILED ENDPOINT KEEPS ITS LAST ANSWER; ONLY A REPLY REPLACES ONE.
+        //
+        // The two endpoints describe different halves of the account and either can fail on its
+        // own. Reading a failure as an empty half is what made the Главная card lie: it decides the
+        // whole подписка state from `accountSubs.first()`, and that first entry is the ACTIVE
+        // подписка only because the merge puts it there. Lose `/client/subscription` for one round
+        // — a timeout, a 502 — and the merge had no root to place, so the list started with a
+        // SECONDARY подписка and the screen reported that one's expiry as the account's:
+        // «Подписка истекла» over a live, paid подписка whose date the app had had a second ago.
+        // Same story on this tab, where the hero time block reads the same first entry.
+        //
+        // An empty REPLY still empties its half — that is the backend saying the подписка is gone,
+        // and it must show. Only a failure is held.
+        val all = allResult.getOrNull()?.items ?: lastAll
+        val primary = primaryResult.getOrNull() ?: lastPrimary
+        applyMerged(primary, all, _profile.value)
         // Resolved either way — a failure is an answer too, and a screen waiting for this one must
         // not wait forever on it. Set last, after the list (or the error) is already published, so
         // a collector woken by this flag reads the state it describes.
@@ -375,13 +391,19 @@ class AccountViewModel : ViewModel() {
     /** Fetch + import all subscriptions; publishes the local guids and refreshes the sub list. */
     fun autoImportSubscriptions(onImported: (List<String>) -> Unit = {}) = viewModelScope.launch {
         _loading.value = true
-        repo.autoImportSubscriptions()
-            .onSuccess { onImported(it) }
-            .onFailure { report(it) }
-        // Publish through the same merge path as loadSubscriptions so the active/primary sub
-        // renders (never the raw un-merged /all list) and lastPrimary/lastAll/hasSubData stay set.
-        fetchAndApplySubscriptions()
-        _loading.value = false
+        try {
+            repo.autoImportSubscriptions()
+                .onSuccess { onImported(it) }
+                .onFailure { report(it) }
+            // Publish through the same merge path as loadSubscriptions so the active/primary sub
+            // renders (never the raw un-merged /all list) and lastPrimary/lastAll/hasSubData stay set.
+            fetchAndApplySubscriptions()
+        } finally {
+            // In a `finally` because the screen can go while the two fetches are in flight, and a
+            // cancelled coroutine that skipped this left the tab's skeleton pulsing over data that
+            // had already arrived — for as long as the ViewModel lived.
+            _loading.value = false
+        }
     }
 
     // endregion
@@ -413,14 +435,50 @@ class AccountViewModel : ViewModel() {
         }
     }
 
-    /** Settles [req] against the wallet balance. Same in-flight guard as [buy]. */
+    /**
+     * Settles [req] against the wallet balance. Same in-flight guard as [buy].
+     *
+     * **A 2xx IS NOT A PAYMENT.** `POST /client/payments/balance` answers with a
+     * `PaymentResultDto` whose `status` is the actual outcome, and this used to call [onDone] on
+     * any successful HTTP reply without reading it. Every screen behind it then said so in its own
+     * words — «Баланс пополнен», «Подписка оплачена», and the buy screen closed itself — for a
+     * charge the backend had just reported as declined, or as still being settled by the bank.
+     * That is the worst failure a money path has: it is silent, and the user leaves believing they
+     * have paid.
+     *
+     * The status is read through [paymentOutcomeOf], the app's single reading of that field —
+     * the same one the payment history renders — so one operation cannot be «Оплачено» here and
+     * «В обработке» in the ledger.
+     *
+     * **UNKNOWN counts as settled, deliberately.** A spelling this build does not recognise (and
+     * an absent field, which deserialises to "") is not evidence of failure, and turning it into
+     * one would break a flow that works today for the sake of a word we have not seen yet. The
+     * safe direction here is the opposite of the ledger's: refuse only what the backend explicitly
+     * NAMES as not-happening. Both callers re-read the profile afterwards, so the balance figure on
+     * screen comes from the server either way.
+     *
+     * A FAILED / CANCELED status is reported through [error] like any other payment failure, so it
+     * lands in the diagnostic dialog with the raw status in it, ready to be screenshotted.
+     */
     fun payWithBalance(
         req: PaymentRequestDto,
-        onDone: () -> Unit = {},
+        onDone: (PaymentOutcome) -> Unit = {},
     ) = viewModelScope.launch {
         if (!_paymentInFlight.compareAndSet(expect = false, update = true)) return@launch
         try {
-            repo.payWithBalance(req).onSuccess { onDone() }.onFailure { report(it) }
+            repo.payWithBalance(req)
+                .onSuccess { result ->
+                    when (val outcome = paymentOutcomeOf(result.status)) {
+                        PaymentOutcome.SETTLED, PaymentOutcome.UNKNOWN -> onDone(PaymentOutcome.SETTLED)
+                        PaymentOutcome.PENDING -> onDone(outcome)
+                        PaymentOutcome.FAILED, PaymentOutcome.CANCELED ->
+                            // Server(200) is not a lie: the request WAS answered 200, and the
+                            // refusal is in the body. The code and the raw status both reach the
+                            // diagnostic dialog, which is what the owner screenshots.
+                            report(ApiError.Server(200, result.status.takeIf { it.isNotBlank() }))
+                    }
+                }
+                .onFailure { report(it) }
         } finally {
             _paymentInFlight.value = false
         }
@@ -517,8 +575,33 @@ class AccountViewModel : ViewModel() {
         repo.renameSubscription(scope, id, name).onSuccess { onDone() }.onFailure { report(it) }
     }
 
-    /** True while the core is up, so the sign-out dialog can tell the truth about the tunnel. */
-    fun isTunnelRunning(): Boolean = runCatching { CoreServiceManager.isRunning() }.getOrDefault(false)
+    /**
+     * True while the core is up, so the sign-out dialog can tell the truth about the tunnel.
+     *
+     * **`CoreServiceManager.isRunning()` alone cannot answer this from here.** It reads
+     * `coreController`, a field of an `object` — one instance PER PROCESS — and the core lives in
+     * `:RunSoLibV2RayDaemon`. In the UI process that controller is a fresh Go object nobody ever
+     * handed a config to, so it answers `false` for the life of the app however long the tunnel has
+     * been up. Both readers here were wrong in the same direction and in ways the user sees: the
+     * sign-out dialog never warned that «Выйти» would drop a live tunnel, and [logout]'s step 2
+     * never actually stopped one — the core kept routing the whole device through подписки that had
+     * just been deleted from under it, which is exactly the undefined state that step exists to
+     * prevent.
+     *
+     * The answer is already on disk in MULTI_PROCESS_MODE, stamped either side of the core loop:
+     * a session instant exists exactly while a tunnel does. `isRunning` is still asked first
+     * because inside the daemon it is the stricter truth (during a teardown the stamp is cleared
+     * before `stopLoop()` returns).
+     *
+     * This is the same rule as `CoreServiceManager.isTunnelUp()` on the core branch and collapses
+     * to a call to it once that lands; it is written out here only because this branch does not
+     * have that method yet. It must NOT be reused as a service-START guard — a stamp left behind by
+     * a killed daemon would refuse the very reconnect that repairs it — and neither caller here is
+     * one: one draws a sentence, the other sends a stop.
+     */
+    fun isTunnelRunning(): Boolean = runCatching {
+        CoreServiceManager.isRunning() || CoreServiceManager.sessionStartedAt() > 0L
+    }.getOrDefault(false)
 
     /**
      * Signs the user out.
@@ -577,7 +660,7 @@ class AccountViewModel : ViewModel() {
                 val ok = runCatching { AccountSession.wipe() }.isSuccess
                 if (ok) {
                     val app = AngApplication.application
-                    runCatching { if (CoreServiceManager.isRunning()) CoreServiceManager.stopVService(app) }
+                    runCatching { if (isTunnelRunning()) CoreServiceManager.stopVService(app) }
                     runCatching { AccountCache.invalidateAll() }
                     runCatching { AvatarManager.clearCustomAvatar(app) }
                 }

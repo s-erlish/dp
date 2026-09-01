@@ -202,6 +202,8 @@
     <string name="account_top_up_hint">Введите сумму</string>
     <string name="account_top_up_invalid">Введите корректную сумму</string>
     <string name="account_top_up_success">Баланс пополнён</string>
+    <!-- Балансовый платёж принят, но ещё не проведён: банк/провайдер отвечает позже. -->
+    <string name="account_pay_pending">Платёж принят, идёт обработка. Баланс обновится, когда придёт ответ.</string>
 
     <!-- Payment statuses -->
     <string name="account_status_paid">Оплачено</string>

@@ -8,6 +8,8 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SubscriptionUpdater
 import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -27,6 +29,23 @@ class SubscriptionSyncManager {
     companion object {
         /** The `{scope}` value of the account's single active subscription. */
         const val TYPE_ROOT = "root"
+
+        /**
+         * ONE import at a time, process-wide.
+         *
+         * Every caller builds its own [SubscriptionSyncManager] (through its own
+         * [AccountRepository]), so an instance lock would lock nothing: the start-up import in
+         * `HomeFragment.onLoggedIn`, the one the Аккаунт tab runs after a purchase and the one
+         * behind «Загрузить серверы» are three different objects and they overlap by design — a
+         * sign-in that is followed straight away by a tap runs two of them within the same second.
+         *
+         * Two concurrent runs read the SAME uuid->guid map, both miss the entry for a подписка
+         * neither has written yet, and both mint a fresh guid for it: two rows for one подписка,
+         * two sets of серверы, and whichever run finishes second overwrites the map — orphaning
+         * the first run's row, which no later prune can find because its uuid is no longer keyed
+         * to it. Serialising is what makes the second run an UPDATE of what the first one wrote.
+         */
+        private val importMutex = Mutex()
     }
 
     /**
@@ -37,8 +56,16 @@ class SubscriptionSyncManager {
      * [items] must be the merged candidate list from [AccountRepository.autoImportSubscriptions],
      * not the raw `/client/subscription/all` payload: `/all` items carry no connect payload, so
      * every one of them would be skipped here.
+     *
+     * @param prune whether [items] is an AUTHORITATIVE picture of the account, i.e. whether
+     * `/client/subscription/all` — the only endpoint that lists the secondary подписки — actually
+     * answered. False when it did not: the run then updates what it saw and removes nothing, so a
+     * partial outage cannot be mistaken for «этих подписок больше нет». @see reconcile
      */
-    suspend fun importAll(items: List<SubInfoDto>): List<String> = withContext(Dispatchers.IO) {
+    suspend fun importAll(items: List<SubInfoDto>, prune: Boolean = true): List<String> =
+        importMutex.withLock { runImport(items, prune) }
+
+    private suspend fun runImport(items: List<SubInfoDto>, prune: Boolean): List<String> = withContext(Dispatchers.IO) {
         val managed = AuthTokenStore.getManagedGuids()
         val newMap = HashMap<String, String>()
         val resultGuids = ArrayList<String>()
@@ -109,22 +136,45 @@ class SubscriptionSyncManager {
             resultGuids.add(guid)
         }
 
-        // Drop any previously managed subscription that is gone remotely — but only on the strength
-        // of a run that actually saw subscriptions. An empty result is not evidence that the
-        // account has none: a payload shape we could not read, a partial outage, or a signed-in
-        // account whose connect payload simply did not arrive all produce the same empty map, and
-        // pruning on that deletes every подписка and every сервер the user has. Nothing is
-        // recoverable from the device afterwards. When in doubt, keep.
-        if (newMap.isNotEmpty()) {
-            for ((uuid, guid) in managed) {
-                if (!newMap.containsKey(uuid)) {
-                    SubscriptionUpdater.cancelOne(subId = guid)
-                    MmkvManager.removeSubscription(guid)
-                }
-            }
-            AuthTokenStore.setManagedGuids(newMap)
-        }
+        reconcile(managed = managed, seen = newMap, prune = prune)
         resultGuids
+    }
+
+    /**
+     * Writes back the uuid->guid map and removes what the account no longer has.
+     *
+     * TWO CONDITIONS GATE THE REMOVAL, and both were paid for in lost серверы.
+     *
+     * [seen] must be non-empty. An empty result is not evidence that the account has none: a
+     * payload shape we could not read, a partial outage, or a signed-in account whose connect
+     * payload simply did not arrive all produce the same empty map, and pruning on that deletes
+     * every подписка and every сервер the user has, unrecoverably.
+     *
+     * [prune] must be true, i.e. `/client/subscription/all` answered. It is the ONLY source of the
+     * secondary подписки — `/client/subscription` describes the active one and nothing else — so a
+     * run that lost `/all` and kept the summary sees exactly one candidate, the root. That run
+     * used to look indistinguishable from «остальные подписки удалены»: every secondary was
+     * cancelled and deleted, серверы and all, because one of two endpoints had a bad minute.
+     * Surviving a partial outage is the whole reason both are asked; it cannot be paid for with
+     * the user's подписки.
+     *
+     * The map is still written in the non-authoritative case, merged over what was already there:
+     * a подписка imported under a fresh guid has to be remembered by uuid immediately or the next
+     * run mints a second guid for it and the account grows a duplicate row.
+     */
+    private fun reconcile(managed: Map<String, String>, seen: Map<String, String>, prune: Boolean) {
+        if (seen.isEmpty()) return
+        if (!prune) {
+            AuthTokenStore.setManagedGuids(managed + seen)
+            return
+        }
+        for ((uuid, guid) in managed) {
+            if (!seen.containsKey(uuid)) {
+                SubscriptionUpdater.cancelOne(subId = guid)
+                MmkvManager.removeSubscription(guid)
+            }
+        }
+        AuthTokenStore.setManagedGuids(seen)
     }
 
     /**
@@ -154,8 +204,13 @@ class SubscriptionSyncManager {
      * A dead JWT deliberately does NOT come through here any more: an expired 7-day token is not
      * the user asking to give up their подписки, and treating it as one deleted every сервер on the
      * device the first time the Аккаунт tab noticed. That path is [AccountSession.endSession].
+     *
+     * Takes the same lock an import does, so a sign-out cannot interleave with one. Untaken, the
+     * import's own writes land AFTER the removal — it read the map before the wipe and re-encodes
+     * every подписка it was already fetching — and the device is left signed out with the previous
+     * account's подписки back on it, keyed to a guid map that was just emptied.
      */
-    fun removeAllManaged() {
+    suspend fun removeAllManaged() = importMutex.withLock {
         val managed = AuthTokenStore.getManagedGuids()
         for ((_, guid) in managed) {
             if (guid.isBlank()) continue
