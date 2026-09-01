@@ -11,7 +11,6 @@ import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
-import com.google.android.material.materialswitch.MaterialSwitch
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.BuildConfig
 import com.v2ray.ang.R

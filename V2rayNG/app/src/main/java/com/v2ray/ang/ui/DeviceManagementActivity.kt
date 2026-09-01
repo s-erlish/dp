@@ -2,7 +2,6 @@ package com.v2ray.ang.ui
 
 import android.os.Bundle
 import android.view.View
-import androidx.activity.viewModels
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -21,7 +20,6 @@ import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.ui.adapter.DeviceAdapter
 import com.v2ray.ang.ui.component.SubPage
 import com.v2ray.ang.ui.component.ToolbarBinder
-import com.v2ray.ang.viewmodel.AccountViewModel
 import kotlinx.coroutines.launch
 
 /**
@@ -31,14 +29,16 @@ import kotlinx.coroutines.launch
  * The subscription UUID may be supplied via [EXTRA_REMNAWAVE_UUID]; if absent the first
  * subscription with a non-blank remnawaveUuid is resolved from the account.
  *
- * Device read/delete are not exposed on [AccountViewModel], so they go through
- * [AccountRepository] directly (both return [Result]); the ViewModel is still used to resolve
- * the active subscription.
+ * Everything on this screen goes through [AccountRepository] directly (every call returns a
+ * [Result]): the device list and the delete are not on `AccountViewModel`, and neither is the
+ * lookup that resolves the active подписка. The screen used to declare an `AccountViewModel`
+ * anyway — the doc comment claimed it resolved the subscription, and nothing ever read the field.
+ * Declaring it was not free: `by viewModels()` builds the model on first access, and the model
+ * builds a repository of its own.
  */
 class DeviceManagementActivity : BaseActivity() {
 
     private val binding by lazy { ActivityDevicesBinding.inflate(layoutInflater) }
-    private val viewModel: AccountViewModel by viewModels()
     private val repo = AccountRepository()
 
     private val adapter by lazy { DeviceAdapter(::confirmDelete) }
