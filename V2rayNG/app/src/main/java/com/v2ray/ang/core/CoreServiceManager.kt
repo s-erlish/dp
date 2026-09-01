@@ -68,7 +68,44 @@ object CoreServiceManager {
      */
     private const val RESTART_GAP_MS = 500L
 
-    private val coreController: CoreController = CoreNativeManager.newCoreController(CoreCallback())
+    /**
+     * **The Go core controller, built ON DEMAND and only where the core actually lives.**
+     *
+     * It used to be a plain `val` on this object, which means it was constructed the first time
+     * ANYTHING touched `CoreServiceManager` — and `Libv2ray.newCoreController` is a Go call, so
+     * touching it loads `libgojni.so` and starts the Go runtime in that process. The интерфейс
+     * process touches this object constantly and owns no core at all: `startVService`,
+     * `stopVService`, `isTunnelUp()` from `depv://toggle` and from Настройки, and the connect
+     * button on Главная all went through here. Every one of them paid for a Go runtime that had
+     * nothing to run — the core is in `:RunSoLibV2RayDaemon`.
+     *
+     * `by lazy` alone would not have been enough, because [isRunning] is the very first thing most
+     * of those callers ask and it would have built the controller to answer. So the question is
+     * answered WITHOUT one: a process that has never built a controller has never started a core,
+     * so its answer is `false` — which is exactly what a freshly-built controller would have said.
+     * @see coreRunning
+     *
+     * Ordering is not just preserved but improved: the controller is now first built either from
+     * the [serviceControl] setter (right after `CoreNativeManager.initCoreEnv`) or from
+     * [startCoreLoop], instead of before the core environment existed at all.
+     */
+    private val coreControllerHolder = lazy { CoreNativeManager.newCoreController(CoreCallback()) }
+
+    /** The controller, building it if this process has none. Only the core loop itself needs this. */
+    private val coreController: CoreController get() = coreControllerHolder.value
+
+    /** The controller this process ALREADY has, or null when it has never built one. */
+    private val loadedCoreController: CoreController?
+        get() = if (coreControllerHolder.isInitialized()) coreControllerHolder.value else null
+
+    /**
+     * Is a core running IN THIS PROCESS — asked without building one.
+     *
+     * Identical in meaning to the old `coreController.isRunning`: a controller that has just been
+     * created has never been handed a config, so it reports `false`, and so does the absence of a
+     * controller. The difference is that this one does not start a Go runtime to say so.
+     */
+    private val coreRunning: Boolean get() = loadedCoreController?.isRunning == true
     private val mMsgReceive = ReceiveMessageHandler()
     private var currentConfig: ProfileItem? = null
     private var processFinder: XrayProcessFinder? = null
@@ -170,7 +207,7 @@ object CoreServiceManager {
      * Checks if the V2Ray service is running.
      * @return True if the service is running, false otherwise.
      */
-    fun isRunning() = coreController.isRunning
+    fun isRunning() = coreRunning
 
     /**
      * **Is a tunnel up — asked from a process that does not own the core.**
@@ -202,7 +239,7 @@ object CoreServiceManager {
      * it. Do NOT use this in the service start guards — there a stale «yes» would refuse the very
      * reconnect that repairs the state.
      */
-    fun isTunnelUp(): Boolean = coreController.isRunning || sessionStartedAt() > 0L
+    fun isTunnelUp(): Boolean = coreRunning || sessionStartedAt() > 0L
 
     /**
      * **The tunnel is down and the way back is one tap in the shade.**
@@ -288,7 +325,7 @@ object CoreServiceManager {
      */
     @Throws(Exception::class)
     private fun startContextService(context: Context) {
-        if (coreController.isRunning) {
+        if (coreRunning) {
             LogUtil.w(AppConfig.TAG, "StartCore-Manager: Core already running")
             return
         }
@@ -359,7 +396,7 @@ object CoreServiceManager {
      * Starts the V2Ray core service.
      */
     fun startCoreLoop(vpnInterface: ParcelFileDescriptor?): Boolean {
-        if (coreController.isRunning) {
+        if (coreRunning) {
             LogUtil.w(AppConfig.TAG, "StartCore-Manager: Core already running")
             return false
         }
@@ -419,7 +456,7 @@ object CoreServiceManager {
         // when isMemoryLimitEnabled() is true, or leave unbounded when disabled).
         coreController.startLoop(result.content, tunFd)
 
-        if (!coreController.isRunning) {
+        if (!coreRunning) {
             error("Core failed to start")
         }
 
@@ -512,7 +549,7 @@ object CoreServiceManager {
         // core still running and either tear the tunnel down entirely (VPN mode) or, because
         // CoreProxyOnlyService ignored the result, silently keep the PREVIOUS server up while the UI
         // showed the new one. Announce the stop only once it has actually happened.
-        if (coreController.isRunning) {
+        if (coreRunning) {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     coreController.stopLoop()
@@ -562,7 +599,9 @@ object CoreServiceManager {
      * Go side format: tag,direction,value;tag,direction,value;
      */
     fun queryAllOutboundTrafficStats(): List<OutboundTrafficStat> {
-        val payload = coreController.queryAllOutboundTrafficStats()
+        // No controller in this process means no core and therefore no counters — the daemon is
+        // the only caller, but answering «нет данных» is the honest reply anywhere else.
+        val payload = loadedCoreController?.queryAllOutboundTrafficStats() ?: return emptyList()
 
         val result = ArrayList<OutboundTrafficStat>()
 
@@ -614,7 +653,7 @@ object CoreServiceManager {
      * no reader is gone.
      */
     private fun measureV2rayDelay() {
-        if (coreController.isRunning == false) {
+        if (!coreRunning) {
             return
         }
 
@@ -757,7 +796,7 @@ object CoreServiceManager {
             val serviceControl = serviceControl?.get() ?: return
             when (intent?.getIntExtra("key", 0)) {
                 AppConfig.MSG_REGISTER_CLIENT -> {
-                    if (coreController.isRunning) {
+                    if (coreRunning) {
                         MessageUtil.sendMsg2UI(serviceControl.getService(), AppConfig.MSG_STATE_RUNNING, "")
                     } else {
                         MessageUtil.sendMsg2UI(serviceControl.getService(), AppConfig.MSG_STATE_NOT_RUNNING, "")
@@ -782,7 +821,7 @@ object CoreServiceManager {
                     // The button only exists on the running row, but a broadcast is a broadcast:
                     // a double tap in the shade, or a PendingIntent fired twice, would otherwise
                     // run the whole teardown again — over a closed interface and a stopped core.
-                    if (!coreController.isRunning) {
+                    if (!coreRunning) {
                         LogUtil.i(AppConfig.TAG, "StartCore-Manager: Nothing to pause; the tunnel is already down")
                         return
                     }
