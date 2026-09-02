@@ -163,6 +163,12 @@ import kotlinx.coroutines.launch
  * outright when the panel would refuse it — `UserProfileDto.canSetPassword` mirrors that gate — so
  * an account that already has a password never sees a step whose only possible answer is a refusal.
  *
+ * **And skipping it does not lose it.** [MODE_SET_PASSWORD] is the same step reached on its own,
+ * from a «Почта» row that says «Нужен пароль для входа» whenever the account has an address and no
+ * password. Without that route the offer was one-shot and a declined one left an address that
+ * quietly could not be signed in with — the exact defect the step was added to close, one screen
+ * further on.
+ *
  * **[MODE_CHANGE_EMAIL]** is the same three beats for an address that already exists: form, letter,
  * wait. Two things differ, both because the account has something to lose. The panel guards it with
  * the CURRENT password for any account that has one, and answers `PASSWORD_REQUIRED` /
@@ -228,6 +234,16 @@ class LoginActivity : BaseActivity() {
     private var currentPasswordRequired = false
 
     /**
+     * True in [MODE_SET_PASSWORD]: the screen IS the password step, with no letter in front of it.
+     *
+     * The account already has an address and no password, so e-mail sign-in does not work — the
+     * «Почта» row says exactly that and comes here. Unlike the other two errands this one has no
+     * form of its own, so it is drawn as the step from the first frame rather than reaching it
+     * through a wait.
+     */
+    private var passwordOnlyMode = false
+
+    /**
      * True when the gate sits behind the form, i.e. Back on surface B pops to surface A instead of
      * closing the screen. False for [MODE_SITE], which opens the form with nothing behind it, for
      * link mode, which never reaches the form at all, and at entry for [MODE_TELEGRAM_START], whose
@@ -252,12 +268,14 @@ class LoginActivity : BaseActivity() {
     private var telegramEntry = false
 
     /**
-     * True for either of the two errands an account runs on its OWN address — attaching one and
-     * replacing one. They share the whole shape of the screen (no gate behind them, no segment, one
-     * address field, one CTA, the same wait) and differ only in labels, in one extra field and in
-     * the question the poll asks, so almost every decision here wants this rather than either flag.
+     * True for the errands an account runs on its OWN sign-in by e-mail: attaching an address,
+     * replacing one, and giving the account the password that makes either usable. They share the
+     * whole shape of the screen (no gate behind them, no segment, one CTA, the same step grammar)
+     * and differ in labels, in which fields exist and in what the poll asks — so almost every
+     * decision here wants this rather than any single flag.
      */
-    private val emailErrand: Boolean get() = emailLinkMode || emailChangeMode
+    private val emailErrand: Boolean
+        get() = emailLinkMode || emailChangeMode || passwordOnlyMode
 
     /** Set once the address has been wrong, after which it is validated live rather than on blur. */
     private var emailWasInvalid = false
@@ -306,6 +324,12 @@ class LoginActivity : BaseActivity() {
         // rather than appearing under the user after a refusal — which is what happens only when
         // this cached answer turns out to be behind the server. @see currentPasswordRequired
         currentPasswordRequired = emailChangeMode && viewModel.currentProfile()?.hasPassword == true
+        passwordOnlyMode = !linkMode && mode == MODE_SET_PASSWORD && viewModel.isLoggedIn()
+        // BEFORE the form is built, not after: [applyFormMode] draws whatever the machine says, and
+        // the machine has to already say «password step» or the first frame is an address field
+        // with the keyboard on it. A rotation finds the state still in the ViewModel and must not
+        // reset it, which is what the savedInstanceState guard is for.
+        if (passwordOnlyMode && savedInstanceState == null) viewModel.beginSetPassword()
         gateReachable = !linkMode && !telegramEntry && !emailErrand && mode != MODE_SITE
         // WHICH surface opens is NOT the same question as whether the gate is behind it. All three
         // of MODE_SITE, link mode and MODE_TELEGRAM_START make Back leave the screen rather than
@@ -337,6 +361,15 @@ class LoginActivity : BaseActivity() {
         setupBack()
 
         showPage(startPage, animate = false)
+        // [showPage] puts the caret on the first field to fill, and on this entry that is the
+        // password — but it only does so from [AuthUiState.Idle], and this screen opens on the
+        // step. [showPasswordStep] does not do it either: the step is already drawn, so its
+        // transition guard correctly finds nothing to do. First creation only; a rotation restores
+        // its own focus and must not raise a keyboard the user had put away.
+        if (passwordOnlyMode && savedInstanceState == null) {
+            binding.mail.etPassword.requestFocus()
+            showKeyboard(binding.mail.etPassword)
+        }
         observe()
 
         // Both of these arrive from a tap that has already named Telegram — «Привязать Telegram»
@@ -1193,8 +1226,10 @@ class LoginActivity : BaseActivity() {
             is AuthUiState.SetPassword -> {
                 // The e-mail errand behind this step has ALREADY succeeded, so the caller is told
                 // so now rather than at the end: skipping the password must not read to the Аккаунт
-                // tab as a cancelled attachment.
-                setResult(RESULT_OK)
+                // tab as a cancelled attachment. [MODE_SET_PASSWORD] has no errand behind it —
+                // nothing has happened yet — so it reports only when the password is actually
+                // saved, from [finishWithBeat].
+                if (!passwordOnlyMode) setResult(RESULT_OK)
                 showPasswordStep(true)
                 setFormBusy(state.busy)
             }
@@ -1906,6 +1941,16 @@ class LoginActivity : BaseActivity() {
          * offers it is drawn from that very fact.
          */
         const val MODE_CHANGE_EMAIL = "change_email"
+
+        /**
+         * Open straight on «Придумайте пароль» for an account that already has an address and no
+         * password: `POST /client/set-password`, then `complete-onboarding`. No letter, no wait.
+         *
+         * The route for somebody who skipped the step when they attached the address — «Способы
+         * входа» → «Почта» says «Нужен пароль для входа» and comes here, so a half-finished
+         * attachment is visible and finishable rather than silently useless.
+         */
+        const val MODE_SET_PASSWORD = "set_password"
 
         /** true → attach Telegram to the session that is already signed in (surface E). */
         const val EXTRA_LINK = "link_telegram"

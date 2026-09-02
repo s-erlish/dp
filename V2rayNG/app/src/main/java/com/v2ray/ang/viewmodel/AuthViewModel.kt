@@ -383,6 +383,20 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
     }
 
     /**
+     * Opens on «Придумайте пароль» with no letter in front of it: the account already HAS an
+     * address and simply has no password, so e-mail sign-in does not work and the «Почта» row says
+     * so. The errand is the second half of an attachment somebody skipped, reached on its own.
+     *
+     * A plain state assignment rather than a request: there is nothing to ask the panel yet. What
+     * follows is [setPassword], the same call the step makes on either of the other two routes.
+     */
+    fun beginSetPassword() {
+        loginJob?.cancel()
+        _error.value = null
+        _state.value = AuthUiState.SetPassword()
+    }
+
+    /**
      * «Придумайте пароль», and the reason the address was attached at all. Minimum six characters
      * — the panel's floor for THIS endpoint, held by the form so a 400 never has to say it.
      *

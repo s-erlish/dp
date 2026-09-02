@@ -39,6 +39,7 @@ import com.v2ray.ang.auth.dto.PaymentOutcome
 import com.v2ray.ang.auth.dto.PaymentRequestDto
 import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.auth.dto.UserProfileDto
+import com.v2ray.ang.auth.dto.emailSignInWorks
 import com.v2ray.ang.databinding.ActivityAccountBinding
 import com.v2ray.ang.databinding.DialogTopUpBinding
 import com.v2ray.ang.extension.toast
@@ -713,6 +714,9 @@ class AccountFragment : Fragment() {
      * person who actually taps it that did NOTHING: they are signed in through Telegram, and the
      * sign-in screen finishes on sight of a session.
      *
+     * …and a THIRD state between them, because an attached address is not the same thing as a
+     * working way in: see the block on [renderLoginMethods]'s e-mail row below.
+     *
      * THERE IS NO UNLINK, and none is drawn: the panel has no endpoint that detaches an address (it
      * detaches payment methods, which is a different noun). A control for it would be an invented
      * affordance for a task the product cannot do.
@@ -743,47 +747,67 @@ class AccountFragment : Fragment() {
         }
         bindLoginMethod(
             row = binding.rowLoginTelegram,
-            state = binding.tvLoginTelegramState,
+            stateView = binding.tvLoginTelegramState,
             chevron = binding.chevronLoginTelegram,
-            identity = telegramIdentity,
+            stateText = if (telegramIdentity != null) {
+                getString(R.string.account_login_telegram_linked, telegramIdentity)
+            } else {
+                getString(R.string.account_login_telegram_unlinked)
+            },
             // Attached Telegram stays a read-out: the panel offers no way to detach it and no way
             // to swap it for another account, so a chevron here would promise a screen that does
             // not exist.
             action = if (telegramIdentity == null) ::openTelegramLink else null,
         )
 
-        // The address IS the identity here, and a blank one is exactly "no e-mail attached" — an
-        // account created from Telegram alone has none.
+        // THE «ПОЧТА» ROW HAS THREE STATES, not two, and the third one is the whole point of the
+        // password step existing at all. Attaching an address does NOT give the account a password
+        // (`verify-link-email` on the panel writes `email` and nothing else), so an account can sit
+        // with an address it cannot sign in with — and this row used to say «Привязан» over it and
+        // offer to change the address, which is fixing the wrong thing.
+        //
+        // `hasPassword`, not `canSetPassword()`: what the row reports is whether e-mail sign-in
+        // WORKS, and it works with any password the account has. The panel's own set-password gate
+        // is a different question, asked in one place — after an errand, where the step is offered.
         val email = profile?.email?.takeIf { it.isNotBlank() }
+        val signInWorks = profile?.emailSignInWorks() == true
         bindLoginMethod(
             row = binding.rowLoginSite,
-            state = binding.tvLoginSiteState,
+            stateView = binding.tvLoginSiteState,
             chevron = binding.chevronLoginSite,
-            identity = email,
-            action = if (email == null) ::openEmailLink else ::openChangeEmail,
+            stateText = when {
+                email == null -> getString(R.string.account_login_telegram_unlinked)
+                signInWorks -> getString(R.string.account_login_telegram_linked, email)
+                else -> getString(R.string.account_login_email_no_password, email)
+            },
+            action = when {
+                email == null -> ::openEmailLink
+                // The missing half first: offering to change an address nobody can sign in with
+                // answers a question the user has not asked.
+                !signInWorks -> ::openSetPassword
+                else -> ::openChangeEmail
+            },
         )
     }
 
     /**
-     * One row of «Способы входа». [identity] non-null means attached; [action] null means the row
-     * is a read-out — no chevron, no press response, no tap, and not a stop for TalkBack's swipe.
+     * One row of «Способы входа»: what it reports and where it goes, both decided by the caller.
      *
-     * The two are INDEPENDENT now, and that is the whole change: «Почта» is attached and still
-     * leads somewhere (a change of address), while Telegram is attached and leads nowhere. Tying
-     * "has an identity" to "is inert" was only ever true because e-mail had nowhere to go.
+     * [action] null means the row is a read-out — no chevron, no press response, no tap, and not a
+     * stop for TalkBack's swipe. It is INDEPENDENT of what the row says, and that is the change
+     * this method has been through twice: «Почта» is attached and still leads somewhere, and it
+     * leads to two DIFFERENT places depending on whether sign-in by e-mail actually works. Deriving
+     * either the sentence or the destination from "has an identity" was only ever adequate while
+     * e-mail had one state and nowhere to go.
      */
     private fun bindLoginMethod(
         row: View,
-        state: TextView,
+        stateView: TextView,
         chevron: View,
-        identity: String?,
+        stateText: CharSequence,
         action: (() -> Unit)?,
     ) {
-        state.text = if (identity != null) {
-            getString(R.string.account_login_telegram_linked, identity)
-        } else {
-            getString(R.string.account_login_telegram_unlinked)
-        }
+        stateView.text = stateText
         chevron.isVisible = action != null
         row.isClickable = action != null
         row.isFocusable = action != null
@@ -801,8 +825,11 @@ class AccountFragment : Fragment() {
     /** «Почта» when the account has none: the form that sends the «привяжите почту» letter. */
     private fun openEmailLink() = openEmailErrand(LoginActivity.MODE_LINK_EMAIL)
 
-    /** «Почта» when it has one: the form that sends the letter to a NEW address. */
+    /** «Почта» when it has one that works: the form that sends the letter to a NEW address. */
     private fun openChangeEmail() = openEmailErrand(LoginActivity.MODE_CHANGE_EMAIL)
+
+    /** «Почта» when the address is there but nothing can be signed in with it: the missing half. */
+    private fun openSetPassword() = openEmailErrand(LoginActivity.MODE_SET_PASSWORD)
 
     private fun openEmailErrand(mode: String) {
         linkEmail.launch(
