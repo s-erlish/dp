@@ -54,6 +54,13 @@
   does, because it is the same kind of moment: we are waiting on the user to finish
   somewhere else, and the app is watching for it.
 
+  AND THE SAME ROW REPORTS THE LETTER NOBODY WAITS ON. The password-reset letter ends
+  the errand where it starts: a new password moves neither the login nor the profile,
+  so there is no question to keep asking and no ring to turn while asking it. The slot
+  swaps the arc for the app's static 40dp tile (@id/verify_mail_tile) and keeps
+  everything else, so the two blocks are one silhouette and only the indicator says
+  which of them is on screen.
+
   THE LABEL LIVES ABOVE THE FIELD and is always visible — hintEnabled=false on
   the field style, so there is no floating-label notch and no label that vanishes
   the moment it is needed (00-rules.md 7.4). The hint inside the box is an
@@ -66,12 +73,17 @@
   reason — the reserved line below is a real TextView we control.
 
   THE ONE ROW AT THE FOOT is the honest form of the spec's «Другой способ входа»
-  sheet. The shipped backend client still has no password-reset call, so that errand
-  is a browser hand-off and says so in its subtitle; one errand goes inline by
-  00-rules.md 7.6's ladder (inline > row > sheet > dialog), not behind a sheet. It is
-  a PLAIN row: a tile down the left edge of a single row is the generated-settings
-  tell, not a design. «Создать аккаунт» is no longer beside it — that errand is the
-  segment at the top and the button in the middle now.
+  sheet: one errand goes inline by 00-rules.md 7.6's ladder (inline > row > sheet >
+  dialog), not behind a sheet. It is a PLAIN row: a tile down the left edge of a
+  single row is the generated-settings tell, not a design. «Создать аккаунт» is no
+  longer beside it — that errand is the segment at the top and the button in the
+  middle now.
+
+  AND IT NO LONGER LEAVES THE APP. «Восстановить пароль» opened
+  departament.site/forgot-password in a browser, for the same reason registration
+  once did: the client carried no call. It carries one now, so the row opens a
+  FOURTH errand on this same form — one field, «Отправить ссылку», and then the block
+  below — and its subtitle says what will happen instead of naming a website.
 
   Rows carry their own 16dp gutter from @style/Widget.Departament.Row, so they
   sit OUTSIDE the form column's padding — otherwise their text would start at 32.
@@ -428,6 +440,39 @@
                             android:importantForAccessibility="no"
                             android:src="@drawable/ic_fab_check"
                             app:tint="?attr/colorPrimary" />
+
+                        <!-- THE SAME SLOT, FOR THE ONE LETTER NOBODY IS WAITING ON.
+                             «Восстановить пароль» sends a letter and then has nothing to
+                             watch: a new password moves neither the login nor the profile,
+                             so a turning ring would be the app pretending to ask a question
+                             it is not asking. The indicator is the app's ordinary static
+                             tile instead — 40dp @drawable/bg_tile_neutral, 22dp glyph, the
+                             treatment every other row in the product uses — and the glyph is
+                             @drawable/ic_ob_mail, already the mark for «почта» on the start
+                             screen, the gate and the Аккаунт tab. One mark, one meaning.
+
+                             Two views rather than one padded ImageView: the tile is
+                             @dimen/tile_size and the glyph @dimen/tile_glyph, and the gap
+                             between them is 9dp, which is not on the spacing scale and must
+                             not be typed into a padding to fake it. -->
+                        <View
+                            android:id="@+id/verify_mail_tile"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:background="@drawable/bg_tile_neutral"
+                            android:visibility="gone"
+                            tools:visibility="visible" />
+
+                        <ImageView
+                            android:id="@+id/verify_mail_glyph"
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
+                            android:layout_gravity="center"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/ic_ob_mail"
+                            android:visibility="gone"
+                            app:tint="?attr/colorOnSurfaceVariant"
+                            tools:visibility="visible" />
                     </FrameLayout>
 
                     <TextView
