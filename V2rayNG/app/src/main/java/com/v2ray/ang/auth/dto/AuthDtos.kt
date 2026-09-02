@@ -12,6 +12,7 @@ import com.google.gson.annotations.SerializedName
  *  POST /client/auth/2fa-login             -> [AuthResult]
  *  POST /client/auth/google                -> [AuthResult]
  *  GET  /client/auth/me                    -> [UserProfileDto]
+ *  POST /client/auth/password-reset/request-> 200 {message}, the same one either way
  *
  * And three errands of an account that already exists, which is why they sit on the client root
  * rather than under `/client/auth`:
@@ -47,6 +48,19 @@ data class TwoFaLoginRequestDto(
 data class GoogleLoginRequestDto(
     val idToken: String,
     val referralCode: String? = null,
+)
+
+/**
+ * POST /client/auth/password-reset/request — «я забыл пароль, пришлите ссылку».
+ *
+ * THE ADDRESS IS THE WHOLE BODY, and unlike [LinkEmailRequestDto] there is no session behind it:
+ * this is the request of somebody who cannot get in. Which is also why the panel answers it
+ * identically for a known address and an unknown one — a different answer would turn this endpoint
+ * into a way of asking «есть ли у вас аккаунт на этот адрес». The copy the app writes afterwards
+ * has to keep that promise; see `auth_sent_reset_body`.
+ */
+data class PasswordResetRequestDto(
+    val email: String,
 )
 
 /**
