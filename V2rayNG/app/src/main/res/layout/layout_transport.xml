@@ -203,12 +203,14 @@
             android:layout_marginBottom="@dimen/padding_spacing_dp16"
             android:entries="@array/browser_dialer_mode" />
 
+        <!-- Единственная в раскладках подпись, у которой размер стоял числом, а роли по шкале не
+             было вовсе (D-2). Роль подписи под полем - Caption. -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/padding_spacing_dp4"
             android:text="@string/server_lab_browser_dialer_tip"
-            android:textColor="?attr/colorOnSurfaceVariant"
-            android:textSize="12sp" />
+            android:textAppearance="@style/TextAppearance.App.Caption"
+            android:textColor="?attr/colorOnSurfaceVariant" />
     </LinearLayout>
 </LinearLayout>

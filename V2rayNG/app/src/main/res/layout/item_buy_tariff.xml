@@ -64,16 +64,6 @@
             android:padding="@dimen/space_16"
             android:stateListAnimator="@anim/press_row">
 
-            <!-- Legacy server glyph slot: gone in both branches (no emoji as chrome). -->
-            <TextView
-                android:id="@+id/tv_group_emoji"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="@dimen/space_12"
-                android:textSize="22sp"
-                android:visibility="gone"
-                tools:ignore="HardcodedText" />
-
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"

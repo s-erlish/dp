@@ -375,7 +375,7 @@ class BuyTariffActivity : BaseActivity() {
 
         groups.forEach { group ->
             group.tariffs.forEach { tariff ->
-                addTariffCard(inflater, tariffsContainer, group.emoji, tariff)
+                addTariffCard(inflater, tariffsContainer, tariff)
             }
         }
         renderedSignature = signature
@@ -429,12 +429,10 @@ class BuyTariffActivity : BaseActivity() {
     private fun addTariffCard(
         inflater: LayoutInflater,
         parent: ViewGroup,
-        emoji: String,
         tariff: TariffDto,
     ) {
         val card = inflater.inflate(R.layout.item_buy_tariff, parent, false) as MaterialCardView
         val header = card.findViewById<View>(R.id.header_tariff)
-        val tvEmoji = card.findViewById<TextView>(R.id.tv_group_emoji)
         val tvName = card.findViewById<TextView>(R.id.tv_tariff_name)
         val tvInfo = card.findViewById<TextView>(R.id.tv_tariff_info)
         val ivCaret = card.findViewById<ImageView>(R.id.iv_tariff_caret)
@@ -443,14 +441,10 @@ class BuyTariffActivity : BaseActivity() {
         val tvPeriod = card.findViewById<TextView>(R.id.tv_tariff_period)
         val llOptions = card.findViewById<LinearLayout>(R.id.ll_price_options)
 
-        // The design retired the emoji chrome: keep tv_group_emoji GONE in both branches so the
-        // star/group glyph never shows, regardless of whether the group carries an emoji.
-        if (emoji.isBlank()) {
-            tvEmoji.visibility = View.GONE
-        } else {
-            tvEmoji.text = emoji
-            tvEmoji.visibility = View.GONE
-        }
+        // THE GLYPH SLOT IS GONE, not hidden. `tv_group_emoji` was a TextView that both branches
+        // set to GONE — the design retired the emoji chrome (1.4.4) — so every tariff row inflated,
+        // measured and threw away a view that could never be visible, and the группа's `emoji` was
+        // threaded three call frames down to reach it.
         tvName.text = tariff.name
 
         val trafficStr = if (tariff.isUnlimitedTraffic() || (tariff.trafficLimitBytes ?: 0L) <= 0L) {
