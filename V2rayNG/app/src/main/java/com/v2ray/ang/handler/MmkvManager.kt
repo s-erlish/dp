@@ -1,6 +1,7 @@
 package com.v2ray.ang.handler
 
 import com.tencent.mmkv.MMKV
+import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.DEFAULT_SUBSCRIPTION_ID
 import com.v2ray.ang.AppConfig.PREF_IS_BOOTED
 import com.v2ray.ang.AppConfig.PREF_ROUTING_RULESET
@@ -13,7 +14,9 @@ import com.v2ray.ang.dto.entities.SubscriptionCache
 import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.dto.entities.WebDavConfig
 import com.v2ray.ang.util.JsonUtil
+import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.Utils
+import java.util.concurrent.locks.ReentrantLock
 
 object MmkvManager {
 
@@ -59,6 +62,57 @@ object MmkvManager {
     //endregion
 
     //region Server
+
+    /**
+     * Runs [block] while holding the cross-process lock on [mainStorage].
+     *
+     * **THE SERVER LIST IS ONE JSON STRING, AND TWO PROCESSES READ-MODIFY-WRITE IT.** Every list
+     * lives under a single `SUB_SERVER_` key: a change means decode the string, edit the collection,
+     * encode it back. MMKV in `MULTI_PROCESS_MODE` makes each `encode` atomic — it does not make the
+     * decode and the encode around it one step. So two writers interleave and the later write wins
+     * whole, silently dropping everything the other one did in between.
+     *
+     * The two writers are real and they run at the same time by design. `:bg` refreshes a подписка —
+     * `removeServerViaSubid` and then one [encodeServerConfig] per imported сервер, several seconds
+     * end to end — while the interface process may be deleting a row, importing a link, or applying
+     * a sort. The visible result was серверы that reappeared after being deleted, or vanished after
+     * being imported, with nothing in the log because neither write failed.
+     *
+     * MMKV's own inter-process lock is what the write path already uses, and it is re-entrant within
+     * a process, so a `decode … encode` fenced with it is genuinely one step against the other
+     * process. It is held for the read-modify-write and NEVER across I/O: a subscription fetch under
+     * this lock would stall the interface for the length of an HTTP request.
+     *
+     * **TWO LOCKS, AND BOTH ARE NEEDED.** MMKV's inter-process lock is reference-counted per
+     * INSTANCE, not per thread: while one thread of this process holds it, a second thread asking
+     * for it sees the count and is let straight through. That is exactly right for the re-entrant
+     * nesting these transactions do (an import fences the whole replacement, and `removeServer`
+     * inside it fences again) and exactly wrong as mutual exclusion between two threads here. The
+     * [java.util.concurrent.locks.ReentrantLock] supplies the second half — re-entrant for the same
+     * thread, blocking for a different one — and it is always taken FIRST, so the two can never be
+     * acquired in opposite orders.
+     *
+     * A failure to take the process lock must not lose the write itself, so the block runs either
+     * way.
+     */
+    private val serverListLock = ReentrantLock()
+
+    private fun <T> withServerListLock(block: () -> T): T {
+        serverListLock.lock()
+        val locked = try {
+            mainStorage.lock()
+            true
+        } catch (e: Throwable) {
+            LogUtil.w(AppConfig.TAG, "Server list lock unavailable, writing unfenced: ${e.message}")
+            false
+        }
+        try {
+            return block()
+        } finally {
+            if (locked) runCatching { mainStorage.unlock() }
+            serverListLock.unlock()
+        }
+    }
 
     /**
      * Reads the legacy server list from KEY_ANG_CONFIGS for migration.
@@ -137,6 +191,12 @@ object MmkvManager {
     fun setSelectServer(guid: String) {
         mainStorage.encode(KEY_SELECTED_SERVER, guid)
     }
+
+    /**
+     * [withServerListLock] for a caller outside this object that read-modify-writes a server list —
+     * a reorder, a sort. Same rules: short, and never around I/O.
+     */
+    fun <T> inServerListTransaction(block: () -> T): T = withServerListLock(block)
 
     /**
      * Encodes the server list for a given subscription.
@@ -226,13 +286,14 @@ object MmkvManager {
 
         // Use default subscription for servers without subscription
         val subId = getSubscriptionId(config.subscriptionId)
-        val serverList = decodeServerList(subId)
-
-        if (!serverList.contains(key)) {
-            serverList.add(0, key)
-            encodeServerList(serverList, subId)
-            if (getSelectServer().isNullOrBlank()) {
-                mainStorage.encode(KEY_SELECTED_SERVER, key)
+        withServerListLock {
+            val serverList = decodeServerList(subId)
+            if (!serverList.contains(key)) {
+                serverList.add(0, key)
+                encodeServerList(serverList, subId)
+                if (getSelectServer().isNullOrBlank()) {
+                    mainStorage.encode(KEY_SELECTED_SERVER, key)
+                }
             }
         }
 
@@ -264,9 +325,11 @@ object MmkvManager {
         val subId = getSubscriptionId(config?.subscriptionId)
 
         // Remove from appropriate server list
-        val serverList = decodeServerList(subId)
-        serverList.remove(guid)
-        encodeServerList(serverList, subId)
+        withServerListLock {
+            val serverList = decodeServerList(subId)
+            serverList.remove(guid)
+            encodeServerList(serverList, subId)
+        }
 
         // Clean up storage
         if (getSelectServer() == guid) {
@@ -292,20 +355,22 @@ object MmkvManager {
      */
     fun removeServerViaSubid(subscriptionId: String?) {
         val subId = getSubscriptionId(subscriptionId)
-        val serverList = decodeServerList(subId)
+        withServerListLock {
+            val serverList = decodeServerList(subId)
 
-        // Remove all servers in the list
-        serverList.forEach { guid ->
-            if (getSelectServer() == guid) {
-                mainStorage.remove(KEY_SELECTED_SERVER)
+            // Remove all servers in the list
+            serverList.forEach { guid ->
+                if (getSelectServer() == guid) {
+                    mainStorage.remove(KEY_SELECTED_SERVER)
+                }
+                profileFullStorage.remove(guid)
+                serverAffStorage.remove(guid)
+                serverRawStorage.remove(guid)
             }
-            profileFullStorage.remove(guid)
-            serverAffStorage.remove(guid)
-            serverRawStorage.remove(guid)
-        }
 
-        serverList.clear()
-        encodeServerList(serverList, subId)
+            serverList.clear()
+            encodeServerList(serverList, subId)
+        }
     }
 
     /**

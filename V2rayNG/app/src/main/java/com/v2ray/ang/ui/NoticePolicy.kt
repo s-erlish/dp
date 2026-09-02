@@ -140,9 +140,17 @@ object NoticePolicy {
         // is a dead button in exactly the state that most needs explaining. Both surfaces that
         // refresh everything say it: `MainActivity.importConfigViaSub`, `SubSettingActivity.updateAll`.
         R.string.subs_update_none,
+        // Итог «Обновить все». Успех молчит (правило 1); эти три — единственные исходы, у которых
+        // есть что сказать. До них экран отвечал на неудачу тем же, чем на успех: ничем.
+        R.string.subs_update_failed,
+        R.string.subs_update_partial,
+        R.string.subs_update_skipped,
         // The clipboard: the one outcome with no visible result of any kind.
         R.string.notice_copied,
         R.string.notice_copy_failed,
+        // Выбранная картинка не содержит QR-кода. Выбор файла закрывается, экран остаётся — и без
+        // этой строки не было ни ошибки, ни объяснения, почему ничего не произошло.
+        R.string.toast_decoding_failed,
         // Dead ends the app cannot resolve for the user.
         R.string.toast_require_file_manager,
         R.string.toast_permission_denied,
@@ -176,6 +184,10 @@ object NoticePolicy {
         R.string.account_avatar_error,
         R.string.account_checkout_no_browser,
         R.string.account_top_up_invalid,
+        // Платёж с баланса, который провайдер ещё проводит. Экран НЕ закрывается (это и есть
+        // замысел — дать увидеть, как он дойдёт), поэтому без этой строки нажатие «Оплатить»
+        // выглядело как нажатие, на которое ничего не ответили.
+        R.string.account_pay_pending,
         R.string.devices_error_delete,
         // The buy flow — departament's own screens, and each of these blocks a tap.
         R.string.buy_select_option_first,
@@ -184,6 +196,15 @@ object NoticePolicy {
         R.string.buy_checkout_return,
         // Editors and settings: a refusal with a reason.
         R.string.srv_config_invalid,
+        // Отказы формы «сервер вручную». До них на их месте стояли ПОДПИСИ ПОЛЕЙ, и ни одна не
+        // была разрешена — то есть «Сохранить» на неполной форме не отвечало ничем.
+        R.string.srv_name_required,
+        R.string.srv_address_required,
+        R.string.srv_port_required,
+        R.string.srv_id_required,
+        R.string.srv_password_required,
+        R.string.srv_tls_required,
+        R.string.srv_json_invalid,
         R.string.editor_url_invalid,
         R.string.editor_failed,
         R.string.asset_name_duplicate,
@@ -192,6 +213,10 @@ object NoticePolicy {
         R.string.srv_delete_selected,
         R.string.srv_chain_no_servers,
         R.string.srv_chain_too_few,
+        // Два оставшихся отказа при сохранении цепочки. Обе строки были с подстановкой и не
+        // показывались вовсе, так что «Сохранить» с пустым шагом не отвечало ничем.
+        R.string.srv_chain_step_empty,
+        R.string.srv_chain_invalid_members,
         R.string.template_locked_toast,
         R.string.toast_action_not_allowed,
         // Routing sets and deep links: an import that could not be read, an export with nothing in

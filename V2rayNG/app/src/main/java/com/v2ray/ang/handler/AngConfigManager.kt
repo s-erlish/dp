@@ -221,10 +221,10 @@ object AngConfigManager {
      * @param subid The subscription ID whose servers should be de-duplicated.
      * @return The number of duplicate servers removed.
      */
-    private fun dedupServersViaSubid(subid: String): Int {
+    private fun dedupServersViaSubid(subid: String): Int = MmkvManager.inServerListTransaction {
         try {
             val serverList = MmkvManager.decodeServerList(subid)
-            if (serverList.size < 2) return 0
+            if (serverList.size < 2) return@inServerListTransaction 0
 
             val selected = MmkvManager.getSelectServer()
             val kept = mutableListOf<Pair<ProfileItem, String>>() // (profile, kept guid)
@@ -244,10 +244,10 @@ object AngConfigManager {
                 }
             }
             toRemove.forEach { MmkvManager.removeServer(it) }
-            return toRemove.size
+            return@inServerListTransaction toRemove.size
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to dedup servers for subid: $subid", e)
-            return 0
+            return@inServerListTransaction 0
         }
     }
 
@@ -314,14 +314,23 @@ object AngConfigManager {
                     }
                 }
 
-            // Batch save all parsed configs (only one serverList read/write)
+            // Batch save all parsed configs (only one serverList read/write).
+            //
+            // THE REPLACEMENT IS ONE STEP AGAINST THE OTHER PROCESS. Clearing the подписка's list
+            // and refilling it are two writes to the same key, and this runs in `:bg` on a scheduled
+            // refresh while the interface process is free to delete a row or apply a sort. Between
+            // the two writes the list is EMPTY on disk, so a concurrent read-modify-write there
+            // wrote that emptiness back over the imported серверы. Parsing is already done by this
+            // point, so the fence holds no I/O — see [MmkvManager.inServerListTransaction].
             if (configs.isNotEmpty()) {
-                if (!append) {
-                    MmkvManager.removeServerViaSubid(subid)
+                MmkvManager.inServerListTransaction {
+                    if (!append) {
+                        MmkvManager.removeServerViaSubid(subid)
+                    }
+                    val keyToProfile = batchSaveConfigs(configs, subid)
+                    val matchKey = resolveSelectedKey(keyToProfile, removedSelected, subid, append)
+                    matchKey?.let { MmkvManager.setSelectServer(it) }
                 }
-                val keyToProfile = batchSaveConfigs(configs, subid)
-                val matchKey = resolveSelectedKey(keyToProfile, removedSelected, subid, append)
-                matchKey?.let { MmkvManager.setSelectServer(it) }
             }
 
             return configs.size

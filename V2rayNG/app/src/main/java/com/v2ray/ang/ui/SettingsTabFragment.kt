@@ -8,9 +8,12 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.FrameLayout
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.BuildConfig
 import com.v2ray.ang.R
@@ -28,6 +31,7 @@ import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.ui.component.restoreChecked
 import com.v2ray.ang.ui.component.pressFeedback
 import com.v2ray.ang.util.LogUtil
+import com.v2ray.ang.util.Utils
 
 /**
  * The Настройки tab: the custom Incy settings screen that replaced the old navigation drawer.
@@ -256,13 +260,11 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         if (!isBindingInitialized) return
         val s = binding
 
-        // The row states the mode that is actually in force, including the one the picker no longer
-        // offers. Reporting «TUN» for a TUN + Proxy tunnel would be the screen lying about the
-        // machine to keep its own list tidy.
+        // The row states the mode that is actually in force. See [pickMode] for why the LAN-sharing
+        // switch is not read here any more.
         s.valueMode.text = getString(
             when (currentMode()) {
                 Mode.PROXY -> R.string.hub_mode_proxy
-                Mode.TUN_PROXY -> R.string.settings_mode_value_tun_proxy
                 Mode.TUN -> R.string.settings_mode_value_tun
             }
         )
@@ -327,24 +329,27 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
      * «Режим» — the first of six select popups (handoff README §6). The dialog this replaced dimmed
      * the whole screen to ask a two-word question; the flyout opens where the value already is.
      *
-     * THE LIST IS THE DESIGN'S TWO, and the app's third mode is still here. The prototype's
+     * THE LIST IS THE DESIGN'S TWO, and it is now also the whole truth. The prototype's
      * `MODES = ['TUN', 'Только прокси']`, and the owner confirmed on 2026-08-04 that the list shows
-     * exactly that — «интерфейс и формулировки по дизайну, возможности по репозиторию». So:
+     * exactly that — «интерфейс и формулировки по дизайну, возможности по репозиторию».
      *
-     *   0 TUN         = VPN(tun) mode, local-proxy sharing OFF          — offered
-     *   1 Только прокси = proxy-only mode (isVpnMode() == false)         — offered
-     *     TUN + Proxy = VPN(tun) mode, local-proxy sharing ON            — NOT offered, still works
+     *   0 TUN           = VPN(tun) mode, `isVpnMode() == true`
+     *   1 Только прокси = proxy-only mode, `isVpnMode() == false`
      *
-     * TUN + Proxy is written by nothing on this screen any more, but it is read by everything:
-     * PREF_PROXY_SHARING is a live key, the core config honours it, and a user who chose the mode
-     * before today still has it. [bindSettingsState] keeps showing them «TUN + Proxy» rather than
-     * lying about which tunnel is up.
+     * **«TUN + Proxy» IS NOT A THIRD MODE, AND TREATING IT AS ONE BROKE A DIFFERENT SCREEN.** It was
+     * this row reading `PREF_PROXY_SHARING` — which is not a mode but the «Доступ через хотспот»
+     * switch on «Локальный прокси», an independent feature that adds an authenticated SOCKS inbound
+     * on 0.0.0.0 and works in EITHER mode. Turning that switch on, which is an offered thing to do,
+     * therefore:
      *
-     * That is also why the picker opens with NOTHING selected for them ([selectedIndex] -1) instead
-     * of pre-selecting TUN. SelectPopup does not fire `onPick` when the current value is re-picked,
-     * so a checkmark on TUN would leave the third mode with no way out of itself — tapping the row
-     * that appears to be selected would do nothing at all. With no selection, either option applies
-     * and lands them on one of the design's two.
+     *  - made this row report «TUN + Proxy» when nothing about the mode had changed;
+     *  - opened the picker with NOTHING selected, over a plain TUN tunnel;
+     *  - and then, on picking «TUN» — the value already in force — silently wrote
+     *    `PREF_PROXY_SHARING = false`, switching the LAN share off behind the user's back. Nobody
+     *    asked about sharing; they re-picked the mode they were already on.
+     *
+     * The mode is `PREF_MODE` and nothing else now, so the row states it, the picker pre-selects it,
+     * and the hotspot switch is owned by the one screen that offers it.
      */
     private fun pickMode() {
         val entries = listOf(
@@ -354,7 +359,6 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         val idx = when (currentMode()) {
             Mode.PROXY -> 1
             Mode.TUN -> 0
-            Mode.TUN_PROXY -> -1 // legacy: offer both, pre-select neither
         }
         SelectPopup.show(
             anchor = binding.rowMode,
@@ -366,7 +370,6 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         ) { which ->
             if (which == 0) { // TUN
                 MmkvManager.encodeSettings(AppConfig.PREF_MODE, AppConfig.VPN)
-                MmkvManager.encodeSettings(AppConfig.PREF_PROXY_SHARING, false)
             } else { // Только прокси
                 MmkvManager.encodeSettings(AppConfig.PREF_MODE, "Proxy only")
             }
@@ -375,17 +378,12 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         }
     }
 
-    /** The three modes the prefs can be in, including the one the picker no longer offers. */
-    private enum class Mode { TUN, PROXY, TUN_PROXY }
+    /** The two modes the prefs can be in. LAN sharing is not one of them; see [pickMode]. */
+    private enum class Mode { TUN, PROXY }
 
     private fun currentMode(): Mode {
         val mode = MmkvManager.decodeSettingsString(AppConfig.PREF_MODE, AppConfig.VPN)
-        val proxySharing = MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING, false)
-        return when {
-            mode != AppConfig.VPN -> Mode.PROXY
-            proxySharing -> Mode.TUN_PROXY
-            else -> Mode.TUN
-        }
+        return if (mode != AppConfig.VPN) Mode.PROXY else Mode.TUN
     }
 
     /**
@@ -513,25 +511,71 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         }
     }
 
-    /** Free-text DNS editor, reached via the "Свой…" preset option. */
+    /**
+     * Free-text DNS editor, reached via the "Свой…" preset option.
+     *
+     * **IT REFUSES WHAT THE READING CODE WOULD THROW AWAY.** `SettingsManager.getVpnDnsServers`
+     * keeps only pure IP addresses and, when nothing survives, quietly returns the default — so any
+     * other text (a bare hostname, a DoH URL, a typo) was accepted here, printed back on the row as
+     * the current value, and the tunnel resolved through 1.1.1.1 instead. The screen said one thing
+     * and the machine did another, which is the one thing «Дополнительно» already forbids of its own
+     * fields («Ни одно не сохранит значение, которое читающий код молча выбросит»).
+     *
+     * Every preset in the list is a pure IP, so this is the same alphabet, not a narrower one. The
+     * dialog stays open on a bad value with the reason under the field, because a dialog that closes
+     * on a refusal has thrown the typing away too.
+     */
     private fun editDnsCustom(current: String) {
-        val input = EditText(requireContext()).apply {
-            setText(current)
-            setSingleLine()
+        val field = TextInputLayout(requireContext()).apply {
+            isErrorEnabled = true
             hint = getString(R.string.settings_dns_hint)
         }
-        AlertDialog.Builder(requireContext())
+        val input = TextInputEditText(requireContext()).apply {
+            setText(current)
+            setSingleLine()
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+        }
+        field.addView(input)
+        val pad = resources.getDimensionPixelSize(R.dimen.space_24)
+        val holder = FrameLayout(requireContext()).apply {
+            setPadding(pad, pad, pad, 0)
+            addView(field)
+        }
+
+        val dialog = AlertDialog.Builder(requireContext())
             .setTitle(R.string.settings_dns)
-            .setView(input)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                val value = input.text.toString().trim().ifEmpty { AppConfig.DNS_VPN }
+            .setView(holder)
+            .setPositiveButton(android.R.string.ok, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val value = normalizeDnsAddresses(input.text?.toString().orEmpty())
+                if (value == null) {
+                    field.error = getString(R.string.settings_dns_error)
+                    return@setOnClickListener
+                }
+                field.error = null
                 MmkvManager.encodeSettings(AppConfig.PREF_VPN_DNS, value)
                 MmkvManager.encodeSettings(AppConfig.PREF_REMOTE_DNS, value)
                 bindSettingsState()
                 restartIfRunning()
+                dialog.dismiss()
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        }
+        dialog.show()
+    }
+
+    /**
+     * A comma-separated list of DNS addresses, trimmed and re-joined — or null when any item is not
+     * one. An empty field is not a value either: it used to mean «put the default back», silently,
+     * from a field the user opened to type something into.
+     */
+    private fun normalizeDnsAddresses(raw: String): String? {
+        val items = raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        if (items.isEmpty()) return null
+        if (items.any { !Utils.isPureIpAddress(it) }) return null
+        return items.joinToString(",")
     }
 
     private fun toggleMux() {

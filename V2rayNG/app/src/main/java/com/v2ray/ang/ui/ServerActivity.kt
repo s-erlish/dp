@@ -11,6 +11,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.DEFAULT_PORT
@@ -26,6 +27,7 @@ import com.v2ray.ang.enums.NetworkType
 import com.v2ray.ang.extension.isNotNullEmpty
 import com.v2ray.ang.extension.nullIfBlank
 import com.v2ray.ang.extension.toast
+import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.MmkvManager
@@ -463,18 +465,31 @@ class ServerActivity : BaseActivity() {
     /**
      * save server config
      */
+    /**
+     * **THIS FORM USED TO REFUSE IN COMPLETE SILENCE.**
+     *
+     * Every check below answered with `toast(R.string.server_lab_…)` — the FIELD LABEL («Название»,
+     * «Адрес», «Порт», «Пароль») used as a message, which is upstream's habit — and not one of those
+     * ids is on [com.v2ray.ang.ui.NoticePolicy.ALLOWED]. So pressing «Сохранить» with an empty
+     * address did nothing at all: no message, no movement, no closed screen. The only way to find
+     * out what was wrong was to guess.
+     *
+     * Two things now happen instead, and they are the pair the rules ask for: the caret goes to the
+     * field that has to change, and one sentence says what to do with it. A label is not a sentence
+     * — it is already written above the box.
+     */
     private fun saveServer(): Boolean {
         if (TextUtils.isEmpty(et_remarks.text.toString())) {
-            toast(R.string.server_lab_remarks)
+            refuse(et_remarks, R.string.srv_name_required)
             return false
         }
         if (TextUtils.isEmpty(et_address.text.toString())) {
-            toast(R.string.server_lab_address)
+            refuse(et_address, R.string.srv_address_required)
             return false
         }
         if (createConfigType != EConfigType.HYSTERIA2) {
             if (Utils.parseInt(et_port.text.toString()) <= 0) {
-                toast(R.string.server_lab_port)
+                refuse(et_port, R.string.srv_port_required)
                 return false
             }
         }
@@ -488,28 +503,28 @@ class ServerActivity : BaseActivity() {
                 || config.configType == EConfigType.SHADOWSOCKS
                 || config.configType == EConfigType.HYSTERIA2
             ) {
-                toast(R.string.server_lab_id3)
+                refuse(et_id, R.string.srv_password_required)
             } else {
-                toast(R.string.server_lab_id)
+                refuse(et_id, R.string.srv_id_required)
             }
             return false
         }
         sp_stream_security?.let {
             if (config.configType == EConfigType.TROJAN && TextUtils.isEmpty(streamSecuritys[it.selectedItemPosition])) {
-                toast(R.string.server_lab_stream_security)
+                toastError(R.string.srv_tls_required)
                 return false
             }
         }
         if (et_extra?.text?.toString().isNotNullEmpty()) {
             if (JsonUtil.parseString(et_extra?.text?.toString()) == null) {
-                toast(R.string.server_lab_xhttp_extra)
+                refuse(et_extra, R.string.srv_json_invalid)
                 return false
             }
         }
 
         if (et_fm?.text?.toString().isNotNullEmpty()) {
             if (JsonUtil.parseString(et_fm?.text?.toString()) == null) {
-                toast(R.string.server_lab_final_mask)
+                refuse(et_fm, R.string.srv_json_invalid)
                 return false
             }
         }
@@ -530,6 +545,12 @@ class ServerActivity : BaseActivity() {
         toastSuccess(R.string.toast_success)
         finish()
         return true
+    }
+
+    /** Says what to fix, and puts the caret in the box that has to change. See [saveServer]. */
+    private fun refuse(field: EditText?, @StringRes message: Int) {
+        toastError(message)
+        field?.requestFocus()
     }
 
     private fun saveCommon(config: ProfileItem) {

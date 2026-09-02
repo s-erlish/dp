@@ -649,19 +649,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun sortByTestResultsForSub(subId: String) {
         data class ServerDelay(var guid: String, var testDelayMillis: Long)
 
-        val serverDelays = mutableListOf<ServerDelay>()
-        val serverListToSort = MmkvManager.decodeServerList(subId)
+        // Fenced: this reads a list and writes it back, and `:bg` can be replacing the same list
+        // from a subscription refresh at that moment. See [MmkvManager.inServerListTransaction].
+        MmkvManager.inServerListTransaction {
+            val serverDelays = mutableListOf<ServerDelay>()
+            val serverListToSort = MmkvManager.decodeServerList(subId)
 
-        serverListToSort.forEach { key ->
-            val delay = MmkvManager.decodeServerAffiliationInfo(key)?.testDelayMillis ?: 0L
-            serverDelays.add(ServerDelay(key, if (delay <= 0L) 999999 else delay))
+            serverListToSort.forEach { key ->
+                val delay = MmkvManager.decodeServerAffiliationInfo(key)?.testDelayMillis ?: 0L
+                serverDelays.add(ServerDelay(key, if (delay <= 0L) 999999 else delay))
+            }
+            serverDelays.sortBy { it.testDelayMillis }
+
+            val sortedServerList = serverDelays.map { it.guid }.toMutableList()
+
+            // Save the sorted list for this subscription
+            MmkvManager.encodeServerList(sortedServerList, subId)
         }
-        serverDelays.sortBy { it.testDelayMillis }
-
-        val sortedServerList = serverDelays.map { it.guid }.toMutableList()
-
-        // Save the sorted list for this subscription
-        MmkvManager.encodeServerList(sortedServerList, subId)
     }
 
 
