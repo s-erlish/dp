@@ -365,6 +365,18 @@
     <string name="srv_config_invalid">Конфигурация не разобрана. Проверьте JSON и повторите.</string>
     <string name="srv_name_required">Укажите название сервера</string>
 
+    <!-- ОТКАЗЫ ФОРМЫ «сервер вручную» (ServerActivity).
+         Раньше на месте каждого стояла ПОДПИСЬ ПОЛЯ («Название», «Адрес», «Порт», «Пароль»),
+         и ни одна из них не была в разрешённых NoticePolicy - то есть «Сохранить» с пустым
+         адресом не делало вообще ничего: экран стоял, ответа не было. Подпись поля и так
+         написана над полем; сообщению нужно назвать, ЧТО сделать. -->
+    <string name="srv_address_required">Укажите адрес сервера</string>
+    <string name="srv_port_required">Укажите порт: число от 1 до 65535</string>
+    <string name="srv_id_required">Укажите идентификатор пользователя</string>
+    <string name="srv_password_required">Укажите пароль</string>
+    <string name="srv_tls_required">Для Trojan нужно выбрать TLS</string>
+    <string name="srv_json_invalid">Проверьте JSON: он не разобрался</string>
+
     <!-- ==================================================================
          RUSSIAN REPLACEMENTS FOR THE UPSTREAM ENGLISH THESE SCREENS STILL SHOWED
 

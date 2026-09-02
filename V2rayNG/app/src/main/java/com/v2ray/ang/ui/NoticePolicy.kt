@@ -189,6 +189,15 @@ object NoticePolicy {
         R.string.buy_checkout_return,
         // Editors and settings: a refusal with a reason.
         R.string.srv_config_invalid,
+        // Отказы формы «сервер вручную». До них на их месте стояли ПОДПИСИ ПОЛЕЙ, и ни одна не
+        // была разрешена — то есть «Сохранить» на неполной форме не отвечало ничем.
+        R.string.srv_name_required,
+        R.string.srv_address_required,
+        R.string.srv_port_required,
+        R.string.srv_id_required,
+        R.string.srv_password_required,
+        R.string.srv_tls_required,
+        R.string.srv_json_invalid,
         R.string.editor_url_invalid,
         R.string.editor_failed,
         R.string.asset_name_duplicate,
