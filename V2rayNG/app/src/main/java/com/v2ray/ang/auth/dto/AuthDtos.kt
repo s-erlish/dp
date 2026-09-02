@@ -57,7 +57,7 @@ data class GoogleLoginRequestDto(
  * this is the request of somebody who cannot get in. Which is also why the panel answers it
  * identically for a known address and an unknown one — a different answer would turn this endpoint
  * into a way of asking «есть ли у вас аккаунт на этот адрес». The copy the app writes afterwards
- * has to keep that promise; see `auth_sent_reset_body`.
+ * has to keep that promise; see `auth_reset_sent_body`.
  */
 data class PasswordResetRequestDto(
     val email: String,

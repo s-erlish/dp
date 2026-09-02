@@ -1363,14 +1363,14 @@ class LoginActivity : BaseActivity() {
             }
 
             is AuthUiState.PasswordResetSent -> {
-                binding.mail.verifyTitle.setText(R.string.auth_sent_reset_title)
+                binding.mail.verifyTitle.setText(R.string.auth_reset_sent_title)
                 // CONDITIONAL, AND BY CONTRACT. The panel answers a known address and an unknown
                 // one identically so that this endpoint cannot be used to find out who has an
                 // account; «мы отправили письмо на <адрес>» would hand back the very answer it
                 // withholds. The address is still named, because the one thing the user has to
                 // check is whether it is the address they meant.
                 binding.mail.verifyBody.text =
-                    getString(R.string.auth_sent_reset_body, state.email)
+                    getString(R.string.auth_reset_sent_body, state.email)
                 showVerification(true, waiting = false)
                 setFormBusy(state.resending)
             }
