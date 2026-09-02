@@ -314,7 +314,7 @@
                         android:id="@+id/et_confirm"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:autofillHints="password"
+                        android:autofillHints="newPassword"
                         android:imeOptions="actionDone"
                         android:inputType="textPassword"
                         android:maxLines="1" />

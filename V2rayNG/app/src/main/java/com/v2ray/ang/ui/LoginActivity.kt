@@ -691,6 +691,24 @@ class LoginActivity : BaseActivity() {
      * The repeat field is the only structural difference between the two errands, which is why they
      * are a segment over one form rather than two forms: everything else here is a label.
      */
+    /**
+     * Подсказка автозаполнения для поля пароля. Поле общее для всех поручений, а смысл у него
+     * разный: на входе и в смене адреса это СУЩЕСТВУЮЩИЙ пароль, при регистрации и на шаге
+     * «Придумайте пароль» — НОВЫЙ. Менеджеру паролей это не всё равно: на новом он предлагает
+     * сохранить придуманный, на существующем — подставить сохранённый (14-auth.md 6.3).
+     *
+     * `setAutofillHints` появился в API 26, минимальная версия у нас 24 — ниже подсказка остаётся
+     * той, что стоит в разметке, и это ровно прежнее поведение.
+     */
+    private fun applyPasswordAutofill(field: android.widget.EditText, newPassword: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            //  «newPassword» задан платформой как значение подсказки, но именованной константы у
+            //  View для него нет (в androidx.autofill.HintConstants это тот же самый литерал) —
+            //  поэтому строкой, чтобы не тянуть библиотеку ради одного слова.
+            field.setAutofillHints(if (newPassword) "newPassword" else View.AUTOFILL_HINT_PASSWORD)
+        }
+    }
+
     private fun applyFormMode() {
         val mail = binding.mail
         val register = formMode == FormMode.REGISTER
@@ -735,6 +753,10 @@ class LoginActivity : BaseActivity() {
             // restart for a field already under the caret.
             mail.etPassword.imeOptions =
                 if (onPassword) EditorInfo.IME_ACTION_NEXT else EditorInfo.IME_ACTION_DONE
+            // Подсказка автозаполнения зависит от того же режима: на шаге «Придумайте пароль» это
+            // НОВЫЙ пароль, и менеджер паролей должен предложить сохранить придуманный, а не
+            // подставить старый. В смене адреса поле несёт текущий пароль — там подсказка обычная.
+            applyPasswordAutofill(mail.etPassword, newPassword = onPassword)
             // The address is the LAST field whenever nothing is drawn under it (14-auth.md 6.4).
             mail.etEmail.imeOptions = if (mail.slotPassword.isVisible && !onPassword) {
                 EditorInfo.IME_ACTION_NEXT
