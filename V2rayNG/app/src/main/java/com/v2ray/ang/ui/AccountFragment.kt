@@ -45,6 +45,7 @@ import com.v2ray.ang.databinding.DialogTopUpBinding
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
+import com.v2ray.ang.handler.SubscriptionNaming
 import com.v2ray.ang.ui.component.Haptic
 import com.v2ray.ang.ui.component.TelegramFlow
 import com.v2ray.ang.ui.component.onSingleClick
@@ -1105,13 +1106,20 @@ class AccountFragment : Fragment() {
             return
         }
 
-        // Name: user label, then the friendly tariff name, then the backend default, then a neutral
-        // header so the line is never blank.
+        // Name: THE SAME RANKING THE CARD ON ГЛАВНАЯ USES, and for the same reason.
+        //
+        // This line read `displayName ?: tariffDisplayName ?: defaultLabel`, and the middle term is
+        // the generic service label «departament vpn» — one string on every подписка of this
+        // deployment. It is refused for the tariff badge two blocks below (`tariffBadgeName`), it is
+        // refused by the import (`SubscriptionSyncManager`), and it is in
+        // `SubscriptionNaming.PLACEHOLDERS` — yet here it outranked everything but the nickname. So
+        // Главная named the подписка «🍀 erlish» and Аккаунт named it «departament vpn».
+        //
+        // The resolver also reaches the провайдер's own `profile-title`, which lives on the LOCAL
+        // подписка and is not in this payload at all, and it ends in «Подписка» — so the line is
+        // still never blank.
         b.tvSubName.isVisible = true
-        b.tvSubName.text = sub.displayName?.takeIf { it.isNotBlank() }
-            ?: sub.tariffDisplayName?.takeIf { it.isNotBlank() }
-            ?: sub.defaultLabel?.takeIf { it.isNotBlank() }
-            ?: getString(R.string.account_subs_header)
+        b.tvSubName.text = SubscriptionNaming.titleOf(requireContext(), sub)
 
         // Badge resolution order: catalog by tariffId, then catalog by the renewing price-option id
         // (correct after a Base→Plus upgrade), then the sub's own non-generic display name.

@@ -2,6 +2,9 @@ package com.v2ray.ang.handler
 
 import android.content.Context
 import com.v2ray.ang.R
+import com.v2ray.ang.auth.AuthTokenStore
+import com.v2ray.ang.auth.SubscriptionSyncManager
+import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.dto.entities.SubscriptionItem
 
 /**
@@ -95,5 +98,51 @@ object SubscriptionNaming {
         val sub = MmkvManager.decodeSubscription(subId)
             ?: return context.getString(R.string.home_sub_untitled)
         return titleOf(context, sub)
+    }
+
+    /**
+     * [titleOf] for a caller holding the ACCOUNT's record of a подписка rather than the local one —
+     * the Аккаунт tab's case.
+     *
+     * That tab used to name the подписка `displayName ?: tariffDisplayName ?: defaultLabel`, and
+     * the middle term is the generic service label «departament vpn» — the same string on every
+     * подписка of this deployment, which [PLACEHOLDERS] exists to refuse and which
+     * `SubInfoDto.tariffBadgeName` already refuses for the badge. So Главная said «🍀 erlish» and
+     * Аккаунт said «departament vpn» about one and the same подписка.
+     *
+     * The account record has no `profile-title`; the LOCAL подписка it maps to does, which is why
+     * this resolves that mapping ([localSubFor]) instead of ranking the payload's fields alone.
+     * With no local подписка yet — the window between signing in and the first import — the two
+     * account fields still answer, in the same order the full ranking gives them.
+     */
+    fun titleOf(context: Context, info: SubInfoDto): String =
+        localSubFor(info)?.let { sub ->
+            titleOf(
+                context = context,
+                sub = sub,
+                accountDisplayName = info.displayName,
+                accountDefaultLabel = info.defaultLabel,
+            )
+        } ?: (realName(info.displayName) ?: realName(info.defaultLabel)
+            ?: context.getString(R.string.home_sub_untitled))
+
+    /**
+     * The LOCAL подписка an account record was imported into, or null before the first import.
+     *
+     * The import remembers each подписка under an identity key — the constant «root» for the
+     * account's primary, the remnawave uuid / id for a secondary — so the way back is that key and
+     * never a name match. Same mapping `HomeFragment` walks in the other direction.
+     */
+    fun localSubFor(info: SubInfoDto): SubscriptionItem? {
+        val identity = if (info.type.equals(SubscriptionSyncManager.TYPE_ROOT, ignoreCase = true)) {
+            SubscriptionSyncManager.TYPE_ROOT
+        } else {
+            info.remnawaveUuid.ifBlank { info.id }
+        }
+        if (identity.isBlank()) return null
+        val guid = runCatching {
+            AuthTokenStore.getManagedGuids()[identity]
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: return null
+        return MmkvManager.decodeSubscription(guid)
     }
 }

@@ -8,6 +8,7 @@ import com.v2ray.ang.R
 import com.v2ray.ang.contracts.BaseAdapterListener
 import com.v2ray.ang.databinding.ViewRowCardBinding
 import com.v2ray.ang.dto.entities.SubscriptionItem
+import com.v2ray.ang.handler.SubscriptionNaming
 import com.v2ray.ang.helper.ItemTouchHelperAdapter
 import com.v2ray.ang.helper.ItemTouchHelperViewHolder
 import com.v2ray.ang.ui.component.RowBinder
@@ -125,12 +126,28 @@ class SubSettingRecyclerAdapter(
          * was deleted - which is how «удалять почему-то я тоже не могу подписки» looks from the
          * outside. The container is named for what it is instead, and the same name is used by the
          * row, by the actions sheet and by the delete confirmation, so all three agree.
+         *
+         * EVERYTHING ELSE GOES THROUGH [SubscriptionNaming], and it did not: this row printed the
+         * RAW REMARK. Two consequences, both visible.
+         *
+         *  - A подписка pasted from the clipboard is stored with a BLANK remark on purpose — the
+         *    провайдер's own `profile-title` is adopted into it on the first fetch. Paste one with
+         *    no network and that fetch fails, so this row drew a title of «» — a nameless row with
+         *    a glyph and «Никогда не обновлялась» under it. The delete confirmation and the edit
+         *    screen's bar quoted the same empty string.
+         *  - An install upgraded from a build that stored «import sub» drew «import sub» here while
+         *    Главная, which does resolve the name, drew the real one. Two surfaces, two names for
+         *    one подписка.
+         *
+         * The resolver already ranks the провайдер's title above the remark and refuses the
+         * placeholders, and it ends in «Подписка» rather than an empty string — which is the same
+         * answer the card gives, so the two agree by construction.
          */
         fun displayName(context: Context, item: SubscriptionItem): String =
             if (isUnnamedLocalGroup(item)) {
                 context.getString(R.string.subs_local)
             } else {
-                item.remarks
+                SubscriptionNaming.titleOf(context, item)
             }
     }
 }
