@@ -452,6 +452,10 @@ class ServerActivity : BaseActivity() {
      * error slot (7.4), and «Для Trojan нужно выбрать TLS» is a refusal that has to land on the
      * control it is about.
      *
+     * The list marks the value in force. A picker that shows only the options makes the user close
+     * it and read the field to find out what is set, which is checking your own choice by doing
+     * something; the marker is a reserved slot, so opening the list never reflows it either.
+     *
      * The box takes focus like any other field but never opens a keyboard: `keyListener = null`
      * makes it uneditable while leaving it in the focus order, so a keyboard, a D-pad or switch
      * access still reaches it. ENTER and the D-pad centre open the list, which is what a focused
@@ -480,7 +484,9 @@ class ServerActivity : BaseActivity() {
         }
         val open = {
             EditorActionsSheet(this, title).apply {
-                options.forEachIndexed { index, label -> action(label = label) { onPick(index) } }
+                options.forEachIndexed { index, label ->
+                    action(label = label, selected = index == selectedIndex) { onPick(index) }
+                }
             }.show()
         }
         field.onSingleClick { open() }

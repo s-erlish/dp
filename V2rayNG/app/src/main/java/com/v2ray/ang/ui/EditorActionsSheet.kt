@@ -27,6 +27,14 @@ import com.v2ray.ang.ui.component.RowBinder
  *     .show()
  * ```
  *
+ * ## Two shapes, one sheet
+ *
+ * `action(...)` without `selected` is an ACTION row - «Обновить все», «Экспортировать» - and has
+ * no current value to point at. Pass `selected` and the same row becomes a VALUE row that shows
+ * whether it is the one in force, which is what a picker owes its user: a list of values that does
+ * not say which one is set makes them close it and look at the field to find out, and that is
+ * checking your own choice by doing something.
+ *
  * Every action closes the sheet before it runs: a sheet that lingers over the screen it just changed
  * makes the user dismiss a thing they already finished with. Destructive rows go last, after a
  * hairline, and carry the red title rather than a red tile - a red tile plus red text is the same
@@ -60,12 +68,14 @@ class EditorActionsSheet(
         @DrawableRes glyph: Int = 0,
         subtitle: CharSequence? = null,
         enabled: Boolean = true,
+        selected: Boolean? = null,
         onClick: () -> Unit,
     ): EditorActionsSheet = addRow(
         label = label,
         glyph = glyph,
         subtitle = subtitle,
         enabled = enabled,
+        selected = selected,
         tone = RowBinder.RowTone.DEFAULT,
         onClick = onClick,
     )
@@ -76,8 +86,10 @@ class EditorActionsSheet(
         @DrawableRes glyph: Int = 0,
         subtitle: CharSequence? = null,
         enabled: Boolean = true,
+        selected: Boolean? = null,
         onClick: () -> Unit,
-    ): EditorActionsSheet = action(context.getString(labelRes), glyph, subtitle, enabled, onClick)
+    ): EditorActionsSheet =
+        action(context.getString(labelRes), glyph, subtitle, enabled, selected, onClick)
 
     /**
      * Adds the destructive action. It is separated from the rest by a hairline and always sits last,
@@ -93,6 +105,7 @@ class EditorActionsSheet(
             glyph = 0,
             subtitle = null,
             enabled = true,
+            selected = null,
             tone = RowBinder.RowTone.DESTRUCTIVE,
             onClick = onClick,
         )
@@ -107,6 +120,7 @@ class EditorActionsSheet(
         @DrawableRes glyph: Int,
         subtitle: CharSequence?,
         enabled: Boolean,
+        selected: Boolean?,
         tone: RowBinder.RowTone,
         onClick: () -> Unit,
     ): EditorActionsSheet {
@@ -117,7 +131,14 @@ class EditorActionsSheet(
             subtitle = subtitle,
             glyph = glyph,
             tone = tone,
-            trailing = RowBinder.Trailing.None,
+            // A VALUE list marks the one in force; an ACTION list has no current value to mark, so
+            // it keeps the empty slot it always had. Marker reserves the slot either way, so the
+            // two shapes measure the same and neither reflows when the selection moves.
+            trailing = if (selected == null) {
+                RowBinder.Trailing.None
+            } else {
+                RowBinder.Trailing.Marker(selected)
+            },
             enabled = enabled,
             onClick = {
                 dialog.dismiss()
