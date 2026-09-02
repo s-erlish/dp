@@ -243,6 +243,15 @@ class ServerActivity : BaseActivity() {
         val configType = config?.configType ?: createConfigType
         editorType = configType
 
+        // A guid that will not decode used to fall through to a BLANK NEW FORM wearing the stored
+        // server's protocol name, and «Сохранить» then wrote that empty form over the record it
+        // could not read. The screen says what happened instead (00-rules.md 9.4, 15).
+        if (editGuid.isNotEmpty() && config == null) {
+            toastError(R.string.srv_config_unreadable)
+            SubPage.close(this)
+            return
+        }
+
         val layoutId = when (configType) {
             EConfigType.VMESS -> R.layout.activity_server_vmess
             EConfigType.SHADOWSOCKS -> R.layout.activity_server_shadowsocks
@@ -648,7 +657,6 @@ class ServerActivity : BaseActivity() {
         } else if (config.configType == EConfigType.WIREGUARD) {
             et_id.text = Utils.getEditable(config.secretKey.orEmpty())
             et_public_key?.text = Utils.getEditable(config.publicKey.orEmpty())
-            et_preshared_key?.visibility = View.VISIBLE
             et_preshared_key?.text = Utils.getEditable(config.preSharedKey.orEmpty())
             et_reserved1?.text = Utils.getEditable(config.reserved ?: "0,0,0")
             et_local_address?.text = Utils.getEditable(
@@ -765,7 +773,8 @@ class ServerActivity : BaseActivity() {
             refuse(til_address, et_address, R.string.srv_address_invalid)
             return false
         }
-        if (createConfigType != EConfigType.HYSTERIA2) {
+        // Hysteria2 can hop ports, so it is the one protocol whose server port may be left out.
+        if (editorType != EConfigType.HYSTERIA2) {
             val port = Utils.parseInt(et_port.text.toString())
             if (port <= 0 || port > MAX_PORT) {
                 refuse(til_port, et_port, R.string.srv_port_required)
@@ -778,14 +787,19 @@ class ServerActivity : BaseActivity() {
             && config.configType != EConfigType.HTTP
             && TextUtils.isEmpty(et_id.text.toString())
         ) {
-            if (config.configType == EConfigType.TROJAN
-                || config.configType == EConfigType.SHADOWSOCKS
-                || config.configType == EConfigType.HYSTERIA2
-            ) {
-                refuse(til_id, et_id, R.string.srv_password_required)
-            } else {
-                refuse(til_id, et_id, R.string.srv_id_required)
-            }
+            // The message names the field the user is looking at. This box is «Пароль» on three
+            // protocols, «Закрытый ключ» on WireGuard and «ID» on the rest, and a refusal that says
+            // «идентификатор пользователя» over a box labelled «Закрытый ключ» sends them hunting.
+            refuse(
+                til_id, et_id,
+                when (config.configType) {
+                    EConfigType.TROJAN, EConfigType.SHADOWSOCKS, EConfigType.HYSTERIA2 ->
+                        R.string.srv_password_required
+
+                    EConfigType.WIREGUARD -> R.string.srv_secret_key_required
+                    else -> R.string.srv_id_required
+                },
+            )
             return false
         }
         if (et_stream_security != null &&

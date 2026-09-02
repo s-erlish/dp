@@ -205,6 +205,11 @@ object NoticePolicy {
         R.string.srv_password_required,
         R.string.srv_tls_required,
         R.string.srv_json_invalid,
+        // Экран, который не может открыться: тип сервера без формы и нечитаемая запись. Оба
+        // закрывают экран, и закрыться молча - это ровно тот пустой чёрный экран, которым
+        // «сервер вручную» отвечал на неизвестный тип до этого.
+        R.string.srv_editor_unavailable,
+        R.string.srv_config_unreadable,
         R.string.editor_url_invalid,
         R.string.editor_failed,
         R.string.asset_name_duplicate,

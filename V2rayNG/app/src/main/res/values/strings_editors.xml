@@ -374,6 +374,7 @@
     <string name="srv_port_required">Укажите порт: число от 1 до 65535</string>
     <string name="srv_id_required">Укажите идентификатор пользователя</string>
     <string name="srv_password_required">Укажите пароль</string>
+    <string name="srv_secret_key_required">Укажите закрытый ключ</string>
     <string name="srv_tls_required">Для Trojan нужно выбрать TLS</string>
     <string name="srv_json_invalid">Проверьте JSON: он не разобрался</string>
 
@@ -468,6 +469,7 @@
     <string name="srv_reserved_invalid">Здесь нужны три числа через запятую, например 0,0,0</string>
     <string name="srv_bandwidth_invalid">Укажите число и единицу, например 100 m</string>
     <string name="srv_editor_unavailable">Для этого типа сервера формы нет. Откройте его как свою конфигурацию</string>
+    <string name="srv_config_unreadable">Сервер не открылся: запись повреждена. Удалите его и добавьте заново</string>
 
     <!-- ==================================================================
          RUSSIAN REPLACEMENTS FOR THE UPSTREAM ENGLISH THESE SCREENS STILL SHOWED
