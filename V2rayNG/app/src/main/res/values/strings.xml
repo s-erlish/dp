@@ -5,7 +5,6 @@
     <string name="title_servers">Серверы</string>
     <string name="search_hint">Поиск серверов…</string>
     <string name="servers_empty_title">Нет серверов</string>
-    <string name="servers_section_local">Локальные</string>
     <!-- Home empty state (no servers/subscriptions yet) -->
     <string name="home_empty_title">Подписок пока нет</string>
     <string name="home_empty_subtitle">Добавьте подписку, чтобы появились серверы.</string>

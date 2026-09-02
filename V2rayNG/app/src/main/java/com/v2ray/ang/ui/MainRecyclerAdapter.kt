@@ -10,11 +10,9 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.color.MaterialColors
 import com.v2ray.ang.R
 import com.v2ray.ang.contracts.MainAdapterListener
-import com.v2ray.ang.dto.GroupMapItem
 import com.v2ray.ang.util.FlagUtil
 import com.v2ray.ang.databinding.ItemRecyclerFooterBinding
 import com.v2ray.ang.databinding.ItemRecyclerMainBinding
-import com.v2ray.ang.databinding.ItemSectionHeaderBinding
 import com.v2ray.ang.dto.V2rayConfig
 import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.dto.entities.ServerAffiliationInfo
@@ -22,7 +20,6 @@ import com.v2ray.ang.dto.entities.ServersCache
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.handler.MmkvManager
-import com.v2ray.ang.handler.SubscriptionNaming
 import com.v2ray.ang.template.TemplateManager
 import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.ui.component.pressFeedback
@@ -34,7 +31,6 @@ class MainRecyclerAdapter(
     private val adapterListener: MainAdapterListener?
 ) : RecyclerView.Adapter<MainRecyclerAdapter.BaseViewHolder>() {
     companion object {
-        private const val VIEW_TYPE_HEADER = 0
         private const val VIEW_TYPE_ITEM = 1
         private const val VIEW_TYPE_FOOTER = 2
 
@@ -46,17 +42,26 @@ class MainRecyclerAdapter(
         private const val PING_FAILED = "-"
     }
 
-    /** A flat row: either a provider section header or a server. */
-    private sealed class Row {
-        data class Header(val subId: String, val remarks: String, val count: Int) : Row()
-        data class Server(val cache: ServersCache) : Row()
-    }
-
+    /**
+     * THE PROVIDER SECTION HEADERS ARE GONE, AND THEY WERE NEVER DRAWN.
+     *
+     * This adapter used to keep a second row kind — a «провайдер» heading with a count and a
+     * collapse chevron — behind a `showHeaders` flag, plus the group list it needed
+     * ([GroupMapItem]), a `collapsed` set, a `Row` sealed hierarchy, a third view type and a
+     * `HeaderViewHolder`. Its one host is Главная (`HomeFragment.setupServerList`, the only
+     * `MainRecyclerAdapter(...)` in the app) and it has always passed `showHeaders = false`,
+     * deliberately: «a second heading inside the list would say the same thing twice» — the
+     * подписка card above the list IS the heading. So `useHeaders` was a compile-time false,
+     * `VIEW_TYPE_HEADER` was never returned and `bindHeader` was never called.
+     *
+     * IT WAS NOT FREE, WHICH IS WHY IT MATTERS RATHER THAN JUST BEING TIDY. To hand this adapter
+     * the groups it never used, `HomeFragment.refreshServerList` called
+     * `MainViewModel.getProviderGroups()` — `MmkvManager.decodeSubscriptions()`, i.e. one MMKV read
+     * and one Gson parse of a `SubscriptionItem` PER подписка, plus a sort and a map — on EVERY
+     * repaint of the list, including the single-row repaint that arrives once per server of a
+     * latency check and once every thirty seconds while a tunnel is up.
+     */
     private var servers: List<ServersCache> = emptyList()
-    private var subs: List<GroupMapItem> = emptyList()
-    private var showHeaders = false
-    private val collapsed = mutableSetOf<String>()
-    private var rows: List<Row> = emptyList()
 
     /**
      * Opens the server-actions sheet for a row — edit, delete, share, QR, duplicate, make default.
@@ -71,25 +76,20 @@ class MainRecyclerAdapter(
     var onItemLongClick: ((String) -> Unit)? = null
 
     /**
-     * Feeds the adapter with the flat server list plus the provider groups used to build
-     * section headers. Headers are suppressed when [showHeaders] is false or there is a
-     * single (or no) provider — Home already shows the meta bar as the provider header.
+     * Feeds the adapter with the server list to draw.
      *
      * @param index server index in [newServers]; when >= 0 only that row is refreshed.
      */
     @SuppressLint("NotifyDataSetChanged")
-    fun setSections(
-        newServers: List<ServersCache>,
-        newSubs: List<GroupMapItem>,
-        showHeaders: Boolean,
-        index: Int = -1
-    ) {
+    fun setSections(newServers: List<ServersCache>, index: Int = -1) {
         this.servers = newServers.toList()
-        this.subs = newSubs
-        this.showHeaders = showHeaders
         val targetGuid = if (index in this.servers.indices) this.servers[index].guid else null
-        pruneCustomProtoCache(index < 0)
-        rebuildRows()
+        // An index that names no row is treated as "the whole list moved", not as "one row moved
+        // and I could not find it": the caches below are dropped wholesale rather than left holding
+        // a value nothing is going to invalidate.
+        val structural = targetGuid == null
+        pruneCustomProtoCache(structural)
+        pruneAffiliationCache(structural, targetGuid)
 
         // Selection can have been changed by something that owns no list — a subscription import,
         // fast-connect, or the service starting with an explicit guid. Re-read it on every rebuild
@@ -102,49 +102,8 @@ class MainRecyclerAdapter(
         if (flat >= 0 && !selectionChanged) notifyItemChanged(flat) else notifyDataSetChanged()
     }
 
-    private fun rebuildRows() {
-        val list = mutableListOf<Row>()
-        val useHeaders = showHeaders && distinctProviderCount() > 1
-        if (!useHeaders) {
-            servers.forEach { list.add(Row.Server(it)) }
-            rows = list
-            return
-        }
-
-        // Ordered provider groups (pinned-first, per subs), then a "Local" group for the rest.
-        val orderedSubIds = subs.map { it.id }.filter { it.isNotEmpty() }
-        // THE HEADING IS RESOLVED, NEVER THE RAW REMARK. A group named from storage printed
-        // whatever the import happened to stamp — «import sub» among them. [SubscriptionNaming]
-        // refuses every placeholder, so a подписка that has not been named yet falls through to the
-        // server's own group name rather than announcing an English word to the user.
-        val remarksById = subs.associate { it.id to SubscriptionNaming.realName(it.remarks) }
-        val grouped = servers.groupBy { it.profile.subscriptionId }
-
-        for (subId in orderedSubIds) {
-            val bucket = grouped[subId] ?: continue
-            if (bucket.isEmpty()) continue
-            val remarks = remarksById[subId]
-                ?: bucket.firstOrNull()?.profile?.remarks.orEmpty()
-            list.add(Row.Header(subId, remarks, bucket.size))
-            if (!collapsed.contains(subId)) bucket.forEach { list.add(Row.Server(it)) }
-        }
-
-        // Servers without a matching provider (local / unsubscribed).
-        val localBucket = servers.filter { it.profile.subscriptionId.let { id -> id.isEmpty() || !orderedSubIds.contains(id) } }
-        if (localBucket.isNotEmpty()) {
-            val localId = ""
-            list.add(Row.Header(localId, "", localBucket.size))
-            if (!collapsed.contains(localId)) localBucket.forEach { list.add(Row.Server(it)) }
-        }
-
-        rows = list
-    }
-
-    private fun distinctProviderCount(): Int =
-        servers.map { it.profile.subscriptionId }.distinct().size
-
     private fun flatPositionOf(guid: String): Int =
-        rows.indexOfFirst { it is Row.Server && it.cache.guid == guid }
+        servers.indexOfFirst { it.guid == guid }
 
     /**
      * The guid this adapter currently paints as selected. Selection lives in MMKV, but MMKV cannot
@@ -155,22 +114,14 @@ class MainRecyclerAdapter(
      */
     private var selectedGuid: String? = MmkvManager.getSelectServer()
 
-    override fun getItemCount() = rows.size + 1
+    override fun getItemCount() = servers.size + 1
 
-    override fun getItemViewType(position: Int): Int {
-        if (position == rows.size) return VIEW_TYPE_FOOTER
-        return when (rows[position]) {
-            is Row.Header -> VIEW_TYPE_HEADER
-            is Row.Server -> VIEW_TYPE_ITEM
-        }
-    }
+    override fun getItemViewType(position: Int): Int =
+        if (position == servers.size) VIEW_TYPE_FOOTER else VIEW_TYPE_ITEM
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): BaseViewHolder {
         val inflater = LayoutInflater.from(parent.context)
         return when (viewType) {
-            VIEW_TYPE_HEADER -> HeaderViewHolder(ItemSectionHeaderBinding.inflate(inflater, parent, false)).also {
-                it.binding.sectionHeaderRoot.pressFeedback(R.anim.press_row)
-            }
             VIEW_TYPE_ITEM -> MainViewHolder(ItemRecyclerMainBinding.inflate(inflater, parent, false)).also {
                 // The press response, attached ONCE per view holder rather than on every bind.
                 // The rung is the same @anim/press_row the layout names; what this adds is the
@@ -184,11 +135,7 @@ class MainRecyclerAdapter(
     }
 
     override fun onBindViewHolder(holder: BaseViewHolder, position: Int) {
-        when (holder) {
-            is HeaderViewHolder -> bindHeader(holder, rows[position] as Row.Header)
-            is MainViewHolder -> bindServer(holder, position, (rows[position] as Row.Server).cache)
-            else -> {}
-        }
+        if (holder is MainViewHolder) bindServer(holder, position, servers[position])
     }
 
     /**
@@ -212,23 +159,6 @@ class MainRecyclerAdapter(
         holder.itemView.alpha = 1f
     }
 
-    private fun bindHeader(holder: HeaderViewHolder, header: Row.Header) {
-        val context = holder.binding.root.context
-        val title = header.remarks.ifBlank { context.getString(R.string.servers_section_local) }
-        holder.binding.sectionTitle.text = title
-        holder.binding.sectionCount.text = header.count.toString()
-        val isCollapsed = collapsed.contains(header.subId)
-        holder.binding.sectionChevron.rotation = if (isCollapsed) -90f else 0f
-        // Guarded like every other control (П-31): a doubled tap here nets out to the same
-        // collapse state but pays for two full rebuildRows + notifyDataSetChanged passes over the
-        // whole list to get there.
-        holder.binding.sectionHeaderRoot.onSingleClick {
-            if (collapsed.contains(header.subId)) collapsed.remove(header.subId) else collapsed.add(header.subId)
-            rebuildRows()
-            notifyDataSetChanged()
-        }
-    }
-
     private fun bindServer(holder: MainViewHolder, position: Int, cache: ServersCache) {
         val binding = holder.itemMainBinding
         val guid = cache.guid
@@ -250,7 +180,7 @@ class MainRecyclerAdapter(
         // and no number. A failed check is PING_FAILED in the failure colour — never the raw
         // negative marker, which is not a duration and would read as one. A server nobody has
         // measured yet is simply blank, and that blank is what tells it apart from a failure.
-        val aff = MmkvManager.decodeServerAffiliationInfo(guid)
+        val aff = affiliationOf(guid)
         val measuring = mainViewModel.isMeasuring(guid)
         val failed = aff?.pingResult == ServerAffiliationInfo.PingResult.FAILED
         binding.progressPing.visibility = if (measuring) View.VISIBLE else View.GONE
@@ -261,10 +191,11 @@ class MainRecyclerAdapter(
             else -> aff?.getTestDelayString().orEmpty()
         }
         binding.tvTestResult.text = pingText
-        // Ping colours resolved from theme attrs so ThemeOverlay.Mono greys them out.
-        val pingAttr = if (failed) R.attr.pingBad else R.attr.pingGood
-        val pingColor = MaterialColors.getColor(binding.tvTestResult, pingAttr)
-        binding.tvTestResult.setTextColor(pingColor)
+        // Ping colours resolved from theme attrs so ThemeOverlay.Mono greys them out — and
+        // resolved ONCE per adapter rather than twice per bind. @see themeColor
+        binding.tvTestResult.setTextColor(
+            themeColor(binding.tvTestResult, if (failed) R.attr.pingBad else R.attr.pingGood)
+        )
         // There is NO dot beside the figure. The colour on the number already carries the verdict,
         // and the owner had the second channel removed — «точка которая появляется она слишком
         // далеко от пинга, лучше ее просто убрать и все». Blank still means "never measured".
@@ -276,7 +207,7 @@ class MainRecyclerAdapter(
         val selected = guid == selectedGuid
         binding.infoContainer.isSelected = selected
         binding.layoutIndicator.setBackgroundColor(
-            if (selected) MaterialColors.getColor(binding.layoutIndicator, R.attr.indicatorColor)
+            if (selected) themeColor(binding.layoutIndicator, R.attr.indicatorColor)
             else Color.TRANSPARENT
         )
 
@@ -286,11 +217,8 @@ class MainRecyclerAdapter(
         // a gap in the selected row's outline.
         //
         // Two rows go without one: the SELECTED row, whose accent frame is already its edge, and
-        // the first row under any heading — the very first of the list, and the first of each
-        // provider section, because a section header is itself the break and a hairline right
-        // under it would draw the same line twice.
-        val followsAServer = position > 0 && rows[position - 1] is Row.Server
-        binding.infoContainer.isActivated = !selected && followsAServer
+        // the FIRST row of the list, which has nothing above it to be separated from.
+        binding.infoContainer.isActivated = !selected && position > 0
 
         // AND BOTH OF THOSE STATES LAND INSTANTLY. `bg_server_row` is a selector with
         // enterFadeDuration/exitFadeDuration, so every state written here CROSS-FADES — and a
@@ -355,6 +283,55 @@ class MainRecyclerAdapter(
         }
         return parts.joinToString(" · ")
     }
+
+    /**
+     * THE LAST STORE READ LEFT IN `onBindViewHolder`, AND IT IS NOT LEFT THERE ANY MORE.
+     *
+     * `MmkvManager.decodeServerAffiliationInfo(guid)` is one MMKV `decodeString` plus one Gson
+     * parse — and it ran on EVERY bind: once per row per recycle while a finger is on the list,
+     * and once per visible row for every `notifyDataSetChanged`. Everything else the row needs was
+     * already memoised (`FlagUtil`'s two caches, [customProtoCache]); this was the one that was
+     * not, so a fling over a хундред-server list re-read and re-parsed the same latency out of the
+     * store several hundred times a second, on the main thread, inside a frame.
+     *
+     * INVALIDATION IS EXACT, WHICH IS WHY THE CACHE IS SAFE. A stored delay is written by exactly
+     * two paths and both announce themselves through this adapter's own entry point:
+     *
+     *  - one server measured (`MainViewModel.publishMeasurement`, or `MSG_MEASURE_CONFIG_SUCCESS`
+     *    from the batch in the daemon) arrives as [setSections] with that server's index, and only
+     *    that guid is dropped;
+     *  - anything wholesale — `clearAllTestDelayResults` before a run, the end of a batch, a
+     *    подписка refresh, an import, a delete — arrives with index -1, and the whole map goes.
+     *
+     * So the value a row paints is never older than the last thing that told the list to repaint
+     * it, which is the same guarantee the direct read gave.
+     */
+    private val affiliationCache = HashMap<String, ServerAffiliationInfo?>()
+
+    /** @param changedGuid the one row this refresh is about, whose stored delay has just moved. */
+    private fun pruneAffiliationCache(structural: Boolean, changedGuid: String?) {
+        if (structural) affiliationCache.clear() else changedGuid?.let { affiliationCache.remove(it) }
+    }
+
+    private fun affiliationOf(guid: String): ServerAffiliationInfo? {
+        if (affiliationCache.containsKey(guid)) return affiliationCache[guid]
+        val aff = MmkvManager.decodeServerAffiliationInfo(guid)
+        affiliationCache[guid] = aff
+        return aff
+    }
+
+    /**
+     * A theme colour, resolved once for the life of the adapter.
+     *
+     * `MaterialColors.getColor(view, attr)` walks the view's theme and allocates a `TypedValue` for
+     * every call, and there were TWO on every bind — the latency figure's colour and the selected
+     * row's indicator. Neither can change while this adapter exists: a theme change recreates the
+     * Activity, which builds a new `HomeFragment`, a new RecyclerView and a new adapter with it.
+     */
+    private val themeColors = HashMap<Int, Int>()
+
+    private fun themeColor(view: View, attr: Int): Int =
+        themeColors.getOrPut(attr) { MaterialColors.getColor(view, attr) }
 
     /** Protocol/transport/security parsed from a CUSTOM profile's wrapped xray-json outbound. */
     private data class CustomProtoInfo(
@@ -427,10 +404,11 @@ class MainRecyclerAdapter(
      * Repaints selection to match [guid] (defaults to whatever MMKV holds).
      *
      * Refreshing only the affected rows is the cheap path, but it is only correct when every one of
-     * them is currently in [rows]. A row can be missing — it may sit inside a collapsed section, or
-     * the list may have been rebuilt by a subscription update since it was selected — and a missed
-     * refresh leaves it painted as selected next to the new one, which is the "two servers selected
-     * at once" defect. So: fall back to a full refresh whenever a row cannot be located.
+     * them is currently in [servers]. A row can be missing — the подписка carousel shows one
+     * провайдер at a time, and the list may have been rebuilt by a subscription update since the
+     * server was selected — and a missed refresh leaves it painted as selected next to the new one,
+     * which is the "two servers selected at once" defect. So: fall back to a full refresh whenever
+     * a row cannot be located.
      *
      * THE MIRROR IS REPAINTED TOO, NOT ONLY THE CALLER'S `previous`, and that is what closes the
      * last hole in this file. [previous] is what the SHELL read out of MMKV before it wrote; the
@@ -455,8 +433,9 @@ class MainRecyclerAdapter(
         for (candidate in affected) {
             val position = flatPositionOf(candidate)
             if (position < 0) {
-                // A row that has to change and cannot be addressed — collapsed, filtered away, or
-                // gone with a refresh. Nothing targeted can reach it, so repaint everything.
+                // A row that has to change and cannot be addressed — filtered away with the
+                // carousel's page, or gone with a refresh. Nothing targeted can reach it, so
+                // repaint everything.
                 notifyDataSetChanged()
                 return
             }
@@ -483,9 +462,6 @@ class MainRecyclerAdapter(
 
     class MainViewHolder(val itemMainBinding: ItemRecyclerMainBinding) :
         BaseViewHolder(itemMainBinding.root)
-
-    class HeaderViewHolder(val binding: ItemSectionHeaderBinding) :
-        BaseViewHolder(binding.root)
 
     class FooterViewHolder(val itemFooterBinding: ItemRecyclerFooterBinding) :
         BaseViewHolder(itemFooterBinding.root)

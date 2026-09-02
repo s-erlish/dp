@@ -1758,7 +1758,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * rebuilding a ViewPager2 once per server would thrash it for a change no card shows.
      */
     private fun refreshServerList(index: Int) {
-        val groups = mainViewModel.getProviderGroups()
         val all = mainViewModel.serversCache
         val pageSubId = homeMetaSubIds.getOrNull(homeMetaPage)
         val shown = if (pageSubId.isNullOrEmpty()) {
@@ -1771,7 +1770,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // list repaints the wrong row.
         val targetGuid = all.getOrNull(index)?.guid
         val shownIndex = targetGuid?.let { guid -> shown.indexOfFirst { it.guid == guid } } ?: -1
-        homeAdapter?.setSections(shown, groups, showHeaders = false, index = shownIndex)
+        homeAdapter?.setSections(shown, index = shownIndex)
     }
 
     /**
