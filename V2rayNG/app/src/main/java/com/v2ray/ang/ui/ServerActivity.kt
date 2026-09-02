@@ -2,6 +2,7 @@ package com.v2ray.ang.ui
 
 import android.os.Bundle
 import android.text.TextUtils
+import android.view.KeyEvent
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
@@ -44,6 +45,9 @@ class ServerActivity : BaseActivity() {
     private companion object {
         /** The last port number there is. A form that accepts 70000 stores a server that cannot dial. */
         const val MAX_PORT = 65535
+
+        /** What upstream stores when a network has no header type of its own. */
+        const val NO_TRANSPORT_TYPE = "---"
     }
 
     private val editGuid by lazy { intent.getStringExtra("guid").orEmpty() }
@@ -121,13 +125,17 @@ class ServerActivity : BaseActivity() {
     private val container_sni: LinearLayout? by lazy { findViewById(R.id.lay_sni) }
     private val sp_stream_fingerprint: Spinner? by lazy { findViewById(R.id.sp_stream_fingerprint) } //uTLS
     private val container_fingerprint: LinearLayout? by lazy { findViewById(R.id.lay_stream_fingerprint) }
-    private val sp_network: Spinner? by lazy { findViewById(R.id.sp_network) }
-    private val sp_header_type: Spinner? by lazy { findViewById(R.id.sp_header_type) }
-    private val sp_header_type_title: TextView? by lazy { findViewById(R.id.sp_header_type_title) }
+    private val et_network: EditText? by lazy { findViewById(R.id.et_network) }
+    private val til_network: TextInputLayout? by lazy { findViewById(R.id.til_network) }
+    private val et_header_type: EditText? by lazy { findViewById(R.id.et_header_type) }
+    private val til_header_type: TextInputLayout? by lazy { findViewById(R.id.til_header_type) }
+    private val tv_header_type: TextView? by lazy { findViewById(R.id.tv_header_type) }
     private val tv_request_host: TextView? by lazy { findViewById(R.id.tv_request_host) }
     private val et_request_host: EditText? by lazy { findViewById(R.id.et_request_host) }
+    private val til_request_host: TextInputLayout? by lazy { findViewById(R.id.til_request_host) }
     private val tv_path: TextView? by lazy { findViewById(R.id.tv_path) }
     private val et_path: EditText? by lazy { findViewById(R.id.et_path) }
+    private val til_path: TextInputLayout? by lazy { findViewById(R.id.til_path) }
     private val sp_stream_alpn: Spinner? by lazy { findViewById(R.id.sp_stream_alpn) } //uTLS
     private val container_alpn: LinearLayout? by lazy { findViewById(R.id.lay_stream_alpn) }
     private val et_public_key: EditText? by lazy { findViewById(R.id.et_public_key) }
@@ -148,18 +156,38 @@ class ServerActivity : BaseActivity() {
     private val et_bandwidth_down: EditText? by lazy { findViewById(R.id.et_bandwidth_down) }
     private val et_bandwidth_up: EditText? by lazy { findViewById(R.id.et_bandwidth_up) }
     private val et_kcp_mtu: EditText? by lazy { findViewById(R.id.et_kcp_mtu) }
+    private val til_kcp_mtu: TextInputLayout? by lazy { findViewById(R.id.til_kcp_mtu) }
     private val et_kcp_tti: EditText? by lazy { findViewById(R.id.et_kcp_tti) }
+    private val til_kcp_tti: TextInputLayout? by lazy { findViewById(R.id.til_kcp_tti) }
     private val layout_kcp: LinearLayout? by lazy { findViewById(R.id.layout_kcp) }
     private val et_extra: EditText? by lazy { findViewById(R.id.et_extra) }
+    private val til_extra: TextInputLayout? by lazy { findViewById(R.id.til_extra) }
     private val et_fm: EditText? by lazy { findViewById(R.id.et_fm) }
+    private val til_fm: TextInputLayout? by lazy { findViewById(R.id.til_fm) }
     private val layout_extra: LinearLayout? by lazy { findViewById(R.id.layout_extra) }
     private val et_ech_config_list: EditText? by lazy { findViewById(R.id.et_ech_config_list) }
     private val container_ech_config_list: LinearLayout? by lazy { findViewById(R.id.lay_ech_config_list) }
     private val et_pinned_ca256: EditText? by lazy { findViewById(R.id.et_pinned_ca256) }
     private val container_pinned_ca256: LinearLayout? by lazy { findViewById(R.id.lay_pinned_ca256) }
     private val layout_browser_dialer: LinearLayout? by lazy { findViewById(R.id.layout_browser_dialer) }
-    private val sp_browser_dialer_mode: Spinner? by lazy { findViewById(R.id.sp_browser_dialer_mode) }
+    private val et_browser_dialer_mode: EditText? by lazy { findViewById(R.id.et_browser_dialer_mode) }
+    private val til_browser_dialer_mode: TextInputLayout? by lazy { findViewById(R.id.til_browser_dialer_mode) }
     private val btn_save: MaterialButton by lazy { findViewById(R.id.btn_save) }
+
+    /**
+     * The three transport choices, held as indices instead of `Spinner.selectedItemPosition`.
+     *
+     * A `Spinner` kept this state for us and reported it back through `onItemSelected`, which fired
+     * on its own during layout as well as on a real pick - so the code below used to run twice for
+     * reasons that had nothing to do with the user. The value lives here now and moves only when
+     * [bindTransportSelects] is told to move it.
+     */
+    private var networkIndex = 0
+    private var headerTypeIndex = 0
+    private var browserDialerIndex = 0
+
+    /** The server being edited, or null for a new one. Read by the pickers when they repopulate. */
+    private var editedConfig: ProfileItem? = null
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -167,6 +195,7 @@ class ServerActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
 
         val config = MmkvManager.decodeServerConfig(editGuid)
+        editedConfig = config
         val configType = config?.configType ?: createConfigType
 
         val layoutId = when (configType) {
@@ -207,113 +236,6 @@ class ServerActivity : BaseActivity() {
         )
         findViewById<View>(R.id.row_delete).isVisible = editGuid.isNotEmpty() && !isRunning
 
-        sp_network?.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(
-                parent: AdapterView<*>?,
-                view: View?,
-                position: Int,
-                id: Long,
-            ) {
-                val types = transportTypes(networks[position])
-                sp_header_type?.isEnabled = types.size > 1
-                val adapter =
-                    ArrayAdapter(this@ServerActivity, android.R.layout.simple_spinner_item, types)
-                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-                sp_header_type?.adapter = adapter
-                sp_header_type_title?.text =
-                    when (networks[position]) {
-                        NetworkType.GRPC.type -> getString(R.string.server_lab_mode_type)
-                        NetworkType.XHTTP.type -> getString(R.string.server_lab_xhttp_mode)
-                        else -> getString(R.string.server_lab_head_type)
-                    }.orEmpty()
-                sp_header_type?.setSelection(
-                    Utils.arrayFind(
-                        types,
-                        when (networks[position]) {
-                            NetworkType.GRPC.type -> config?.mode
-                            NetworkType.XHTTP.type -> config?.xhttpMode
-                            else -> config?.headerType
-                        }.orEmpty()
-                    )
-                )
-
-                et_request_host?.text = Utils.getEditable(
-                    when (networks[position]) {
-                        NetworkType.GRPC.type -> config?.authority
-                        else -> config?.host
-                    }.orEmpty()
-                )
-                et_path?.text = Utils.getEditable(
-                    when (networks[position]) {
-                        NetworkType.KCP.type -> config?.seed
-                        NetworkType.GRPC.type -> config?.serviceName
-                        else -> config?.path
-                    }.orEmpty()
-                )
-
-                tv_request_host?.text = Utils.getEditable(
-                    getString(
-                        when (networks[position]) {
-                            NetworkType.TCP.type -> R.string.server_lab_request_host_http
-                            NetworkType.WS.type -> R.string.server_lab_request_host_ws
-                            NetworkType.HTTP_UPGRADE.type -> R.string.server_lab_request_host_httpupgrade
-                            NetworkType.XHTTP.type -> R.string.server_lab_request_host_xhttp
-                            NetworkType.H2.type -> R.string.server_lab_request_host_h2
-                            //"quic" -> R.string.server_lab_request_host_quic
-                            NetworkType.GRPC.type -> R.string.server_lab_request_host_grpc
-                            else -> R.string.server_lab_request_host
-                        }
-                    )
-                )
-
-                tv_path?.text = Utils.getEditable(
-                    getString(
-                        when (networks[position]) {
-                            NetworkType.KCP.type -> R.string.server_lab_path_kcp
-                            NetworkType.WS.type -> R.string.server_lab_path_ws
-                            NetworkType.HTTP_UPGRADE.type -> R.string.server_lab_path_httpupgrade
-                            NetworkType.XHTTP.type -> R.string.server_lab_path_xhttp
-                            NetworkType.H2.type -> R.string.server_lab_path_h2
-                            //"quic" -> R.string.server_lab_path_quic
-                            NetworkType.GRPC.type -> R.string.server_lab_path_grpc
-                            else -> R.string.server_lab_path
-                        }
-                    )
-                )
-                et_extra?.text = Utils.getEditable(
-                    when (networks[position]) {
-                        NetworkType.XHTTP.type -> config?.xhttpExtra
-                        else -> null
-                    }.orEmpty()
-                )
-                et_fm?.text = Utils.getEditable(config?.finalMask)
-
-                layout_kcp?.visibility =
-                    when (networks[position]) {
-                        NetworkType.KCP.type -> View.VISIBLE
-                        else -> View.GONE
-                    }
-                et_kcp_mtu?.text = Utils.getEditable(config?.kcpMtu?.toString().orEmpty())
-                et_kcp_tti?.text = Utils.getEditable(config?.kcpTti?.toString().orEmpty())
-
-                layout_extra?.visibility =
-                    when (networks[position]) {
-                        NetworkType.XHTTP.type -> View.VISIBLE
-                        else -> View.GONE
-                    }
-
-                layout_browser_dialer?.visibility =
-                    when (networks[position]) {
-                        NetworkType.WS.type -> View.VISIBLE
-                        NetworkType.XHTTP.type -> View.VISIBLE
-                        else -> View.GONE
-                    }
-            }
-
-            override fun onNothingSelected(parent: AdapterView<*>?) {
-                // do nothing
-            }
-        }
         sp_stream_security?.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(
                 parent: AdapterView<*>?,
@@ -392,6 +314,211 @@ class ServerActivity : BaseActivity() {
         }
     }
 
+
+    // ------------------------------------------------------------------ выбор значения
+
+    /**
+     * A value chosen from a fixed list, drawn as a FIELD and not as a `Spinner`.
+     *
+     * `Spinner` is not in the allowed component vocabulary (00-rules.md 11.2) and the three that
+     * lived here were the last ones in the product: it draws a platform popover with its own fill,
+     * corner, type and ripple, which is exactly the seam that makes a screen read as somebody
+     * else's app. What replaces it is the same 56dp box with the same 16dp corner as every field
+     * beside it, the value written inside where it can still be read after scrolling past, a caret
+     * on the trailing edge, and [EditorActionsSheet] - the sheet «Подписка» already opens - for the
+     * list itself.
+     *
+     * A field rather than a settings row, and that is not a matter of taste: a field carries the
+     * error slot (7.4), and «Для Trojan нужно выбрать TLS» is a refusal that has to land on the
+     * control it is about.
+     *
+     * The box takes focus like any other field but never opens a keyboard: `keyListener = null`
+     * makes it uneditable while leaving it in the focus order, so a keyboard, a D-pad or switch
+     * access still reaches it. ENTER and the D-pad centre open the list, which is what a focused
+     * control has to do for a user with no touchscreen.
+     */
+    private fun bindSelect(
+        layout: TextInputLayout?,
+        field: EditText?,
+        title: CharSequence,
+        options: List<CharSequence>,
+        selectedIndex: Int,
+        enabled: Boolean = true,
+        onPick: (Int) -> Unit,
+    ) {
+        if (layout == null || field == null) return
+        field.setText(options.getOrNull(selectedIndex) ?: "")
+        field.keyListener = null
+        field.isCursorVisible = false
+        field.showSoftInputOnFocus = false
+        layout.isEnabled = enabled
+        if (!enabled) {
+            field.setOnClickListener(null)
+            field.setOnKeyListener(null)
+            layout.setEndIconOnClickListener(null)
+            return
+        }
+        val open = {
+            EditorActionsSheet(this, title).apply {
+                options.forEachIndexed { index, label -> action(label = label) { onPick(index) } }
+            }.show()
+        }
+        field.setOnClickListener { open() }
+        layout.setEndIconOnClickListener { open() }
+        field.setOnKeyListener { _, keyCode, event ->
+            val opens = keyCode == KeyEvent.KEYCODE_ENTER ||
+                keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+                keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
+            if (opens && event.action == KeyEvent.ACTION_UP) {
+                open()
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    /**
+     * What a stored value looks like in the field.
+     *
+     * Two of them are not words: the empty string, which every one of these lists uses for «not
+     * set», and «---», which [transportTypes] returns for a network that has no header type at all.
+     * A `Spinner` printed both of those at the user verbatim.
+     */
+    private fun optionLabel(value: String): CharSequence = when {
+        value.isBlank() -> getString(R.string.srv_value_none)
+        value == NO_TRANSPORT_TYPE -> getString(R.string.srv_value_not_applicable)
+        else -> value
+    }
+
+    private fun optionLabels(values: Array<out String>): List<CharSequence> = values.map { optionLabel(it) }
+
+    /** Draws the three transport pickers from the current index state. */
+    private fun bindTransportSelects() {
+        val types = transportTypes(networks.getOrNull(networkIndex))
+        bindSelect(
+            layout = til_network,
+            field = et_network,
+            title = getString(R.string.server_lab_network),
+            options = optionLabels(networks),
+            selectedIndex = networkIndex,
+        ) { picked -> applyNetwork(picked) }
+
+        bindSelect(
+            layout = til_header_type,
+            field = et_header_type,
+            title = tv_header_type?.text ?: getString(R.string.server_lab_head_type),
+            options = optionLabels(types),
+            selectedIndex = headerTypeIndex,
+            // One value is not a choice: a network with no header type leaves the box readable and
+            // out of the touch order rather than opening a list of one.
+            enabled = types.size > 1,
+        ) { picked ->
+            headerTypeIndex = picked
+            bindTransportSelects()
+        }
+
+        bindSelect(
+            layout = til_browser_dialer_mode,
+            field = et_browser_dialer_mode,
+            title = getString(R.string.server_lab_browser_dialer),
+            options = optionLabels(browserDialerModes),
+            selectedIndex = browserDialerIndex,
+        ) { picked ->
+            browserDialerIndex = picked
+            bindTransportSelects()
+        }
+    }
+
+    /**
+     * The network changed, so everything downstream of it is re-read from the stored server.
+     *
+     * This is the body of the old `sp_network` listener, unchanged in what it does: the header
+     * type, the host, the path and the XHTTP extra all mean different things per network, so each
+     * one is re-labelled and re-filled from the field of [editedConfig] that the new network reads.
+     * mKCP, XHTTP Extra and the browser dialer appear only where they apply - a form that shows a
+     * mKCP MTU box on a WebSocket server is asking for a value nothing will read.
+     */
+    private fun applyNetwork(position: Int) {
+        if (et_network == null) return
+        networkIndex = position.coerceIn(networks.indices)
+        val network = networks[networkIndex]
+        val config = editedConfig
+        val types = transportTypes(network)
+
+        headerTypeIndex = Utils.arrayFind(
+            types,
+            when (network) {
+                NetworkType.GRPC.type -> config?.mode
+                NetworkType.XHTTP.type -> config?.xhttpMode
+                else -> config?.headerType
+            }.orEmpty()
+        ).coerceAtLeast(0)
+
+        tv_header_type?.text = getString(
+            when (network) {
+                NetworkType.GRPC.type -> R.string.server_lab_mode_type
+                NetworkType.XHTTP.type -> R.string.server_lab_xhttp_mode
+                else -> R.string.server_lab_head_type
+            }
+        )
+
+        et_request_host?.text = Utils.getEditable(
+            when (network) {
+                NetworkType.GRPC.type -> config?.authority
+                else -> config?.host
+            }.orEmpty()
+        )
+        et_path?.text = Utils.getEditable(
+            when (network) {
+                NetworkType.KCP.type -> config?.seed
+                NetworkType.GRPC.type -> config?.serviceName
+                else -> config?.path
+            }.orEmpty()
+        )
+
+        tv_request_host?.text = getString(
+            when (network) {
+                NetworkType.TCP.type -> R.string.server_lab_request_host_http
+                NetworkType.WS.type -> R.string.server_lab_request_host_ws
+                NetworkType.HTTP_UPGRADE.type -> R.string.server_lab_request_host_httpupgrade
+                NetworkType.XHTTP.type -> R.string.server_lab_request_host_xhttp
+                NetworkType.H2.type -> R.string.server_lab_request_host_h2
+                NetworkType.GRPC.type -> R.string.server_lab_request_host_grpc
+                else -> R.string.server_lab_request_host
+            }
+        )
+        tv_path?.text = getString(
+            when (network) {
+                NetworkType.KCP.type -> R.string.server_lab_path_kcp
+                NetworkType.WS.type -> R.string.server_lab_path_ws
+                NetworkType.HTTP_UPGRADE.type -> R.string.server_lab_path_httpupgrade
+                NetworkType.XHTTP.type -> R.string.server_lab_path_xhttp
+                NetworkType.H2.type -> R.string.server_lab_path_h2
+                NetworkType.GRPC.type -> R.string.server_lab_path_grpc
+                else -> R.string.server_lab_path
+            }
+        )
+
+        et_extra?.text = Utils.getEditable(
+            when (network) {
+                NetworkType.XHTTP.type -> config?.xhttpExtra
+                else -> null
+            }.orEmpty()
+        )
+        et_fm?.text = Utils.getEditable(config?.finalMask)
+
+        layout_kcp?.isVisible = network == NetworkType.KCP.type
+        et_kcp_mtu?.text = Utils.getEditable(config?.kcpMtu?.toString().orEmpty())
+        et_kcp_tti?.text = Utils.getEditable(config?.kcpTti?.toString().orEmpty())
+
+        layout_extra?.isVisible = network == NetworkType.XHTTP.type
+        layout_browser_dialer?.isVisible =
+            network == NetworkType.WS.type || network == NetworkType.XHTTP.type
+
+        bindTransportSelects()
+    }
+
     /**
      * binding selected server config
      */
@@ -461,15 +588,10 @@ class ServerActivity : BaseActivity() {
             }
         }
 
-        val network = Utils.arrayFind(networks, config.network.orEmpty())
-        if (network >= 0) {
-            sp_network?.setSelection(network)
-        }
-
-        val browserDialerMode = Utils.arrayFind(browserDialerModes, config.browserDialerMode.orEmpty())
-        if (browserDialerMode >= 0) {
-            sp_browser_dialer_mode?.setSelection(browserDialerMode)
-        }
+        browserDialerIndex =
+            Utils.arrayFind(browserDialerModes, config.browserDialerMode.orEmpty()).coerceAtLeast(0)
+        // Last, because it repopulates the host, the path and the extra from the network it lands on.
+        applyNetwork(Utils.arrayFind(networks, config.network.orEmpty()).coerceAtLeast(0))
 
         return true
     }
@@ -483,9 +605,9 @@ class ServerActivity : BaseActivity() {
         et_port.text = Utils.getEditable(DEFAULT_PORT.toString())
         et_id.text = null
         sp_security?.setSelection(0)
-        sp_network?.setSelection(0)
 
-        sp_header_type?.setSelection(0)
+        browserDialerIndex = 0
+        applyNetwork(0)
         et_request_host?.text = null
         et_path?.text = null
         sp_stream_security?.setSelection(0)
@@ -499,7 +621,6 @@ class ServerActivity : BaseActivity() {
         et_local_address?.text =
             Utils.getEditable(WIREGUARD_LOCAL_ADDRESS_V4)
         et_local_mtu?.text = Utils.getEditable(WIREGUARD_LOCAL_MTU)
-        sp_browser_dialer_mode?.setSelection(0)
         return true
     }
 
@@ -571,17 +692,22 @@ class ServerActivity : BaseActivity() {
         }
         if (et_extra?.text?.toString().isNotNullEmpty()) {
             if (JsonUtil.parseString(et_extra?.text?.toString()) == null) {
-                refuseNotPortedYet(et_extra, R.string.srv_json_invalid)
+                refuse(til_extra, et_extra, R.string.srv_json_invalid)
                 return false
             }
         }
 
         if (et_fm?.text?.toString().isNotNullEmpty()) {
             if (JsonUtil.parseString(et_fm?.text?.toString()) == null) {
-                refuseNotPortedYet(et_fm, R.string.srv_json_invalid)
+                refuse(til_fm, et_fm, R.string.srv_json_invalid)
                 return false
             }
         }
+        // mKCP MTU and TTI went through `toIntOrNull()` on the way out, so anything that was not a
+        // number was dropped in silence and the field kept showing it. A discarded value that still
+        // looks stored is the same defect as a silent refusal.
+        if (!checkOptionalPositiveNumber(til_kcp_mtu, et_kcp_mtu)) return false
+        if (!checkOptionalPositiveNumber(til_kcp_tti, et_kcp_tti)) return false
 
         saveCommon(config)
         saveStreamSettings(config)
@@ -615,6 +741,21 @@ class ServerActivity : BaseActivity() {
     }
 
     /**
+     * An optional number: empty is fine, anything that is not a whole number above zero is not.
+     * Returns false once it has written the refusal into the field.
+     */
+    private fun checkOptionalPositiveNumber(layout: TextInputLayout?, field: EditText?): Boolean {
+        val typed = field?.text?.toString()?.trim().orEmpty()
+        if (typed.isEmpty()) return true
+        val value = typed.toIntOrNull()
+        if (value == null || value <= 0) {
+            refuse(layout, field, R.string.srv_number_invalid)
+            return false
+        }
+        return true
+    }
+
+    /**
      * The bridge while the protocol layouts are still being ported: a field whose `TextInputLayout`
      * does not exist yet keeps the previous behaviour rather than losing its message. Gone as soon
      * as the last layout has its error slot.
@@ -626,7 +767,11 @@ class ServerActivity : BaseActivity() {
 
     /** Every field's error slot, emptied before a fresh pass. */
     private fun clearErrors() {
-        listOf(til_remarks, til_address, til_port).forEach { it.error = null }
+        listOf<TextInputLayout?>(
+            til_remarks, til_address, til_port,
+            til_network, til_header_type, til_request_host, til_path,
+            til_kcp_mtu, til_kcp_tti, til_extra, til_fm, til_browser_dialer_mode,
+        ).forEach { it?.error = null }
     }
 
     private fun saveCommon(config: ProfileItem) {
@@ -665,28 +810,33 @@ class ServerActivity : BaseActivity() {
 
 
     private fun saveStreamSettings(profileItem: ProfileItem) {
-        val network = sp_network?.selectedItemPosition ?: return
-        val type = sp_header_type?.selectedItemPosition ?: return
+        // The guard the `Spinner`s used to give for free: a screen without the transport group
+        // (SOCKS, WireGuard, Hysteria2) has none of these views and writes none of these fields.
+        if (et_network == null) return
         val requestHost = et_request_host?.text?.toString()?.trim() ?: return
         val path = et_path?.text?.toString()?.trim() ?: return
 
-        profileItem.network = networks[network]
-        profileItem.headerType = transportTypes(networks[network])[type]
+        val network = networks[networkIndex]
+        val types = transportTypes(network)
+        val headerType = types.getOrElse(headerTypeIndex) { types.first() }
+
+        profileItem.network = network
+        profileItem.headerType = headerType
         profileItem.host = requestHost
         profileItem.path = path
         profileItem.seed = path
         profileItem.quicSecurity = requestHost
         profileItem.quicKey = path
-        profileItem.mode = transportTypes(networks[network])[type]
+        profileItem.mode = headerType
         profileItem.serviceName = path
         profileItem.authority = requestHost
-        profileItem.xhttpMode = transportTypes(networks[network])[type]
+        profileItem.xhttpMode = headerType
         profileItem.xhttpExtra = et_extra?.text?.toString()?.trim().nullIfBlank()
         profileItem.finalMask = et_fm?.text?.toString()?.trim()?.nullIfBlank()
         profileItem.kcpMtu = et_kcp_mtu?.text?.toString()?.toIntOrNull()
         profileItem.kcpTti = et_kcp_tti?.text?.toString()?.toIntOrNull()
-        if (networks[network] == NetworkType.WS.type || networks[network] == NetworkType.XHTTP.type) {
-            val browserDialerMode = browserDialerModes[sp_browser_dialer_mode?.selectedItemPosition ?: 0]
+        if (network == NetworkType.WS.type || network == NetworkType.XHTTP.type) {
+            val browserDialerMode = browserDialerModes[browserDialerIndex]
             if (browserDialerMode != browserDialerModes[0]) {
                 profileItem.browserDialerMode = browserDialerMode
             } else {
@@ -749,7 +899,7 @@ class ServerActivity : BaseActivity() {
             }
 
             else -> {
-                arrayOf("---")
+                arrayOf(NO_TRANSPORT_TYPE)
             }
         }
     }

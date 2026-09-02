@@ -449,6 +449,11 @@
          разрешённый набор компонентов не входит (11.2), а поле, в отличие от
          строки настроек, несёт ту же строку отказа, что и соседи по форме. -->
     <string name="srv_pick_value">Выберите значение</string>
+    <string name="srv_value_none">Нет</string>
+    <string name="srv_value_not_applicable">Не применимо</string>
+    <string name="srv_value_default">Как в настройках</string>
+    <string name="srv_value_yes">Да</string>
+    <string name="srv_value_no">Нет</string>
 
     <!-- ОТКАЗЫ. Каждый называет, что исправить, и приходит ПОД своё поле, а не
          поверх экрана: тост поверх формы не показывает, какое из двадцати полей
