@@ -428,6 +428,7 @@
 
     <!-- Подсказки под полями. -->
     <string name="srv_hint_optional">Можно оставить пустым</string>
+    <string name="srv_hint_pinned_ca256">SHA-256. Можно оставить пустым</string>
     <string name="srv_hint_address">Домен или IP-адрес сервера</string>
     <string name="srv_hint_port">От 1 до 65535</string>
     <string name="srv_hint_reserved">Три числа через запятую. Можно оставить пустым</string>
@@ -444,6 +445,9 @@
 
     <!-- Примеры значения в пустом поле. Плейсхолдер - это пример, а не подпись (7.4). -->
     <string name="srv_ph_address" translatable="false">example.com</string>
+    <!-- Значение, которого VLESS ждёт в поле «Шифрование» по умолчанию. Технический
+         идентификатор, не текст интерфейса. -->
+    <string name="srv_encryption_default" translatable="false">none</string>
 
     <!-- Выбор значения из списка. Поле открывает лист с вариантами: Spinner в
          разрешённый набор компонентов не входит (11.2), а поле, в отличие от

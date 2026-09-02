@@ -174,7 +174,7 @@
             android:layout_marginStart="@dimen/screen_gutter"
             android:layout_marginTop="@dimen/space_8"
             android:layout_marginEnd="@dimen/screen_gutter"
-            app:helperText="@string/srv_hint_optional">
+            app:helperText="@string/srv_hint_pinned_ca256">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/et_pinned_ca256"

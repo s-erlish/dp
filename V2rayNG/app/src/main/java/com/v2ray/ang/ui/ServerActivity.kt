@@ -1,5 +1,6 @@
 package com.v2ray.ang.ui
 
+import android.graphics.Rect
 import android.os.Bundle
 import android.text.TextUtils
 import android.view.KeyEvent
@@ -664,29 +665,29 @@ class ServerActivity : BaseActivity() {
         methodIndex = Utils.arrayFind(methodOptions(), config.method.orEmpty()).coerceAtLeast(0)
         bindProtocolSelects()
 
-        val streamSecurity = Utils.arrayFind(streamSecuritys, config.security.orEmpty())
-        if (streamSecurity >= 0) {
-            et_sni?.text = Utils.getEditable(config.sni)
-            config.fingerPrint?.let { fingerPrint ->
-                fingerprintIndex = Utils.arrayFind(uTlsItems, fingerPrint).coerceAtLeast(0)
-            }
-            config.alpn?.let { alpn ->
-                alpnIndex = Utils.arrayFind(alpns, alpn).coerceAtLeast(0)
-            }
-            if (config.security == TLS) {
-                allowInsecureIndex =
-                    Utils.arrayFind(allowinsecures, config.insecure.toString()).coerceAtLeast(0)
-                et_ech_config_list?.text = Utils.getEditable(config.echConfigList)
-                et_pinned_ca256?.text = Utils.getEditable(config.pinnedCA256)
-            } else if (config.security == REALITY) {
-                et_public_key?.text = Utils.getEditable(config.publicKey.orEmpty())
-                et_short_id?.text = Utils.getEditable(config.shortId.orEmpty())
-                et_spider_x?.text = Utils.getEditable(config.spiderX.orEmpty())
-                et_mldsa65_verify?.text = Utils.getEditable(config.mldsa65Verify.orEmpty())
-            }
-            // Last: it draws the four pickers and decides which of the fields above are on screen.
-            applyStreamSecurity(streamSecurity)
+        et_sni?.text = Utils.getEditable(config.sni)
+        config.fingerPrint?.let { fingerPrint ->
+            fingerprintIndex = Utils.arrayFind(uTlsItems, fingerPrint).coerceAtLeast(0)
         }
+        config.alpn?.let { alpn ->
+            alpnIndex = Utils.arrayFind(alpns, alpn).coerceAtLeast(0)
+        }
+        if (config.security == TLS) {
+            allowInsecureIndex =
+                Utils.arrayFind(allowinsecures, config.insecure.toString()).coerceAtLeast(0)
+            et_ech_config_list?.text = Utils.getEditable(config.echConfigList)
+            et_pinned_ca256?.text = Utils.getEditable(config.pinnedCA256)
+        } else if (config.security == REALITY) {
+            et_public_key?.text = Utils.getEditable(config.publicKey.orEmpty())
+            et_short_id?.text = Utils.getEditable(config.shortId.orEmpty())
+            et_spider_x?.text = Utils.getEditable(config.spiderX.orEmpty())
+            et_mldsa65_verify?.text = Utils.getEditable(config.mldsa65Verify.orEmpty())
+        }
+        // Unconditional, and that is the point: `arrayFind` answers -1 for a stored value this
+        // build does not know, and the old code then left the picker unbound. Every field below it
+        // starts `gone` in the layout, so an unbound picker is an empty box over an empty screen.
+        // Falling back to the first value draws a form the user can see and correct.
+        applyStreamSecurity(Utils.arrayFind(streamSecuritys, config.security.orEmpty()).coerceAtLeast(0))
 
         browserDialerIndex =
             Utils.arrayFind(browserDialerModes, config.browserDialerMode.orEmpty()).coerceAtLeast(0)
@@ -886,7 +887,10 @@ class ServerActivity : BaseActivity() {
     private fun refuse(layout: TextInputLayout?, field: EditText?, @StringRes message: Int) {
         layout?.error = getString(message)
         field?.requestFocus()
-        (layout ?: field)?.let { view -> view.post { view.parent?.requestChildFocus(view, view) } }
+        val target = layout ?: field ?: return
+        target.post {
+            target.requestRectangleOnScreen(Rect(0, 0, target.width, target.height), false)
+        }
     }
 
     /**
