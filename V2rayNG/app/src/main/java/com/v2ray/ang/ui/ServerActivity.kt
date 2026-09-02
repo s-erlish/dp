@@ -170,10 +170,15 @@ class ServerActivity : BaseActivity() {
     private val et_local_mtu: EditText? by lazy { findViewById(R.id.et_local_mtu) }
     private val til_local_mtu: TextInputLayout? by lazy { findViewById(R.id.til_local_mtu) }
     private val et_obfs_password: EditText? by lazy { findViewById(R.id.et_obfs_password) }
+    private val til_obfs_password: TextInputLayout? by lazy { findViewById(R.id.til_obfs_password) }
     private val et_port_hop: EditText? by lazy { findViewById(R.id.et_port_hop) }
+    private val til_port_hop: TextInputLayout? by lazy { findViewById(R.id.til_port_hop) }
     private val et_port_hop_interval: EditText? by lazy { findViewById(R.id.et_port_hop_interval) }
+    private val til_port_hop_interval: TextInputLayout? by lazy { findViewById(R.id.til_port_hop_interval) }
     private val et_bandwidth_down: EditText? by lazy { findViewById(R.id.et_bandwidth_down) }
+    private val til_bandwidth_down: TextInputLayout? by lazy { findViewById(R.id.til_bandwidth_down) }
     private val et_bandwidth_up: EditText? by lazy { findViewById(R.id.et_bandwidth_up) }
+    private val til_bandwidth_up: TextInputLayout? by lazy { findViewById(R.id.til_bandwidth_up) }
     private val et_kcp_mtu: EditText? by lazy { findViewById(R.id.et_kcp_mtu) }
     private val til_kcp_mtu: TextInputLayout? by lazy { findViewById(R.id.til_kcp_mtu) }
     private val et_kcp_tti: EditText? by lazy { findViewById(R.id.et_kcp_tti) }
@@ -803,6 +808,11 @@ class ServerActivity : BaseActivity() {
         if (!checkOptionalPositiveNumber(til_kcp_mtu, et_kcp_mtu)) return false
         if (!checkOptionalPositiveNumber(til_kcp_tti, et_kcp_tti)) return false
         if (!checkOptionalPositiveNumber(til_local_mtu, et_local_mtu)) return false
+        if (!checkOptionalPositiveNumber(til_port_hop_interval, et_port_hop_interval)) return false
+        // Hysteria2 reads the bandwidth as a number with a unit. A string with no digit in it at
+        // all cannot be one, and was stored verbatim for the core to ignore.
+        if (!checkBandwidth(til_bandwidth_down, et_bandwidth_down)) return false
+        if (!checkBandwidth(til_bandwidth_up, et_bandwidth_up)) return false
         // Reserved is three bytes WireGuard puts in front of every packet. Anything else went to
         // `config.reserved` as typed and came back out of the tunnel as nothing.
         val reserved = et_reserved1?.text?.toString()?.trim().orEmpty()
@@ -842,6 +852,17 @@ class ServerActivity : BaseActivity() {
         (layout ?: field)?.let { view -> view.post { view.parent?.requestChildFocus(view, view) } }
     }
 
+    /**
+     * A bandwidth: a number and a unit. Deliberately permissive - «100 m», «100m», «100 mbps» and
+     * «1g» are all forms Hysteria2 takes, so the only thing refused is a value with no digit in it.
+     */
+    private fun checkBandwidth(layout: TextInputLayout?, field: EditText?): Boolean {
+        val typed = field?.text?.toString()?.trim().orEmpty()
+        if (typed.isEmpty() || typed.any { it.isDigit() }) return true
+        refuse(layout, field, R.string.srv_bandwidth_invalid)
+        return false
+    }
+
     /** Three numbers 0-255, separated by commas, and nothing else. */
     private fun isReservedTriple(value: String): Boolean {
         val parts = value.split(',')
@@ -873,6 +894,8 @@ class ServerActivity : BaseActivity() {
             til_kcp_mtu, til_kcp_tti, til_extra, til_fm, til_browser_dialer_mode,
             til_stream_security, til_sni, til_stream_fingerprint, til_stream_alpn,
             til_preshared_key, til_reserved1, til_local_address, til_local_mtu,
+            til_obfs_password, til_port_hop, til_port_hop_interval,
+            til_bandwidth_down, til_bandwidth_up,
             til_allow_insecure, til_ech_config_list, til_pinned_ca256,
             til_public_key, til_short_id, til_spider_x, til_mldsa65_verify,
         ).forEach { it?.error = null }
