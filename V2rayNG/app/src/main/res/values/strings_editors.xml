@@ -375,6 +375,15 @@
     <string name="srv_id_required">Укажите идентификатор пользователя</string>
     <string name="srv_password_required">Укажите пароль</string>
     <string name="srv_secret_key_required">Укажите закрытый ключ</string>
+    <!-- ПОЛЯ, БЕЗ КОТОРЫХ ПРОТОКОЛ НЕ ПОДНИМЕТСЯ. Сохранённый без них сервер - это не
+         сохранённый сервер, а будущее «не подключается» без объяснения: пустой открытый
+         ключ уходит в конфиг как есть и рукопожатие не состоится, пустое шифрование
+         VLESS ядро не принимает, пустой порт Hysteria2 роняет сборку конфига на toInt().
+         Проверка стоит на СОХРАНЕНИИ, поэтому уже сохранённую запись всегда можно
+         открыть и починить. -->
+    <string name="srv_public_key_required">Укажите открытый ключ сервера</string>
+    <string name="srv_public_key_required_reality">Укажите открытый ключ сервера: без него REALITY не соединится</string>
+    <string name="srv_encryption_required">Укажите шифрование: для VLESS это почти всегда none</string>
     <string name="srv_tls_required">Для Trojan нужно выбрать TLS</string>
     <string name="srv_json_invalid">Проверьте JSON: он не разобрался</string>
 
@@ -397,6 +406,11 @@
     <!-- Заголовок экрана - имя протокола. Технический идентификатор, 1.4.10.
          EConfigType.toString() давал «SHADOWSOCKS» и «WIREGUARD»: имена этих
          двух проектов пишутся не так, а капс запрещён (0.4.3). -->
+    <!-- Заголовок экрана: русское подлежащее плюс имя протокола. «VLESS» в одиночку
+         выпадает из ряда соседей по семейству - «Группа серверов», «Своя
+         конфигурация», «Цепочка прокси»: те названы существительными по-русски.
+         Имя протокола остаётся как есть - это технический идентификатор (1.4.10). -->
+    <string name="srv_title_fmt">Сервер %1$s</string>
     <string name="srv_proto_vmess" translatable="false">VMess</string>
     <string name="srv_proto_vless" translatable="false">VLESS</string>
     <string name="srv_proto_trojan" translatable="false">Trojan</string>

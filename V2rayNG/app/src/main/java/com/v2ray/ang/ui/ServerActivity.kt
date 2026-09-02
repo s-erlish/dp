@@ -274,7 +274,7 @@ class ServerActivity : BaseActivity() {
 
         ToolbarBinder.bind(
             root = findViewById(R.id.toolbar),
-            title = getString(protocolTitle(configType)),
+            title = getString(R.string.srv_title_fmt, getString(protocolTitle(configType))),
             activity = this,
         )
         ToolbarBinder.attachTo(findViewById(R.id.toolbar), findViewById<NestedScrollView>(R.id.main_content))
@@ -452,6 +452,10 @@ class ServerActivity : BaseActivity() {
      * error slot (7.4), and «Для Trojan нужно выбрать TLS» is a refusal that has to land on the
      * control it is about.
      *
+     * The list marks the value in force. A picker that shows only the options makes the user close
+     * it and read the field to find out what is set, which is checking your own choice by doing
+     * something; the marker is a reserved slot, so opening the list never reflows it either.
+     *
      * The box takes focus like any other field but never opens a keyboard: `keyListener = null`
      * makes it uneditable while leaving it in the focus order, so a keyboard, a D-pad or switch
      * access still reaches it. ENTER and the D-pad centre open the list, which is what a focused
@@ -480,7 +484,9 @@ class ServerActivity : BaseActivity() {
         }
         val open = {
             EditorActionsSheet(this, title).apply {
-                options.forEachIndexed { index, label -> action(label = label) { onPick(index) } }
+                options.forEachIndexed { index, label ->
+                    action(label = label, selected = index == selectedIndex) { onPick(index) }
+                }
             }.show()
         }
         field.onSingleClick { open() }
@@ -777,13 +783,15 @@ class ServerActivity : BaseActivity() {
             refuse(til_address, et_address, R.string.srv_address_invalid)
             return false
         }
-        // Hysteria2 can hop ports, so it is the one protocol whose server port may be left out.
-        if (editorType != EConfigType.HYSTERIA2) {
-            val port = Utils.parseInt(et_port.text.toString())
-            if (port <= 0 || port > MAX_PORT) {
-                refuse(til_port, et_port, R.string.srv_port_required)
-                return false
-            }
+        // Hysteria2 used to be exempt here, on the argument that port hopping replaces the port.
+        // It does not: `mport` is a query parameter on the URI, and the outbound is still built as
+        // `serverPort.orEmpty().toInt()` - so a Hysteria2 server saved without one threw on the way
+        // to the tunnel and the connection failed with nothing to read. The exemption let the form
+        // save a server that could never produce a config.
+        val port = Utils.parseInt(et_port.text.toString())
+        if (port <= 0 || port > MAX_PORT) {
+            refuse(til_port, et_port, R.string.srv_port_required)
+            return false
         }
         val config =
             MmkvManager.decodeServerConfig(editGuid) ?: ProfileItem.create(createConfigType)
@@ -806,11 +814,38 @@ class ServerActivity : BaseActivity() {
             )
             return false
         }
+        // VLESS carries an encryption on the user, and the core takes «none» rather than nothing:
+        // an empty box was written into the outbound verbatim and rejected there.
+        if (config.configType == EConfigType.VLESS &&
+            et_security != null &&
+            TextUtils.isEmpty(et_security?.text?.toString()?.trim())
+        ) {
+            refuse(til_security, et_security, R.string.srv_encryption_required)
+            return false
+        }
+        // WireGuard's peer key. `peer.publicKey = publicKey.orEmpty()` puts an empty string in the
+        // config and the handshake then has nothing to answer, so the tunnel never comes up.
+        if (config.configType == EConfigType.WIREGUARD &&
+            TextUtils.isEmpty(et_public_key?.text?.toString()?.trim())
+        ) {
+            refuse(til_public_key, et_public_key, R.string.srv_public_key_required)
+            return false
+        }
         if (et_stream_security != null &&
             config.configType == EConfigType.TROJAN &&
             TextUtils.isEmpty(streamSecuritys.getOrNull(streamSecurityIndex))
         ) {
             refuse(til_stream_security, et_stream_security, R.string.srv_tls_required)
+            return false
+        }
+        // REALITY verifies the server against its public key; `nullIfBlank()` drops an empty one
+        // and leaves the handshake with nothing to check. Scoped to REALITY: on plain TLS the same
+        // box is not used at all, and on «Нет» it is not even on screen.
+        if (et_stream_security != null &&
+            streamSecuritys.getOrNull(streamSecurityIndex) == REALITY &&
+            TextUtils.isEmpty(et_public_key?.text?.toString()?.trim())
+        ) {
+            refuse(til_public_key, et_public_key, R.string.srv_public_key_required_reality)
             return false
         }
         if (et_extra?.text?.toString().isNotNullEmpty()) {
@@ -1131,10 +1166,13 @@ class ServerActivity : BaseActivity() {
     }
 
     /**
-     * The screen title is the PROTOCOL, and it is a technical identifier, so it stays Latin
-     * (00-rules.md 1.4.10). `EConfigType.toString()` printed the enum constant - «SHADOWSOCKS»,
-     * «WIREGUARD» - which is neither how those two projects spell their own names nor allowed by
-     * the no-caps rule (0.4.3).
+     * The protocol half of the screen title, dropped into «Сервер %s».
+     *
+     * The name itself is a technical identifier and stays Latin (00-rules.md 1.4.10), but the
+     * SUBJECT of the title is Russian: the three editors beside this one are «Группа серверов»,
+     * «Своя конфигурация» and «Цепочка прокси», and a bare «VLESS» falls out of that row.
+     * `EConfigType.toString()` printed the enum constant - «SHADOWSOCKS», «WIREGUARD» - which is
+     * neither how those two projects spell their own names nor allowed by the no-caps rule (0.4.3).
      */
     @StringRes
     private fun protocolTitle(type: EConfigType): Int = when (type) {

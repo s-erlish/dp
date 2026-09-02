@@ -130,8 +130,13 @@ class ServerProxyChainActivity : BaseActivity() {
      */
     private fun showStepActions(position: Int) {
         val sheet = EditorActionsSheet(this, getString(R.string.srv_chain_step, position + 1))
+        val current = memberAdapter.getMembers().getOrNull(position)
         allRemarks.forEach { remark ->
-            sheet.action(label = remark, glyph = R.drawable.ic_globe_24dp) {
+            sheet.action(
+                label = remark,
+                glyph = R.drawable.ic_globe_24dp,
+                selected = remark == current,
+            ) {
                 memberAdapter.setRemark(position, remark)
             }
         }
