@@ -47,7 +47,7 @@ class MainRecyclerAdapter(
      *
      * This adapter used to keep a second row kind — a «провайдер» heading with a count and a
      * collapse chevron — behind a `showHeaders` flag, plus the group list it needed
-     * ([GroupMapItem]), a `collapsed` set, a `Row` sealed hierarchy, a third view type and a
+     * (`GroupMapItem`), a `collapsed` set, a `Row` sealed hierarchy, a third view type and a
      * `HeaderViewHolder`. Its one host is Главная (`HomeFragment.setupServerList`, the only
      * `MainRecyclerAdapter(...)` in the app) and it has always passed `showHeaders = false`,
      * deliberately: «a second heading inside the list would say the same thing twice» — the
@@ -291,8 +291,8 @@ class MainRecyclerAdapter(
      * parse — and it ran on EVERY bind: once per row per recycle while a finger is on the list,
      * and once per visible row for every `notifyDataSetChanged`. Everything else the row needs was
      * already memoised (`FlagUtil`'s two caches, [customProtoCache]); this was the one that was
-     * not, so a fling over a хундред-server list re-read and re-parsed the same latency out of the
-     * store several hundred times a second, on the main thread, inside a frame.
+     * not, so a fling down a long list re-read and re-parsed the same latency out of the store
+     * hundreds of times a second, on the main thread, inside a frame.
      *
      * INVALIDATION IS EXACT, WHICH IS WHY THE CACHE IS SAFE. A stored delay is written by exactly
      * two paths and both announce themselves through this adapter's own entry point:
