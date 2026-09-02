@@ -45,6 +45,9 @@ class ServerActivity : BaseActivity() {
 
         /** What upstream stores when a network has no header type of its own. */
         const val NO_TRANSPORT_TYPE = "---"
+
+        /** WireGuard stores three BYTES in the reserved field. */
+        const val RESERVED_MAX = 255
     }
 
     private val editGuid by lazy { intent.getStringExtra("guid").orEmpty() }
@@ -149,6 +152,7 @@ class ServerActivity : BaseActivity() {
     private val et_public_key: EditText? by lazy { findViewById(R.id.et_public_key) }
     private val til_public_key: TextInputLayout? by lazy { findViewById(R.id.til_public_key) }
     private val et_preshared_key: EditText? by lazy { findViewById(R.id.et_preshared_key) }
+    private val til_preshared_key: TextInputLayout? by lazy { findViewById(R.id.til_preshared_key) }
     private val container_public_key: LinearLayout? by lazy { findViewById(R.id.lay_public_key) }
     private val et_short_id: EditText? by lazy { findViewById(R.id.et_short_id) }
     private val til_short_id: TextInputLayout? by lazy { findViewById(R.id.til_short_id) }
@@ -160,8 +164,11 @@ class ServerActivity : BaseActivity() {
     private val til_mldsa65_verify: TextInputLayout? by lazy { findViewById(R.id.til_mldsa65_verify) }
     private val container_mldsa65_verify: LinearLayout? by lazy { findViewById(R.id.lay_mldsa65_verify) }
     private val et_reserved1: EditText? by lazy { findViewById(R.id.et_reserved1) }
+    private val til_reserved1: TextInputLayout? by lazy { findViewById(R.id.til_reserved1) }
     private val et_local_address: EditText? by lazy { findViewById(R.id.et_local_address) }
+    private val til_local_address: TextInputLayout? by lazy { findViewById(R.id.til_local_address) }
     private val et_local_mtu: EditText? by lazy { findViewById(R.id.et_local_mtu) }
+    private val til_local_mtu: TextInputLayout? by lazy { findViewById(R.id.til_local_mtu) }
     private val et_obfs_password: EditText? by lazy { findViewById(R.id.et_obfs_password) }
     private val et_port_hop: EditText? by lazy { findViewById(R.id.et_port_hop) }
     private val et_port_hop_interval: EditText? by lazy { findViewById(R.id.et_port_hop_interval) }
@@ -795,6 +802,14 @@ class ServerActivity : BaseActivity() {
         // looks stored is the same defect as a silent refusal.
         if (!checkOptionalPositiveNumber(til_kcp_mtu, et_kcp_mtu)) return false
         if (!checkOptionalPositiveNumber(til_kcp_tti, et_kcp_tti)) return false
+        if (!checkOptionalPositiveNumber(til_local_mtu, et_local_mtu)) return false
+        // Reserved is three bytes WireGuard puts in front of every packet. Anything else went to
+        // `config.reserved` as typed and came back out of the tunnel as nothing.
+        val reserved = et_reserved1?.text?.toString()?.trim().orEmpty()
+        if (et_reserved1 != null && reserved.isNotEmpty() && !isReservedTriple(reserved)) {
+            refuse(til_reserved1, et_reserved1, R.string.srv_reserved_invalid)
+            return false
+        }
 
         saveCommon(config)
         saveStreamSettings(config)
@@ -827,6 +842,14 @@ class ServerActivity : BaseActivity() {
         (layout ?: field)?.let { view -> view.post { view.parent?.requestChildFocus(view, view) } }
     }
 
+    /** Three numbers 0-255, separated by commas, and nothing else. */
+    private fun isReservedTriple(value: String): Boolean {
+        val parts = value.split(',')
+        return parts.size == 3 && parts.all { part ->
+            part.trim().toIntOrNull()?.let { it in 0..RESERVED_MAX } == true
+        }
+    }
+
     /**
      * An optional number: empty is fine, anything that is not a whole number above zero is not.
      * Returns false once it has written the refusal into the field.
@@ -849,6 +872,7 @@ class ServerActivity : BaseActivity() {
             til_network, til_header_type, til_request_host, til_path,
             til_kcp_mtu, til_kcp_tti, til_extra, til_fm, til_browser_dialer_mode,
             til_stream_security, til_sni, til_stream_fingerprint, til_stream_alpn,
+            til_preshared_key, til_reserved1, til_local_address, til_local_mtu,
             til_allow_insecure, til_ech_config_list, til_pinned_ca256,
             til_public_key, til_short_id, til_spider_x, til_mldsa65_verify,
         ).forEach { it?.error = null }
