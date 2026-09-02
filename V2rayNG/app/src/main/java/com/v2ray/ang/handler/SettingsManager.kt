@@ -267,8 +267,13 @@ object SettingsManager {
         if (remarks.isNullOrEmpty()) {
             return null
         }
-        val serverList = decodeAllServerList()
-        return serverList
+        // A SEQUENCE, so the scan STOPS at the match. `mapNotNull` on a List is eager: it decoded
+        // every сервер on the device — one MMKV read plus one Gson parse each, ~5 µs a profile on a
+        // desktop JVM and several times that on a phone — and only then looked for the name, even
+        // when the answer was the first row. This is called per routing tag and per chain step
+        // while a config is being built, so the waste multiplied by the number of lookups.
+        return decodeAllServerList()
+            .asSequence()
             .mapNotNull { guid -> decodeServerConfig(guid) }
             .firstOrNull { it.remarks == remarks }
     }
