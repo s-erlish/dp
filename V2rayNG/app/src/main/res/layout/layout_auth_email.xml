@@ -28,10 +28,18 @@
   to fix an address in, and the user who mistyped one on the wrong tab would have
   to type it again.
 
+  AND A THIRD ERRAND, WHICH IS NOT ON THE SEGMENT. «Способы входа» → «Почта» for
+  somebody who signed in through Telegram opens this same form with the segment, the
+  password and the «Восстановить пароль» row all gone: one field, one hint, one button
+  «Отправить ссылку». It is not a way IN — the user is already in — so it is not one of
+  the two the segment chooses between, and putting it there would ask a signed-in
+  account whether it would like to sign in again. The wait that follows is the one below,
+  unchanged.
+
   THE WAITING STATE IS PART OF THIS FORM, not a screen of its own (@id/slot_verify).
-  Registration on a panel with e-mail confirmation on does not end with the button:
-  a letter goes out carrying A LINK, not a code, so there is nothing to type back
-  and no field to draw. The slot replaces the fields with the app's universal 56dp
+  Neither registration on a panel with e-mail confirmation on, nor attaching an address
+  to an account, ends with the button: a letter goes out carrying A LINK, not a code, so
+  there is nothing to type back and no field to draw. The slot replaces the fields with the app's universal 56dp
   ledger row — 40dp ring, 12dp gap, text at 68 — exactly as the gate's Telegram wait
   does, because it is the same kind of moment: we are waiting on the user to finish
   somewhere else, and the app is watching for it.
@@ -169,6 +177,34 @@
                     tools:text="@string/auth_email_invalid"
                     tools:visibility="visible" />
             </LinearLayout>
+
+            <!-- THE METHOD SLOT'S OTHER OCCUPANT (14-auth.md 6.4). When the errand is
+                 «привязать почту к аккаунту», there is no password to take: the account
+                 exists, the request is signed by its token, and what comes back is a
+                 letter. So the slot that would hold the password holds one sentence
+                 saying what the button will do and what it will not do to the account.
+
+                 Body 14/400 on colorOnSurfaceVariant — the same role every explanatory
+                 line on this screen uses. It is a sentence, not a label, so it takes a
+                 full stop and no field boundary of its own. Gone by default: only the
+                 link errand ever shows it, and it is never on screen with the password.
+
+                 Its 16dp top margin is the password slot's, so the column keeps the same
+                 rhythm whichever occupant the slot has.
+
+                 NO maxLines, deliberately. 6.4 caps its (shorter) hint at 3; two lines at
+                 the default font scale become five at 200 %, and a clipped instruction is
+                 worse than a taller block in a column that already scrolls. -->
+            <TextView
+                android:id="@+id/slot_link_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_16"
+                android:text="@string/auth_link_email_hint"
+                android:textAppearance="@style/TextAppearance.App.Body"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:visibility="gone"
+                tools:visibility="visible" />
 
             <!-- THE METHOD SLOT. Password today; the 2FA group below replaces it
                  wholesale when the backend asks for a code, so the two are never

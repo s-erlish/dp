@@ -95,6 +95,18 @@ object BackendConfig {
         const val googleLogin = "/client/auth/google"
         const val me = "/client/auth/me"
 
+        /**
+         * Attach an e-mail to the session already in flight: `{email}` in, a letter carrying a
+         * LINK out. Deliberately NOT under `/client/auth` — the panel puts it on the client root,
+         * because it is an errand of an account that exists rather than a way of getting one.
+         *
+         * There is no confirmation endpoint here on purpose. The link in the letter opens the
+         * SITE, and the site calls `/client/auth/verify-link-email` with the token in it; the app
+         * never sees that token and never posts it. What the app watches instead is [me], which
+         * starts answering with a non-blank `email` the moment the link is opened.
+         */
+        const val linkEmailRequest = "/client/link-email-request"
+
         // Subscription
         /** The authoritative ACTIVE (root) subscription summary — richer than the /all root item. */
         const val subscription = "/client/subscription"

@@ -166,6 +166,26 @@ class AccountFragment : Fragment() {
     private val pickAvatar =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri -> onAvatarPicked(uri) }
 
+    /**
+     * «Почта» под «Способы входа», launched for a RESULT rather than fired and forgotten.
+     *
+     * The address is proved on the panel, so what changes when the errand succeeds changes on the
+     * SERVER: nothing this tab already holds knows about it, and the tab does not reload on resume
+     * (only a signed-out → signed-in transition cold-loads it). Without this, a link the user has
+     * just opened would leave the row that sent them there still reading «Не привязан».
+     *
+     * **The result code is deliberately not consulted.** `RESULT_OK` covers the success, but the
+     * OTHER way this screen is reached is a row whose belief is already out of date: it is only
+     * tappable when the profile shows no address, so a panel answering «Почта уже привязана» means
+     * the address was attached somewhere else and this tab is the one holding the stale copy. Both
+     * endings are answered by the same move — re-read the profile — so the cheap unconditional
+     * form is also the correct one, at the cost of one GET after a return that changed nothing.
+     */
+    private val linkEmail =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            viewModel.refreshProfile()
+        }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -421,10 +441,13 @@ class AccountFragment : Fragment() {
     /**
      * Opens [LoginActivity] on the door the tapped button names.
      *
-     * ON THE SIGNED-OUT BLOCK IT IS «ВОЙТИ ЧЕРЕЗ САЙТ» AND NOTHING ELSE — a form is genuinely
+     * ON THE SIGNED-OUT BLOCK IT IS «ВОЙТИ ПО ПОЧТЕ» AND NOTHING ELSE — a form is genuinely
      * another screen, so pushing one is not the defect the Telegram button had. The same door is
-     * where [startTelegramSignIn] falls back to when there is no backend to sign in against, and
-     * the «Способы входа» rows are the method's other users.
+     * where [startTelegramSignIn] falls back to when there is no backend to sign in against.
+     *
+     * The «Способы входа» rows are NOT its users any more: they belong to accounts that are signed
+     * in, and a sign-in screen shown to somebody who is already signed in closes itself. They take
+     * [openTelegramLink] and [openEmailLink], both of which attach to the session instead.
      */
     private fun openLogin(mode: String) {
         startActivity(
@@ -680,10 +703,11 @@ class AccountFragment : Fragment() {
      * while it is not: «в аккаунте добавь кнопку где способы входа туда сайт, чтобы можно было
      * привязать почту с сайта … все в том же стиле как и кнопка телеграма там».
      *
-     * THE SITE ROW GOES WHERE «ВОЙТИ ЧЕРЕЗ САЙТ» GOES — [LoginActivity.MODE_SITE]. The owner has
-     * taken e-mail out of the interface as a method of its own, so there is no in-app "attach an
-     * address" form to send anyone to and there must not be a second one invented here; the site's
-     * own sign-in is where an address is proved, and that surface already exists.
+     * THE «ПОЧТА» ROW ATTACHES AN ADDRESS — [LoginActivity.MODE_LINK_EMAIL]. It used to open
+     * [LoginActivity.MODE_SITE], from the days when proving an address meant signing in on the
+     * site, and for the person who actually taps it that did NOTHING: they are signed in through
+     * Telegram, and the sign-in screen finishes on sight of a session. The app carries
+     * `POST /client/link-email-request` now, so the row opens the form that sends the letter.
      *
      * THE TELEGRAM ROW GAINS THE SAME AFFORDANCE, and this is the gap the second row exposed: the
      * app's only «Привязать Telegram» sits on the Главная gate, which is not drawn once a подписка
@@ -723,7 +747,7 @@ class AccountFragment : Fragment() {
             state = binding.tvLoginSiteState,
             chevron = binding.chevronLoginSite,
             identity = profile?.email?.takeIf { it.isNotBlank() },
-        ) { openLogin(LoginActivity.MODE_SITE) }
+        ) { openEmailLink() }
     }
 
     /** One row of «Способы входа». [identity] non-null means attached, and attached means inert. */
@@ -752,6 +776,14 @@ class AccountFragment : Fragment() {
         // The row's background is a selector with a fade; a recycled or re-bound row must not
         // dissolve its previous look into this one (the rule found three times in this project).
         row.jumpDrawablesToCurrentState()
+    }
+
+    /** «Почта» when the account has none: the form that sends the «привяжите почту» letter. */
+    private fun openEmailLink() {
+        linkEmail.launch(
+            Intent(requireContext(), LoginActivity::class.java)
+                .putExtra(LoginActivity.EXTRA_MODE, LoginActivity.MODE_LINK_EMAIL)
+        )
     }
 
     /**

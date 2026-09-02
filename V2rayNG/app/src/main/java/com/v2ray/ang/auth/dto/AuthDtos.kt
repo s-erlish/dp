@@ -12,6 +12,11 @@ import com.google.gson.annotations.SerializedName
  *  POST /client/auth/2fa-login             -> [AuthResult]
  *  POST /client/auth/google                -> [AuthResult]
  *  GET  /client/auth/me                    -> [UserProfileDto]
+ *
+ * And one errand of an account that already exists, which is why it sits on the client root
+ * rather than under `/client/auth`:
+ *
+ *  POST /client/link-email-request         -> 200 (a letter is out) / 400 / 500 / 503
  */
 
 // region request bodies
@@ -40,6 +45,18 @@ data class TwoFaLoginRequestDto(
 data class GoogleLoginRequestDto(
     val idToken: String,
     val referralCode: String? = null,
+)
+
+/**
+ * POST /client/link-email-request — attach an address to the session the request already carries.
+ *
+ * THE ADDRESS IS THE WHOLE BODY. There is no password here and there must not be one: the account
+ * exists, the caller is already authenticated by the Bearer token, and what the panel is being
+ * asked for is a letter, not a credential. The password the account will sign in with afterwards
+ * is set on the site, behind the link.
+ */
+data class LinkEmailRequestDto(
+    val email: String,
 )
 
 // endregion

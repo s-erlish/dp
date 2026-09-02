@@ -41,6 +41,15 @@ interface DepartamentApiClient {
     suspend fun loginGoogle(idToken: String, referralCode: String? = null): AuthResult
     suspend fun getMe(): UserProfileDto
 
+    /**
+     * Sends the «привяжите эту почту» letter to [email] for the session already signed in. Returns
+     * on 200 (the letter is out) and throws [ApiError] otherwise, carrying the panel's own sentence
+     * — «Почта уже привязана», «Эта почта уже используется другим аккаунтом» — which is the only
+     * description of the refusal that exists. There is no confirmation call: the link lands on the
+     * site, and [getMe] is what tells the app it was opened.
+     */
+    suspend fun linkEmailRequest(email: String)
+
     // Subscription
     suspend fun getPrimarySubscription(): PrimarySubscriptionDto
     suspend fun getSubscriptionAll(): SubscriptionAllDto
