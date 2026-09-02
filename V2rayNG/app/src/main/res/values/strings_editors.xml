@@ -30,8 +30,8 @@
          day one of them is wanted somewhere it can be read whole - the actions sheet, a help
          screen. Do not wire them back into the row. -->
     <string name="perapp_mode_all_hint">Через VPN идут все приложения</string>
-    <string name="perapp_mode_selected_hint">Отмеченные — через прокси, остальные напрямую</string>
-    <string name="perapp_mode_except_hint">Отмеченные — напрямую, остальные через прокси</string>
+    <string name="perapp_mode_selected_hint">Отмеченные идут через прокси, остальные напрямую</string>
+    <string name="perapp_mode_except_hint">Отмеченные идут напрямую, остальные через прокси</string>
     <string name="perapp_search_hint">Поиск по приложениям</string>
     <string name="perapp_section_user">Ваши приложения</string>
     <string name="perapp_section_system">Системные приложения</string>
@@ -251,7 +251,7 @@
     <string name="upd_none_title">Обновлений нет</string>
     <string name="upd_none_line">Установлена последняя версия.</string>
     <string name="upd_found_title">Доступна версия %1$s</string>
-    <string name="upd_found_line">Скачаем и установим обновление — данные и подписка останутся на месте.</string>
+    <string name="upd_found_line">Скачаем и установим обновление. Данные и подписка останутся на месте.</string>
     <string name="upd_action_download">Обновить</string>
 
     <!-- Скачивание. Определённый прогресс, пока сервер прислал длину; иначе одна строка без цифр,
@@ -266,9 +266,13 @@
     <string name="upd_ready_line">Осталось подтвердить установку в системном окне.</string>
     <string name="upd_action_install">Установить</string>
 
-    <!-- Установка из неизвестных источников: не ошибка, а недостающее разрешение. -->
+    <!-- Установка из неизвестных источников: не ошибка, а недостающее разрешение.
+
+         Порядок фраз перевёрнут вместе с правкой тире (00-rules 1.4.11): раньше строка начиналась
+         с просьбы и объясняла её после длинного тире. Теперь сначала состояние, потом действие —
+         так экран отвечает на вопрос «почему я тут оказался» прежде, чем что-то требует. -->
     <string name="upd_permission_title">Нужно разрешение на установку</string>
-    <string name="upd_permission_line">Разрешите departament устанавливать приложения — обновление уже скачано.</string>
+    <string name="upd_permission_line">Обновление уже скачано. Разрешите departament устанавливать приложения.</string>
     <string name="upd_action_permission">Открыть настройки</string>
 
     <!-- Отказы. У каждого своя причина, и «Повторить» стоит рядом с ней (G2). -->
@@ -281,7 +285,7 @@
     <string name="upd_error_download_title">Не удалось скачать обновление</string>
     <string name="upd_error_download">Связь прервалась или не хватило места. Повторите.</string>
     <string name="upd_error_foreign_title">Файл не от departament</string>
-    <string name="upd_error_foreign">Скачанный файл — другое приложение, поэтому он удалён. Обновитесь вручную с сайта.</string>
+    <string name="upd_error_foreign">Скачанный файл оказался другим приложением, поэтому он удалён. Обновитесь вручную с сайта.</string>
     <string name="upd_error_not_newer_title">Эта версия не новее</string>
     <string name="upd_error_not_newer">Система откажется её установить. Дождитесь следующей сборки.</string>
     <string name="upd_error_installer_title">Установщик не открылся</string>
