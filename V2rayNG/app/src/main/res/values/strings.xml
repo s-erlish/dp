@@ -34,7 +34,6 @@
     <string name="toast_status_connecting">Подключение…</string>
 
     <!--ServerActivity-->
-    <string name="title_server">Сервер</string>
     <string name="menu_item_save_config">Сохранить сервер</string>
     <string name="menu_item_del_config">Удалить сервер</string>
     <string name="menu_item_import_config_qrcode">Импорт из QR-кода</string>

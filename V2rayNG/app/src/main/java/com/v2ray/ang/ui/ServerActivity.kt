@@ -11,8 +11,8 @@ import android.widget.TextView
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
-import androidx.core.widget.doAfterTextChanged
 import androidx.core.widget.NestedScrollView
+import androidx.core.widget.doAfterTextChanged
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.progressindicator.CircularProgressIndicator
 import com.google.android.material.textfield.TextInputLayout

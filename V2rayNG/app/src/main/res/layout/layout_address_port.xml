@@ -28,15 +28,14 @@
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
-    <TextView
-        style="@style/SettingsSectionLabel"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/title_server" />
-
+    <!-- Первая группа без заголовка, как в «Подписке» и «Группе серверов»: заголовок
+         «Сервер» над формой одного сервера ничего не сообщает, а 24dp сверху и так
+         отделяют форму от шапки. Заголовки начинаются со второй группы, где им есть
+         что различать. -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_24"
         android:labelFor="@id/et_remarks"
         android:paddingStart="@dimen/screen_gutter"
         android:paddingEnd="@dimen/screen_gutter"
