@@ -137,10 +137,17 @@ object BackendConfig {
          * Marks the account's onboarding finished. Body-less; the whole effect is
          * `onboardingCompleted = true`.
          *
-         * It is the SECOND half of [setPassword], not an errand of its own. The panel refuses a
-         * set-password only when `passwordHash && onboardingCompleted`, so leaving the flag alone
-         * keeps the endpoint open on an account that already has a password: the step could be
-         * walked twice, and the app's idea of the account would drift from the site's.
+         * It is the SECOND half of whatever gave the account its password, not an errand of its
+         * own. The panel refuses a set-password only when `passwordHash && onboardingCompleted`, so
+         * leaving the flag alone keeps the endpoint open on an account that already has a password:
+         * the step could be walked twice, and the app's idea of the account would drift from the
+         * site's.
+         *
+         * Which is why a REGISTRATION sends it too. The panel creates the client with the flag
+         * false on both of its registration paths — `/client/auth/register` with e-mail
+         * verification off, and `/client/auth/verify-email` — even though the password travelled in
+         * that very request. Without the flag the account is born permanently eligible for a
+         * password step it does not need.
          */
         const val completeOnboarding = "/client/complete-onboarding"
 

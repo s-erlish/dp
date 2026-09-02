@@ -192,6 +192,12 @@ import kotlinx.coroutines.launch
  * (`password-reset/consume` is the site's call, not ours). So the same block reports it with the
  * ring swapped for a static tile: «Письмо отправлено», «Отправить снова», «Назад».
  *
+ * **«Назад» there is one rung, not the way out, and the copy says so.** The form under the block
+ * is the reset form with the address still in it, because a mistyped address is invisible on this
+ * errand — the panel answers it exactly as it answers a real one, and «Отправить снова» would send
+ * the second letter to the same wrong place. The third sentence of the block names that, since it
+ * is the only thing that makes the correction findable at all.
+ *
  * **The copy over it is conditional and that is the panel's rule, not caution.** The endpoint
  * answers a known address and an unknown one identically so it cannot be used to enumerate
  * customers; «мы отправили письмо на <адрес>» would give away the answer it withholds.
@@ -1363,14 +1369,14 @@ class LoginActivity : BaseActivity() {
             }
 
             is AuthUiState.PasswordResetSent -> {
-                binding.mail.verifyTitle.setText(R.string.auth_sent_reset_title)
+                binding.mail.verifyTitle.setText(R.string.auth_reset_sent_title)
                 // CONDITIONAL, AND BY CONTRACT. The panel answers a known address and an unknown
                 // one identically so that this endpoint cannot be used to find out who has an
                 // account; «мы отправили письмо на <адрес>» would hand back the very answer it
                 // withholds. The address is still named, because the one thing the user has to
                 // check is whether it is the address they meant.
                 binding.mail.verifyBody.text =
-                    getString(R.string.auth_sent_reset_body, state.email)
+                    getString(R.string.auth_reset_sent_body, state.email)
                 showVerification(true, waiting = false)
                 setFormBusy(state.resending)
             }
