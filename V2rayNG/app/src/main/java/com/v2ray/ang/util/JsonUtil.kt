@@ -53,15 +53,23 @@ object JsonUtil {
     }
 
     /**
-     * Converts an object to its pretty-printed JSON representation.
+     * The pretty-printer, BUILT ONCE.
      *
-     * @param src The object to convert.
-     * @return The pretty-printed JSON representation of the object, or null if the object is null.
+     * A `Gson` is not a call: it is an immutable, thread-safe engine with a list of type-adapter
+     * factories and a cache of the reflective adapters it has already resolved, and building one
+     * costs about a microsecond on a desktop JVM (measured) before it has serialised anything —
+     * more on ART, and the resolved-adapter cache starts empty every time, so a fresh instance also
+     * re-derives the reflective adapter for every class it meets.
+     *
+     * [toJsonPretty] minted one PER CALL, and its callers are loops: the XRAY_JSON import path goes
+     * through it TWICE per server (`AngConfigManager.stripVendorRootKey` and the array loop that
+     * calls it), so a 100-server подписка refresh built two hundred of these; the real-ping batch
+     * builds one per server on the test-config path. The engine has no per-call state — the
+     * settings below are fixed and `Gson` is documented thread-safe — so one instance answers every
+     * caller, including the batch's own thread pool.
      */
-    fun toJsonPretty(src: Any?): String? {
-        if (src == null)
-            return null
-        val gsonPre = GsonBuilder()
+    private val prettyGson: Gson by lazy {
+        GsonBuilder()
             .setPrettyPrinting()
             .disableHtmlEscaping()
             .registerTypeAdapter( // custom serializer is needed here since JSON by default parse number as Double, core will fail to start
@@ -73,7 +81,18 @@ object JsonUtil {
                 }
             )
             .create()
-        return gsonPre.toJson(src)
+    }
+
+    /**
+     * Converts an object to its pretty-printed JSON representation.
+     *
+     * @param src The object to convert.
+     * @return The pretty-printed JSON representation of the object, or null if the object is null.
+     */
+    fun toJsonPretty(src: Any?): String? {
+        if (src == null)
+            return null
+        return prettyGson.toJson(src)
     }
 
     /**
