@@ -73,8 +73,15 @@ interface DepartamentApiClient {
     suspend fun setPassword(newPassword: String)
 
     /**
-     * Sets `onboardingCompleted` on the account. Always called straight after a successful
-     * [setPassword] and never on its own: together they are what «пароль задан» means to the panel.
+     * Sets `onboardingCompleted` on the account. Never an errand of its own — it is the second half
+     * of whatever gave the account its password, and it has two of those.
+     *
+     * After [setPassword]: together they are what «пароль задан» means to the panel.
+     *
+     * After a REGISTRATION that ended with a session: the panel creates the client with the flag
+     * false on both of its registration paths even though a password was set in the same request,
+     * so without this call `set-password` stays open on an account that already has one. See
+     * `AuthManager.settleRegistration`.
      */
     suspend fun completeOnboarding()
 

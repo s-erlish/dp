@@ -156,7 +156,7 @@ class AuthManager(
                     emit(LoginState.Error(e))
                     return@flow
                 }
-                emit(LoginState.Success(result.client))
+                emit(LoginState.Success(settleRegistration(result.client)))
             }
 
             is RegisterResult.RequiresVerification -> {
@@ -197,13 +197,45 @@ class AuthManager(
                     emit(LoginState.Error(e))
                     return
                 }
-                emit(LoginState.Success(result.client))
+                emit(LoginState.Success(settleRegistration(result.client)))
                 return
             }
             // An account registered a minute ago cannot have TOTP on it, so Requires2FA is not a
             // real answer here; keep waiting rather than stranding the user on a code prompt they
             // have no way to satisfy.
         }
+    }
+
+    /**
+     * **Регистрация оставляет `onboardingCompleted` ЛОЖНЫМ, хотя пароль у аккаунта уже есть.**
+     *
+     * Проверено по исходникам панели, и по обоим путям сразу: и `POST /client/auth/register` при
+     * выключенной проверке почты, и `POST /client/auth/verify-email` создают клиента с этим флагом
+     * в `false`. А `set-password` панель отклоняет ровно при `passwordHash && onboardingCompleted`,
+     * и то же условие зеркалит [com.v2ray.ang.auth.dto.canSetPassword] — так что без этой отметки
+     * у только что зарегистрировавшегося «можно задать пароль» остаётся истинным НАВСЕГДА. Панель
+     * примет повторную установку пароля, «Способы входа» будут звать на шаг, который аккаунту не
+     * нужен, и то, что приложение думает об аккаунте, разойдётся с тем, что показывает сайт.
+     *
+     * Те же правила, что у [setPassword], и по той же причине. Обе неудачи проглатываются: сессия
+     * к этому моменту уже сохранена, регистрация уже состоялась, и назвать неудачу довеска
+     * неудачей поручения значило бы сказать человеку, что аккаунт не создан, когда он создан.
+     * Порядок обязателен: сначала флаг, потом перечитать профиль, чтобы кэш нёс то, что этот вызов
+     * только что поставил.
+     *
+     * Возвращает самый свежий профиль, какой есть: перечитанный, если он приехал, иначе тот, что
+     * пришёл с регистрацией. Экран получает его же, поэтому «Способы входа» говорят правду сразу,
+     * а не со следующего захода на вкладку.
+     *
+     * Вызывается ТОЛЬКО там, где регистрация закончилась сессией, и только после
+     * [AccountSession.onAuthenticated]: без сохранённого токена оба запроса ушли бы без
+     * `Authorization` и вернулись бы 401.
+     */
+    private suspend fun settleRegistration(profile: UserProfileDto): UserProfileDto {
+        runCatching { api.completeOnboarding() }
+        val refreshed = runCatching { api.getMe() }.getOrNull() ?: return profile
+        runCatching { AccountSession.updateProfile(refreshed) }
+        return refreshed
     }
 
     /**
