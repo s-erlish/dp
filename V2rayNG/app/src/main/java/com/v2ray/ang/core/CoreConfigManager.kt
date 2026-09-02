@@ -342,8 +342,9 @@ object CoreConfigManager {
 
         // resolvedOutbounds is a single ordered plan: index 0 is primary and must be prepended,
         // the rest are routing outbounds and can be appended.
+        var primaryBuilt = false
         configContext.resolvedOutbounds.forEachIndexed { index, spec ->
-            buildOutbounds(
+            val built = buildOutbounds(
                 resolvedOutbound = spec,
                 prepend = index == 0,
                 existingTags = existingTags,
@@ -351,6 +352,7 @@ object CoreConfigManager {
                 policyGroupBalancerTags = policyGroupBalancerTags,
                 balancerStrategies = balancerStrategies,
             )
+            if (index == 0) primaryBuilt = built
         }
 
         // A CONFIG WITHOUT THE PRIMARY OUTBOUND IS NOT A CONFIG, IT IS A LEAK.
@@ -366,7 +368,7 @@ object CoreConfigManager {
         //
         // Failing here instead means «Не удалось подключиться» with the reason in «Журнал» — the
         // honest answer, and the only safe one.
-        if (primaryResolvedOutbound.tag !in existingTags) {
+        if (!primaryBuilt) {
             error("No usable outbound for «${primaryResolvedOutbound.profile.remarks}»: check the server's settings")
         }
 
@@ -405,6 +407,14 @@ object CoreConfigManager {
     /**
      * Convert one analyzed outbound entry into concrete outbounds and register
      * them to the runtime configuration.
+     *
+     * @return whether this entry actually put an outbound into the runtime configuration. Every
+     *   refusal below is a `LogUtil.w` and a skip, which is right for a ROUTING entry — the rule
+     *   falls back to the proxy — and fatal for the PRIMARY one, whose absence turns the config
+     *   into `direct` first and every byte unproxied. The caller needs the two told apart, and it
+     *   cannot ask `existingTags`: a policy group registers its MEMBERS' tags
+     *   («proxy-proxy-1-…») and never its own, so its own tag is missing from that set even on a
+     *   perfectly built group.
      */
     private fun buildOutbounds(
         resolvedOutbound: CoreConfigContext.ResolvedOutbound,
@@ -413,13 +423,13 @@ object CoreConfigManager {
         v2rayConfig: V2rayConfig,
         policyGroupBalancerTags: MutableMap<String, String>,
         balancerStrategies: MutableList<BalancerStrategy>,
-    ) {
+    ): Boolean {
         if (resolvedOutbound.tag in existingTags) {
             LogUtil.w(AppConfig.TAG, "Resolved outbound tag '${resolvedOutbound.tag}' already exists, skipping duplicated entry")
-            return
+            return false
         }
 
-        when (resolvedOutbound.resolvedType) {
+        return when (resolvedOutbound.resolvedType) {
             CoreResolvedType.NORMAL -> handleNormalResolvedOutbound(
                 resolvedOutbound = resolvedOutbound,
                 prepend = prepend,
@@ -453,14 +463,14 @@ object CoreConfigManager {
         prepend: Boolean,
         existingTags: MutableSet<String>,
         v2rayConfig: V2rayConfig,
-    ) {
+    ): Boolean {
         val profile = resolvedOutbound.resolvedProfiles.firstOrNull() ?: run {
             LogUtil.w(AppConfig.TAG, "NORMAL resolved outbound '${resolvedOutbound.tag}' has empty resolvedProfiles, skipping")
-            return
+            return false
         }
         val outbound = convertProfile2Outbound(profile) ?: run {
             LogUtil.w(AppConfig.TAG, "Could not convert NORMAL resolved outbound '${resolvedOutbound.tag}' profile to outbound, skipping")
-            return
+            return false
         }
         outbound.tag = resolvedOutbound.tag
         if (prepend) {
@@ -469,6 +479,7 @@ object CoreConfigManager {
             v2rayConfig.outbounds.add(outbound)
         }
         existingTags.add(resolvedOutbound.tag)
+        return true
     }
 
     /**
@@ -479,13 +490,13 @@ object CoreConfigManager {
         prepend: Boolean,
         existingTags: MutableSet<String>,
         v2rayConfig: V2rayConfig,
-    ) {
+    ): Boolean {
         val chainOutbounds = resolvedOutbound.resolvedProfiles
             .mapNotNull { convertProfile2Outbound(it) }
             .toMutableList()
         if (chainOutbounds.isEmpty()) {
             LogUtil.w(AppConfig.TAG, "PROXYCHAIN resolved outbound '${resolvedOutbound.tag}' has no valid profiles, skipping")
-            return
+            return false
         }
         if (chainOutbounds.size == 1) {
             val outbound = chainOutbounds.first()
@@ -496,7 +507,7 @@ object CoreConfigManager {
                 v2rayConfig.outbounds.add(outbound)
             }
             existingTags.add(resolvedOutbound.tag)
-            return
+            return true
         }
 
         val chainTags = chainOutbounds.mapIndexed { index, _ ->
@@ -511,7 +522,7 @@ object CoreConfigManager {
                 AppConfig.TAG,
                 "PROXYCHAIN resolved outbound '${resolvedOutbound.tag}' has colliding hop tags, skipping"
             )
-            return
+            return false
         }
 
         chainOutbounds.forEachIndexed { index, outbound ->
@@ -527,6 +538,7 @@ object CoreConfigManager {
             v2rayConfig.outbounds.addAll(chainOutbounds)
         }
         chainOutbounds.forEach { existingTags.add(it.tag) }
+        return true
     }
 
     /**
@@ -539,13 +551,13 @@ object CoreConfigManager {
         v2rayConfig: V2rayConfig,
         policyGroupBalancerTags: MutableMap<String, String>,
         balancerStrategies: MutableList<BalancerStrategy>,
-    ) {
+    ): Boolean {
         val memberPairs = resolvedOutbound.resolvedProfiles.mapNotNull { profile ->
             convertProfile2Outbound(profile)?.let { ob -> ob to profile }
         }
         if (memberPairs.isEmpty()) {
             LogUtil.w(AppConfig.TAG, "POLICYGROUP resolved outbound '${resolvedOutbound.tag}' has no valid member outbounds, skipping")
-            return
+            return false
         }
 
         val memberTagPrefix = "${AppConfig.TAG_PROXY}-${resolvedOutbound.tag}-"
@@ -565,7 +577,7 @@ object CoreConfigManager {
                 AppConfig.TAG,
                 "POLICYGROUP resolved outbound '${resolvedOutbound.tag}' produced no unique member tags, skipping"
             )
-            return
+            return false
         }
 
         if (prepend) {
@@ -591,6 +603,7 @@ object CoreConfigManager {
         }
         balancerStrategies.add(strategy)
         policyGroupBalancerTags[resolvedOutbound.tag] = balancerTag
+        return true
     }
 
     /**
