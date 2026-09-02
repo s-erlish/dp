@@ -483,14 +483,7 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
                 authManager.requestPasswordReset(email)
                 _state.value = AuthUiState.PasswordResetSent(email)
             } catch (e: ApiError) {
-                // THIS ENDPOINT TAKES NO SESSION AND NO PASSWORD, so neither of the two readings a
-                // 401 has elsewhere on this screen fits: «неверная почта или пароль» names a field
-                // that is not on the form, and «сессия истекла» names a session that was never
-                // opened. Only as a fallback — the panel's own sentence, when it sent one, still
-                // wins over anything this app can guess.
-                val fallback =
-                    if (e is ApiError.Unauthorized) R.string.auth_err_generic else null
-                fail(e, Surface.MAIL, quoteBackend = true, fallback = fallback)
+                fail(e, Surface.MAIL, quoteBackend = true, passwordReset = true)
             }
         }
     }
@@ -609,6 +602,7 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         surface: Surface,
         quoteBackend: Boolean = false,
         linkEmail: Boolean = false,
+        passwordReset: Boolean = false,
         @StringRes fallback: Int? = null,
     ) {
         val awaitingTelegram = _state.value is AuthUiState.TelegramAwaiting
@@ -645,7 +639,7 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
             // `fallback` is this app's own words for a refusal whose MEANING the panel named in a
             // code: if the sentence beside it ever goes missing, «Введите текущий пароль» is still
             // a better answer than whatever a status code maps to.
-            message = fallback ?: messageFor(cause, surface, awaitingTelegram, linkEmail),
+            message = fallback ?: messageFor(cause, surface, awaitingTelegram, linkEmail, passwordReset),
             surface = surface,
             // 12.11: an Unauthorized on the password step flashes both credential borders. On the
             // 2FA step the cells carry that signal instead, so the flash is not doubled.
@@ -707,6 +701,7 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
             surface: Surface = Surface.GATE,
             awaitingTelegram: Boolean = false,
             linkEmail: Boolean = false,
+            passwordReset: Boolean = false,
         ): Int = when {
             // A wrong TOTP code is not "wrong password": it names the authenticator app, because
             // that is where the user has to look.
@@ -715,6 +710,13 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
             // the seven-day token dying mid-errand. «Неверная почта или пароль» would name a
             // password nobody typed and send the user back to check a field that is not on screen.
             linkEmail && cause is ApiError.Unauthorized -> R.string.auth_err_session_expired
+            // «Восстановить пароль» takes NO session and NO password, so neither of the two
+            // readings above fits: «неверная почта или пароль» names a field that is not on the
+            // form and that the user is here precisely because they do not have, and «сессия
+            // истекла» names a session nobody opened. The panel's own sentence still wins over
+            // this — see the `quoteBackend` half of [fail] — so this is what is left when it sent
+            // none, and it says the one true thing: something went wrong, try again.
+            passwordReset && cause is ApiError.Unauthorized -> R.string.auth_err_generic
             cause is ApiError.Unauthorized -> R.string.auth_err_credentials
             cause is ApiError.Gone -> R.string.auth_err_gone
             cause is ApiError.RateLimited -> R.string.auth_err_rate_limited
