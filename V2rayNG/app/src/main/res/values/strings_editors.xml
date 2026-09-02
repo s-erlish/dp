@@ -397,6 +397,11 @@
     <!-- Заголовок экрана - имя протокола. Технический идентификатор, 1.4.10.
          EConfigType.toString() давал «SHADOWSOCKS» и «WIREGUARD»: имена этих
          двух проектов пишутся не так, а капс запрещён (0.4.3). -->
+    <!-- Заголовок экрана: русское подлежащее плюс имя протокола. «VLESS» в одиночку
+         выпадает из ряда соседей по семейству - «Группа серверов», «Своя
+         конфигурация», «Цепочка прокси»: те названы существительными по-русски.
+         Имя протокола остаётся как есть - это технический идентификатор (1.4.10). -->
+    <string name="srv_title_fmt">Сервер %1$s</string>
     <string name="srv_proto_vmess" translatable="false">VMess</string>
     <string name="srv_proto_vless" translatable="false">VLESS</string>
     <string name="srv_proto_trojan" translatable="false">Trojan</string>

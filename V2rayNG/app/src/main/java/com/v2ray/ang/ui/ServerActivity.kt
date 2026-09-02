@@ -274,7 +274,7 @@ class ServerActivity : BaseActivity() {
 
         ToolbarBinder.bind(
             root = findViewById(R.id.toolbar),
-            title = getString(protocolTitle(configType)),
+            title = getString(R.string.srv_title_fmt, getString(protocolTitle(configType))),
             activity = this,
         )
         ToolbarBinder.attachTo(findViewById(R.id.toolbar), findViewById<NestedScrollView>(R.id.main_content))
@@ -1131,10 +1131,13 @@ class ServerActivity : BaseActivity() {
     }
 
     /**
-     * The screen title is the PROTOCOL, and it is a technical identifier, so it stays Latin
-     * (00-rules.md 1.4.10). `EConfigType.toString()` printed the enum constant - «SHADOWSOCKS»,
-     * «WIREGUARD» - which is neither how those two projects spell their own names nor allowed by
-     * the no-caps rule (0.4.3).
+     * The protocol half of the screen title, dropped into «Сервер %s».
+     *
+     * The name itself is a technical identifier and stays Latin (00-rules.md 1.4.10), but the
+     * SUBJECT of the title is Russian: the three editors beside this one are «Группа серверов»,
+     * «Своя конфигурация» and «Цепочка прокси», and a bare «VLESS» falls out of that row.
+     * `EConfigType.toString()` printed the enum constant - «SHADOWSOCKS», «WIREGUARD» - which is
+     * neither how those two projects spell their own names nor allowed by the no-caps rule (0.4.3).
      */
     @StringRes
     private fun protocolTitle(type: EConfigType): Int = when (type) {
