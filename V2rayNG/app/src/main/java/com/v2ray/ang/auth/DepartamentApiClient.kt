@@ -50,6 +50,22 @@ interface DepartamentApiClient {
      */
     suspend fun linkEmailRequest(email: String)
 
+    /**
+     * Sets the account's password (minimum six characters — the panel's floor for THIS endpoint,
+     * not registration's eight). Returns on 200 and throws [ApiError] otherwise, carrying the
+     * panel's own sentence: «Пароль уже установлен. Используйте смену пароля.» or «Некорректные
+     * данные».
+     */
+    suspend fun setPassword(newPassword: String)
+
+    /**
+     * Sends the «подтвердите новый адрес» letter to [newEmail]. [currentPassword] must be supplied
+     * when the account has one; omitting it then is answered 400 `PASSWORD_REQUIRED` and getting it
+     * wrong 401 `INVALID_PASSWORD` (see [serverCode]) — neither of which is a dead session. Returns
+     * on 200; the address does not change until the link in the letter is opened.
+     */
+    suspend fun changeEmailRequest(newEmail: String, currentPassword: String?)
+
     // Subscription
     suspend fun getPrimarySubscription(): PrimarySubscriptionDto
     suspend fun getSubscriptionAll(): SubscriptionAllDto

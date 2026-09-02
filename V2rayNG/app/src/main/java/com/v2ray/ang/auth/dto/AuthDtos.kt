@@ -13,10 +13,12 @@ import com.google.gson.annotations.SerializedName
  *  POST /client/auth/google                -> [AuthResult]
  *  GET  /client/auth/me                    -> [UserProfileDto]
  *
- * And one errand of an account that already exists, which is why it sits on the client root
+ * And three errands of an account that already exists, which is why they sit on the client root
  * rather than under `/client/auth`:
  *
- *  POST /client/link-email-request         -> 200 (a letter is out) / 400 / 500 / 503
+ *  POST /client/link-email-request          -> 200 (a letter is out) / 400 / 500 / 503
+ *  POST /client/set-password                -> 200 / 400
+ *  POST /client/profile/change-email/request-> 200 (a letter is out) / 400 / 401 / 403 / 404 / 500 / 503
  */
 
 // region request bodies
@@ -57,6 +59,31 @@ data class GoogleLoginRequestDto(
  */
 data class LinkEmailRequestDto(
     val email: String,
+)
+
+/**
+ * POST /client/set-password — the password an account gets AFTER an address is attached to it.
+ *
+ * **Six characters, not eight.** Registration's floor is 8 and this endpoint's is 6; they are
+ * different endpoints with different schemas on the panel, and copying the bigger number here would
+ * refuse a password the server would have taken. See [com.v2ray.ang.ui.LoginActivity].
+ */
+data class SetPasswordRequestDto(
+    val newPassword: String,
+)
+
+/**
+ * POST /client/profile/change-email/request — replace the address an account already has.
+ *
+ * [currentPassword] is sent only when the account HAS one ([UserProfileDto.hasPassword]); the panel
+ * requires it then and ignores its absence otherwise, because for an account without a password the
+ * live session is already the proof of identity. Getting that wrong is not a cosmetic error: it is
+ * the panel's account-takeover guard, and it answers `PASSWORD_REQUIRED` / `INVALID_PASSWORD` —
+ * both of which belong on the password FIELD rather than on the screen.
+ */
+data class ChangeEmailRequestDto(
+    val newEmail: String,
+    val currentPassword: String? = null,
 )
 
 // endregion
@@ -175,6 +202,26 @@ data class UserProfileDto(
     val trialUsed: Boolean = false,
     val autoRenewEnabled: Boolean = false,
     val totpEnabled: Boolean = false,
+    /**
+     * **Can this account sign in with a password at all?** The panel computes it as
+     * `Boolean(passwordHash)` and sends it on every profile, and it is the fact that decides two
+     * screens: whether «Привязать почту» ends with a «Придумайте пароль» step, and whether
+     * «Сменить почту» has to ask for the current password before it will send anything.
+     *
+     * Defaults to false, which is the safe end of both: a profile that somehow arrives without the
+     * field offers the password step (the panel refuses with a sentence if it is not needed) and
+     * omits the current-password box (the panel answers `PASSWORD_REQUIRED` if it was).
+     */
+    val hasPassword: Boolean = false,
+    /**
+     * False while the account still carries the dummy password an e-mail registration leaves
+     * behind. The panel's `set-password` refuses only when `passwordHash && onboardingCompleted`,
+     * so BOTH fields decide whether the step is offered — see `UserProfileDto.canSetPassword`.
+     *
+     * Defaults to true so an older backend that omits it is read as "onboarding is done", which
+     * with `hasPassword` false still offers the step and with it true correctly does not.
+     */
+    val onboardingCompleted: Boolean = true,
     // Telegram profile photo, if the backend exposes one. Key name varies across backends,
     // so accept the common spellings; stays null (monogram fallback) when absent.
     @SerializedName(
@@ -183,3 +230,29 @@ data class UserProfileDto(
     )
     val avatarUrl: String? = null,
 )
+
+/**
+ * **Would `POST /client/set-password` be accepted for this account?**
+ *
+ * Mirrors the panel's own gate — it refuses with «Пароль уже установлен» exactly when the account
+ * has a real password AND has finished onboarding — so the step is offered when it can work and is
+ * silently skipped when it cannot. Mirroring rather than always asking is the difference between a
+ * flow that ends and a flow that ends with a refusal for something the user never requested.
+ */
+fun UserProfileDto.canSetPassword(): Boolean = !hasPassword || !onboardingCompleted
+
+/**
+ * **Has the address the app is waiting on actually arrived?** The one decision the confirmation
+ * poll makes, kept here as a function of the profile rather than inline in the loop, because both
+ * of its halves are easy to get wrong in a way that never raises anything — it just waits forever.
+ *
+ * @param expected null when the account had NO address: any address is the answer, because the
+ * link is the only thing that could have put one there. The new address when one is being
+ * REPLACED: «есть ли адрес» is already true then and would end the wait on its first round,
+ * before the user has opened anything.
+ *
+ * Compared case-insensitively and against a trimmed value, because the panel lower-cases what it
+ * is given: a user who typed `A@B.RU` would otherwise never be answered about their own address.
+ */
+fun UserProfileDto.emailArrived(expected: String?): Boolean =
+    if (expected == null) email.isNotBlank() else email.equals(expected.trim(), ignoreCase = true)

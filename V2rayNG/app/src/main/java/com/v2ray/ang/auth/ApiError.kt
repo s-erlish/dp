@@ -91,11 +91,61 @@ fun ApiError.serverMessage(): String? {
     return text.takeIf { readable }
 }
 
-/** The `{"message": …}` envelope every auth refusal arrives in. `error` is the older spelling. */
+/**
+ * **The panel's MACHINE-READABLE name for this failure, when it sent one, or null.**
+ *
+ * A companion to [serverMessage] and not a replacement for it: the sentence is what the user reads,
+ * this is what the screen decides with. It exists because one endpoint answers two failures that a
+ * status code cannot separate and that belong in two different places on screen —
+ * `POST /client/profile/change-email/request` returns 400 `PASSWORD_REQUIRED` when the account has
+ * a password and the request carried none, and 401 `INVALID_PASSWORD` when it carried the wrong
+ * one. Both are about the password FIELD, and the second one is emphatically not «сессия истекла»,
+ * which is what a bare 401 on a signed-in errand otherwise means.
+ *
+ * Read from the same already-sanitized body [serverMessage] uses, and admitted only when it looks
+ * like an identifier rather than prose: a code is `A-Z0-9_`, so anything else is a payload that
+ * happened to land in a field of that name and is refused rather than compared against.
+ */
+fun ApiError.serverCode(): String? {
+    val raw = when (this) {
+        is ApiError.Server -> detail
+        is ApiError.Unauthorized -> detail
+        is ApiError.RateLimited -> detail
+        is ApiError.ServiceUnavailable -> detail
+        else -> null
+    } ?: return null
+
+    val parsed = try {
+        ApiGson.instance.fromJson(raw, ServerMessageDto::class.java)?.code
+    } catch (e: JsonSyntaxException) {
+        null
+    } ?: return null
+
+    val text = parsed.trim()
+    val identifier = text.isNotEmpty() &&
+        text.length <= MAX_SERVER_CODE_CHARS &&
+        text.all { it in 'A'..'Z' || it in '0'..'9' || it == '_' }
+    return text.takeIf { identifier }
+}
+
+/**
+ * The `{"message": …}` envelope every auth refusal arrives in. `error` is the older spelling, and
+ * `code` is the machine name a few of them add beside the sentence — see [serverCode].
+ */
 private data class ServerMessageDto(
     @SerializedName(value = "message", alternate = ["error"])
     val message: String? = null,
+    val code: String? = null,
 )
 
 /** A sentence, not a stack trace: anything longer is a payload that leaked into the copy. */
 private const val MAX_SERVER_MESSAGE_CHARS = 200
+
+/** A name, not a payload. The longest the panel actually sends is `PASSWORD_REQUIRED` at 17. */
+private const val MAX_SERVER_CODE_CHARS = 64
+
+/** 400 on change-email: the account has a password and the request did not carry it. */
+const val CODE_PASSWORD_REQUIRED = "PASSWORD_REQUIRED"
+
+/** 401 on change-email: the current password was wrong. NOT a dead session. */
+const val CODE_INVALID_PASSWORD = "INVALID_PASSWORD"

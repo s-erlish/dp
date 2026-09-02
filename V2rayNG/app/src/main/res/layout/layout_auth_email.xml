@@ -28,13 +28,23 @@
   to fix an address in, and the user who mistyped one on the wrong tab would have
   to type it again.
 
-  AND A THIRD ERRAND, WHICH IS NOT ON THE SEGMENT. «Способы входа» → «Почта» for
-  somebody who signed in through Telegram opens this same form with the segment, the
-  password and the «Восстановить пароль» row all gone: one field, one hint, one button
-  «Отправить ссылку». It is not a way IN — the user is already in — so it is not one of
-  the two the segment chooses between, and putting it there would ask a signed-in
-  account whether it would like to sign in again. The wait that follows is the one below,
-  unchanged.
+  AND THREE MORE ERRANDS, NONE OF THEM ON THE SEGMENT. «Способы входа» → «Почта» opens
+  this same form with the segment and «Восстановить пароль» gone, because none of the
+  three is a way IN — the user is already in, and putting them on the segment would ask a
+  signed-in account whether it would like to sign in again.
+
+    «Привязать почту»    one field, one hint, «Отправить ссылку»
+    «Сменить почту»      the same, plus the CURRENT password when the account has one
+                         (the panel's account-takeover guard; its PASSWORD_REQUIRED /
+                         INVALID_PASSWORD answers land on that field, not on the screen)
+    «Придумайте пароль»  the step after either letter is answered: @id/slot_password and
+                         @id/slot_confirm again, six characters this time, and a way out
+                         that says «Пропустить» because nothing is undone by leaving
+
+  The wait between them is the one below, unchanged. Attaching an address without giving
+  the account a password leaves an identifier that cannot be signed in with, which is why
+  the third errand exists at all: `verify-link-email` on the panel writes `email` and
+  nothing else.
 
   THE WAITING STATE IS PART OF THIS FORM, not a screen of its own (@id/slot_verify).
   Neither registration on a panel with e-mail confirmation on, nor attaching an address
@@ -126,6 +136,40 @@
                     android:text="@string/auth_seg_register" />
             </com.google.android.material.button.MaterialButtonToggleGroup>
 
+            <!-- THE ERRAND'S OWN SENTENCE, and the first thing under the bar whenever an
+                 errand has one to say. Three occupants, never two at once:
+
+                   «Привязать почту»  what will happen to the account (nothing: it stays
+                                      the same one, the address joins it)
+                   «Сменить почту»    what will NOT happen until the link is opened
+                   «Придумайте пароль» why a password is being asked for at all, right
+                                      after a wait that just ended in a check
+
+                 ABOVE THE FIELDS, not between them. 14-auth.md 6.4 puts its (single) hint
+                 in the method slot, where it stands in for the password box it replaces;
+                 here the line explains the whole errand, and «Сменить почту» has a real
+                 password box under the address — a paragraph wedged between two fields
+                 interrupts the form instead of introducing it. Explanation, then fields.
+
+                 Body 14/400 on colorOnSurfaceVariant, the same role every explanatory line
+                 on this screen uses. A sentence, so it takes a full stop and no boundary of
+                 its own. Gone by default: the sign-in and registration modes have nothing
+                 to explain that their own labels do not.
+
+                 NO maxLines, deliberately. Two lines at the default font scale become five
+                 at 200 %, and a clipped instruction is worse than a taller block in a
+                 column that already scrolls. -->
+            <TextView
+                android:id="@+id/slot_link_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_24"
+                android:text="@string/auth_link_email_hint"
+                android:textAppearance="@style/TextAppearance.App.Body"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:visibility="gone"
+                tools:visibility="visible" />
+
             <!-- The address. One slot so the whole thing — label, field, reserved error
                  line — leaves together while the app is waiting on the confirmation
                  letter, without a second visibility rule per view. -->
@@ -177,34 +221,6 @@
                     tools:text="@string/auth_email_invalid"
                     tools:visibility="visible" />
             </LinearLayout>
-
-            <!-- THE METHOD SLOT'S OTHER OCCUPANT (14-auth.md 6.4). When the errand is
-                 «привязать почту к аккаунту», there is no password to take: the account
-                 exists, the request is signed by its token, and what comes back is a
-                 letter. So the slot that would hold the password holds one sentence
-                 saying what the button will do and what it will not do to the account.
-
-                 Body 14/400 on colorOnSurfaceVariant — the same role every explanatory
-                 line on this screen uses. It is a sentence, not a label, so it takes a
-                 full stop and no field boundary of its own. Gone by default: only the
-                 link errand ever shows it, and it is never on screen with the password.
-
-                 Its 16dp top margin is the password slot's, so the column keeps the same
-                 rhythm whichever occupant the slot has.
-
-                 NO maxLines, deliberately. 6.4 caps its (shorter) hint at 3; two lines at
-                 the default font scale become five at 200 %, and a clipped instruction is
-                 worse than a taller block in a column that already scrolls. -->
-            <TextView
-                android:id="@+id/slot_link_hint"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_16"
-                android:text="@string/auth_link_email_hint"
-                android:textAppearance="@style/TextAppearance.App.Body"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:visibility="gone"
-                tools:visibility="visible" />
 
             <!-- THE METHOD SLOT. Password today; the 2FA group below replaces it
                  wholesale when the backend asks for a code, so the two are never

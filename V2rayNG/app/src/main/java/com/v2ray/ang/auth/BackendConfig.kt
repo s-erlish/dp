@@ -107,6 +107,27 @@ object BackendConfig {
          */
         const val linkEmailRequest = "/client/link-email-request"
 
+        /**
+         * Give the account a password, so the address attached above becomes a way IN and not only
+         * a label. `{newPassword}`, **minimum six characters** — the panel's schema for THIS
+         * endpoint; registration's is eight, and the two are not interchangeable.
+         *
+         * Refused with «Пароль уже установлен. Используйте смену пароля.» exactly when the account
+         * has a real password and has finished onboarding, which is what
+         * `UserProfileDto.canSetPassword` mirrors so the step is never offered into a refusal.
+         */
+        const val setPassword = "/client/set-password"
+
+        /**
+         * Replace the address the account already has: `{newEmail, currentPassword?}`. The password
+         * is the panel's account-takeover guard and is required only of accounts that HAVE one.
+         *
+         * Answers with a letter, exactly as [linkEmailRequest] does, and the link in it lands on
+         * the same `verify-link-email` on the site. So the app watches the same [me] afterwards —
+         * but for the address becoming the NEW one, not merely for it being non-blank.
+         */
+        const val changeEmailRequest = "/client/profile/change-email/request"
+
         // Subscription
         /** The authoritative ACTIVE (root) subscription summary — richer than the /all root item. */
         const val subscription = "/client/subscription"

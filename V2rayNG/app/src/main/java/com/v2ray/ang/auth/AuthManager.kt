@@ -5,6 +5,7 @@ import com.v2ray.ang.auth.dto.LoginResult
 import com.v2ray.ang.auth.dto.RegisterResult
 import com.v2ray.ang.auth.dto.TelegramCheckResult
 import com.v2ray.ang.auth.dto.UserProfileDto
+import com.v2ray.ang.auth.dto.emailArrived
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -12,7 +13,8 @@ import kotlinx.coroutines.flow.flow
 
 /**
  * Orchestrates the auth flows only (Telegram deep-link login, e-mail registration, e-mail/password
- * sign-in, TOTP 2FA, and attaching an e-mail to a session that already exists).
+ * sign-in, TOTP 2FA, and the e-mail errands of a session that already exists: attaching an
+ * address, replacing it, and giving the account the password that makes either one a way IN).
  * There is NO refresh/logout here — the JWT is 7-day and non-refreshable; session persistence is
  * delegated to [AccountSession]/[AuthTokenStore], subscription import to [AccountRepository].
  */
@@ -231,20 +233,66 @@ class AuthManager(
         }
 
         emit(LoginState.AwaitingEmailVerification(email))
-        pollUntilLinked()
+        pollUntilEmail(expected = null)
     }
+
+    /**
+     * **Replacing the address an account already has.**
+     *
+     * The same letter, the same link, the same `verify-link-email` behind it — and a different
+     * endpoint, because the panel guards this one: an account WITH a password must prove it before
+     * anything is sent ([currentPassword]), which is its account-takeover check. Getting that guard
+     * wrong is reported as `PASSWORD_REQUIRED` / `INVALID_PASSWORD` beside the sentence, and both
+     * belong on the password field rather than on the screen — see `ApiError.serverCode`.
+     *
+     * **The wait afterwards asks a sharper question than [beginLinkEmail]'s.** «Есть ли адрес?» is
+     * already true here and would resolve instantly against the OLD one, ending the wait before the
+     * user has opened anything. So the poll waits for the address to BECOME [newEmail].
+     */
+    fun beginChangeEmail(newEmail: String, currentPassword: String?): Flow<LoginState> = flow {
+        if (!BackendConfig.isConfigured()) {
+            emit(LoginState.Error(ApiError.NotConfigured))
+            return@flow
+        }
+
+        try {
+            api.changeEmailRequest(newEmail, currentPassword)
+        } catch (e: ApiError) {
+            emit(LoginState.Error(e))
+            return@flow
+        }
+
+        emit(LoginState.AwaitingEmailVerification(newEmail))
+        pollUntilEmail(expected = newEmail)
+    }
+
+    /**
+     * Gives the account a password, so the address it just gained is a way IN rather than a label.
+     *
+     * The profile is re-read afterwards and written back to [AccountSession] — `hasPassword` has
+     * just changed on the server, and it is the fact that decides whether the NEXT «Сменить почту»
+     * asks for the current password. A failure of that re-read is swallowed: the password is set
+     * either way, and reporting a stale cache as a failed errand would be a lie about what happened.
+     */
+    suspend fun setPassword(newPassword: String) {
+        if (!BackendConfig.isConfigured()) throw ApiError.NotConfigured
+        api.setPassword(newPassword)
+        runCatching { AccountSession.updateProfile(api.getMe()) }
+    }
+
+    /** The profile this process is signed in with, or null. Read-only; see [AccountSession]. */
+    fun currentProfile(): UserProfileDto? =
+        (AccountSession.state.value as? AccountSession.AccountState.LoggedIn)?.profile
 
     /**
      * Watches for the emailed link being opened, and — as in [pollUntilVerified] — it does so by
      * asking the one question whose answer changes when it is. Here that question is not the login
-     * (this user is already signed in) but the PROFILE: `/client/auth/me` carries a blank `email`
-     * for a Telegram-only account and a real one the moment the site has run the confirmation
-     * behind the link.
+     * (this user is already signed in) but the PROFILE: `/client/auth/me` is what the site's
+     * `verify-link-email` writes the address into.
      *
-     * The address the letter went to is deliberately NOT compared against the one that comes back.
-     * The panel owns that value and may hand it back normalised — a different case, a trimmed
-     * alias — and an equality test would then wait forever for a link that was opened correctly.
-     * A profile that has an address where it had none is the whole signal.
+     * @param expected null when the account had NO address (any address is the answer), and the new
+     * address when it is being REPLACED — there the old one is already non-blank, so «есть ли
+     * адрес» would answer itself on the first round and end the wait before anything happened.
      *
      * **Every failure here is swallowed, exactly as in [pollUntilVerified]**: an unread letter is
      * not news, and neither is a network blip. Note this is also why the poll asks [api] directly
@@ -255,16 +303,16 @@ class AuthManager(
      * The profile is written back to [AccountSession] before the success is emitted, so the row
      * that sent the user here reports the new address from cache rather than from a lucky reload.
      */
-    private suspend fun FlowCollector<LoginState>.pollUntilLinked() {
+    private suspend fun FlowCollector<LoginState>.pollUntilEmail(expected: String?) {
         val deadline = System.currentTimeMillis() + VERIFY_TIMEOUT_MS
         while (System.currentTimeMillis() < deadline) {
             delay(VERIFY_POLL_INTERVAL_MS)
             val profile = try {
                 api.getMe()
             } catch (e: ApiError) {
-                continue // Still unlinked, or a blip. Neither is news.
+                continue // Still unconfirmed, or a blip. Neither is news.
             }
-            if (profile.email.isNotBlank()) {
+            if (profile.emailArrived(expected)) {
                 AccountSession.updateProfile(profile)
                 emit(LoginState.Success(profile))
                 return
