@@ -163,9 +163,8 @@ class ServerProxyChainActivity : BaseActivity() {
         }
 
         val members = memberAdapter.getMembers().map { it.trim() }
-        val emptyStep = members.indexOfFirst { it.isEmpty() }
-        if (emptyStep >= 0) {
-            toastError(getString(R.string.srv_chain_step_empty, emptyStep + 1))
+        if (members.any { it.isEmpty() }) {
+            toastError(R.string.srv_chain_step_empty)
             return
         }
         if (members.size < MIN_CHAIN_MEMBERS) {
@@ -178,7 +177,7 @@ class ServerProxyChainActivity : BaseActivity() {
             profile == null || profile.configType.isComplexType()
         }
         if (invalid.isNotEmpty()) {
-            toastError(getString(R.string.srv_chain_invalid_members, invalid.joinToString(", ")))
+            toastError(R.string.srv_chain_invalid_members)
             return
         }
 

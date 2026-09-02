@@ -140,6 +140,11 @@ object NoticePolicy {
         // is a dead button in exactly the state that most needs explaining. Both surfaces that
         // refresh everything say it: `MainActivity.importConfigViaSub`, `SubSettingActivity.updateAll`.
         R.string.subs_update_none,
+        // Итог «Обновить все». Успех молчит (правило 1); эти три — единственные исходы, у которых
+        // есть что сказать. До них экран отвечал на неудачу тем же, чем на успех: ничем.
+        R.string.subs_update_failed,
+        R.string.subs_update_partial,
+        R.string.subs_update_skipped,
         // The clipboard: the one outcome with no visible result of any kind.
         R.string.notice_copied,
         R.string.notice_copy_failed,
@@ -192,6 +197,10 @@ object NoticePolicy {
         R.string.srv_delete_selected,
         R.string.srv_chain_no_servers,
         R.string.srv_chain_too_few,
+        // Два оставшихся отказа при сохранении цепочки. Обе строки были с подстановкой и не
+        // показывались вовсе, так что «Сохранить» с пустым шагом не отвечало ничем.
+        R.string.srv_chain_step_empty,
+        R.string.srv_chain_invalid_members,
         R.string.template_locked_toast,
         R.string.toast_action_not_allowed,
         // Routing sets and deep links: an import that could not be read, an export with nothing in

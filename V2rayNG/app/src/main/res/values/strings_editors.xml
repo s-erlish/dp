@@ -350,7 +350,11 @@
     <string name="srv_chain_step">Шаг %1$d</string>
     <string name="srv_chain_pick">Выберите сервер</string>
     <string name="srv_chain_remove_step">Убрать шаг</string>
-    <string name="srv_chain_step_empty">Выберите сервер для шага %1$d</string>
+    <!-- Отказы при сохранении цепочки. Обе строки были с подстановкой (номер шага, список имён)
+         и уходили в CharSequence-дверь, которая ничего не показывает; вторую вдобавок отсеивал
+         `isCounterReport`, потому что в именах серверов есть цифры. Нажатие «Сохранить» с пустым
+         шагом не делало ВООБЩЕ ничего. Теперь это предложения без подстановки: их видно. -->
+    <string name="srv_chain_step_empty">В цепочке остался пустой шаг. Выберите для него сервер.</string>
     <string name="srv_chain_no_servers">Пока нет серверов, из которых можно собрать цепочку</string>
     <string name="srv_group_title">Группа серверов</string>
     <string name="srv_group_type">Тип группы</string>
@@ -379,9 +383,18 @@
 
     <string name="perapp_unknown_app">Неопознанный трафик</string>
 
-    <string name="subs_update_done">Обновлено серверов: %1$d</string>
+    <!-- ИТОГ «Обновить все».
+         `subs_update_done` («Обновлено серверов: %1$d») и `subs_update_result` («Серверов: … ·
+         обновлено: …, с ошибкой: …») УДАЛЕНЫ. Обе строились через getString и уходили в
+         CharSequence-дверь, которая по правилу 4 NoticePolicy не показывает ничего, а вторая ещё
+         и распознавалась как счётчик. То есть «Обновить все» молчал ОБО ВСЁМ, кроме случая «нет
+         подписок»: неудача выглядела ровно как успех.
+         Успех и дальше молчит (правило 1 - строки перерисовались, это и есть подтверждение), а у
+         неудачи теперь есть предложение с причиной и следующим шагом. -->
     <string name="subs_update_none">Нет подписок для обновления</string>
-    <string name="subs_update_result">Серверов: %1$d · обновлено: %2$d, с ошибкой: %3$d, пропущено: %4$d</string>
+    <string name="subs_update_failed">Не удалось обновить подписки. Проверьте сеть и повторите.</string>
+    <string name="subs_update_partial">Часть подписок не обновилась. Проверьте сеть и повторите.</string>
+    <string name="subs_update_skipped">Обновлять нечего: подписки выключены или их срок истёк.</string>
 
     <string name="asset_copy_failed">Не удалось скопировать файл</string>
 
@@ -391,7 +404,7 @@
     <string name="srv_group_sub_all">Все подписки</string>
     <string name="srv_delete_selected">Нельзя удалить выбранный сервер</string>
     <string name="srv_chain_too_few">В цепочке нужно минимум два шага</string>
-    <string name="srv_chain_invalid_members">Эти серверы нельзя использовать в цепочке: %1$s</string>
+    <string name="srv_chain_invalid_members">Не все шаги ведут на обычный сервер. Выберите для них другой.</string>
     <string name="srv_config_label">Конфигурация</string>
     <string name="srv_config_note">Порт входящего подключения должен совпадать с настройками приложения.</string>
 </resources>
