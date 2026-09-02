@@ -4,11 +4,8 @@ import android.os.Bundle
 import android.text.TextUtils
 import android.view.KeyEvent
 import android.view.View
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.Spinner
 import android.widget.TextView
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
@@ -115,9 +112,15 @@ class ServerActivity : BaseActivity() {
     private val til_address: TextInputLayout by lazy { findViewById(R.id.til_address) }
     private val til_port: TextInputLayout by lazy { findViewById(R.id.til_port) }
     private val et_id: EditText by lazy { findViewById(R.id.et_id) }
+    // Nullable while the last protocol layouts are still being ported: a screen that has not got
+    // its error slot yet answers with focus alone rather than losing the message.
+    private val til_id: TextInputLayout? by lazy { findViewById(R.id.til_id) }
     private val et_security: EditText? by lazy { findViewById(R.id.et_security) }
-    private val sp_flow: Spinner? by lazy { findViewById(R.id.sp_flow) }
-    private val sp_security: Spinner? by lazy { findViewById(R.id.sp_security) }
+    private val til_security: TextInputLayout? by lazy { findViewById(R.id.til_security) }
+    private val et_flow: EditText? by lazy { findViewById(R.id.et_flow) }
+    private val til_flow: TextInputLayout? by lazy { findViewById(R.id.til_flow) }
+    private val et_method: EditText? by lazy { findViewById(R.id.et_method) }
+    private val til_method: TextInputLayout? by lazy { findViewById(R.id.til_method) }
     private val et_stream_security: EditText? by lazy { findViewById(R.id.et_stream_security) }
     private val til_stream_security: TextInputLayout? by lazy { findViewById(R.id.til_stream_security) }
     private val et_allow_insecure: EditText? by lazy { findViewById(R.id.et_allow_insecure) }
@@ -203,6 +206,10 @@ class ServerActivity : BaseActivity() {
     private var alpnIndex = 0
     private var allowInsecureIndex = 0
 
+    /** VLESS flow and the VMess / Shadowsocks cipher, likewise. */
+    private var flowIndex = 0
+    private var methodIndex = 0
+
     /** The server being edited, or null for a new one. Read by the pickers when they repopulate. */
     private var editedConfig: ProfileItem? = null
 
@@ -264,6 +271,40 @@ class ServerActivity : BaseActivity() {
         }
     }
 
+
+    // ------------------------------------------------------------------ доступ
+
+    /** The cipher list this protocol has: Shadowsocks carries eleven, VMess five. */
+    private fun methodOptions(): Array<out String> =
+        if (editorType == EConfigType.SHADOWSOCKS) shadowsocksSecuritys else securitys
+
+    /** Draws the two protocol pickers - the VLESS flow and the VMess / Shadowsocks cipher. */
+    private fun bindProtocolSelects() {
+        bindSelect(
+            layout = til_method,
+            field = et_method,
+            title = getString(
+                if (editorType == EConfigType.SHADOWSOCKS) R.string.server_lab_security3
+                else R.string.server_lab_security
+            ),
+            options = optionLabels(methodOptions()),
+            selectedIndex = methodIndex,
+        ) { picked ->
+            methodIndex = picked
+            bindProtocolSelects()
+        }
+
+        bindSelect(
+            layout = til_flow,
+            field = et_flow,
+            title = getString(R.string.server_lab_flow),
+            options = optionLabels(flows),
+            selectedIndex = flowIndex,
+        ) { picked ->
+            flowIndex = picked
+            bindProtocolSelects()
+        }
+    }
 
     // ------------------------------------------------------------------ шифрование канала
 
@@ -585,10 +626,7 @@ class ServerActivity : BaseActivity() {
             et_security?.text = Utils.getEditable(config.username.orEmpty())
         } else if (config.configType == EConfigType.VLESS) {
             et_security?.text = Utils.getEditable(config.method.orEmpty())
-            val flow = Utils.arrayFind(flows, config.flow.orEmpty())
-            if (flow >= 0) {
-                sp_flow?.setSelection(flow)
-            }
+            flowIndex = Utils.arrayFind(flows, config.flow.orEmpty()).coerceAtLeast(0)
         } else if (config.configType == EConfigType.WIREGUARD) {
             et_id.text = Utils.getEditable(config.secretKey.orEmpty())
             et_public_key?.text = Utils.getEditable(config.publicKey.orEmpty())
@@ -606,12 +644,8 @@ class ServerActivity : BaseActivity() {
             et_bandwidth_down?.text = Utils.getEditable(config.bandwidthDown)
             et_bandwidth_up?.text = Utils.getEditable(config.bandwidthUp)
         }
-        val securityEncryptions =
-            if (config.configType == EConfigType.SHADOWSOCKS) shadowsocksSecuritys else securitys
-        val security = Utils.arrayFind(securityEncryptions, config.method.orEmpty())
-        if (security >= 0) {
-            sp_security?.setSelection(security)
-        }
+        methodIndex = Utils.arrayFind(methodOptions(), config.method.orEmpty()).coerceAtLeast(0)
+        bindProtocolSelects()
 
         val streamSecurity = Utils.arrayFind(streamSecuritys, config.security.orEmpty())
         if (streamSecurity >= 0) {
@@ -653,7 +687,9 @@ class ServerActivity : BaseActivity() {
         et_address.text = null
         et_port.text = Utils.getEditable(DEFAULT_PORT.toString())
         et_id.text = null
-        sp_security?.setSelection(0)
+        methodIndex = 0
+        flowIndex = 0
+        bindProtocolSelects()
 
         browserDialerIndex = 0
         applyNetwork(0)
@@ -666,7 +702,6 @@ class ServerActivity : BaseActivity() {
         et_sni?.text = null
 
         //et_security.text = null
-        sp_flow?.setSelection(0)
         et_public_key?.text = null
         et_reserved1?.text = Utils.getEditable("0,0,0")
         et_local_address?.text =
@@ -729,9 +764,9 @@ class ServerActivity : BaseActivity() {
                 || config.configType == EConfigType.SHADOWSOCKS
                 || config.configType == EConfigType.HYSTERIA2
             ) {
-                refuseNotPortedYet(et_id, R.string.srv_password_required)
+                refuse(til_id, et_id, R.string.srv_password_required)
             } else {
-                refuseNotPortedYet(et_id, R.string.srv_id_required)
+                refuse(til_id, et_id, R.string.srv_id_required)
             }
             return false
         }
@@ -807,20 +842,10 @@ class ServerActivity : BaseActivity() {
         return true
     }
 
-    /**
-     * The bridge while the protocol layouts are still being ported: a field whose `TextInputLayout`
-     * does not exist yet keeps the previous behaviour rather than losing its message. Gone as soon
-     * as the last layout has its error slot.
-     */
-    private fun refuseNotPortedYet(field: EditText?, @StringRes message: Int) {
-        toastError(message)
-        field?.requestFocus()
-    }
-
     /** Every field's error slot, emptied before a fresh pass. */
     private fun clearErrors() {
         listOf<TextInputLayout?>(
-            til_remarks, til_address, til_port,
+            til_remarks, til_address, til_port, til_id, til_security, til_flow, til_method,
             til_network, til_header_type, til_request_host, til_path,
             til_kcp_mtu, til_kcp_tti, til_extra, til_fm, til_browser_dialer_mode,
             til_stream_security, til_sni, til_stream_fingerprint, til_stream_alpn,
@@ -836,12 +861,12 @@ class ServerActivity : BaseActivity() {
         config.password = et_id.text.toString().trim()
 
         if (config.configType == EConfigType.VMESS) {
-            config.method = securitys[sp_security?.selectedItemPosition ?: 0]
+            config.method = securitys[methodIndex.coerceIn(securitys.indices)]
         } else if (config.configType == EConfigType.VLESS) {
             config.method = et_security?.text.toString().trim()
-            config.flow = flows[sp_flow?.selectedItemPosition ?: 0]
+            config.flow = flows[flowIndex.coerceIn(flows.indices)]
         } else if (config.configType == EConfigType.SHADOWSOCKS) {
-            config.method = shadowsocksSecuritys[sp_security?.selectedItemPosition ?: 0]
+            config.method = shadowsocksSecuritys[methodIndex.coerceIn(shadowsocksSecuritys.indices)]
         } else if (config.configType == EConfigType.SOCKS || config.configType == EConfigType.HTTP) {
             if (!TextUtils.isEmpty(et_security?.text) || !TextUtils.isEmpty(et_id.text)) {
                 config.username = et_security?.text.toString().trim()

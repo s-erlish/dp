@@ -4,17 +4,16 @@
   A-13 servers/server/{guid} - форма «сервер вручную», VMess.  H3 - R4.
   ============================================================================
 
-  РАМКА, общая у восьми протокольных форм и у трёх уже перенесённых редакторов
-  рядом («Группа серверов», «Своя конфигурация», «Цепочка прокси»):
+  ВСЁ, ЧТО БЫЛО НА ЭТОМ ЭКРАНЕ, ОСТАЛОСЬ: id пользователя и шифр. Шифр был
+  Spinner'ом, стал полем выбора с кареткой и листом вариантов.
 
-      view_toolbar - бесшовная шапка подстраницы (0.4.6)
-      NestedScrollView - тело формы, снизу space_32
-      «Сохранить» - Primary.Tall в потоке, а не пункт меню ActionBar
-      «Удалить сервер» - Row.Destructive последней строкой
+  РАМКА, общая у восьми протокольных форм и у трёх перенесённых редакторов рядом:
+  бесшовная шапка подстраницы, тело в NestedScrollView, «Сохранить» - Primary.Tall
+  под последним полем, «Удалить сервер» - разрушающая строка.
 
-  Действия были иконками в ActionBar: галочка и корзина, без подписей, рядом
-  друг с другом. Сохранение - главное действие экрана и стоит в потоке под
-  последним полем; удаление - разрушающее, названо словами и стоит отдельно.
+  ЛЕКАЛО ПОЛЯ - layout_address_port.xml: заголовок группы предложением, подпись
+  сверху и всегда видимая, поле 56 радиусом 16, зарезервированная строка снизу -
+  подсказка, а при отказе сообщение о том, что исправить.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -42,49 +41,76 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="@dimen/padding_spacing_dp16">
+            android:orientation="vertical">
 
             <include layout="@layout/layout_address_port" />
 
-            <LinearLayout
+            <TextView
+                style="@style/SettingsSectionLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/padding_spacing_dp16"
-                android:orientation="vertical">
+                android:text="@string/srv_section_access" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/server_lab_id" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:labelFor="@id/et_id"
+                android:paddingStart="@dimen/screen_gutter"
+                android:paddingEnd="@dimen/screen_gutter"
+                android:text="@string/server_lab_id"
+                android:textAppearance="@style/TextAppearance.App.Title.Medium" />
 
-                <EditText
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_id"
+                style="@style/Widget.Departament.TextField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/screen_gutter"
+                android:layout_marginTop="@dimen/space_8"
+                android:layout_marginEnd="@dimen/screen_gutter">
+
+                <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_id"
+                    style="@style/Widget.Departament.TextField.EditText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="text" />
+                    android:imeOptions="actionNext"
+                    android:inputType="text"
+                    android:maxLines="1"
+                    tools:ignore="TextFields" />
+            </com.google.android.material.textfield.TextInputLayout>
 
-            </LinearLayout>
-
-            <LinearLayout
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/padding_spacing_dp16"
-                android:orientation="vertical">
+                android:layout_marginTop="@dimen/space_12"
+                android:labelFor="@id/et_method"
+                android:paddingStart="@dimen/screen_gutter"
+                android:paddingEnd="@dimen/screen_gutter"
+                android:text="@string/server_lab_security"
+                android:textAppearance="@style/TextAppearance.App.Title.Medium" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/server_lab_security" />
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_method"
+                style="@style/Widget.Departament.TextField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/screen_gutter"
+                android:layout_marginTop="@dimen/space_8"
+                android:layout_marginEnd="@dimen/screen_gutter"
+                app:endIconContentDescription="@string/srv_pick_value"
+                app:endIconDrawable="@drawable/ic_arrow_drop_down"
+                app:endIconMode="custom">
 
-                <Spinner
-                    android:id="@+id/sp_security"
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_method"
+                    style="@style/Widget.Departament.TextField.EditText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/padding_spacing_dp8"
-                    android:layout_marginBottom="@dimen/padding_spacing_dp8"
-                    android:entries="@array/securitys" />
-            </LinearLayout>
+                    android:inputType="none"
+                    android:maxLines="1"
+                    tools:ignore="TextFields" />
+            </com.google.android.material.textfield.TextInputLayout>
 
             <include layout="@layout/layout_transport" />
 
