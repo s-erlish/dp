@@ -21,13 +21,17 @@
 
     <string name="settings_url_scheme">Схемы URL-адресов</string>
 
-    <!-- Режим подключения. Названия и порядок заданы владельцем: TUN, Proxy,
-         TUN + Proxy. Значения латиницей, поэтому translatable="false".
-           TUN         - PREF_MODE = VPN, PREF_PROXY_SHARING = false
-           Proxy       - PREF_MODE = «Proxy only»
-           TUN + Proxy - PREF_MODE = VPN, PREF_PROXY_SHARING = true -->
+    <!-- Режим подключения: ДВА значения, «TUN» и «Только прокси» (@string/hub_mode_proxy).
+           TUN            - PREF_MODE = VPN
+           Только прокси  - PREF_MODE = «Proxy only»
+         «TUN» латиницей, поэтому translatable="false".
+
+         `settings_mode_value_tun_proxy` («TUN + Proxy») УДАЛЕНА вместе с третьим значением.
+         Третьего режима не было: строка показывалась, когда включён переключатель «Доступ
+         через хотспот» на экране «Локальный прокси» - отдельная возможность, работающая в
+         ЛЮБОМ режиме. Строка называла её режимом, список из-за неё открывался без выбранного
+         пункта, а выбор «TUN» молча выключал раздачу в сеть. См. SettingsTabFragment.pickMode. -->
     <string name="settings_mode_value_tun" translatable="false">TUN</string>
-    <string name="settings_mode_value_tun_proxy" translatable="false">TUN + Proxy</string>
 
     <!-- Оформление (выбор темы: светлая / тёмная / чёрно-белая) -->
     <string name="settings_appearance">Оформление</string>

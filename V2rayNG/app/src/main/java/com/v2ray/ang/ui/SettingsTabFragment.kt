@@ -256,13 +256,11 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         if (!isBindingInitialized) return
         val s = binding
 
-        // The row states the mode that is actually in force, including the one the picker no longer
-        // offers. Reporting «TUN» for a TUN + Proxy tunnel would be the screen lying about the
-        // machine to keep its own list tidy.
+        // The row states the mode that is actually in force. See [pickMode] for why the LAN-sharing
+        // switch is not read here any more.
         s.valueMode.text = getString(
             when (currentMode()) {
                 Mode.PROXY -> R.string.hub_mode_proxy
-                Mode.TUN_PROXY -> R.string.settings_mode_value_tun_proxy
                 Mode.TUN -> R.string.settings_mode_value_tun
             }
         )
@@ -327,24 +325,27 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
      * «Режим» — the first of six select popups (handoff README §6). The dialog this replaced dimmed
      * the whole screen to ask a two-word question; the flyout opens where the value already is.
      *
-     * THE LIST IS THE DESIGN'S TWO, and the app's third mode is still here. The prototype's
+     * THE LIST IS THE DESIGN'S TWO, and it is now also the whole truth. The prototype's
      * `MODES = ['TUN', 'Только прокси']`, and the owner confirmed on 2026-08-04 that the list shows
-     * exactly that — «интерфейс и формулировки по дизайну, возможности по репозиторию». So:
+     * exactly that — «интерфейс и формулировки по дизайну, возможности по репозиторию».
      *
-     *   0 TUN         = VPN(tun) mode, local-proxy sharing OFF          — offered
-     *   1 Только прокси = proxy-only mode (isVpnMode() == false)         — offered
-     *     TUN + Proxy = VPN(tun) mode, local-proxy sharing ON            — NOT offered, still works
+     *   0 TUN           = VPN(tun) mode, `isVpnMode() == true`
+     *   1 Только прокси = proxy-only mode, `isVpnMode() == false`
      *
-     * TUN + Proxy is written by nothing on this screen any more, but it is read by everything:
-     * PREF_PROXY_SHARING is a live key, the core config honours it, and a user who chose the mode
-     * before today still has it. [bindSettingsState] keeps showing them «TUN + Proxy» rather than
-     * lying about which tunnel is up.
+     * **«TUN + Proxy» IS NOT A THIRD MODE, AND TREATING IT AS ONE BROKE A DIFFERENT SCREEN.** It was
+     * this row reading `PREF_PROXY_SHARING` — which is not a mode but the «Доступ через хотспот»
+     * switch on «Локальный прокси», an independent feature that adds an authenticated SOCKS inbound
+     * on 0.0.0.0 and works in EITHER mode. Turning that switch on, which is an offered thing to do,
+     * therefore:
      *
-     * That is also why the picker opens with NOTHING selected for them ([selectedIndex] -1) instead
-     * of pre-selecting TUN. SelectPopup does not fire `onPick` when the current value is re-picked,
-     * so a checkmark on TUN would leave the third mode with no way out of itself — tapping the row
-     * that appears to be selected would do nothing at all. With no selection, either option applies
-     * and lands them on one of the design's two.
+     *  - made this row report «TUN + Proxy» when nothing about the mode had changed;
+     *  - opened the picker with NOTHING selected, over a plain TUN tunnel;
+     *  - and then, on picking «TUN» — the value already in force — silently wrote
+     *    `PREF_PROXY_SHARING = false`, switching the LAN share off behind the user's back. Nobody
+     *    asked about sharing; they re-picked the mode they were already on.
+     *
+     * The mode is `PREF_MODE` and nothing else now, so the row states it, the picker pre-selects it,
+     * and the hotspot switch is owned by the one screen that offers it.
      */
     private fun pickMode() {
         val entries = listOf(
@@ -354,7 +355,6 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         val idx = when (currentMode()) {
             Mode.PROXY -> 1
             Mode.TUN -> 0
-            Mode.TUN_PROXY -> -1 // legacy: offer both, pre-select neither
         }
         SelectPopup.show(
             anchor = binding.rowMode,
@@ -366,7 +366,6 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         ) { which ->
             if (which == 0) { // TUN
                 MmkvManager.encodeSettings(AppConfig.PREF_MODE, AppConfig.VPN)
-                MmkvManager.encodeSettings(AppConfig.PREF_PROXY_SHARING, false)
             } else { // Только прокси
                 MmkvManager.encodeSettings(AppConfig.PREF_MODE, "Proxy only")
             }
@@ -375,17 +374,12 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
         }
     }
 
-    /** The three modes the prefs can be in, including the one the picker no longer offers. */
-    private enum class Mode { TUN, PROXY, TUN_PROXY }
+    /** The two modes the prefs can be in. LAN sharing is not one of them; see [pickMode]. */
+    private enum class Mode { TUN, PROXY }
 
     private fun currentMode(): Mode {
         val mode = MmkvManager.decodeSettingsString(AppConfig.PREF_MODE, AppConfig.VPN)
-        val proxySharing = MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING, false)
-        return when {
-            mode != AppConfig.VPN -> Mode.PROXY
-            proxySharing -> Mode.TUN_PROXY
-            else -> Mode.TUN
-        }
+        return if (mode != AppConfig.VPN) Mode.PROXY else Mode.TUN
     }
 
     /**
