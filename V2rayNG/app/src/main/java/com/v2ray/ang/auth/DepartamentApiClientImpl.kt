@@ -98,8 +98,15 @@ class DepartamentApiClientImpl(
             AuthTokenStore.getToken()
                 ?.takeIf { it.isNotBlank() && HttpUtil.isHeaderSafe(it) }
                 ?.let { builder.header("Authorization", "Bearer $it") }
+            //  ТА ЖЕ ДЫРА, ЧТО НА ПУТИ ПОДПИСКИ, ТОЛЬКО ДРУГАЯ ДВЕРЬ. Это application-интерцептор:
+            //  на редиректе OkHttp зовёт его заново для нового адреса. Свой Authorization он с
+            //  межхостового прыжка снимает сам, а НАШИ заголовки — нет, и опознаватель устройства
+            //  уехал бы на чужой хост. Панель — наш хост, редирект там был бы настройкой оператора,
+            //  но полагаться на это нельзя: правило одно и то же на обоих путях — опознаватель
+            //  видит только тот хост, которому запрос адресован.
+            val sameHost = HttpUtil.isOriginHost(BackendConfig.baseUrl, chain.request().url.toString())
             val hwid = AuthTokenStore.deviceId().takeIf { HttpUtil.isHeaderSafe(it) }
-            if (SettingsManager.isSendHwid() && hwid != null) {
+            if (sameHost && SettingsManager.isSendHwid() && hwid != null) {
                 // Stable per-install HWID + real, stable device model so the panel keeps ONE
                 // device entry per physical device and labels it with the actual model.
                 builder.header(AppConfig.HEADER_HWID, hwid)
