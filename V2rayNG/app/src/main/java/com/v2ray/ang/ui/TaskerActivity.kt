@@ -12,6 +12,7 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityTaskerBinding
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.ui.component.restoreChecked
 import com.v2ray.ang.util.LogUtil
 
 class TaskerActivity : BaseActivity() {
@@ -23,7 +24,6 @@ class TaskerActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        //setContentView(binding.root)
         setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = "")
 
         //add def value
@@ -55,7 +55,9 @@ class TaskerActivity : BaseActivity() {
             if (switch == null || TextUtils.isEmpty(guid)) {
                 return
             } else {
-                binding.switchStartService.isChecked = switch
+                // Read back from the Tasker bundle before the screen has drawn, so the position is
+                // restored rather than morphed on the first frame. @see restoreChecked
+                binding.switchStartService.restoreChecked(switch)
                 val pos = lstGuid.indexOf(guid.toString())
                 if (pos >= 0) {
                     listview?.setItemChecked(pos, true)

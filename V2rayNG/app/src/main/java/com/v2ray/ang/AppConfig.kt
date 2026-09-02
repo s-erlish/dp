@@ -25,6 +25,14 @@ object AppConfig {
     const val PREF_PER_APP_PROXY = "pref_per_app_proxy"
     const val PREF_PER_APP_PROXY_SET = "pref_per_app_proxy_set"
     const val PREF_BYPASS_APPS = "pref_bypass_apps"
+
+    // The «Российские приложения» bypass preset — see [handler.RussianAppsPreset].
+    /** Is the preset currently applied? */
+    const val PREF_RU_BYPASS_PRESET_ON = "pref_ru_bypass_preset_on"
+    /** Exactly what applying it ADDED, so switching it off gives back that and nothing else. */
+    const val PREF_RU_BYPASS_PRESET_OWNED = "pref_ru_bypass_preset_owned"
+    /** The one-time default-on has run (whatever it decided), so it never runs twice. */
+    const val PREF_RU_BYPASS_PRESET_SEEDED = "pref_ru_bypass_preset_seeded"
     const val PREF_LOCAL_DNS_ENABLED = "pref_local_dns_enabled"
     const val PREF_FAKE_DNS_ENABLED = "pref_fake_dns_enabled"
     const val PREF_APPEND_HTTP_PROXY = "pref_append_http_proxy"
@@ -46,6 +54,17 @@ object AppConfig {
     const val SUBSCRIPTION_UPDATE_TASK_NAME = "subscription_updater"
     const val SUBSCRIPTION_MIN_INTERVAL_MINUTES = 15L
     const val PREF_SPEED_ENABLED = "pref_speed_enabled"
+
+    /**
+     * The user has dismissed Главная's «Привязать Telegram» banner.
+     *
+     * PERSISTED, not a field. The banner is an offer to a pasted-подписка user, and at 5e8cd54 the
+     * dismissal lived in an Activity field — so it came back on the next cold start, which is what
+     * makes an offer read as nagging. Restoring the control is the owner's rule; remembering the
+     * answer is the refinement that goes with it.
+     */
+    const val PREF_LINK_TG_CTA_DISMISSED = "pref_link_tg_cta_dismissed"
+
     const val PREF_CONFIRM_REMOVE = "pref_confirm_remove"
     const val PREF_START_SCAN_IMMEDIATE = "pref_start_scan_immediate"
     const val PREF_DOUBLE_COLUMN_DISPLAY = "pref_double_column_display"
@@ -115,6 +134,21 @@ object AppConfig {
     const val BROADCAST_ACTION_ACTIVITY = "$ANG_PACKAGE.action.activity"
     const val BROADCAST_ACTION_WIDGET_CLICK = "$ANG_PACKAGE.action.widget.click"
 
+    /**
+     * «Возобновить» in the shade, as a start command addressed to the service itself.
+     *
+     * IT IS NOT A BROADCAST, AND THAT IS THE POINT. Every command that talks to a LIVE core —
+     * `MSG_STATE_STOP`, `MSG_STATE_PAUSE` — travels on [BROADCAST_ACTION_SERVICE] to a receiver
+     * that `CoreServiceManager` registers while the tunnel is up. Resuming is the other
+     * direction: it is a START, and it has to work in the one case where that receiver may not
+     * exist — the paused foreground service was killed and `START_STICKY` brought it back with a
+     * `null` intent and a fresh process. A broadcast into that would be a button that does
+     * nothing; an Intent to the service class starts it if it must. Same split as
+     * [com.v2ray.ang.core.CoreServiceManager.startVService] (Intent) versus `stopVService`
+     * (broadcast) — the shade just reuses it.
+     */
+    const val ACTION_RESUME_SERVICE = "$ANG_PACKAGE.action.resume"
+
     /** Tasker extras. */
     const val TASKER_EXTRA_BUNDLE = "com.twofortyfouram.locale.intent.extra.BUNDLE"
     const val TASKER_EXTRA_STRING_BLURB = "com.twofortyfouram.locale.intent.extra.BLURB"
@@ -150,22 +184,42 @@ object AppConfig {
     const val APP_URL = "$GITHUB_URL/2dust/v2rayNG"
 
     /**
-     * The self-update feed. **Blank on purpose: departament publishes no release feed.**
+     * The repository this application is released from — **ours**, `owner/name`.
+     *
+     * It is one constant because everything the updater touches has to agree about it: the feed
+     * below, the browser fallback when the in-app install path is unavailable, and the audit trail
+     * in the log. Changing the owner or the name here retargets the whole updater in one edit.
+     */
+    const val APP_RELEASE_REPO = "s-erlish/dp"
+
+    /**
+     * The self-update feed: departament's own GitHub releases.
      *
      * This used to read `https://api.github.com/repos/2dust/v2rayNG/releases`, so «Проверить
      * обновления» compared departament's version against *upstream v2rayNG's* tags and, on a hit,
      * handed the customer upstream's APK — a different application, under a different
      * applicationId, signed with a different key. It could never upgrade anything; it side-installs
-     * a stranger's VPN client next to this one. That is worse than having no updater.
+     * a stranger's VPN client next to this one. It was then blanked, which stopped the harm and
+     * left the control answering «не удалось» forever.
      *
-     * Blank means the updater has nothing to reach and can no longer offer anyone else's build.
-     * Consumers must treat blank as «this build has no update channel» and not present the control
-     * at all — see `UpdateCheckerManager` and the «Проверить обновления» rows in `AboutActivity`
-     * and `SettingsTabFragment`. Fill this in with departament's own releases endpoint (and keep
-     * asset names matching `departament_<version>[-fdroid]_<abi>.apk`, which
-     * `UpdateCheckerManager.getDownloadUrl` already filters on) to turn the feature back on.
+     * It points at [APP_RELEASE_REPO] now, and three independent guards keep it honest, because a
+     * feed URL alone is not proof of provenance:
+     *
+     *  1. `UpdateCheckerManager.selectAsset` accepts only assets named the way *this* build names
+     *     its own outputs — `departament_<version>[-fdroid]_<abi>.apk` (`app/build.gradle.kts`) —
+     *     so `v2rayNG_*.apk` in any feed is unreachable;
+     *  2. the downloaded file is parsed before it is offered to the installer, and refused unless
+     *     its `packageName` is this application id;
+     *  3. its `versionCode` must exceed the installed one, which is what makes the offer an
+     *     upgrade rather than an «Приложение не установлено» dead end.
+     *
+     * Blank is still a supported value and still means «this build has no update channel»: the
+     * screen says so in words instead of failing.
      */
-    const val APP_API_URL = ""
+    const val APP_API_URL = "https://api.github.com/repos/$APP_RELEASE_REPO/releases"
+
+    /** The releases page, for the browser fallback when the device refuses the in-app install. */
+    const val APP_RELEASES_URL = "$GITHUB_URL/$APP_RELEASE_REPO/releases/latest"
 
     /** Customer support. Was upstream's GitHub issue tracker — a stranger's inbox for our users. */
     const val APP_ISSUES_URL = "https://t.me/departamentvpnbot"
@@ -223,13 +277,50 @@ object AppConfig {
     const val MSG_STATE_SPEED_UPDATE = 51
     const val MSG_STATE_RESTART = 5
     const val MSG_MEASURE_DELAY = 6
+
+    /**
+     * «Пауза» in the shade: bring the tunnel down and leave the service — and its row — standing.
+     *
+     * A COMMAND, NOT A STATE. It is 9 rather than something in the 4x range because 41 is
+     * `MSG_STATE_STOP_SUCCESS`, a RESULT the service sends to the UI, and single digits are what
+     * this file uses for what the UI sends the service (3 start, 4 stop, 5 restart, 6 measure).
+     * Pause is one of those, so it takes the next free digit.
+     *
+     * NOTHING NEW IS PUBLISHED BACK. The tunnel really is down after this, so the answer is the
+     * one the stop path already sends — `MSG_STATE_STOP_SUCCESS` — and Главная, плитка in the
+     * shade and the виджет all read «не подключено» without a line of new code. A second state
+     * channel for «paused» would be a second truth about the same tunnel.
+     */
+    const val MSG_STATE_PAUSE = 9
+
+    // NOBODY SENDS OR RECEIVES 61 IN THIS FORK, and the number is kept so a future upstream merge
+    // does not reuse it for something else. It carried the probe's human-readable sentence to a
+    // status line this product does not have; the reading itself travels as a number on 62.
+    // @see com.v2ray.ang.core.CoreServiceManager.measureV2rayDelay
     const val MSG_MEASURE_DELAY_SUCCESS = 61
     const val MSG_STATE_DELAY_RESULT = 62
     const val MSG_MEASURE_CONFIG_START = 7
     const val MSG_MEASURE_CONFIG_CANCEL = 71
     const val MSG_MEASURE_CONFIG_SUCCESS = 72
-    const val MSG_MEASURE_CONFIG_NOTIFY = 73
+
+    // 73 WAS `MSG_MEASURE_CONFIG_NOTIFY` — the batch's own «сделано / осталось» tally, broadcast
+    // across processes once per finished server and printed by nothing. Its one reader answered
+    // each message with a full list rebuild that the per-server 72 above had already made
+    // unnecessary. The number stays retired rather than reused: an old build on the same device can
+    // still be sending it.
     const val MSG_MEASURE_CONFIG_FINISH = 74
+
+    /**
+     * A подписка refresh replaced servers, so anything holding a server list must re-read it.
+     *
+     * IT CROSSES PROCESSES ON PURPOSE. The periodic refresh runs in a WorkManager worker while the
+     * app is in the foreground, and it deletes every profile of the провайдер it refreshes and
+     * mints a new guid for each replacement. Until this existed nothing told the UI: the rows on
+     * screen went on addressing profiles that had been deleted, and a tap on one of them stored a
+     * dead guid as the selection — after which Главная said «Выберите сервер в списке ниже» over a
+     * full list and the connect object was disabled.
+     */
+    const val MSG_STATE_SERVERS_CHANGED = 81
 
     /** Notification channel IDs and names. */
     const val RAY_NG_CHANNEL_ID = "DEPARTAMENT_VPN_CH_ID"

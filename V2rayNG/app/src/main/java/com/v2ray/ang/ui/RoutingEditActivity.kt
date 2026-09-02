@@ -135,9 +135,12 @@ class RoutingEditActivity : BaseActivity() {
         binding.tilOutboundTag.setEndIconOnClickListener {
             val suggestions = (BUILTIN_OUTBOUND_TAGS.toList() + SettingsManager.getProfileRemarks())
                 .distinct()
+            val current = binding.etOutboundTag.text.toString()
             EditorActionsSheet(this, getString(R.string.routing_ed_outbound)).apply {
                 suggestions.forEach { tag ->
-                    action(label = tag) { binding.etOutboundTag.text = Utils.getEditable(tag) }
+                    action(label = tag, selected = tag == current) {
+                        binding.etOutboundTag.text = Utils.getEditable(tag)
+                    }
                 }
             }.show()
         }

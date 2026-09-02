@@ -4,7 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches:
+      # Every branch the work has lived on. A workflow that builds only yesterday's branch produces
+      # no artefact for today's, and the fix nobody can install is indistinguishable from no fix.
       - claude/app-audit-agents-hyyftk
+      - claude/project-analysis-status-9cefax
     paths:
       - 'V2rayNG/**'
       - '.github/workflows/debug.yml'
@@ -57,6 +60,18 @@ jobs:
       - name: Grant gradlew permission
         working-directory: V2rayNG
         run: chmod +x ./gradlew
+
+      # A debug APK is signed with AGP's auto-generated ~/.android/debug.keystore, and a
+      # GitHub-hosted runner is a fresh VM, so every run used to sign with a DIFFERENT identity:
+      # build N+1 then refuses to install over build N (INSTALL_FAILED_UPDATE_INCOMPATIBLE) and the
+      # tester loses every server, subscription and their session to an uninstall. Restoring the same
+      # keystore keeps one identity across runs; a cache miss is harmless, Gradle just makes a fresh
+      # key exactly as it does today. Same cache key as release.yml on purpose — one CI identity.
+      - name: Restore the CI debug keystore
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: departament-ci-debug-keystore-v1
 
       - name: Build debug APK (arm64-v8a, playstore only)
         working-directory: V2rayNG

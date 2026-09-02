@@ -81,14 +81,13 @@
             app:iconSpaceReserved="false"
             app:singleLineTitle="false" />
 
-        <!-- Разрешает автопереключение сервера после неудачной проверки. -->
-        <CheckBoxPreference
-            android:defaultValue="true"
-            android:key="pref_auto_fallback"
-            android:summary="@string/adv_auto_fallback_summary"
-            android:title="@string/adv_auto_fallback_title"
-            app:iconSpaceReserved="false"
-            app:singleLineTitle="false" />
+        <!--
+            «Переключать сервер при сбое» стоял здесь и снят по прямому указанию владельца:
+            «надо убрать в целом эту функцию о переключении на более быстрый сервер».
+            Ключ pref_auto_fallback принудительно выключается на каждом старте
+            (SettingsManager.retireAutoFallback), поэтому переключателю нечем управлять.
+            Замер задержки, четыре метода проверки и ручное «обновить» остаются (П-26).
+        -->
 
     </PreferenceCategory>
 

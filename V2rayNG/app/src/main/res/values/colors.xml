@@ -94,11 +94,6 @@
     <!-- shipped. Names referenced by themes.xml and by layouts.        -->
     <!-- ============================================================= -->
 
-    <!-- Brand: departament VPN blue (sampled from logo) -->
-    <color name="brand_blue">#1E5FC7</color>
-    <color name="brand_blue_dark">#17469A</color>
-    <color name="brand_cream">#F4F1EA</color>
-
     <color name="colorPing">#12B76A</color>
     <color name="colorPingRed">#E5484D</color>
     <color name="colorConfigType">#1E5FC7</color>
@@ -111,14 +106,10 @@
 
     <!-- Colored setting-row icon tints (same in light/dark).
          D-5: the coloured tile system is exactly three - accent, destructive,
-         neutral. icon_green / icon_yellow / icon_orange / icon_purple are NOT
-         used by new work; they stay only until their last reference migrates. -->
+         neutral. icon_green / icon_yellow / icon_orange / icon_purple stayed
+         only until their last reference migrated, and it has - they are gone. -->
     <color name="icon_blue">#4C8DFF</color>
-    <color name="icon_green">#22C55E</color>
-    <color name="icon_purple">#4C8DFF</color>
-    <color name="icon_yellow">#EAB308</color>
     <color name="icon_red">#F04452</color>
-    <color name="icon_orange">#FB923C</color>
     <color name="divider_color_light">#E4E9F2</color>
     <color name="colorIndicator">@color/md_theme_primary</color>
 
@@ -132,21 +123,16 @@
     <color name="ping_good">#0B7D4A</color>
     <color name="ping_bad">#C42B32</color>
     <!-- Icon-tile background fills (translucent hue, shared light/dark).
-         D-5: only _blue (accent) and _red (destructive) survive for new work. -->
+         D-5: only _blue (accent) and _red (destructive) survive; the green,
+         orange, purple and yellow washes had no reader left. -->
     <color name="icon_tile_blue">#334C8DFF</color>
-    <color name="icon_tile_green">#3322C55E</color>
-    <color name="icon_tile_orange">#33FB923C</color>
-    <color name="icon_tile_purple">#334C8DFF</color>
     <color name="icon_tile_red">#33F04452</color>
-    <color name="icon_tile_yellow">#33EAB308</color>
 
-    <!-- Neutral (non-accent) icon tile: solid surface fill + muted glyph.
-         Spends no accent budget so default/utility rows stay quiet and the
-         blue reads as the only accent. Light = surfaceContainerHighest tone;
-         night overrides in values-night/. Glyph #54607A on fill #E3EAF4
-         measures 5.21:1, clearing the 3:1 icon floor with headroom. -->
-    <color name="icon_tile_neutral">#E3EAF4</color>
-    <color name="icon_glyph_neutral">#54607A</color>
+    <!-- The neutral tile has no colour resource any more. It reads
+         ?attr/colorSurfaceContainerHighest for the fill and
+         ?attr/colorOnSurfaceVariant for the glyph — same pixels in both live
+         themes, and ThemeOverlay.Mono can re-point an attribute where it could
+         never re-point @color/icon_tile_neutral. See Widget.Departament.Tile. -->
 
     <!-- Primary colors - main tone: departament blue -->
     <color name="md_theme_primary">#1E5FC7</color>
@@ -338,6 +324,44 @@
     <color name="mono_warningContainer">#E7E7E9</color>
     <color name="mono_skeleton">#E7E7E9</color>
 
+    <!-- ==================================================================
+         MONO × LIGHT: THE THREE VALUES THAT WERE MISSING.
+
+         The owner: «если с белой темы переключиться на черно белую то вот так
+         становится, а если с темной на чернобелую то все нормально». Dark was
+         fine because mono's ink there is WHITE on black - luminance alone
+         separates everything. On white it does not: every plate on this screen
+         was a tint of the accent (#D8E4FF at 1.19:1, #E9EEF7 at 1.09:1) and
+         read as an object only because it was BLUE. Take the hue away and the
+         protocol chips lose their fill entirely, the traffic pill loses its
+         plate, and the one thing that keeps its weight - the accent, remapped
+         to ink - becomes the heaviest mark on the screen.
+         ================================================================== -->
+
+    <!-- The plate under a chip, a badge or a meter track. A fill delta ALONE
+         cannot carry a plate on white without going grey enough to look like a
+         disabled control, so the plate is a fill PLUS a real boundary and the
+         boundary is what clears the 3:1 non-text floor.
+         #E0E0E3 on mono_surface #FFFFFF = 1.32:1 (the fill delta);
+         mono_onSurface #111214 on it = 14.28:1 (the chip's own label). -->
+    <color name="mono_plateContainer">#E0E0E3</color>
+    <!-- The boundary that does the work. 3.44:1 on mono_surface #FFFFFF and
+         3.13:1 on mono_surfaceContainer #F4F4F5 - it clears the floor on the
+         screen ground AND on a card, which is where these chips actually sit. -->
+    <color name="mono_plateOutline">#8A8A8E</color>
+    <!-- ?attr/colorAccentFill in mono, LIGHT: 12% of mono_primary #111214.
+         Composites to #E4E4E5 over mono_surface #FFFFFF; mono_onSurface on that
+         measures 14.79:1. The blue theme's accent_fill_12 is a colour resource
+         and the runtime overlay cannot re-point it, which is why the selected
+         server row kept a blue cast here. -->
+    <color name="mono_accentFill">#1F111214</color>
+    <!-- The connect object's ink: rings, shield, confirm rings, sweep. Matched
+         to the WEIGHT of the blue accent rather than to ink, because a 3dp
+         stroke is not a button fill. md_theme_primary #1E5FC7 measures 5.97:1
+         on white; this measures 5.99:1 (5.45:1 on a card). mono_primary #111214 is 18.74:1,
+         which is what made the object read as a hard outline drawing. -->
+    <color name="mono_accentFigure">#636366</color>
+
     <!-- Surface container ramp (blue theme, light) - enables layering & glass depth -->
     <color name="md_theme_surfaceContainerLowest">#FFFFFF</color>
     <color name="md_theme_surfaceContainerLow">#F7F9FD</color>
@@ -403,4 +427,45 @@
     <color name="btn_gloss_press_top">#1F000000</color>
     <!-- ...and the base catches what the top lost. -->
     <color name="btn_gloss_press_bottom">#0AFFFFFF</color>
+
+    <!-- =====================================================================
+         THE PRESS PLANE, and the SELECTED OPTION — README §1 and §6.
+         Light column; values-night/ carries dark, ThemeOverlay.Mono the mono
+         remap. Reached from a layout as ?attr/colorPressBg.
+         ===================================================================== -->
+
+    <!--
+      THE SECOND CHANNEL OF A PRESS: the plane a row or card sits on while the
+      finger is down. README §1 — «шаг фона ВНИЗ по рампе», down and never up,
+      and never a ripple or a glow around the object.
+
+      Light steps to the surfaceContainerHigh plane (#EAEFF7), which is a real
+      rung of this theme's own ramp rather than an invented tint: on a white
+      surface "down" is the only direction with anywhere to go. onSurface
+      #111826 over it measures 15.4:1, so nothing a row draws loses contrast
+      while it is held.
+    -->
+    <color name="press_bg">#EAEFF7</color>
+    <!-- Mono light: the same step on the greyscale ramp. -->
+    <color name="mono_press_bg">#E7E7E9</color>
+
+    <!--
+      The SELECTED option inside a select popup (§6: «выбранный — фон на шаг
+      выше и галочка 16dp справа»).
+
+      A translucent ink wash rather than a named plane, and that is deliberate:
+      the popup body already sits on the TOP rung of the surface ramp
+      (colorSurfaceContainerHighest), so there is no higher named step for the
+      selected option to move to. 6% ink over it composites one visible step in
+      the direction §6 asks for, and it costs no mono mapping — it carries no
+      hue, so the mono overlay renders it identically without restating it.
+
+      DIVERGENCE, recorded rather than silently resolved: the prototype paints
+      this option with its own top surface rung, which in both of the prototype's
+      themes is the SAME colour
+      as the popup body, so the step §6 describes does not actually appear there
+      and the check is the only mark. README is the contract and README asks for
+      the step, so the step is what ships.
+    -->
+    <color name="select_item_selected">#0F000000</color>
 </resources>

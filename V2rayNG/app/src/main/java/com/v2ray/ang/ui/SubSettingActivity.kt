@@ -15,6 +15,7 @@ import com.v2ray.ang.contracts.BaseAdapterListener
 import com.v2ray.ang.databinding.ActivitySubSettingBinding
 import com.v2ray.ang.databinding.ItemQrcodeBinding
 import com.v2ray.ang.extension.toast
+import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.helper.SimpleItemTouchHelperCallback
@@ -131,19 +132,29 @@ class SubSettingActivity : BaseActivity() {
             updatingAll = false
             bindUpdateAllRow()
 
+            // «ОБНОВИТЬ ВСЕ» РАНЬШЕ МОЛЧАЛО ОБО ВСЁМ, КРОМЕ «нет подписок».
+            //
+            // Две ветки из трёх звали `toast(getString(...))` — то есть CharSequence-перегрузку,
+            // которая по правилу 4 [NoticePolicy] не показывает НИЧЕГО (у построенной строки нет
+            // идентификатора, который политика могла бы проверить), а вторая к тому же была
+            // счётчиком и отсеялась бы и по тексту. Обновление без сети выглядело ровно как
+            // удавшееся: строка «Обновляем…» возвращалась в «Обновить все» и на этом всё.
+            //
+            // Правило 1 оставляет успех молчаливым — отметки «обновлено» в строках перерисовались,
+            // это и есть подтверждение. Правило 2 требует, чтобы у неудачи было одно предложение с
+            // причиной и следующим шагом, и вот оно.
             when {
                 result.successCount + result.failureCount + result.skipCount == 0 ->
                     toast(R.string.subs_update_none)
 
-                result.successCount > 0 && result.failureCount + result.skipCount == 0 ->
-                    toast(getString(R.string.subs_update_done, result.configCount))
+                result.failureCount > 0 && result.successCount == 0 ->
+                    toastError(R.string.subs_update_failed)
 
-                else -> toast(
-                    getString(
-                        R.string.subs_update_result,
-                        result.configCount, result.successCount, result.failureCount, result.skipCount
-                    )
-                )
+                result.failureCount > 0 ->
+                    toastError(R.string.subs_update_partial)
+
+                result.successCount == 0 ->
+                    toast(R.string.subs_update_skipped)
             }
             refreshData()
         }
@@ -253,7 +264,6 @@ class SubSettingActivity : BaseActivity() {
             confirmRemove(guid, SubSettingRecyclerAdapter.displayName(this@SubSettingActivity, item))
         }
 
-        override fun onShare(url: String) = showQrCode(url)
 
         override fun onRefreshData() {
             refreshData()

@@ -27,6 +27,7 @@ import com.v2ray.ang.handler.MmkvManager.decodeSubsList
 import com.v2ray.ang.handler.MmkvManager.decodeSubscription
 import com.v2ray.ang.handler.MmkvManager.encodeSubscription
 import com.v2ray.ang.handler.MmkvManager.removeSubscription
+import com.v2ray.ang.service.TProxyService
 import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.Utils
@@ -43,7 +44,10 @@ object SettingsManager {
 
     fun initApp(context: Context) {
         ensureDefaultSettings()
-        //ensureDefaultSubscription()
+        retireAutoFallback()
+        // «Российские приложения» mimo VPN, on out of the box — but only on an install whose
+        // per-app routing nobody has touched. See RussianAppsPreset.seedOnFirstRun.
+        RussianAppsPreset.seedOnFirstRun()
         initRoutingRulesets(context)
         migrateServerListToSubscriptions()
         migrateHysteria2PinSHA256()
@@ -179,10 +183,24 @@ object SettingsManager {
 
     /**
      * Check if routing rulesets bypass LAN.
+     *
+     * OFF WHEN NOBODY ASKED (owner report 0.4.9: «обход локальной сети почему-то по дефолту
+     * включён, хотя не должен быть»). `PREF_VPN_BYPASS_LAN` is a STRING, not a boolean, and that is
+     * what makes this change safe: it holds "1" (on), "2" (off) or nothing at all, and only
+     * [com.v2ray.ang.ui.SettingsTabFragment.toggleBypassLan] ever writes it, always with "1" or
+     * "2". So «never touched» is a third, distinguishable state — an install that had the switch
+     * turned on deliberately reads "1" and keeps bypassing, and only the untouched install changes
+     * behaviour, which is exactly what was asked for. Nothing seeds this key on first run, so no
+     * migration is needed and none is possible to get wrong.
+     *
+     * The fall-through below (a value that is neither "1" nor "2") derives the answer from the
+     * selected server's routing rules. It stays reachable only for a value this app never writes;
+     * `null` is answered here, because «unset» has to mean OFF and not «go and look».
+     *
      * @return True if bypassing LAN, false otherwise.
      */
     fun routingRulesetsBypassLan(): Boolean {
-        val vpnBypassLan = MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_BYPASS_LAN) ?: "1"
+        val vpnBypassLan = MmkvManager.decodeSettingsString(AppConfig.PREF_VPN_BYPASS_LAN) ?: "2"
         if (vpnBypassLan == "1") {
             return true
         } else if (vpnBypassLan == "2") {
@@ -249,8 +267,13 @@ object SettingsManager {
         if (remarks.isNullOrEmpty()) {
             return null
         }
-        val serverList = decodeAllServerList()
-        return serverList
+        // A SEQUENCE, so the scan STOPS at the match. `mapNotNull` on a List is eager: it decoded
+        // every сервер on the device — one MMKV read plus one Gson parse each, ~5 µs a profile on a
+        // desktop JVM and several times that on a phone — and only then looked for the name, even
+        // when the answer was the first row. This is called per routing tag and per chain step
+        // while a config is being built, so the waste multiplied by the number of lookups.
+        return decodeAllServerList()
+            .asSequence()
             .mapNotNull { guid -> decodeServerConfig(guid) }
             .firstOrNull { it.remarks == remarks }
     }
@@ -285,9 +308,11 @@ object SettingsManager {
             return
         }
 
-        val defaultSub = SubscriptionItem(
-            remarks = "Default",
-        )
+        // NO PLACEHOLDER NAME. This is the linkless container that holds hand-added servers, not a
+        // подписка, and it is addressed by DEFAULT_SUBSCRIPTION_ID — nothing looks it up by its
+        // remark. Storing the English word «Default» in it only gave every display path one more
+        // string to filter out, and one of them always forgot. Blank is what it is.
+        val defaultSub = SubscriptionItem()
         encodeSubscription(DEFAULT_SUBSCRIPTION_ID, defaultSub)
     }
 
@@ -444,9 +469,12 @@ object SettingsManager {
             subIds.add(DEFAULT_SUBSCRIPTION_ID)
         }
 
-        subIds.forEach { subId ->
+        // ONE FENCED READ-MODIFY-WRITE PER ПОДПИСКА. This runs in `:bg` right after a refresh and in
+        // the interface process at start-up, and it re-reads and rewrites every list — exactly the
+        // shape that loses a concurrent write. See [MmkvManager.inServerListTransaction].
+        subIds.forEach { subId -> MmkvManager.inServerListTransaction {
             val guids = MmkvManager.decodeServerList(subId)
-            if (guids.size < 2) return@forEach
+            if (guids.size < 2) return@inServerListTransaction
 
             // Each key is read once and then sorted, never re-read per comparison: this runs on the
             // main thread during startup and one key costs an MMKV read plus a JSON parse.
@@ -467,10 +495,10 @@ object SettingsManager {
                     .sortedBy { it.second }
                     .map { it.first }
 
-                else -> return@forEach
+                else -> return@inServerListTransaction
             }
             MmkvManager.encodeServerList(sorted.toMutableList(), subId)
-        }
+        } }
     }
 
     /**
@@ -665,10 +693,26 @@ object SettingsManager {
 
     /**
      * Check if HEV TUN is being used.
+     *
+     * Two conditions, and the second one is not cosmetic. The user's preference decides whether we
+     * WANT the hev-socks5-tunnel bridge; [TProxyService.isAvailable] decides whether the process
+     * CAN have it. If `libhev-socks5-tunnel.so` is not in this APK's ABI split, or refuses to load
+     * for any other reason, answering "yes" here builds a config with no tun inbound, hands the
+     * core a tun fd of 0, and then dies loading the library — a VPN that neither carries traffic
+     * nor survives the attempt.
+     *
+     * Answering "no" instead routes the start down the path the app already takes whenever a user
+     * turns the preference off: the core builds its own `tun` inbound ([CoreConfigManager.needTun]),
+     * receives the real fd, and owns the tunnel. Degraded, not dead.
+     *
+     * The preference is checked first so the library is never loaded by a process that had already
+     * opted out of it.
+     *
      * @return True if HEV TUN is used, false otherwise.
      */
     fun isUsingHevTun(): Boolean {
-        return MmkvManager.decodeSettingsBool(AppConfig.PREF_USE_HEV_TUNNEL, true)
+        if (!MmkvManager.decodeSettingsBool(AppConfig.PREF_USE_HEV_TUNNEL, true)) return false
+        return TProxyService.isAvailable
     }
 
     /**
@@ -715,7 +759,19 @@ object SettingsManager {
         ensureDefaultValue(AppConfig.PREF_DOMESTIC_DNS, AppConfig.DNS_DIRECT)
         ensureDefaultValue(AppConfig.PREF_DELAY_TEST_URL, AppConfig.DELAY_TEST_URL)
         ensureDefaultValue(AppConfig.PREF_PING_METHOD, PingMethod.PROXIED_REAL_DELAY.prefValue)
-        ensureDefaultValue(AppConfig.PREF_UI_MODE_NIGHT, "2") // Incy-style dark by default
+        // «в оформлении надо чтобы 1 была кнопка как в системе и чтобы оно включалось по умолчанию».
+        //
+        // "0" is FOLLOW_SYSTEM (setNightMode above). It was "2", pinned dark, and that value is the
+        // reason the app could never follow the phone: ensureDefaultValue writes on first launch
+        // whenever the key is absent, so "nothing has been chosen yet" stopped existing after the
+        // very first run and setNightMode's own "0" fallback became unreachable code.
+        //
+        // ONLY FRESH INSTALLS MOVE. ensureDefaultValue writes nothing over an existing value, so
+        // anyone already running keeps exactly what they have. That is also the honest limit of
+        // this change: a user who never opened the row and a user who deliberately chose «Тёмная»
+        // both hold "2" and cannot be told apart, so migrating the existing ones would be
+        // indistinguishable from overriding a deliberate choice. It is not attempted.
+        ensureDefaultValue(AppConfig.PREF_UI_MODE_NIGHT, "0")
         ensureDefaultValue(AppConfig.PREF_IP_API_URL, AppConfig.IP_API_URL)
         ensureDefaultValue(AppConfig.PREF_HEV_TUNNEL_RW_TIMEOUT, AppConfig.HEVTUN_RW_TIMEOUT)
         ensureDefaultValue(AppConfig.PREF_MUX_CONCURRENCY, "8")
@@ -728,6 +784,38 @@ object SettingsManager {
         if (MmkvManager.decodeSettingsString(key).isNullOrEmpty()) {
             MmkvManager.encodeSettings(key, default)
         }
+    }
+
+    /**
+     * SWITCHING THE SERVER BY ITSELF IS NOT A FEATURE OF THIS PRODUCT ANY MORE.
+     *
+     * > «нужно убрать функцию, что если сервер недоступен, то появляется уведомление что идёт поиск
+     * > быстрейшего сервера, надо убрать в целом эту функцию о переключении на более быстрый сервер»
+     *
+     * What it was: seven seconds after a connect, the app probed the tunnel; two consecutive
+     * failures and it announced «Подключение не отвечает. Переключаемся на самый быстрый рабочий
+     * сервер…», measured every сервер and restarted the tunnel on whichever answered fastest. The
+     * user's own choice was overridden, and the first they knew of it was the sentence.
+     *
+     * How it is off: the switch that armed it is gone from the settings screen, and this puts its
+     * key back to `false` on every start where it is not already `false` — so an install that
+     * stored `true`, or one restored from a backup that carried it, is switched off too, and the
+     * health check is never armed at all. Not a one-shot migration on purpose: the value must not
+     * be able to come back from anywhere.
+     *
+     * IT NO LONGER WRITES WHEN THERE IS NOTHING TO WRITE. The unconditional `encode` put the same
+     * `false` into a MULTI_PROCESS_MODE store at every launch — an mmap append plus the store's
+     * cross-process lock, on the startup path, for a value that has not changed since the build
+     * that retired the feature. Reading first is one lookup, and on every install past the first
+     * launch that is the whole cost.
+     *
+     * What is NOT touched, because the owner asked for the switching to go and nothing else
+     * (`PORT-DELTA.md` П-26): the latency measurement itself, all four check methods, «обновить»,
+     * the 30-second probe that draws the «мс» figure on Главная, and picking a сервер by hand.
+     */
+    private fun retireAutoFallback() {
+        if (!MmkvManager.decodeSettingsBool(AppConfig.PREF_AUTO_FALLBACK, false)) return
+        MmkvManager.encodeSettings(AppConfig.PREF_AUTO_FALLBACK, false)
     }
 
     /**
@@ -833,9 +921,8 @@ object SettingsManager {
      */
     private fun ensureDefaultSubscription() {
         if (decodeSubscription(DEFAULT_SUBSCRIPTION_ID) == null) {
-            val defaultSub = SubscriptionItem(
-                remarks = "Default",
-            )
+            // Blank, not «Default» — see the note in removeSubscriptionWithDefault.
+            val defaultSub = SubscriptionItem()
             encodeSubscription(DEFAULT_SUBSCRIPTION_ID, defaultSub)
 
             // Move top

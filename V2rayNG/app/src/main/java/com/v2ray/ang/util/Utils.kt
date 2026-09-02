@@ -323,36 +323,6 @@ object Utils {
     }
 
     /**
-     * Decode a URL-encoded string.
-     *
-     * @param url The URL-encoded string.
-     * @return The decoded string, or the original string if decoding fails.
-     */
-    fun urlDecode(url: String): String {
-        return try {
-            URLDecoder.decode(url, Charsets.UTF_8.toString())
-        } catch (e: Exception) {
-            LogUtil.e(AppConfig.TAG, "Failed to decode URL", e)
-            url
-        }
-    }
-
-    /**
-     * Encode a string to URL-encoded format.
-     *
-     * @param url The string to encode.
-     * @return The URL-encoded string, or the original string if encoding fails.
-     */
-    fun urlEncode(url: String): String {
-        return try {
-            URLEncoder.encode(url, Charsets.UTF_8.toString())
-        } catch (e: Exception) {
-            LogUtil.e(AppConfig.TAG, "Failed to encode URL", e)
-            url
-        }
-    }
-
-    /**
      * Decode a "encodeURIComponent" string.
      *
      * @param url The "encodeURIComponent" string.
@@ -487,26 +457,6 @@ object Utils {
     }
 
     /**
-     * Find a free port from a list of ports.
-     *
-     * @param ports The list of ports to check.
-     * @return The first free port found.
-     * @throws IOException If no free port is found.
-     */
-    fun findFreePort(ports: List<Int>): Int {
-        for (port in ports) {
-            try {
-                return ServerSocket(port).use { it.localPort }
-            } catch (ex: IOException) {
-                continue  // try next port
-            }
-        }
-
-        // if the program gets here, no port in the range was found
-        throw IOException("no free port found")
-    }
-
-    /**
      * Find a random free port.
      *
      * @return A random free port.
@@ -561,13 +511,6 @@ object Utils {
      * @return True if the package is Xray, false otherwise.
      */
     fun isXray(): Boolean = BuildConfig.APPLICATION_ID.startsWith("com.v2ray.ang")
-
-    /**
-     * Check if it is the Google Play version.
-     *
-     * @return True if the package is Google Play, false otherwise.
-     */
-    fun isGoogleFlavor(): Boolean = BuildConfig.FLAVOR == "playstore"
 
     /**
      * Converts an InetAddress to its long representation

@@ -1,8 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="pa_title">Прокси по приложениям</string>
-    <string name="pa_enable">Включить прокси по приложениям</string>
-    <string name="pa_bypass_mode">Режим обхода</string>
-    <string name="pa_bypass_tips">Показать подсказку по режиму обхода</string>
-    <string name="pa_summary">Обычный режим: отмеченные приложения идут через прокси, остальные напрямую.\nРежим обхода: отмеченные приложения идут напрямую, остальные через прокси.\nАвтоматический выбор приложений доступен в меню.</string>
 </resources>

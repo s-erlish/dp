@@ -198,9 +198,13 @@ android {
             else -> "-unsigned"
         }
         if (isFdroid) {
+            // Same 64-before-32 rule as the playstore branch below, and the same inversion to
+            // undo — here the rank is the tiebreaker in the low digits rather than the leading
+            // one. Both corrections RAISE a rank and never lower one, so no already-published
+            // fdroid APK is downgraded. Inert for our CI today, which only ever builds playstore.
             val versionCodes =
                 mapOf(
-                    "armeabi-v7a" to 2, "arm64-v8a" to 1, "x86" to 4, "x86_64" to 3, "universal" to 0
+                    "armeabi-v7a" to 2, "arm64-v8a" to 3, "x86" to 4, "x86_64" to 5, "universal" to 0
                 )
 
             variant.outputs
@@ -221,8 +225,24 @@ android {
             // 4000731 and Play refuses the second APK of a multi-APK release ("Version code
             // 4000731 has already been used"). `universal` stays lowest so a device-specific split
             // always outranks the fat one on the same device.
+            //
+            // THE RANKS START AT 4, AND THAT FLOOR IS NOT COSMETIC. This value is the LEADING digit
+            // of the shipped versionCode, so lowering a rank lowers the version. Every playstore
+            // APK this project has ever produced used rank 4 — 4000731 on every ABI — and giving
+            // arm64-v8a rank 1 made the next CI build 1000731, three million BELOW what testers
+            // already had installed. Android refuses that install outright
+            // (INSTALL_FAILED_VERSION_DOWNGRADE, surfaced as «Приложение не установлено»), so the
+            // build that fixed the duplicate-code defect also made itself uninstallable for
+            // everyone who had the previous one. Ranks may be reordered; they may never go below
+            // the highest rank already published, which is 4.
+            //
+            // THE ORDER WITHIN EACH ABI FAMILY IS LOAD-BEARING TOO. Play serves the highest
+            // versionCode the device can run, and a 64-bit device can run its 32-bit sibling. So
+            // arm64-v8a must outrank armeabi-v7a, and x86_64 must outrank x86, or every 64-bit
+            // device is served the 32-bit split — on a store that mandates 64-bit support. Both
+            // pairs were inverted; CI builds one ABI at a time, so it never showed.
             val versionCodes =
-                mapOf("universal" to 0, "arm64-v8a" to 1, "armeabi-v7a" to 2, "x86_64" to 3, "x86" to 4)
+                mapOf("universal" to 4, "armeabi-v7a" to 5, "arm64-v8a" to 6, "x86" to 7, "x86_64" to 8)
 
             variant.outputs
                 .map { it as com.android.build.gradle.internal.api.ApkVariantOutputImpl }
@@ -277,7 +297,12 @@ dependencies {
 
     // UI Libraries
     implementation(libs.material)
-    implementation(libs.toasty)
+    // NO `toasty`. It was upstream's notification layer — the green tick, the red cross, the
+    // system-chrome capsule floating over the screen — and the owner asked for the layer itself
+    // rather than for any one message: «это же старые от в2рей уведомления… их убрать надо
+    // совсем». `NoticePolicy` / `Notice` replaced it, on one themed bottom surface, and the
+    // dependency comes out with it so an upstream merge that adds a `Toasty.error(...)` call
+    // fails to compile instead of quietly putting the layer back.
     implementation(libs.editorkit)
     implementation(libs.flexbox)
 

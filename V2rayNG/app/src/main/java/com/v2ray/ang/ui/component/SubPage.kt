@@ -16,10 +16,21 @@ import com.v2ray.ang.util.animationsEnabled
  * The motion is fixed by 00-rules.md 3.7 / 8 and 32-master-plan-android.md 7.3, and it is the whole
  * vocabulary a sub-page gets:
  *
- * | | translation | alpha | duration | curve |
- * |---|---|---|---|---|
- * | enter | 16dp to 0 | 0 to 1 | `motion_reveal` 300 | `ease_out_quint` |
- * | exit  | 0 to 16dp | 1 to 0 | `motion_reveal_exit` 225 | `ease_standard` |
+ * | leg | file | translation | alpha | duration | curve |
+ * |---|---|---|---|---|---|
+ * | push, arriving | `subpage_enter`     | +16dp to 0 | 0 to 1 | `motion_subpage_enter` 260 | `ease_out_quint` |
+ * | push, covered  | `subpage_push_exit` | 0 to −16dp | 1 to 0 | `motion_subpage_exit` 195  | `ease_standard`  |
+ * | pop, returning | `subpage_pop_enter` | −16dp to 0 | 0 to 1 | `motion_subpage_enter` 260 | `ease_out_quint` |
+ * | pop, leaving   | `subpage_exit`      | 0 to +16dp | 1 to 0 | `motion_subpage_exit` 195  | `ease_standard`  |
+ *
+ * **FOUR LEGS, NOT TWO, AND THAT IS THE CORRECTION.** This object used to hand ONE pair to both
+ * directions, on the reasoning that the arriving screen always enters and the leaving screen always
+ * exits whichever way the stack moves. That holds for the alpha and fails for the translation: it
+ * sent the covered page to +16 while the page arriving on top of it came from +16, so the two
+ * crossed, and on the way back the crossing is not hidden behind an opaque incoming window. That is
+ * the defect the owner reported — «анимация выхода … типа дерганная как будто резко влево вправо
+ * делает и выход, хотя должно сбоку закрываться как-то». A stack slides as ONE sheet: pushing, both
+ * pages travel left; popping, both travel right.
  *
  * Exit is 75% of enter, which is why the two numbers differ and why neither of them is 150. Only
  * transform and alpha move; 00-rules.md 8.7 forbids animating layout properties for effect. There
@@ -49,13 +60,13 @@ object SubPage {
      */
     fun open(activity: Activity, intent: Intent) {
         activity.startActivity(intent)
-        applyTransition(activity)
+        applyTransition(activity, Direction.PUSH)
     }
 
     /** [open], for a sub-page that returns a result through the Activity Result API. */
     fun open(activity: Activity, launcher: ActivityResultLauncher<Intent>, intent: Intent) {
         launcher.launch(intent)
-        applyTransition(activity)
+        applyTransition(activity, Direction.PUSH)
     }
 
     /**
@@ -64,7 +75,7 @@ object SubPage {
      */
     fun close(activity: Activity) {
         activity.finish()
-        applyTransition(activity)
+        applyTransition(activity, Direction.POP)
     }
 
     /**
@@ -81,25 +92,48 @@ object SubPage {
 
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     private fun installModernTransitions(activity: Activity, animated: Boolean) {
-        val enter = if (animated) R.anim.subpage_enter else 0
-        val exit = if (animated) R.anim.subpage_exit else 0
-        activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_OPEN, enter, exit)
-        activity.overrideActivityTransition(Activity.OVERRIDE_TRANSITION_CLOSE, enter, exit)
+        activity.overrideActivityTransition(
+            Activity.OVERRIDE_TRANSITION_OPEN,
+            if (animated) Direction.PUSH.enter else 0,
+            if (animated) Direction.PUSH.exit else 0,
+        )
+        activity.overrideActivityTransition(
+            Activity.OVERRIDE_TRANSITION_CLOSE,
+            if (animated) Direction.POP.enter else 0,
+            if (animated) Direction.POP.exit else 0,
+        )
+    }
+
+    /**
+     * Which way the stack is moving, and therefore which two of the four legs play.
+     *
+     * [enter] is always the animation for the activity being SHOWN and [exit] the one for the
+     * activity being HIDDEN — that is what both platform APIs mean by the two arguments. What
+     * changes with the direction is not which role each window has, it is which way each one
+     * travels; see the table on [SubPage].
+     */
+    private enum class Direction(val enter: Int, val exit: Int) {
+        PUSH(R.anim.subpage_enter, R.anim.subpage_push_exit),
+        POP(R.anim.subpage_pop_enter, R.anim.subpage_exit),
     }
 
     /*
-     * One pair covers both directions: the arriving screen always enters and the leaving screen
-     * always exits, whether the stack is growing or shrinking.
-     *
      * overridePendingTransition is deprecated as of API 34 in favour of overrideActivityTransition,
      * which only the OPENED activity may call. It is still honoured, and it is the only form
      * available to the CALLER, which is where a push is written. installTransitions() is the modern
      * path for an activity that wants to declare its own.
+     *
+     * THE TWO PATHS OVERLAP AND THAT IS DELIBERATE. 24 activities call installTransitions() and
+     * seven of those also close through here, so on API 34+ a close can be specified twice. It is
+     * harmless precisely BECAUSE both paths now read the same Direction: whichever spec the
+     * platform honours, it is the same pair of files. When the two disagreed — one pair for both
+     * directions here, the same one pair there — a double spec had two chances to pick the wrong
+     * leg instead of none.
      */
     @Suppress("DEPRECATION")
-    private fun applyTransition(activity: Activity) {
+    private fun applyTransition(activity: Activity, direction: Direction) {
         if (activity.animationsEnabled()) {
-            activity.overridePendingTransition(R.anim.subpage_enter, R.anim.subpage_exit)
+            activity.overridePendingTransition(direction.enter, direction.exit)
         } else {
             activity.overridePendingTransition(0, 0)
         }
@@ -120,10 +154,14 @@ object SubPage {
  */
 fun FragmentTransaction.subPageAnimations(context: Context): FragmentTransaction =
     if (context.animationsEnabled()) {
+        // The four-argument form IS the four legs, in the order (enter, exit, popEnter, popExit) —
+        // which is why the fragment path carried the same defect as the activity one: passing
+        // subpage_enter as popEnter brought the returning fragment back from the edge the leaving
+        // one was heading for.
         setCustomAnimations(
             R.anim.subpage_enter,
-            R.anim.subpage_exit,
-            R.anim.subpage_enter,
+            R.anim.subpage_push_exit,
+            R.anim.subpage_pop_enter,
             R.anim.subpage_exit,
         )
     } else {

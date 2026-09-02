@@ -14,14 +14,12 @@ import com.v2ray.ang.enums.NotificationChannelType
  * Unified notification helper for different notification channels.
  * Supports both regular notifications and foreground service notifications.
  *
- * Performance: NotificationManager is cached. Builder is created once per update.
- * Safe for high-frequency updates (100+ times/second).
+ * Performance: the NotificationManager is cached; every post builds its own builder.
  */
 object NotificationHelper {
 
-    // Cached instances for performance
+    // Cached instance for performance
     private var cachedNotificationManager: NotificationManager? = null
-    private val builderCache = mutableMapOf<Int, NotificationCompat.Builder>()
 
     /**
      * Notify with a regular notification (non-foreground).
@@ -40,32 +38,6 @@ object NotificationHelper {
         ensureChannelCreated(channelType, context)
         val notificationManager = getNotificationManager(context)
         val builder = buildNotificationBuilder(channelType, context, title, content)
-        notificationManager.notify(channelType.notificationId, builder.build())
-    }
-
-    /**
-     * Update an existing notification's content.
-     * Optimized for high-frequency updates (100+/sec).
-     * Reuses cached Builder to minimize allocation overhead.
-     *
-     * @param channelType The notification channel type
-     * @param context The context
-     * @param content The new content text
-     */
-    fun updateNotification(
-        channelType: NotificationChannelType,
-        context: Context,
-        content: String
-    ) {
-        val notificationManager = getNotificationManager(context)
-
-        // Get or create builder from cache
-        val builder = builderCache.getOrPut(channelType.notificationId) {
-            buildNotificationBuilder(channelType, context, "", content)
-        }
-
-        // Update only the content text (fast operation)
-        builder.setContentText(content)
         notificationManager.notify(channelType.notificationId, builder.build())
     }
 
@@ -91,6 +63,13 @@ object NotificationHelper {
     /**
      * Stop the foreground notification for a service.
      *
+     * THE BUILDER CACHE THIS USED TO CLEAR IS GONE, and it had been empty for some time: the only
+     * thing that ever put a builder in it was `updateNotification`, an "optimised for 100+ updates
+     * a second" path from upstream that lost its last caller when the latency batch stopped
+     * pushing its own tally into the shade (`CoreTestService.handleWorkerEvent`). Every notify here
+     * builds a fresh builder, so there is nothing left to forget — and the stale-text defect the
+     * cache used to cause cannot come back.
+     *
      * @param service The service to stop foreground on
      */
     fun stopForeground(service: Service) {
@@ -98,7 +77,7 @@ object NotificationHelper {
     }
 
     /**
-     * Cancel a notification and clean up cached builder.
+     * Cancel a notification.
      *
      * @param channelType The notification channel type
      * @param context The context
@@ -108,7 +87,6 @@ object NotificationHelper {
         context: Context
     ) {
         getNotificationManager(context).cancel(channelType.notificationId)
-        builderCache.remove(channelType.notificationId)  // Clean up cache
     }
 
     // ====== Private helper methods ======
@@ -120,22 +98,46 @@ object NotificationHelper {
         return cachedNotificationManager!!
     }
 
+    /**
+     * Creates the channel if it is missing, and clears away the id this type used to have.
+     *
+     * A channel's importance is fixed the moment it is created — `createNotificationChannel` will
+     * not lower it later — so a type that has to become quieter has to move to a new id, and the
+     * old one has to go with it or the user is left reading two rows for one thing in the system's
+     * notification settings. See [NotificationChannelType.CORE_TEST].
+     */
     private fun ensureChannelCreated(channelType: NotificationChannelType, context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        channelType.legacyChannelId?.let { old ->
+            if (notificationManager.getNotificationChannel(old) != null) {
+                notificationManager.deleteNotificationChannel(old)
+            }
+        }
         if (notificationManager.getNotificationChannel(channelType.channelId) != null) return
 
         val channel = NotificationChannel(
             channelType.channelId,
-            channelType.channelName,
-            NotificationManager.IMPORTANCE_LOW
+            context.getString(channelType.channelNameRes),
+            channelType.importance
         ).apply {
             lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+            setShowBadge(false)
         }
         notificationManager.createNotificationChannel(channel)
     }
 
+    /**
+     * A BLANK [content] LEAVES THE LINE OUT, rather than printing an empty one — the same
+     * distinction `NotificationManager.stopSpeedNotification` had to learn about the ongoing VPN
+     * notification. It matters here because the latency check now has nothing to say: its
+     * notification exists to satisfy the foreground-service requirement and carries the app's name
+     * and nothing else.
+     *
+     * The priority follows the channel rather than being one figure for every channel, so a
+     * min-importance channel is also min-priority on the versions that read that instead.
+     */
     private fun buildNotificationBuilder(
         channelType: NotificationChannelType,
         context: Context,
@@ -149,14 +151,25 @@ object NotificationHelper {
         }
 
         val displayTitle = title.ifEmpty { context.getString(R.string.app_name) }
-        return NotificationCompat.Builder(context, channelId)
+        val priority = if (channelType.importance <= NotificationManager.IMPORTANCE_MIN) {
+            NotificationCompat.PRIORITY_MIN
+        } else {
+            NotificationCompat.PRIORITY_LOW
+        }
+        val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_name)
             .setContentTitle(displayTitle)
-            .setContentText(content)
             .setOngoing(false)
             .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setSilent(true)
+            .setPriority(priority)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            // Android 12+ holds a foreground-service notification back for ten seconds when it is
+            // not marked immediate — longer than most latency batches run for, so the shade often
+            // never shows this one at all.
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_DEFERRED)
+        if (content.isNotEmpty()) builder.setContentText(content)
+        return builder
     }
 }
 

@@ -7,7 +7,6 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.AuthTokenStore
 import com.v2ray.ang.auth.BackendConfig
-import com.v2ray.ang.core.CoreConfigManager
 import com.v2ray.ang.dto.SubscriptionUpdateResult
 import com.v2ray.ang.dto.UrlContentRequest
 import com.v2ray.ang.dto.entities.ProfileItem
@@ -36,14 +35,6 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.net.URI
 
 object AngConfigManager {
-
-    /**
-     * Generic placeholder used as a subscription's [SubscriptionItem.remarks] when neither the
-     * sub URL `#fragment` nor a provider `profile-title` yields a real name. Kept as a single
-     * constant so import (fallback) and update (the "may I adopt the provider title?" check)
-     * agree on what counts as "still unnamed".
-     */
-    private const val DEFAULT_SUBSCRIPTION_REMARKS = "import sub"
 
     /**
      * Rich outcome of [importBatchConfig].
@@ -118,34 +109,6 @@ object AngConfigManager {
     }
 
     /**
-     * Shares non-custom configurations to the clipboard.
-     *
-     * @param context The context.
-     * @param serverList The list of server GUIDs.
-     * @return The number of configurations shared.
-     */
-    fun shareNonCustomConfigsToClipboard(context: Context, serverList: List<String>): Int {
-        try {
-            val sb = StringBuilder()
-            for (guid in serverList) {
-                val url = shareConfig(guid)
-                if (TextUtils.isEmpty(url)) {
-                    continue
-                }
-                sb.append(url)
-                sb.appendLine()
-            }
-            if (sb.count() > 0) {
-                Utils.setClipboard(context, sb.toString())
-            }
-            return sb.lines().count() - 1
-        } catch (e: Exception) {
-            LogUtil.e(AppConfig.TAG, "Failed to share non-custom configs to clipboard", e)
-            return -1
-        }
-    }
-
-    /**
      * Shares the configuration as a QR code.
      *
      * @param guid The GUID of the configuration.
@@ -163,31 +126,6 @@ object AngConfigManager {
             LogUtil.e(AppConfig.TAG, "Failed to share config as QR code", e)
             return null
         }
-    }
-
-    /**
-     * Shares the full content of the configuration to the clipboard.
-     *
-     * @param context The context.
-     * @param guid The GUID of the configuration.
-     * @return The result code.
-     */
-    fun shareFullContent2Clipboard(context: Context, guid: String?): Int {
-        try {
-            if (guid == null) return -1
-            // Block full-config export for managed/hidden profiles.
-            if (TemplateManager.isLocked(guid)) return -1
-            val result = CoreConfigManager.getV2rayConfig(context, guid)
-            if (result.status) {
-                Utils.setClipboard(context, result.content)
-            } else {
-                return -1
-            }
-        } catch (e: Exception) {
-            LogUtil.e(AppConfig.TAG, "Failed to share full content to clipboard", e)
-            return -1
-        }
-        return 0
     }
 
     /**
@@ -283,10 +221,10 @@ object AngConfigManager {
      * @param subid The subscription ID whose servers should be de-duplicated.
      * @return The number of duplicate servers removed.
      */
-    private fun dedupServersViaSubid(subid: String): Int {
+    private fun dedupServersViaSubid(subid: String): Int = MmkvManager.inServerListTransaction {
         try {
             val serverList = MmkvManager.decodeServerList(subid)
-            if (serverList.size < 2) return 0
+            if (serverList.size < 2) return@inServerListTransaction 0
 
             val selected = MmkvManager.getSelectServer()
             val kept = mutableListOf<Pair<ProfileItem, String>>() // (profile, kept guid)
@@ -306,10 +244,10 @@ object AngConfigManager {
                 }
             }
             toRemove.forEach { MmkvManager.removeServer(it) }
-            return toRemove.size
+            return@inServerListTransaction toRemove.size
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to dedup servers for subid: $subid", e)
-            return 0
+            return@inServerListTransaction 0
         }
     }
 
@@ -376,14 +314,23 @@ object AngConfigManager {
                     }
                 }
 
-            // Batch save all parsed configs (only one serverList read/write)
+            // Batch save all parsed configs (only one serverList read/write).
+            //
+            // THE REPLACEMENT IS ONE STEP AGAINST THE OTHER PROCESS. Clearing the подписка's list
+            // and refilling it are two writes to the same key, and this runs in `:bg` on a scheduled
+            // refresh while the interface process is free to delete a row or apply a sort. Between
+            // the two writes the list is EMPTY on disk, so a concurrent read-modify-write there
+            // wrote that emptiness back over the imported серверы. Parsing is already done by this
+            // point, so the fence holds no I/O — see [MmkvManager.inServerListTransaction].
             if (configs.isNotEmpty()) {
-                if (!append) {
-                    MmkvManager.removeServerViaSubid(subid)
+                MmkvManager.inServerListTransaction {
+                    if (!append) {
+                        MmkvManager.removeServerViaSubid(subid)
+                    }
+                    val keyToProfile = batchSaveConfigs(configs, subid)
+                    val matchKey = resolveSelectedKey(keyToProfile, removedSelected, subid, append)
+                    matchKey?.let { MmkvManager.setSelectServer(it) }
                 }
-                val keyToProfile = batchSaveConfigs(configs, subid)
-                val matchKey = resolveSelectedKey(keyToProfile, removedSelected, subid, append)
-                matchKey?.let { MmkvManager.setSelectServer(it) }
             }
 
             return configs.size
@@ -875,11 +822,16 @@ object AngConfigManager {
                 return SubscriptionUpdateResult(skipCount = 1)
             }
 
-            // Validate subscription info
-            if (TextUtils.isEmpty(it.guid)
-                || TextUtils.isEmpty(it.subscription.remarks)
-                || TextUtils.isEmpty(it.subscription.url)
-            ) {
+            // Validate subscription info.
+            //
+            // A BLANK REMARK IS NOT A REASON TO SKIP, and it used to be. A подписка is identified by
+            // its guid and its url; the remark is a display name that this very function is
+            // responsible for FILLING IN from the провайдер's `profile-title` a few dozen lines
+            // below. Refusing to fetch until it is already named made that adoption unreachable —
+            // which is why the import had to invent «import sub» to get past this line at all. With
+            // the placeholder gone, this guard would have skipped every freshly added подписка
+            // forever.
+            if (TextUtils.isEmpty(it.guid) || TextUtils.isEmpty(it.subscription.url)) {
                 return SubscriptionUpdateResult(skipCount = 1)
             }
 
@@ -889,7 +841,11 @@ object AngConfigManager {
             }
             val fetchUrl = resolveSecureSubUrl(url, it.subscription)
                 ?: return SubscriptionUpdateResult(failureCount = 1)
-            LogUtil.i(AppConfig.TAG, fetchUrl)
+            // THE ADDRESS IS NOT LOGGED. A подписка URL carries the account token in its path, so
+            // this line put a working credential into «Журнал», into logcat, and into every log the
+            // user might export or screenshot for support. The host alone answers the only question
+            // the log has to answer here — which операторский endpoint was contacted.
+            LogUtil.i(AppConfig.TAG, "Subscription fetch: ${HttpUtil.hostOf(fetchUrl)}")
             // The panel picks the response format (XRAY_JSON template vs base64 link list) from
             // the User-Agent, so a per-subscription override wins over everything, then the
             // global override from the provider screen, then the operator-configured UA. All
@@ -922,7 +878,20 @@ object AngConfigManager {
                     )
                 )
             } catch (e: Exception) {
-                LogUtil.e(AppConfig.ANG_PACKAGE, "Update subscription: proxy not ready or other error", e)
+                // THE FIRST ATTEMPT IS EXPECTED TO FAIL WHEN NO TUNNEL IS UP, so it is not an error.
+                //
+                // This call is deliberately routed through the local HTTP proxy port, which only
+                // exists while the core is running. Refreshing a подписка with the VPN off — the
+                // ordinary case, and what the background worker does every few hours — therefore
+                // threw here EVERY time, and the ERROR line with its stack trace was the first thing
+                // in «Журнал» on a session where nothing had gone wrong. The direct retry two lines
+                // below is what actually fetches it, and it succeeds.
+                //
+                // One INFO line, and the reason, so a genuine proxy failure is still traceable.
+                LogUtil.i(
+                    AppConfig.TAG,
+                    "Subscription fetch via the local proxy did not answer, retrying directly: ${e.message}"
+                )
                 null
             }
             if (result == null || result.body.isEmpty()) {
@@ -935,7 +904,14 @@ object AngConfigManager {
                         )
                     )
                 } catch (e: Exception) {
-                    LogUtil.e(AppConfig.TAG, "Update subscription: Failed to get URL content with user agent", e)
+                    // THIS one is a real failure — both routes are exhausted and the подписка did
+                    // not refresh — so it stays at error level. The address is not in the message:
+                    // it carries the account token (see the fetch log above).
+                    LogUtil.e(
+                        AppConfig.TAG,
+                        "Subscription not refreshed: ${HttpUtil.hostOf(fetchUrl)} did not answer",
+                        e
+                    )
                     null
                 }
             }
@@ -951,39 +927,69 @@ object AngConfigManager {
                 MmkvManager.encodeSubscription(it.guid, it.subscription)
             }
 
+            // ============================================================================
+            // AN EXPIRED ПОДПИСКА DOES NOT ANSWER WITH SERVERS, AND THIS IS WHERE THAT MATTERS.
+            // ============================================================================
+            //
+            // When the term is over the panel replies with a NOTICE instead of the list: a single
+            // entry pointing at a host whose only job is to say «подписка истекла». Nothing below
+            // could tell that apart from a list of one. `parseBatchConfig` parses it, counts one
+            // config, calls `MmkvManager.removeServerViaSubid` — which deletes every real сервер of
+            // this подписка AND clears the selected one — and then saves the notice in their place.
+            // The user is left with one fake «локация» in the list, quite possibly selected, that
+            // the app will happily try to connect through; the серверы it replaced are gone from
+            // the device and only a renewal brings them back.
+            //
+            // The подписка's own `subscription-userinfo` header is the authoritative statement, it
+            // arrives ON THIS RESPONSE, and it is what the app already stores as the expiry it
+            // draws. So it is read BEFORE the body and it decides whether the body is a list at
+            // all. An expired подписка keeps everything it had — серверы, selection, name — and its
+            // metadata is still written, which is what makes Главная say «Подписка истекла» and
+            // offer «Продлить». That is the whole intended behaviour: the session is not touched
+            // (a 401 from the identity endpoint is the only thing that ends one), nothing is
+            // deleted, and the way out is on screen.
+            //
+            // The account's own JWT and this подписка's credentials are unrelated, so this is the
+            // only signal available on the refresh path — and it is also the only one the hand-added
+            // подписки have, which come through here too.
+            val userInfo = SubscriptionUserInfo.parse(result?.subscriptionUserInfo)
+            if (userInfo != null && userInfo.isExpired()) {
+                applySubUserInfo(it.subscription, userInfo)
+                applySubDirectives(it.subscription, result)
+                it.subscription.lastUpdated = System.currentTimeMillis()
+                MmkvManager.encodeSubscription(it.guid, it.subscription)
+                LogUtil.i(
+                    AppConfig.TAG,
+                    "Subscription term is over: the answer is a notice, keeping the stored servers"
+                )
+                // Not a failure — nothing went wrong and nothing needs retrying — and not a
+                // success either, because no config was imported. `skipCount` is already the
+                // bucket for «ничего не запрашивалось», and the screens branch on it that way.
+                return SubscriptionUpdateResult(skipCount = 1)
+            }
+
             val count = parseConfigViaSub(configText, it.guid, false)
             if (count > 0) {
                 // Persist traffic/expiry metadata from the subscription-userinfo header, if present.
-                SubscriptionUserInfo.parse(result?.subscriptionUserInfo)?.let { info ->
-                    it.subscription.uploadUsed = info.upload
-                    it.subscription.downloadUsed = info.download
-                    it.subscription.totalTraffic = info.total
-                    it.subscription.expire = info.expire
-                    it.subscription.userInfoUpdated = System.currentTimeMillis()
-                }
-                // Persist Happ/Incy-style directives (announce banner, support/website buttons).
-                // null header = leave unchanged; "0" = clear; "base64:.." = decoded.
-                decodeSubDirective(result?.announce)?.let { v -> it.subscription.announce = v }
-                decodeSubDirective(result?.supportUrl)?.let { v -> it.subscription.supportUrl = v }
-                decodeSubDirective(result?.webPageUrl)?.let { v -> it.subscription.webPageUrl = v }
-                // Real subscription title sent by the provider (used as the meta-bar heading).
-                decodeSubDirective(result?.profileTitle)?.let { v -> it.subscription.profileTitle = v }
-                // Adopt that provider title as the Servers group name too, but only while the
-                // subscription is still unnamed (blank or the generic "import sub"/"Default"
-                // placeholder) — a name the user typed in SubEditActivity must never be clobbered.
+                userInfo?.let { info -> applySubUserInfo(it.subscription, info) }
+                applySubDirectives(it.subscription, result)
+                // Adopt that provider title as the подписка's stored name too, but only while the
+                // подписка is still unnamed — a name that identifies THIS подписка must never be
+                // clobbered.
+                //
+                // THIS IS ALSO THE HEALING PATH FOR EVERY INSTALL THAT ALREADY STORED A
+                // PLACEHOLDER. [SubscriptionNaming.isUnnamed] treats «import sub», «Default» and the
+                // generic service label as no name at all, so the first refresh after this build
+                // replaces each of them with what the провайдер actually calls the подписка
+                // («🍀 erlish»). There is no rename to fall back on (OWNER-DECISION-2026-08-02 §5),
+                // so this is the only route by which a bad stored name can ever be corrected.
                 val providerTitle = it.subscription.profileTitle.trim()
-                if (providerTitle.isNotEmpty()) {
-                    val currentRemarks = it.subscription.remarks.trim()
-                    if (currentRemarks.isEmpty()
-                        || currentRemarks.equals(DEFAULT_SUBSCRIPTION_REMARKS, ignoreCase = true)
-                        || currentRemarks.equals("Default", ignoreCase = true)
-                    ) {
-                        it.subscription.remarks = providerTitle
-                    }
+                if (providerTitle.isNotEmpty() && SubscriptionNaming.isUnnamed(it.subscription)) {
+                    it.subscription.remarks = providerTitle
                 }
                 it.subscription.lastUpdated = System.currentTimeMillis()
                 MmkvManager.encodeSubscription(it.guid, it.subscription)
-                LogUtil.i(AppConfig.TAG, "Subscription updated: ${it.subscription.remarks}, $count configs")
+                LogUtil.i(AppConfig.TAG, "Subscription updated: $count configs")
                 return SubscriptionUpdateResult(
                     configCount = count,
                     successCount = 1
@@ -996,6 +1002,37 @@ object AngConfigManager {
             LogUtil.e(AppConfig.TAG, "Failed to update config via subscription", e)
             return SubscriptionUpdateResult(failureCount = 1)
         }
+    }
+
+    /**
+     * Copies the parsed `subscription-userinfo` figures onto the подписка.
+     *
+     * Extracted because two branches of [updateConfigViaSub] need it and they must not diverge: an
+     * expired подписка imports nothing, but its traffic and its expiry are exactly what the screens
+     * then draw to explain why — writing them on the success path alone would have left the app
+     * silent about the one state it most needs to name.
+     */
+    private fun applySubUserInfo(sub: SubscriptionItem, info: SubscriptionUserInfo) {
+        sub.uploadUsed = info.upload
+        sub.downloadUsed = info.download
+        sub.totalTraffic = info.total
+        sub.expire = info.expire
+        sub.userInfoUpdated = System.currentTimeMillis()
+    }
+
+    /**
+     * Persists the Happ/Incy-style directives (announce banner, support/website buttons, provider
+     * title). null header = leave unchanged; "0" = clear; "base64:.." = decoded.
+     *
+     * Applied on the expired path too, and that is the point of it being shared: `announce` and
+     * `support-url` are how a панель explains an expired подписка and where it sends the user to
+     * renew, so the one response that carries a reason must not be the one whose reason is dropped.
+     */
+    private fun applySubDirectives(sub: SubscriptionItem, result: HttpUtil.UrlContentResult?) {
+        decodeSubDirective(result?.announce)?.let { v -> sub.announce = v }
+        decodeSubDirective(result?.supportUrl)?.let { v -> sub.supportUrl = v }
+        decodeSubDirective(result?.webPageUrl)?.let { v -> sub.webPageUrl = v }
+        decodeSubDirective(result?.profileTitle)?.let { v -> sub.profileTitle = v }
     }
 
     /**
@@ -1047,10 +1084,17 @@ object AngConfigManager {
 
         val uri = URI(Utils.fixIllegalUrl(url))
         val subItem = SubscriptionItem()
-        // Name the group after the URL's #fragment when present; the real provider title
-        // (`profile-title`) is not known until the first fetch, so [updateConfigViaSub] later
-        // upgrades this placeholder to the real name (e.g. "erlish") on the first update.
-        subItem.remarks = uri.fragment?.trim()?.takeIf { it.isNotEmpty() } ?: DEFAULT_SUBSCRIPTION_REMARKS
+        // Name the подписка after the URL's #fragment when present, and LEAVE IT BLANK otherwise —
+        // no placeholder is stored, because a placeholder that is stored is a placeholder that gets
+        // shown. Upstream's «import sub» reached the card heading, the server-list group name and
+        // the shade («Обновляем «import sub»»), and with no rename UI to correct it
+        // (OWNER-DECISION-2026-08-02 §5) it was permanent.
+        //
+        // Blank is not a gap: the real provider title (`profile-title`) arrives on the very first
+        // fetch, a few lines into [updateConfigViaSub], which adopts it into a still-unnamed
+        // подписка. Until then every display path resolves the name through [SubscriptionNaming],
+        // which answers «Подписка» rather than printing an empty string.
+        subItem.remarks = uri.fragment?.trim().orEmpty()
         subItem.url = url
         val guid = Utils.getUuid()
         MmkvManager.encodeSubscription(guid, subItem)

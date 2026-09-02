@@ -4,7 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches:
+      # Every branch the work has lived on. A workflow that builds only yesterday's branch produces
+      # no artefact for today's, and the fix nobody can install is indistinguishable from no fix.
       - claude/app-audit-agents-hyyftk
+      - claude/project-analysis-status-9cefax
     paths:
       - 'V2rayNG/**'
       - '.github/workflows/release.yml'
@@ -36,8 +39,25 @@ jobs:
       - name: Build libhev-socks5-tunnel (tun2socks native lib)
         run: bash compile-hevtun.sh
 
+      # `app/build.gradle.kts` declares `jniLibs.srcDirs("libs")`, so the ABI directories
+      # compile-hevtun.sh produced have to land at V2rayNG/app/libs/<abi>/.
+      #
+      # This used to be `cp -r <ws>/libs <ws>/V2rayNG/app`, which is correct ONLY while the
+      # destination does not already exist — V2rayNG/app/libs is untracked (.gitignore excludes
+      # *.so and *.aar) so on a clean runner it does not. The moment anything creates it first —
+      # a cached workspace, a self-hosted runner, a reordered step, one committed placeholder —
+      # the same command nests to V2rayNG/app/libs/libs/<abi>/, Gradle finds no ABI directory,
+      # and the .so silently vanishes from a perfectly green build. Copying the CONTENTS into an
+      # explicitly created destination has one behaviour instead of two.
       - name: Copy libhev-socks5-tunnel into app
-        run: cp -r "${{ github.workspace }}/libs" "${{ github.workspace }}/V2rayNG/app"
+        run: |
+          set -e
+          mkdir -p "${{ github.workspace }}/V2rayNG/app/libs"
+          cp -r "${{ github.workspace }}/libs/." "${{ github.workspace }}/V2rayNG/app/libs/"
+          echo "jniLibs source tree:"
+          ls -R "${{ github.workspace }}/V2rayNG/app/libs"
+          test -f "${{ github.workspace }}/V2rayNG/app/libs/arm64-v8a/libhev-socks5-tunnel.so" \
+            || { echo "::error::arm64-v8a/libhev-socks5-tunnel.so is not where jniLibs expects it"; exit 1; }
 
       - name: Fetch AndroidLibXrayLite tag
         run: |
@@ -58,9 +78,99 @@ jobs:
         working-directory: V2rayNG
         run: chmod +x ./gradlew
 
-      - name: Build release APK (arm64-v8a, playstore only, debug-signed)
+      # The identity this APK is signed with. Without one of the two branches below,
+      # app/build.gradle.kts leaves the release UNSIGNED on purpose — and an unsigned APK cannot be
+      # installed on any Android device at all ("App not installed" / apksigner: "Missing
+      # META-INF/MANIFEST.MF"). This step used to be missing entirely while the build step was still
+      # titled "debug-signed", which is how the branch shipped an artefact nobody could install.
+      #
+      # Real key first: DEPARTAMENT_* is what build.gradle.kts reads, APP_KEYSTORE_* is the secret
+      # set the repo already carries for build.yml. Fall back to the documented
+      # -PdebugSignedRelease escape hatch, so the output is always installable.
+      - name: Prepare release signing
+        env:
+          APP_KEYSTORE_BASE64: ${{ secrets.APP_KEYSTORE_BASE64 }}
+          APP_KEYSTORE_PASSWORD: ${{ secrets.APP_KEYSTORE_PASSWORD }}
+          APP_KEYSTORE_ALIAS: ${{ secrets.APP_KEYSTORE_ALIAS }}
+          APP_KEY_PASSWORD: ${{ secrets.APP_KEY_PASSWORD }}
+        run: |
+          if [ -n "$APP_KEYSTORE_BASE64" ]; then
+            printf '%s' "$APP_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/departament-release.jks"
+            {
+              echo "DEPARTAMENT_KEYSTORE=$RUNNER_TEMP/departament-release.jks"
+              echo "DEPARTAMENT_KEYSTORE_PASSWORD=$APP_KEYSTORE_PASSWORD"
+              echo "DEPARTAMENT_KEY_ALIAS=$APP_KEYSTORE_ALIAS"
+              echo "DEPARTAMENT_KEY_PASSWORD=$APP_KEY_PASSWORD"
+            } >> "$GITHUB_ENV"
+            echo "SIGNING=release-key" >> "$GITHUB_ENV"
+          else
+            echo "No APP_KEYSTORE_BASE64 secret; falling back to the debug key for a test build."
+            echo "SIGNING=debug-key" >> "$GITHUB_ENV"
+          fi
+
+      # Only reached on the debug-key fallback, and only because a debug key that is regenerated per
+      # runner makes build N+1 refuse to install over build N (INSTALL_FAILED_UPDATE_INCOMPATIBLE),
+      # which costs the tester every server, subscription and their session. Restoring the same
+      # ~/.android/debug.keystore keeps one identity across runs. A cache miss is harmless: Gradle
+      # creates a fresh key exactly as it does today.
+      - name: Restore the CI debug keystore
+        if: env.SIGNING == 'debug-key'
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: departament-ci-debug-keystore-v1
+
+      - name: Build release APK (arm64-v8a, playstore only)
         working-directory: V2rayNG
-        run: ./gradlew assemblePlaystoreRelease -PABI_FILTERS=arm64-v8a
+        run: |
+          if [ "$SIGNING" = "release-key" ]; then
+            ./gradlew assemblePlaystoreRelease -PABI_FILTERS=arm64-v8a
+          else
+            ./gradlew assemblePlaystoreRelease -PABI_FILTERS=arm64-v8a -PdebugSignedRelease=true
+          fi
+
+      # An artefact that cannot be installed must not be published looking like one that can.
+      # build.gradle.kts tags an unsigned release `-unsigned` in the filename precisely so this
+      # check is one glob; apksigner then proves the APK actually carries a signature.
+      - name: Refuse to publish an uninstallable APK
+        run: |
+          set -e
+          apk=$(find V2rayNG/app/build/outputs/apk -name '*arm64-v8a*.apk' | head -n 1)
+          if [ -z "$apk" ]; then echo "::error::no APK was produced"; exit 1; fi
+          case "$apk" in
+            *-unsigned.apk)
+              echo "::error::$apk is UNSIGNED and cannot be installed on any device."
+              exit 1;;
+          esac
+          signer=$(find "$ANDROID_HOME/build-tools" -name apksigner 2>/dev/null | sort | tail -n 1)
+          if [ -x "$signer" ]; then
+            "$signer" verify --print-certs "$apk" \
+              || { echo "::error::$apk carries no valid signature"; exit 1; }
+          else
+            echo "note: apksigner not on this runner; relied on the filename check alone."
+          fi
+          echo "installable artefact: $apk"
+
+      # Whether the tunnel library actually ships is a fact about the APK, not an argument about
+      # the copy step. `System.loadLibrary("hev-socks5-tunnel")` needs lib/arm64-v8a/ inside the
+      # archive; if it is absent the app degrades to the core's own tun (SettingsManager
+      # .isUsingHevTun consults TProxyService.isAvailable) instead of dying — but a degraded VPN
+      # must never be published silently as the normal one.
+      - name: Prove the tunnel library is inside the APK
+        run: |
+          set -e
+          apk=$(find V2rayNG/app/build/outputs/apk -name '*arm64-v8a*.apk' | head -n 1)
+          echo "native libraries in $apk:"
+          unzip -l "$apk" | grep -E '\.so$' || true
+          if ! unzip -l "$apk" | grep -q 'lib/arm64-v8a/libhev-socks5-tunnel\.so'; then
+            echo "::error::$apk carries no lib/arm64-v8a/libhev-socks5-tunnel.so — tun2socks cannot load."
+            exit 1
+          fi
+          if ! unzip -l "$apk" | grep -q 'lib/arm64-v8a/libgojni\.so'; then
+            echo "::error::$apk carries no lib/arm64-v8a/libgojni.so — the xray core cannot start."
+            exit 1
+          fi
+          echo "both native libraries present for arm64-v8a"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

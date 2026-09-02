@@ -1,648 +1,440 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  ============================================================================
+  «Настройки подписок» (ProviderSettingsActivity) — handoff README §7.
+  ============================================================================
+
+  §7's table gives this screen four groups and this file draws exactly those four,
+  in that order: «Обновление · При запуске · Сеть · Список серверов».
+
+      кнопка назад → заголовок 24sp/700 → четыре карточки
+
+  The header is @layout/view_sub_header, so the screen goes through setContentView
+  and ToolbarBinder rather than BaseActivity.setContentViewWithToolbar and its 16sp
+  MaterialToolbar title.
+
+  EVERY ROW IS §6's «Строка», AND EVERY ROW IS THE SAME HEIGHT:
+
+      плитка 40dp r12 нейтральная, глиф 22dp   @style/Widget.Departament.Tile
+      → 16dp → заголовок 14sp                  Body
+      → 12dp → значение 13sp / переключатель   Subtitle / MaterialSwitch
+      минимум 56dp, высота по плитке = 60dp    @style/Widget.Departament.Row
+
+  What that replaces, line for line: `?attr/selectableItemBackground` (a ripple, and
+  §1 bans the whole kind — it is @drawable/bg_row plus @anim/press_row 0.975 now),
+  a 60dp fixed row height, 14dp inner padding, inline 16sp/12sp/13sp sizes, a 12dp
+  card inset, a 68dp-inset hairline, and five colours of icon tile — blue, green,
+  orange, yellow and purple — that encoded no category at all (D-5, §9).
+
+  NOT ONE ROW CARRIES A SUBTITLE, and every switch overrides android:minHeight.
+  Owner report 0.4.9, the same one that levelled the Настройки tab: «в настройках
+  подписок такая же тема с высотой, надо фиксить». This screen was the worse of the
+  two — FIVE different row heights, 60 / 61 / 68 / 78 / 95 — from two causes:
+
+    1. FOUR ROWS CARRIED A SECOND LINE, and unlike the tab's these had no maxLines,
+       so they ran as long as they liked: «Показывать уведомление после обновления
+       подписки» took two lines and «Отправлять идентификатор устройства при
+       обновлении подписки» took THREE, which is a 95dp row next to a 60dp one.
+       Dropped at the call site — here. NO STRING WAS DELETED; each one stays in
+       values/strings_provider.xml with a comment saying it has no reader and why.
+    2. EVERY SWITCH WAS 48dp TALL. Material's
+       Widget.Material3.CompoundButton.MaterialSwitch (the parent of
+       @style/Widget.Departament.Switch) sets android:minHeight="?minTouchTargetSize"
+       = 48dp — 8dp above the tile — so even a bare toggle row measured 68 against
+       a value row's 60. Every switch here is clickable="false" focusable="false"
+       because THE ROW is the target and the row already carries minHeight 56, so
+       the floor guards a target that does not exist; minHeight 0 lets the switch
+       sit at its own 32dp track. Not a fixed height, and a switch has no text to
+       clip: at font scale 200% the text column overtakes the tile and the row grows.
+
+  «СПИСОК СЕРВЕРОВ» УБРАН ЦЕЛИКОМ по указанию владельца — см. комментарий на месте,
+  где стоял раздел. Ни одна строка ресурсов при этом не удалена.
+
+  «User-Agent» IS Row.Fact NOW: it reports, it does not lead anywhere. See the
+  comment on @id/row_user_agent. «Интервал обновления» is gone from this screen
+  altogether; see the comment where it stood, in the ОБНОВЛЕНИЕ card.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/transparent"
-    android:fillViewport="true"
-    android:scrollbars="none">
+    android:background="?android:attr/colorBackground"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical"
+    tools:context=".ui.ProviderSettingsActivity">
 
-    <LinearLayout
+    <include
+        android:id="@+id/toolbar"
+        layout="@layout/view_sub_header" />
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/main_content"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="8dp"
-        android:paddingBottom="16dp">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/space_32"
+        android:scrollbars="none">
 
-        <!-- ==================== ОБНОВЛЕНИЕ ==================== -->
-        <TextView
-            style="@style/SettingsSectionLabel"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/ps_section_update" />
+            android:clipChildren="false"
+            android:orientation="vertical">
 
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
+            <!-- ==================== ОБНОВЛЕНИЕ ==================== -->
+            <TextView
+                style="@style/SettingsSectionLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:text="@string/ps_section_update" />
 
-                <!-- Автообновление (toggle) -->
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Departament.CardSection"
+                android:clipChildren="false"
+                android:clipToPadding="false">
+
                 <LinearLayout
-                    android:id="@+id/row_auto_update"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="60dp"
-                    android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+                    style="@style/Widget.Departament.CardSection.Body"
+                    android:clipChildren="false"
+                    android:clipToPadding="false">
 
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_icon_blue">
+                    <!-- Автообновление. THE EDGE ROWS OF THIS CARD ROUND THEMSELVES: the card
+                         hosts «Интервал обновления»'s select popup and therefore cannot clip its
+                         children (§11 grabl 4), so it no longer trims its first and last row to
+                         its own corner. 19dp, one pixel inside the card's 20dp stroke. -->
+                    <LinearLayout
+                        android:id="@+id/row_auto_update"
+                        style="@style/Widget.Departament.Row"
+                        android:background="@drawable/bg_row_top"
+                        android:baselineAligned="false">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
+                            style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
+                            android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_refresh_24dp"
-                            app:tint="?attr/iconTintBlue" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+                            app:srcCompat="@drawable/ic_refresh_24dp" />
 
                         <TextView
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
+                            android:layout_marginEnd="@dimen/space_12"
+                            android:layout_weight="1"
                             android:text="@string/ps_auto_update"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp" />
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
-                        <TextView
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switch_auto_update"
+                            style="@style/Widget.Departament.Switch"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="@string/ps_auto_update_sub"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp" />
+                            android:clickable="false"
+                            android:focusable="false"
+                            android:importantForAccessibility="no"
+                            android:minHeight="0dp" />
                     </LinearLayout>
 
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switch_auto_update"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:clickable="false"
-                        android:focusable="false" />
-                </LinearLayout>
+                    <!-- «ИНТЕРВАЛ ОБНОВЛЕНИЯ» СТОЯЛ ЗДЕСЬ и снят по указанию владельца
+                         («он уже и так вынесен в общий список настроек»). Проверено перед
+                         снятием, а не после: обе строки писали ОДНО И ТО ЖЕ хранилище —
+                         SubscriptionItem.updateInterval + .autoUpdate у каждой подписки,
+                         с последующим SubscriptionUpdater.sync(forceReschedule = true).
+                         Отдельного ключа у этого экрана нет и не было (см. комментарий
+                         к DEFAULT_INTERVAL_MINUTES в ProviderSettingsActivity).
+                         Уцелевший вход — «Автообновление подписки» (@id/row_sub_auto_update)
+                         в разделе ПОДПИСКА вкладки Настройки, SettingsTabFragment.
+                         pickSubAutoUpdate(). Он же умеет «Выключено», чего здешний список
+                         не умел. Единственная разница в наборе значений: здесь предлагалось
+                         «2 ч», а на вкладке — «3 часа»; уже сохранённые 120 минут не
+                         теряются, вкладка покажет их как «120 мин». Ни одна строка
+                         values/strings_provider.xml не удалена. -->
 
-                <View
-                    android:id="@+id/divider_interval"
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
-                    android:background="?attr/colorOutlineVariant" />
+                    <!-- The id this divider used to carry (@id/divider_interval) went with the row
+                         it was named after. It never had a reader in Kotlin — the interval row was
+                         hidden by nothing and disabled instead — so the name was already only a
+                         label, and a divider called «interval» between «Автообновление» and
+                         «Уведомлять об обновлениях» would be a lie the next reader has to check. -->
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
 
-                <!-- Интервал обновления (value + chevron) -->
-                <LinearLayout
-                    android:id="@+id/row_interval"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="60dp"
-                    android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
-
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_icon_green">
-
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_ps_clock"
-                            app:tint="?attr/iconTintGreen" />
-                    </FrameLayout>
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_weight="1"
-                        android:text="@string/ps_interval"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
-
-                    <TextView
-                        android:id="@+id/value_interval"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:maxLines="1"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="13sp"
-                        tools:text="24 ч" />
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
-                    android:background="?attr/colorOutlineVariant" />
-
-                <!-- Уведомлять об обновлениях (toggle) -->
-                <LinearLayout
-                    android:id="@+id/row_notify"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="60dp"
-                    android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
-
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_icon_orange">
-
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_ps_bell"
-                            app:tint="?attr/iconTintOrange" />
-                    </FrameLayout>
-
+                    <!-- Уведомлять об обновлениях -->
                     <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:id="@+id/row_notify"
+                        style="@style/Widget.Departament.Row"
+                        android:background="@drawable/bg_row_bottom"
+                        android:baselineAligned="false">
+
+                        <ImageView
+                            style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
+                            android:layout_marginEnd="@dimen/space_16"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_ps_bell" />
 
                         <TextView
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
+                            android:layout_marginEnd="@dimen/space_12"
+                            android:layout_weight="1"
                             android:text="@string/ps_notify_updates"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp" />
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
-                        <TextView
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switch_notify"
+                            style="@style/Widget.Departament.Switch"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="@string/ps_notify_updates_sub"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp" />
+                            android:clickable="false"
+                            android:focusable="false"
+                            android:importantForAccessibility="no"
+                            android:minHeight="0dp" />
                     </LinearLayout>
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switch_notify"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:clickable="false"
-                        android:focusable="false" />
                 </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            </com.google.android.material.card.MaterialCardView>
 
-        <!-- ==================== ПРИ ЗАПУСКЕ ==================== -->
-        <TextView
-            style="@style/SettingsSectionLabel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/ps_section_startup" />
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
+            <!-- ==================== ПРИ ЗАПУСКЕ ==================== -->
+            <TextView
+                style="@style/SettingsSectionLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:text="@string/ps_section_startup" />
 
-                <!-- Обновлять подписки при запуске (toggle) -->
-                <LinearLayout
-                    android:id="@+id/row_update_on_launch"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="60dp"
-                    android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+            <com.google.android.material.card.MaterialCardView style="@style/Widget.Departament.CardSection">
 
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_icon_blue">
+                <LinearLayout style="@style/Widget.Departament.CardSection.Body">
 
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_power_settings"
-                            app:tint="?attr/iconTintBlue" />
-                    </FrameLayout>
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
-                        android:layout_weight="1"
-                        android:text="@string/ps_update_on_launch"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switch_update_on_launch"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:clickable="false"
-                        android:focusable="false" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
-                    android:background="?attr/colorOutlineVariant" />
-
-                <!-- Пинг серверов при запуске (toggle) -->
-                <LinearLayout
-                    android:id="@+id/row_ping_on_launch"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="60dp"
-                    android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
-
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_icon_yellow">
-
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_ping_24dp"
-                            app:tint="?attr/iconTintYellow" />
-                    </FrameLayout>
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
-                        android:layout_weight="1"
-                        android:text="@string/ps_ping_on_launch"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switch_ping_on_launch"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:clickable="false"
-                        android:focusable="false" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
-                    android:background="?attr/colorOutlineVariant" />
-
-                <!-- Пинг при обновлении (toggle) -->
-                <LinearLayout
-                    android:id="@+id/row_ping_on_update"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="60dp"
-                    android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
-
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_icon_purple">
-
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_ping_24dp"
-                            app:tint="?attr/iconTintPurple" />
-                    </FrameLayout>
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
-                        android:layout_weight="1"
-                        android:text="@string/ps_ping_on_update"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switch_ping_on_update"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:clickable="false"
-                        android:focusable="false" />
-                </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- ==================== СЕТЬ ==================== -->
-        <TextView
-            style="@style/SettingsSectionLabel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/ps_section_network" />
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <!-- Отправлять HWID (toggle) -->
-                <LinearLayout
-                    android:id="@+id/row_send_hwid"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="60dp"
-                    android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
-
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_icon_blue">
-
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_ps_fingerprint"
-                            app:tint="?attr/iconTintBlue" />
-                    </FrameLayout>
-
+                    <!-- Обновлять подписки при запуске -->
                     <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_marginEnd="10dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:id="@+id/row_update_on_launch"
+                        style="@style/Widget.Departament.Row"
+                        android:baselineAligned="false">
+
+                        <ImageView
+                            style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
+                            android:layout_marginEnd="@dimen/space_16"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_power_settings" />
 
                         <TextView
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:text="@string/ps_send_hwid"
-                            android:textColor="?attr/colorOnSurface"
-                            android:textSize="16sp" />
+                            android:layout_marginEnd="@dimen/space_12"
+                            android:layout_weight="1"
+                            android:text="@string/ps_update_on_launch"
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
-                        <TextView
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switch_update_on_launch"
+                            style="@style/Widget.Departament.Switch"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="@string/ps_send_hwid_sub"
-                            android:textColor="?attr/colorOnSurfaceVariant"
-                            android:textSize="12sp" />
+                            android:clickable="false"
+                            android:focusable="false"
+                            android:importantForAccessibility="no"
+                            android:minHeight="0dp" />
                     </LinearLayout>
 
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switch_send_hwid"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:clickable="false"
-                        android:focusable="false" />
-                </LinearLayout>
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="68dp"
-                    android:background="?attr/colorOutlineVariant" />
-
-                <!-- User-Agent (value + chevron) -->
-                <LinearLayout
-                    android:id="@+id/row_user_agent"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="60dp"
-                    android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
-
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_icon_purple">
+                    <!-- Пинг серверов при запуске -->
+                    <LinearLayout
+                        android:id="@+id/row_ping_on_launch"
+                        style="@style/Widget.Departament.Row"
+                        android:baselineAligned="false">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
+                            style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
+                            android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_ps_tag"
-                            app:tint="?attr/iconTintPurple" />
-                    </FrameLayout>
+                            app:srcCompat="@drawable/ic_ping_24dp" />
 
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_weight="1"
-                        android:text="@string/ps_user_agent"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="@dimen/space_12"
+                            android:layout_weight="1"
+                            android:text="@string/ps_ping_on_launch"
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
-                    <TextView
-                        android:id="@+id/value_user_agent"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:layout_weight="1.4"
-                        android:ellipsize="end"
-                        android:gravity="end"
-                        android:maxLines="1"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="13sp"
-                        tools:text="DepartamentVPN/1.0" />
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switch_ping_on_launch"
+                            style="@style/Widget.Departament.Switch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:clickable="false"
+                            android:focusable="false"
+                            android:importantForAccessibility="no"
+                            android:minHeight="0dp" />
+                    </LinearLayout>
 
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
-                        app:tint="?attr/colorOnSurfaceVariant" />
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                    <!-- Пинг при обновлении -->
+                    <LinearLayout
+                        android:id="@+id/row_ping_on_update"
+                        style="@style/Widget.Departament.Row"
+                        android:baselineAligned="false">
+
+                        <ImageView
+                            style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
+                            android:layout_marginEnd="@dimen/space_16"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_ping_24dp" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="@dimen/space_12"
+                            android:layout_weight="1"
+                            android:text="@string/ps_ping_on_update"
+                            android:textAppearance="@style/TextAppearance.App.Body" />
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switch_ping_on_update"
+                            style="@style/Widget.Departament.Switch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:clickable="false"
+                            android:focusable="false"
+                            android:importantForAccessibility="no"
+                            android:minHeight="0dp" />
+                    </LinearLayout>
                 </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            </com.google.android.material.card.MaterialCardView>
 
-        <!-- ==================== СПИСОК СЕРВЕРОВ ==================== -->
-        <TextView
-            style="@style/SettingsSectionLabel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/ps_section_server_list" />
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
-            app:cardBackgroundColor="?attr/colorSurface"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="0dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
+            <!-- ==================== СЕТЬ ==================== -->
+            <TextView
+                style="@style/SettingsSectionLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:text="@string/ps_section_network" />
 
-                <!-- Сортировка серверов (value + chevron) -->
-                <LinearLayout
-                    android:id="@+id/row_sort_order"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="60dp"
-                    android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingVertical="10dp">
+            <com.google.android.material.card.MaterialCardView style="@style/Widget.Departament.CardSection">
 
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_icon_green">
+                <LinearLayout style="@style/Widget.Departament.CardSection.Body">
+
+                    <!-- Отправлять HWID -->
+                    <LinearLayout
+                        android:id="@+id/row_send_hwid"
+                        style="@style/Widget.Departament.Row"
+                        android:baselineAligned="false">
 
                         <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
+                            style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
+                            android:layout_marginEnd="@dimen/space_16"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_ps_sort"
-                            app:tint="?attr/iconTintGreen" />
-                    </FrameLayout>
+                            app:srcCompat="@drawable/ic_ps_fingerprint" />
 
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_weight="1"
-                        android:text="@string/ps_sort_order"
-                        android:textColor="?attr/colorOnSurface"
-                        android:textSize="16sp" />
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="@dimen/space_12"
+                            android:layout_weight="1"
+                            android:text="@string/ps_send_hwid"
+                            android:textAppearance="@style/TextAppearance.App.Body" />
 
-                    <TextView
-                        android:id="@+id/value_sort_order"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:maxLines="1"
-                        android:textColor="?attr/colorOnSurfaceVariant"
-                        android:textSize="13sp"
-                        tools:text="По умолчанию" />
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switch_send_hwid"
+                            style="@style/Widget.Departament.Switch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:clickable="false"
+                            android:focusable="false"
+                            android:importantForAccessibility="no"
+                            android:minHeight="0dp" />
+                    </LinearLayout>
 
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_marginStart="4dp"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
-                        app:tint="?attr/colorOnSurfaceVariant" />
+                    <com.google.android.material.divider.MaterialDivider
+                        style="@style/Widget.Departament.Divider.Full"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                    <!-- User-Agent — Row.Fact (view_row.xml 8.1): заголовок слева, значение
+                         справа, СТРОКА НИЧЕГО НЕ ОТКРЫВАЕТ.
+
+                         Владелец: «убери возможность настройки user agent, чтобы жил было
+                         некликабельно». Поэтому здесь нет шеврона (шеврон обещает экран),
+                         нет отклика на нажатие и нет clickable/focusable — иначе строка
+                         осталась бы остановкой для TalkBack и D-pad, то есть мишенью,
+                         которая ничего не делает. Стиль Widget.Departament.Row включает всё
+                         три, их приходится гасить здесь поимённо; stateListAnimator="@null"
+                         снимает @anim/press_row, а фон остаётся @drawable/bg_row — его
+                         состояние покоя и есть поверхность карточки, а нажатого состояния
+                         у неведущей строки не бывает.
+
+                         ЗНАЧЕНИЕ ПЕРЕЕХАЛО В ХВОСТ СТРОКИ и не потерялось. Прежде оно
+                         стояло второй строчкой (12.5sp, две строки), и это была ровно та
+                         подпись, из-за которой ряды на экране разной высоты. Прежний
+                         комментарий здесь возражал, что длинный User-Agent в хвосте
+                         обрежется до «Mozilla/5.0…» — но он и подписью обрезался, просто
+                         на строку позже, а всё, что приложение отправляет по умолчанию
+                         («v2rayNG/2.2.1», «departament/2.2.1»), это ~90dp при 206dp
+                         свободных, то есть целиком. Показать сокращённо то, что почти
+                         всегда влезает, лучше, чем ради редкого случая держать весь экран
+                         разновысоким. -->
+                    <LinearLayout
+                        android:id="@+id/row_user_agent"
+                        style="@style/Widget.Departament.Row"
+                        android:baselineAligned="false"
+                        android:clickable="false"
+                        android:focusable="false"
+                        android:stateListAnimator="@null">
+
+                        <ImageView
+                            style="@style/Widget.Departament.Tile"
+                            android:backgroundTint="?attr/colorSurfaceContainerHighest"
+                            android:layout_marginEnd="@dimen/space_16"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_ps_tag" />
+
+                        <!-- 12 и не 4: §6 даёт 12dp тому, у кого справа ЗНАЧЕНИЕ или
+                             переключатель, а здесь теперь значение. -->
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="@dimen/space_12"
+                            android:layout_weight="1"
+                            android:text="@string/ps_user_agent"
+                            android:textAppearance="@style/TextAppearance.App.Body" />
+
+                        <TextView
+                            android:id="@+id/value_user_agent"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textAppearance="@style/TextAppearance.App.Subtitle"
+                            tools:text="departament/2.2.1" />
+                    </LinearLayout>
                 </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            </com.google.android.material.card.MaterialCardView>
 
-    </LinearLayout>
-</androidx.core.widget.NestedScrollView>
+            <!-- «СПИСОК СЕРВЕРОВ» СНЯТ ПО УКАЗАНИЮ ВЛАДЕЛЬЦА: «убери кнопку сортировка
+                 серверов и текст выше "список серверов" вообще убери функцию».
+
+                 Раздел был одной карточкой с одной строкой, поэтому вместе со строкой уходит и
+                 заголовок — секция из ноля строк это заголовок, под которым ничего нет.
+
+                 Ни одна строка ресурсов не удалена: ps_section_server_list, ps_sort_order,
+                 ps_sort_default/_ping/_name остаются в strings_provider.xml, у них просто больше
+                 нет читателя. Порядок серверов теперь всегда тот, что задан по умолчанию — см.
+                 ProviderSettingsActivity, где сохранённое значение приводится к нему. -->
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

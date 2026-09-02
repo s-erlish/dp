@@ -22,6 +22,9 @@ import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.PackageUidResolver
 import com.v2ray.ang.util.Utils
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 object CoreConfigManager {
     private var initConfigCache: String? = null
@@ -39,7 +42,15 @@ object CoreConfigManager {
             if (configContext.isCustom) {
                 return buildV2rayCustomConfig(configContext)
             }
-            return toConfigResult(configContext, buildUnifiedConfig(configContext))
+            val v2rayConfig = buildUnifiedConfig(configContext)
+            // THE PRE-RESOLUTION BELONGS TO THE CONNECT AND TO NOTHING ELSE. It used to be the last
+            // line of [buildUnifiedConfig], which the latency test also goes through — and the very
+            // next thing the test does is `postProcessForSpeedtest`, whose `v2rayConfig.dns = null`
+            // throws away the only thing the lookups produced. So «Проверить все» over 100 серверов
+            // performed 100 blocking DNS queries whose answers were discarded three lines later,
+            // and the native `measureOutboundDelay` then resolved every one of them again itself.
+            resolveOutboundDomainsToHosts(v2rayConfig)
+            return toConfigResult(configContext, v2rayConfig)
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to get V2ray config", e)
             return ConfigResult(
@@ -331,8 +342,9 @@ object CoreConfigManager {
 
         // resolvedOutbounds is a single ordered plan: index 0 is primary and must be prepended,
         // the rest are routing outbounds and can be appended.
+        var primaryBuilt = false
         configContext.resolvedOutbounds.forEachIndexed { index, spec ->
-            buildOutbounds(
+            val built = buildOutbounds(
                 resolvedOutbound = spec,
                 prepend = index == 0,
                 existingTags = existingTags,
@@ -340,6 +352,24 @@ object CoreConfigManager {
                 policyGroupBalancerTags = policyGroupBalancerTags,
                 balancerStrategies = balancerStrategies,
             )
+            if (index == 0) primaryBuilt = built
+        }
+
+        // A CONFIG WITHOUT THE PRIMARY OUTBOUND IS NOT A CONFIG, IT IS A LEAK.
+        //
+        // The template's placeholder `proxy` outbound was removed above, so at this point the only
+        // outbounds a skipped primary leaves behind are `direct` (freedom) and `block` — and Xray
+        // sends anything that matches no rule through the FIRST outbound in the list. The core would
+        // have started, the shade would have said «Подключено», and every byte would have gone out
+        // unproxied. Every skip in [buildOutbounds] is a `LogUtil.w` and a `return`, and each of them
+        // could reach this state: a profile whose stored settings cannot be read (see
+        // [CoreOutboundBuilder.convert]), a policy group whose members are all broken, a resolved
+        // entry with no profiles at all.
+        //
+        // Failing here instead means «Не удалось подключиться» with the reason in «Журнал» — the
+        // honest answer, and the only safe one.
+        if (!primaryBuilt) {
+            error("No usable outbound for «${primaryResolvedOutbound.profile.remarks}»: check the server's settings")
         }
 
         // User routing rules (policyGroupBalancerTags rewrites TAG_PROXY→balancer when main is POLICYGROUP).
@@ -370,7 +400,6 @@ object CoreConfigManager {
 
         applyObservability(v2rayConfig, balancerStrategies)
         applySpeedDisabled(v2rayConfig)
-        resolveOutboundDomainsToHosts(v2rayConfig)
 
         return v2rayConfig
     }
@@ -378,6 +407,14 @@ object CoreConfigManager {
     /**
      * Convert one analyzed outbound entry into concrete outbounds and register
      * them to the runtime configuration.
+     *
+     * @return whether this entry actually put an outbound into the runtime configuration. Every
+     *   refusal below is a `LogUtil.w` and a skip, which is right for a ROUTING entry — the rule
+     *   falls back to the proxy — and fatal for the PRIMARY one, whose absence turns the config
+     *   into `direct` first and every byte unproxied. The caller needs the two told apart, and it
+     *   cannot ask `existingTags`: a policy group registers its MEMBERS' tags
+     *   («proxy-proxy-1-…») and never its own, so its own tag is missing from that set even on a
+     *   perfectly built group.
      */
     private fun buildOutbounds(
         resolvedOutbound: CoreConfigContext.ResolvedOutbound,
@@ -386,13 +423,13 @@ object CoreConfigManager {
         v2rayConfig: V2rayConfig,
         policyGroupBalancerTags: MutableMap<String, String>,
         balancerStrategies: MutableList<BalancerStrategy>,
-    ) {
+    ): Boolean {
         if (resolvedOutbound.tag in existingTags) {
             LogUtil.w(AppConfig.TAG, "Resolved outbound tag '${resolvedOutbound.tag}' already exists, skipping duplicated entry")
-            return
+            return false
         }
 
-        when (resolvedOutbound.resolvedType) {
+        return when (resolvedOutbound.resolvedType) {
             CoreResolvedType.NORMAL -> handleNormalResolvedOutbound(
                 resolvedOutbound = resolvedOutbound,
                 prepend = prepend,
@@ -426,14 +463,14 @@ object CoreConfigManager {
         prepend: Boolean,
         existingTags: MutableSet<String>,
         v2rayConfig: V2rayConfig,
-    ) {
+    ): Boolean {
         val profile = resolvedOutbound.resolvedProfiles.firstOrNull() ?: run {
             LogUtil.w(AppConfig.TAG, "NORMAL resolved outbound '${resolvedOutbound.tag}' has empty resolvedProfiles, skipping")
-            return
+            return false
         }
         val outbound = convertProfile2Outbound(profile) ?: run {
             LogUtil.w(AppConfig.TAG, "Could not convert NORMAL resolved outbound '${resolvedOutbound.tag}' profile to outbound, skipping")
-            return
+            return false
         }
         outbound.tag = resolvedOutbound.tag
         if (prepend) {
@@ -442,6 +479,7 @@ object CoreConfigManager {
             v2rayConfig.outbounds.add(outbound)
         }
         existingTags.add(resolvedOutbound.tag)
+        return true
     }
 
     /**
@@ -452,13 +490,13 @@ object CoreConfigManager {
         prepend: Boolean,
         existingTags: MutableSet<String>,
         v2rayConfig: V2rayConfig,
-    ) {
+    ): Boolean {
         val chainOutbounds = resolvedOutbound.resolvedProfiles
             .mapNotNull { convertProfile2Outbound(it) }
             .toMutableList()
         if (chainOutbounds.isEmpty()) {
             LogUtil.w(AppConfig.TAG, "PROXYCHAIN resolved outbound '${resolvedOutbound.tag}' has no valid profiles, skipping")
-            return
+            return false
         }
         if (chainOutbounds.size == 1) {
             val outbound = chainOutbounds.first()
@@ -469,7 +507,7 @@ object CoreConfigManager {
                 v2rayConfig.outbounds.add(outbound)
             }
             existingTags.add(resolvedOutbound.tag)
-            return
+            return true
         }
 
         val chainTags = chainOutbounds.mapIndexed { index, _ ->
@@ -484,7 +522,7 @@ object CoreConfigManager {
                 AppConfig.TAG,
                 "PROXYCHAIN resolved outbound '${resolvedOutbound.tag}' has colliding hop tags, skipping"
             )
-            return
+            return false
         }
 
         chainOutbounds.forEachIndexed { index, outbound ->
@@ -500,6 +538,7 @@ object CoreConfigManager {
             v2rayConfig.outbounds.addAll(chainOutbounds)
         }
         chainOutbounds.forEach { existingTags.add(it.tag) }
+        return true
     }
 
     /**
@@ -512,13 +551,13 @@ object CoreConfigManager {
         v2rayConfig: V2rayConfig,
         policyGroupBalancerTags: MutableMap<String, String>,
         balancerStrategies: MutableList<BalancerStrategy>,
-    ) {
+    ): Boolean {
         val memberPairs = resolvedOutbound.resolvedProfiles.mapNotNull { profile ->
             convertProfile2Outbound(profile)?.let { ob -> ob to profile }
         }
         if (memberPairs.isEmpty()) {
             LogUtil.w(AppConfig.TAG, "POLICYGROUP resolved outbound '${resolvedOutbound.tag}' has no valid member outbounds, skipping")
-            return
+            return false
         }
 
         val memberTagPrefix = "${AppConfig.TAG_PROXY}-${resolvedOutbound.tag}-"
@@ -538,7 +577,7 @@ object CoreConfigManager {
                 AppConfig.TAG,
                 "POLICYGROUP resolved outbound '${resolvedOutbound.tag}' produced no unique member tags, skipping"
             )
-            return
+            return false
         }
 
         if (prepend) {
@@ -564,6 +603,7 @@ object CoreConfigManager {
         }
         balancerStrategies.add(strategy)
         policyGroupBalancerTags[resolvedOutbound.tag] = balancerTag
+        return true
     }
 
     /**
@@ -989,7 +1029,45 @@ object CoreConfigManager {
 
 
     /**
+     * How long the whole pre-resolution may hold up a connect, and how many names may be in flight.
+     *
+     * The deadline is a budget for ALL the names together, not for one of them: past it whatever
+     * came back is used and the rest are left to the core, which resolves at dial time anyway — that
+     * is precisely what setting «2» of [AppConfig.PREF_OUTBOUND_DOMAIN_RESOLVE_METHOD] does full
+     * time. So the worst case of a dead resolver costs this, once, instead of the resolver's own
+     * timeout per сервер.
+     */
+    private const val OUTBOUND_RESOLVE_BUDGET_MS = 2000L
+    private const val OUTBOUND_RESOLVE_PARALLELISM = 8
+
+    /**
      * Resolve outbound domains to IPs and write resolved hosts to DNS map.
+     *
+     * **THIS RUNS ON THE CONNECT PATH, AND IT USED TO RUN THERE ONE NAME AT A TIME, ON THE MAIN
+     * THREAD OF THE DAEMON PROCESS.** `CoreVpnService.onStartCommand` → `startCoreLoop` →
+     * `getV2rayConfig` is one synchronous chain on `:RunSoLibV2RayDaemon`'s main thread, and this
+     * function sat at the end of it calling a blocking `InetAddress.getAllByName` per proxy outbound
+     * in a `for` loop. Two separate consequences, both real:
+     *
+     *  - **It is O(серверы).** A policy group of twenty locations is twenty DNS round-trips in
+     *    series before the core is handed anything. Measured cold against a datacentre resolver,
+     *    twenty names cost 222 ms with the slowest single name at 36 ms; on mobile data, at
+     *    50-300 ms a name, the same loop is one to six seconds of frozen service. On a network that
+     *    answers nothing — captive Wi-Fi, the case where people press connect hardest — Android's
+     *    resolver spends seconds per name before giving up, and the sum walks into the foreground
+     *    service's start deadline.
+     *  - **In «Только прокси» it did not work at all.** `CoreVpnService.onCreate` installs a
+     *    `permitAll` StrictMode policy; `CoreProxyOnlyService` does not, so on that path every
+     *    lookup threw `NetworkOnMainThreadException`, was swallowed by `resolveHostToIP`, and left
+     *    one «Failed to resolve host to IP» in «Журнал» per сервер and nothing in `dns.hosts`.
+     *
+     * Both are the same fix: do the lookups on worker threads (no main-thread network policy to
+     * violate), all at once rather than one after another, and give the whole batch ONE budget. The
+     * cost of the step becomes the slowest single name, capped — not the sum of all of them.
+     *
+     * Called from [getV2rayConfig] alone. It is NOT part of [buildUnifiedConfig] any more: the
+     * latency test builds through the same function and then drops `dns` entirely, so every
+     * measured сервер used to pay for a lookup nobody read.
      */
     private fun resolveOutboundDomainsToHosts(v2rayConfig: V2rayConfig) {
         if (MmkvManager.decodeSettingsString(AppConfig.PREF_OUTBOUND_DOMAIN_RESOLVE_METHOD, "1") != "1") {
@@ -1001,39 +1079,72 @@ object CoreConfigManager {
         val newHosts = dns.hosts?.toMutableMap() ?: mutableMapOf()
         val preferIpv6 = MmkvManager.decodeSettingsBool(AppConfig.PREF_PREFER_IPV6) == true
 
+        // A group of twenty серверы behind one hostname is ONE lookup: the names are collected and
+        // de-duplicated before anything is resolved, which the per-outbound loop could not do.
+        val wanted = LinkedHashSet<String>()
         for (item in proxyOutboundList) {
             val domain = item.getServerAddress()
-            if (domain.isNullOrEmpty()) {
-                continue
-            }
+            if (domain.isNullOrEmpty() || newHosts.containsKey(domain)) continue
+            wanted.add(domain)
+        }
 
-            if (newHosts.containsKey(domain)) {
-                item.ensureSockopt().domainStrategy = "UseIP"
-                item.ensureSockopt().happyEyeballs = V2rayConfig.OutboundBean.StreamSettingsBean.HappyEyeballsBean(
-                    prioritizeIPv6 = preferIpv6,
-                    interleave = 2
-                )
-                continue
+        if (wanted.isNotEmpty()) {
+            resolveInParallel(wanted.toList(), preferIpv6).forEach { (domain, ips) ->
+                newHosts[domain] = if (ips.size == 1) ips[0] else ips
             }
+        }
 
-            val resolvedIps = HttpUtil.resolveHostToIP(domain, preferIpv6)
-            if (resolvedIps.isNullOrEmpty()) {
-                continue
-            }
-
+        // `UseIP` is written for exactly the outbounds whose address ENDED UP in the map, which is
+        // the rule the serial loop applied too: an address that is already an IP, or a name nothing
+        // could resolve, keeps whatever the profile asked for and is left to the core.
+        for (item in proxyOutboundList) {
+            val domain = item.getServerAddress()
+            if (domain.isNullOrEmpty() || !newHosts.containsKey(domain)) continue
             item.ensureSockopt().domainStrategy = "UseIP"
             item.ensureSockopt().happyEyeballs = V2rayConfig.OutboundBean.StreamSettingsBean.HappyEyeballsBean(
                 prioritizeIPv6 = preferIpv6,
                 interleave = 2
             )
-            newHosts[domain] = if (resolvedIps.size == 1) {
-                resolvedIps[0]
-            } else {
-                resolvedIps
-            }
         }
 
         dns.hosts = newHosts
+    }
+
+    /**
+     * [domains] → their addresses, for as many as answer within [OUTBOUND_RESOLVE_BUDGET_MS].
+     *
+     * A name that does not answer in time is simply absent from the result; it is not an error and
+     * nothing retries it, because the core will resolve it itself when it dials. The pool is shut
+     * down before returning, and the tasks left running are interrupted — a lookup nobody is waiting
+     * for must not keep a thread alive into the session.
+     */
+    private fun resolveInParallel(domains: List<String>, preferIpv6: Boolean): Map<String, List<String>> {
+        val pool = Executors.newFixedThreadPool(minOf(domains.size, OUTBOUND_RESOLVE_PARALLELISM))
+        return try {
+            val tasks = domains.map { domain ->
+                Callable { domain to HttpUtil.resolveHostToIP(domain, preferIpv6) }
+            }
+            val started = System.currentTimeMillis()
+            val futures = pool.invokeAll(tasks, OUTBOUND_RESOLVE_BUDGET_MS, TimeUnit.MILLISECONDS)
+            val out = LinkedHashMap<String, List<String>>()
+            futures.forEach { future ->
+                if (future.isCancelled) return@forEach
+                val (domain, ips) = runCatching { future.get() }.getOrNull() ?: return@forEach
+                if (!ips.isNullOrEmpty()) out[domain] = ips
+            }
+            if (out.size < domains.size) {
+                LogUtil.i(
+                    AppConfig.TAG,
+                    "Outbound pre-resolve: ${out.size} of ${domains.size} names in ${System.currentTimeMillis() - started} ms, the rest are left to the core"
+                )
+            }
+            out
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            emptyMap()
+        } finally {
+            pool.shutdownNow()
+        }
     }
 
     /**

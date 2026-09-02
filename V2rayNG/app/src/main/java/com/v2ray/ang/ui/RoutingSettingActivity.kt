@@ -13,6 +13,7 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.contracts.BaseAdapterListener
 import com.v2ray.ang.databinding.ActivityRoutingSettingBinding
+import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.MmkvManager
@@ -20,6 +21,7 @@ import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.helper.SimpleItemTouchHelperCallback
 import com.v2ray.ang.ui.component.EmptyStateBinder
 import com.v2ray.ang.ui.component.RowBinder
+import com.v2ray.ang.ui.component.SelectPopup
 import com.v2ray.ang.ui.component.SubPage
 import com.v2ray.ang.ui.component.ToolbarBinder
 import com.v2ray.ang.util.JsonUtil
@@ -62,13 +64,14 @@ class RoutingSettingActivity : HelperBaseActivity() {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
 
+        // NO TOOLBAR ACTION. §7's lekalo is «кнопка назад → заголовок → группы карточек» and
+        // carries none; the prototype puts «Добавить правило» in a card under the rules, where
+        // it has a name instead of being a «+» the user has to interpret. Same function, and
+        // one fewer target in the header.
         ToolbarBinder.bind(
             root = binding.toolbar.root,
             title = getString(R.string.routing_title),
             activity = this,
-            actionIcon = R.drawable.ic_add_24dp,
-            actionDescription = getString(R.string.routing_action_add),
-            onAction = { addRule() },
         )
         ToolbarBinder.attachTo(binding.toolbar.root, binding.mainContent)
 
@@ -94,6 +97,17 @@ class RoutingSettingActivity : HelperBaseActivity() {
         MmkvManager.decodeSettingsString(AppConfig.PREF_ROUTING_DOMAIN_STRATEGY)
             ?: domainStrategies.first()
 
+    /**
+     * «Доменная стратегия» — handoff README §6, «Выбор из списка — окошко у значения».
+     *
+     * It used to CYCLE: one tap advanced AsIs -> IPIfNonMatch -> IPOnDemand and the user had to
+     * tap three times to see what the third option even was. §6 names this row among the nine that
+     * open the select popup instead, so the whole list is visible where the value already is, and
+     * a value two steps away costs one tap rather than two.
+     *
+     * `select_popup_w_default` and not a bespoke width: §6's width table stops at the six rows it
+     * measured, and this is one of the three it does not name (TOKENS.md).
+     */
     private fun bindDomainStrategyRow() {
         val current = currentDomainStrategy()
         RowBinder.bind(
@@ -101,25 +115,45 @@ class RoutingSettingActivity : HelperBaseActivity() {
             title = getString(R.string.routing_domain_strategy),
             glyph = R.drawable.ic_globe_24dp,
             value = current,
-            // Three values: the affordance grammar's cycle-in-place case. The glyph promises the
-            // value changes right here, and it does - no dialog, no screen.
+            // The caret, not a chevron: a chevron promises a screen and this row opens none.
             trailing = RowBinder.Trailing.Glyph(
                 icon = R.drawable.ic_arrow_drop_down,
                 contentDescription = getString(R.string.routing_strategy_cd),
             ),
             onClick = {
-                val next = domainStrategies[
-                    (domainStrategies.indexOf(current).coerceAtLeast(0) + 1) % domainStrategies.size
-                ]
-                MmkvManager.encodeSettings(AppConfig.PREF_ROUTING_DOMAIN_STRATEGY, next)
-                bindDomainStrategyRow()
+                SelectPopup.show(
+                    anchor = binding.rowDomainStrategy.root,
+                    options = domainStrategies.toList(),
+                    selectedIndex = domainStrategies.indexOf(current).coerceAtLeast(0),
+                    valueView = binding.rowDomainStrategy.rowValue,
+                    caret = binding.rowDomainStrategy.rowTrailingGlyph,
+                ) { picked ->
+                    MmkvManager.encodeSettings(
+                        AppConfig.PREF_ROUTING_DOMAIN_STRATEGY,
+                        domainStrategies[picked],
+                    )
+                    bindDomainStrategyRow()
+                }
             },
         )
+        // Its card cannot clip (the popup would be sliced off at the bottom edge), so the row
+        // carries the card's corner itself. One row in the card: all four corners.
+        RowBinder.edge(binding.rowDomainStrategy.root, RowBinder.Edge.ONLY)
     }
 
     // ------------------------------------------------------------- actions
 
     private fun bindActionRows() {
+        // §7's accent action row: the name IS the affordance, so no chevron and no button. And
+        // no tile either - the prototype gives this one row no glyph at all, so its label starts
+        // on the 16dp gutter, which is what makes it read as an action rather than a setting.
+        RowBinder.bind(
+            root = binding.rowAddRule.root,
+            title = getString(R.string.routing_action_add),
+            tone = RowBinder.RowTone.ACCENT,
+            trailing = RowBinder.Trailing.None,
+            onClick = { addRule() },
+        )
         RowBinder.bind(
             root = binding.rowPresets.root,
             title = getString(R.string.routing_action_presets),
@@ -219,7 +253,7 @@ class RoutingSettingActivity : HelperBaseActivity() {
             toastError(R.string.routing_export_empty)
         } else {
             Utils.setClipboard(this, JsonUtil.toJson(rulesetList))
-            toastSuccess(R.string.editor_copied)
+            toast(R.string.notice_copied)
         }
     }
 
@@ -259,7 +293,6 @@ class RoutingSettingActivity : HelperBaseActivity() {
 
         override fun onRemove(guid: String, position: Int) {}
 
-        override fun onShare(url: String) {}
 
         override fun onRefreshData() {
             refreshData()

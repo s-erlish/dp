@@ -1,15 +1,129 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    The Настройки tab, hosted in the shell's fragment container (activity_main's @id/tab_host).
+    THE НАСТРОЙКИ TAB, hosted in the shell's fragment container (activity_main's @id/tab_host).
 
-    Lifted out of activity_main.xml unchanged (it was an <include> named group_settings there): the
-    same sections, cards and rows, in the same order, with the same ids — SettingsTabFragment binds
-    every one of them. The container is padded with the status-bar inset on behalf of every tab it
-    hosts, so this tree adds no top inset of its own.
+    Six sections, no screen title (handoff README §6). Each section is a sentence-case header
+    16sp/700 with padding 22 x 16 x 8 over a radius-20 card inset 16 from the screen edge, and each
+    card is a stack of rows separated by a full-width hairline.
 
-    The `visibility="gone"` the include carried is gone with it: as a sibling group the shell had to
-    start it hidden and settleTabs() turned it on, whereas a fragment's view is on screen exactly
-    when its tab is shown.
+    THE ROW, and every number is §6's:
+
+        [ tile 40 (radius 12, NEUTRAL fill, glyph 22) ][ 16 ][ title 14/400 ]   [ 12 ][ value 13 ]
+                                                                                      [ or switch ]
+                                                                                       [ 4 ][ 18 ]
+
+    - minHeight @dimen/row_min_height 56, padding 10 x 16. The 40dp tile is the tallest thing in
+      the row, so every row measures 10 + 40 + 10 = 60 and the hairline above it 61, which is §6's
+      «без подписи 61dp». That is a CONSEQUENCE of the padding, never a fixed height — a fixed
+      height clips a Russian label at font scale 200% (П-29), and at 200% the text column
+      overtakes the tile and the row grows, which is the point.
+    - The gap before the trailing slot is 12 when something is there to trail (§6: «правый отступ
+      12dp только когда справа есть значение или переключатель») and 0 when nothing is — the
+      prototype's own rule, `gap: (isToggle || pop || r[6]) ? '12px' : '0px'`. A chevron is not
+      «значение»: it is the row's own punctuation, already spaced by its 4dp, and holding a second
+      12dp open in front of it shortens the label for nothing. Eleven rows here trail only a
+      chevron and set no gap at all.
+
+    NOT ONE ROW ON THIS TAB CARRIES A SUBTITLE, and every switch overrides android:minHeight.
+    Both are the same owner report (0.4.9): «эти все кнопки вкладки они некоторые больше по высоте,
+    чем некоторые… надо подравнять такие кнопки под обычный размер как условно у dns, у режима».
+    The tab had THREE heights and two independent causes, which is why fixing one of them would
+    have left the list still ragged:
+
+      1. NINE ROWS CARRIED A SECOND LINE. A one-line subtitle put the text column at 20 + 2 + 17
+         = 39, just under the tile, so those rows stayed at 60 — but four of the nine wrapped to
+         two lines at 360dp («Прямой доступ к устройствам», «Разбивает рукопожатие против DPI»,
+         «Подключаться после перезагрузки», «Автообновление, сеть, список серверов»), which puts
+         the column at 56 and the row at 76. A subtitle whose length decides the row's height is
+         not a subtitle, it is a leak, and §11 grabl 9 already said so: «длинные подписи ломают
+         ритм строк». Dropped at the CALL SITE — here, where each row is written — exactly as
+         @id/row_mode and @id/row_ru_preset were dropped at the RowBinder call in 0.4.9. NO STRING
+         WAS DELETED: all nine live on in values/strings_hub.xml and values/strings_settings_hub.xml
+         with a comment saying they have no reader and why.
+      2. EVERY SWITCH WAS 48dp TALL, subtitle or no subtitle. Material's
+         Widget.Material3.CompoundButton.MaterialSwitch sets android:minHeight="?minTouchTargetSize"
+         = 48dp, 8dp ABOVE the tile — so a toggle row measured 68 while a chevron row measured 60,
+         and no amount of removing text would have closed that. The floor is there to make a bare
+         switch a legal touch target; on this tab the switch is explicitly clickable="false"
+         focusable="false" because THE ROW is the target, and the row already carries
+         minHeight 56 (≥48). The floor is therefore protecting a target that does not exist here,
+         so each switch sets minHeight 0 and falls back to its own 32dp track. This is NOT a fixed
+         height and it clips nothing: a switch has no text, and the row is still wrap_content.
+
+    Net: all 25 rows resolve to the same 60dp, and the tile — not the trailing control and not the
+    copy — is what decides it. Before re-adding a subtitle to any row here, read П-29 and grabl 9,
+    and note that the two rows whose subtitle was their ONLY explanation («Локальный прокси»,
+    «Постоянный VPN») were reported to the owner as such when it was dropped.
+
+    WHAT CHANGED IN THE 2026-08 PORT, and why each one is here rather than in a shared style:
+
+    1. TILES ARE NEUTRAL. They were bg_icon_blue / _green / _orange / _purple / _red / _yellow — six
+       fills encoding a category system this product does not have (D-5), and the prototype draws
+       every one of them grey in the blue theme too. @drawable/bg_tile_neutral carries the shape;
+       the FILL comes from ?attr/colorSurfaceContainerHighest through backgroundTint, and the glyph
+       from ?attr/colorOnSurfaceVariant. Both are theme ATTRIBUTES rather than the drawable's own
+       @color/icon_tile_neutral, and that is the whole point: the attribute is #20242B on dark —
+       §8's «Плитка #20242B» to the character — #E3EAF4 on light, and the mono overlay remaps it to
+       mono_surfaceContainerHighest by itself. A colour resource cannot be remapped by an overlay,
+       so the plain drawable would have left 25 faintly blue tiles on a screen whose whole premise
+       is that it has no colour (П-24). No hex is written here.
+    2. THE RIPPLE IS GONE. Every row carried ?attr/selectableItemBackground. §1 replaces the splash
+       with two channels that push the object IN: @anim/press_row 0.975 and @drawable/bg_row, whose
+       pressed state steps the fill DOWN to ?attr/colorPressBg. SettingsTabFragment additionally
+       calls pressFeedback() on each row, which adds the hardware layer that keeps a label from
+       twitching on the rebound (§11 grabl 1) — the one part of the press XML cannot say.
+    3. THE HAIRLINE RUNS EDGE TO EDGE. It was inset 72dp to clear the tile. The prototype draws it
+       across the whole card.
+    4. THE CARDS DO NOT CLIP, and the edge rows round themselves. §11 grabl 4: a select popup opened
+       on the last row of a card is sliced off at the card's bottom edge if the card clips. With
+       clipChildren and clipToPadding off, the card also stops rounding its first and last rows for
+       them, so those two rows carry the corner themselves via @drawable/bg_row_top and
+       @drawable/bg_row_bottom — @dimen/radius_row_edge 19, one device pixel inside the card's 20.
+    5. A SELECT ROW ENDS IN A CARET, a navigation row in a chevron. A chevron promises a screen and
+       a select row does not open one; it opens the flyout, and its caret turns 180° while that is up
+       (SelectPopup, @integer/motion_caret 300). Every caret has an id for exactly that reason.
+    6. A SELECT ROW'S VALUE IS FULL-STRENGTH INK. It is the answer to the row's question, not a
+       caption about it, and it dims to ?attr/colorOnSurfaceVariant only while the popup is open.
+       A navigation row's value stays muted, which is what tells the two kinds of row apart at a
+       glance before either is touched.
+    7. THE GLYPHS ARE THE DESIGN'S, ROW BY ROW. §9: «Все из res/drawable, в прототипе вставлены теми
+       же pathData» — so the prototype is not decorated with stand-ins, it names a drawable in this
+       repository for every row, and each one below was matched back by comparing pathData
+       character for character rather than by eye. Fourteen rows were still carrying the glyph the
+       old preference tree gave them, which is the whole of «не все функции перенесены по внешнему
+       виду» (owner, 2026-08-05). What changed and to what:
+
+         Режим, Постоянный VPN  ic_shield_outline  -> ic_shield_filled   (the design's shield is SOLID)
+         Прокси по приложениям  ic_per_apps_24dp   -> ic_hub_local_proxy (`router`, the same glyph
+                                                                          «Локальный прокси» already had)
+         DNS, О приложении      ic_privacy_24dp,   -> ic_support_24dp    (`help`)
+                                ic_about_24dp
+         Мультиплексирование    ic_qu_switch_24dp  -> ic_lp_http         (`http`)
+         Оформление             ic_palette_24dp    -> ic_settings_24dp   (`gear`)
+         Запуск при загрузке    ic_power_settings  -> ic_lock_24dp       (`lock`)
+         Маршрутизация          ic_routing_24dp    -> ic_nav_servers     (`servers`)
+         Файлы ресурсов, Журнал ic_file_24dp,      -> ic_source_code_24dp (`code`, which Фрагментация
+                                ic_logcat_24dp                            already had — three rows,
+                                                                          one glyph, on purpose)
+         Проверить обновления   ic_check_update_24dp -> ic_refresh_24dp  (`refresh`, shared with
+                                                                          «Автообновление подписки»)
+         Перенести на телевизор ic_tv_24dp         -> ic_share_24dp      (`share`)
+
+       THE REUSE IS THE POINT, not an oversight to tidy up later: the design draws twenty-five rows
+       with thirteen glyphs, because a settings row is identified by its words and the tile is there
+       to give the eye a rhythm. A per-row bespoke icon is the taxonomy D-5 already refused for the
+       tile COLOUR, arriving through the other door.
+
+       «Настройки подписок» is the one row that moved without the design asking. It is a repository
+       row (П-05, not in §6) and it was holding ic_hub_provider, which is the `http` glyph to within
+       how its two dots are drawn — the glyph Мультиплексирование has now taken. It carries
+       ic_subscriptions_24dp instead, which is also what the row is about. The other three
+       repository-only rows keep what they had: «Число соединений Mux» ic_speed_24dp, «Принять
+       подписку» ic_tv_24dp (now the only television on the screen), «Схемы URL-адресов»
+       ic_hub_url_scheme.
+
+    Ids are load-bearing: SettingsTabFragment reads and writes a persisted value behind every one of
+    them, and a rename is a setting that silently stops saving. Nothing here was renamed.
 -->
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -18,13 +132,35 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/transparent"
+    android:clipChildren="false"
+    android:clipToPadding="false"
     android:fillViewport="true"
     android:scrollbars="none">
 
+    <!--
+        THE SCROLL CONTENT, and its bottom padding is a FLOOR rather than the figure.
+
+        The bottom navigation is an overlay: it floats over this tab so the cards scroll UNDER its
+        scrim instead of stopping at a solid bar. Nothing here reserves space for it, so this 16 —
+        the breathing room the design gives the last card — left «Схемы URL-адресов», the very last
+        row, half-covered by the bar with the list already scrolled to its end (owner's report from
+        the device). The bar is 56dp of buttons plus whatever the phone's gesture bar or 3-button
+        strip adds, which is why the real figure cannot be written here at all: it is different on
+        two phones running the same build.
+
+        SettingsTabFragment.applyListInsets raises this to the shell's own measurement
+        (MainHost.listBottomInset = system inset + bar + breathing room) and never below the 16 —
+        the same mechanism, and the same floor idea, Главная's list already uses
+        (HomeFragment.applyListInsets). The id exists for that call and for nothing else.
+    -->
     <LinearLayout
+        android:id="@+id/settings_content"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:orientation="vertical"
+        android:paddingTop="@dimen/space_6"
         android:paddingBottom="@dimen/space_16">
 
         <!-- ==================== ПОДКЛЮЧЕНИЕ ==================== -->
@@ -32,6 +168,7 @@
             style="@style/SettingsSectionLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:paddingTop="@dimen/space_22"
             android:text="@string/settings_section_connection" />
 
         <com.google.android.material.card.MaterialCardView
@@ -39,50 +176,58 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/screen_gutter"
             android:layout_marginEnd="@dimen/screen_gutter"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            app:strokeWidth="@dimen/stroke_hairline">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:clipChildren="false"
+                android:clipToPadding="false"
                 android:orientation="vertical">
 
-                <!-- Режим -->
+                <!-- Режим — select popup, three values (TUN / Только прокси / TUN + Proxy) -->
                 <LinearLayout
                     android:id="@+id/row_mode"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row_top"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_shield_outline"
-                            app:tint="?attr/iconTintBlue" />
+                            app:srcCompat="@drawable/ic_shield_filled"
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:text="@string/settings_mode"
                         android:textAppearance="@style/TextAppearance.App.Body" />
@@ -91,59 +236,65 @@
                         android:id="@+id/value_mode"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_8"
+                        android:ellipsize="end"
                         android:maxLines="1"
                         android:textAppearance="@style/TextAppearance.App.Subtitle"
-                        tools:text="VPN" />
+                        android:textColor="?attr/colorOnSurface"
+                        tools:text="TUN" />
 
                     <ImageView
+                        android:id="@+id/caret_mode"
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
+                        app:srcCompat="@drawable/ic_arrow_drop_down"
                         app:tint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
+                    android:layout_height="@dimen/stroke_hairline"
                     android:background="?attr/colorOutlineVariant" />
 
-                <!-- Прокси по приложениям -->
+                <!-- Прокси по приложениям — opens PerAppProxyActivity, so a chevron -->
                 <LinearLayout
                     android:id="@+id/row_per_app"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_orange">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_per_apps_24dp"
-                            app:tint="?attr/iconTintOrange" />
+                            app:srcCompat="@drawable/ic_hub_local_proxy"
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:text="@string/settings_per_app"
                         android:textAppearance="@style/TextAppearance.App.Body" />
@@ -152,10 +303,10 @@
                         android:id="@+id/value_per_app"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_8"
+                        android:ellipsize="end"
                         android:maxLines="1"
                         android:textAppearance="@style/TextAppearance.App.Subtitle"
-                        tools:text="Выкл" />
+                        tools:text="Вкл" />
 
                     <ImageView
                         android:layout_width="18dp"
@@ -166,10 +317,10 @@
                         app:tint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
+                    android:layout_height="@dimen/stroke_hairline"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Обход локальной сети (toggle) -->
@@ -177,20 +328,23 @@
                     android:id="@+id/row_bypass_lan"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_green">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -198,43 +352,31 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_globe_24dp"
-                            app:tint="?attr/iconTintGreen" />
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_8"
+                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_bypass_lan"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/settings_bypass_lan_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
+                        android:text="@string/settings_bypass_lan"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switch_bypass_lan"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:clickable="false"
-                        android:focusable="false" />
+                        android:focusable="false"
+                        android:minHeight="0dp" />
                 </LinearLayout>
 
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
+                    android:layout_height="@dimen/stroke_hairline"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- IPv6 (toggle) -->
@@ -242,20 +384,23 @@
                     android:id="@+id/row_ipv6"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_green">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -263,78 +408,70 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_globe_24dp"
-                            app:tint="?attr/iconTintGreen" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_8"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_ipv6"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/settings_ipv6_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
-
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/switch_ipv6"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:clickable="false"
-                        android:focusable="false" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
-                    android:background="?attr/colorOutlineVariant" />
-
-                <!-- DNS -->
-                <LinearLayout
-                    android:id="@+id/row_dns"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="@dimen/row_min_height"
-                    android:orientation="horizontal"
-                    android:paddingStart="@dimen/space_16"
-                    android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
-
-                    <FrameLayout
-                        android:layout_width="@dimen/tile_size"
-                        android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_purple">
-
-                        <ImageView
-                            android:layout_width="@dimen/tile_glyph"
-                            android:layout_height="@dimen/tile_glyph"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_privacy_24dp"
-                            app:tint="?attr/iconTintPurple" />
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_12"
+                        android:layout_weight="1"
+                        android:text="@string/settings_ipv6"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switch_ipv6"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:clickable="false"
+                        android:focusable="false"
+                        android:minHeight="0dp" />
+                </LinearLayout>
+
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/stroke_hairline"
+                    android:background="?attr/colorOutlineVariant" />
+
+                <!-- DNS — select popup; its last option «Свой…» opens a free-text field -->
+                <LinearLayout
+                    android:id="@+id/row_dns"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_row"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="@dimen/row_min_height"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
+
+                    <FrameLayout
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
+
+                        <ImageView
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
+                            android:layout_gravity="center"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_support_24dp"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:text="@string/settings_dns"
                         android:textAppearance="@style/TextAppearance.App.Body" />
@@ -343,45 +480,50 @@
                         android:id="@+id/value_dns"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_8"
+                        android:ellipsize="end"
                         android:maxLines="1"
                         android:textAppearance="@style/TextAppearance.App.Subtitle"
-                        tools:text="1.1.1.1" />
+                        android:textColor="?attr/colorOnSurface"
+                        tools:text="Cloudflare" />
 
                     <ImageView
+                        android:id="@+id/caret_dns"
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
+                        app:srcCompat="@drawable/ic_arrow_drop_down"
                         app:tint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
+                    android:layout_height="@dimen/stroke_hairline"
                     android:background="?attr/colorOutlineVariant" />
 
-                <!-- Пинг (ping method) -->
+                <!-- Пинг — select popup, four methods (П-26) -->
                 <LinearLayout
                     android:id="@+id/row_ping_method"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_yellow">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -389,13 +531,14 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_ping_24dp"
-                            app:tint="?attr/iconTintYellow" />
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:text="@string/settings_ping_method"
                         android:textAppearance="@style/TextAppearance.App.Body" />
@@ -404,45 +547,50 @@
                         android:id="@+id/value_ping_method"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_8"
+                        android:ellipsize="end"
                         android:maxLines="1"
                         android:textAppearance="@style/TextAppearance.App.Subtitle"
-                        tools:text="Real delay" />
+                        android:textColor="?attr/colorOnSurface"
+                        tools:text="Реальная задержка" />
 
                     <ImageView
+                        android:id="@+id/caret_ping_method"
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
+                        app:srcCompat="@drawable/ic_arrow_drop_down"
                         app:tint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
+                    android:layout_height="@dimen/stroke_hairline"
                     android:background="?attr/colorOutlineVariant" />
 
-                <!-- Локальный прокси -->
+                <!-- Локальный прокси — opens LocalProxyActivity -->
                 <LinearLayout
                     android:id="@+id/row_local_proxy"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_red">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -450,30 +598,16 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_hub_local_proxy"
-                            app:tint="?attr/iconTintRed" />
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_local_proxy"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/settings_local_proxy_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
+                        android:text="@string/settings_local_proxy"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <ImageView
                         android:layout_width="18dp"
@@ -484,62 +618,51 @@
                         app:tint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
+                    android:layout_height="@dimen/stroke_hairline"
                     android:background="?attr/colorOutlineVariant" />
 
-                <!-- Always-on VPN и блокировка (deep-link в системные настройки) -->
+                <!-- Постоянный VPN — opens the system VPN settings screen -->
                 <LinearLayout
                     android:id="@+id/row_always_on"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row_bottom"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_shield_outline"
-                            app:tint="?attr/iconTintBlue" />
+                            app:srcCompat="@drawable/ic_shield_filled"
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_always_on"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/settings_always_on_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
+                        android:text="@string/hub_always_on"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <ImageView
                         android:layout_width="18dp"
@@ -557,6 +680,7 @@
             style="@style/SettingsSectionLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:paddingTop="@dimen/space_22"
             android:text="@string/settings_section_bypass" />
 
         <com.google.android.material.card.MaterialCardView
@@ -564,15 +688,19 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/screen_gutter"
             android:layout_marginEnd="@dimen/screen_gutter"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            app:strokeWidth="@dimen/stroke_hairline">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:clipChildren="false"
+                android:clipToPadding="false"
                 android:orientation="vertical">
 
                 <!-- Mux (toggle) -->
@@ -580,86 +708,80 @@
                     android:id="@+id/row_mux"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row_top"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_qu_switch_24dp"
-                            app:tint="?attr/iconTintBlue" />
+                            app:srcCompat="@drawable/ic_lp_http"
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_8"
+                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_mux"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/settings_mux_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
+                        android:text="@string/settings_mux"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switch_mux"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:clickable="false"
-                        android:focusable="false" />
+                        android:focusable="false"
+                        android:minHeight="0dp" />
                 </LinearLayout>
 
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
                 <View
                     android:id="@+id/divider_mux"
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
+                    android:layout_height="@dimen/stroke_hairline"
                     android:background="?attr/colorOutlineVariant" />
 
-                <!-- Число соединений Mux (visible only when Mux on) -->
+                <!-- П-04: одновременных потоков. Free numeric input, so a chevron and not a caret; shown only while Mux is on (SettingsTabFragment.bindSettingsState) -->
                 <LinearLayout
                     android:id="@+id/row_mux_concurrency"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -667,13 +789,14 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_speed_24dp"
-                            app:tint="?attr/iconTintBlue" />
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:text="@string/settings_mux_concurrency"
                         android:textAppearance="@style/TextAppearance.App.Body" />
@@ -682,7 +805,7 @@
                         android:id="@+id/value_mux_concurrency"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_8"
+                        android:ellipsize="end"
                         android:maxLines="1"
                         android:textAppearance="@style/TextAppearance.App.Subtitle"
                         tools:text="8" />
@@ -696,11 +819,11 @@
                         app:tint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
                 <View
                     android:id="@+id/divider_concurrency"
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
+                    android:layout_height="@dimen/stroke_hairline"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Фрагментация пакетов (toggle) -->
@@ -708,20 +831,23 @@
                     android:id="@+id/row_fragment"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row_bottom"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_purple">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -729,37 +855,25 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_source_code_24dp"
-                            app:tint="?attr/iconTintPurple" />
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_8"
+                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_fragment"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/settings_fragment_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
+                        android:text="@string/settings_fragment"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switch_fragment"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:clickable="false"
-                        android:focusable="false" />
+                        android:focusable="false"
+                        android:minHeight="0dp" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -769,6 +883,7 @@
             style="@style/SettingsSectionLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:paddingTop="@dimen/space_22"
             android:text="@string/settings_section_interface" />
 
         <com.google.android.material.card.MaterialCardView
@@ -776,50 +891,58 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/screen_gutter"
             android:layout_marginEnd="@dimen/screen_gutter"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            app:strokeWidth="@dimen/stroke_hairline">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:clipChildren="false"
+                android:clipToPadding="false"
                 android:orientation="vertical">
 
-                <!-- Оформление (picker: Тёмная / Чёрно-белая) -->
+                <!-- Оформление — select popup: Тёмная / Светлая / Чёрно-белая / Как в системе (П-24) -->
                 <LinearLayout
                     android:id="@+id/row_appearance"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row_top"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_purple">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_palette_24dp"
-                            app:tint="?attr/iconTintPurple" />
+                            app:srcCompat="@drawable/ic_settings_24dp"
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:text="@string/settings_appearance"
                         android:textAppearance="@style/TextAppearance.App.Body" />
@@ -828,45 +951,50 @@
                         android:id="@+id/value_appearance"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_8"
+                        android:ellipsize="end"
                         android:maxLines="1"
                         android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        android:textColor="?attr/colorOnSurface"
                         tools:text="Тёмная" />
 
                     <ImageView
+                        android:id="@+id/caret_appearance"
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
+                        app:srcCompat="@drawable/ic_arrow_drop_down"
                         app:tint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
+                    android:layout_height="@dimen/stroke_hairline"
                     android:background="?attr/colorOutlineVariant" />
 
-                <!-- Язык -->
+                <!-- Язык — select popup -->
                 <LinearLayout
                     android:id="@+id/row_language"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_green">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -874,13 +1002,14 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_globe_24dp"
-                            app:tint="?attr/iconTintGreen" />
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:text="@string/settings_language"
                         android:textAppearance="@style/TextAppearance.App.Body" />
@@ -889,24 +1018,26 @@
                         android:id="@+id/value_language"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_8"
+                        android:ellipsize="end"
                         android:maxLines="1"
                         android:textAppearance="@style/TextAppearance.App.Subtitle"
-                        tools:text="Русский" />
+                        android:textColor="?attr/colorOnSurface"
+                        tools:text="Системный" />
 
                     <ImageView
+                        android:id="@+id/caret_language"
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
+                        app:srcCompat="@drawable/ic_arrow_drop_down"
                         app:tint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
+                    android:layout_height="@dimen/stroke_hairline"
                     android:background="?attr/colorOutlineVariant" />
 
                 <!-- Запуск при загрузке (toggle) -->
@@ -914,58 +1045,49 @@
                     android:id="@+id/row_boot"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row_bottom"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_orange">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_power_settings"
-                            app:tint="?attr/iconTintOrange" />
+                            app:srcCompat="@drawable/ic_lock_24dp"
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_8"
+                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_boot"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/settings_boot_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
+                        android:text="@string/settings_boot"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <com.google.android.material.materialswitch.MaterialSwitch
                         android:id="@+id/switch_boot"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:clickable="false"
-                        android:focusable="false" />
+                        android:focusable="false"
+                        android:minHeight="0dp" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -975,6 +1097,7 @@
             style="@style/SettingsSectionLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:paddingTop="@dimen/space_22"
             android:text="@string/settings_section_subscription" />
 
         <com.google.android.material.card.MaterialCardView
@@ -982,176 +1105,61 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/screen_gutter"
             android:layout_marginEnd="@dimen/screen_gutter"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            app:strokeWidth="@dimen/stroke_hairline">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:clipChildren="false"
+                android:clipToPadding="false"
                 android:orientation="vertical">
 
-                <!-- Список подписок (SubSettingActivity). Единственный вход на экран, где
-                     подписку можно добавить, включить, обновить и удалить: до этой волны
-                     экран был собран, объявлен в манифесте и не открывался ниоткуда. -->
-                <LinearLayout
-                    android:id="@+id/row_subs_list"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="@dimen/row_min_height"
-                    android:orientation="horizontal"
-                    android:paddingStart="@dimen/space_16"
-                    android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                <!-- REMOVED AT THE OWNER'S INSTRUCTION (2026-08-02).
+                     Two rows stood here: «Список подписок» (SubSettingActivity) and «Другие
+                     способы добавления» (MainHost.showAdvancedAddMethods). He asked for both
+                     gone from Настройки. Подписки are added, refreshed and deleted from their
+                     card on Главная, which is where he works with them.
 
-                    <FrameLayout
-                        android:layout_width="@dimen/tile_size"
-                        android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
+                     WHAT THAT MAKES UNREACHABLE, recorded so it is a decision and not a loss:
+                       - SubSettingActivity + SubEditActivity — the subscription list screen and
+                         its editor (add by typed URL, rename, enable/disable, per-sub User-Agent
+                         and auto-update overrides, remote-DNS override, delete). The card on
+                         Главная carries refresh, pin, support, Telegram and delete; renaming and
+                         the per-sub overrides now have no UI.
+                       - MainHost.showAdvancedAddMethods() — «Добавить по ссылке», «Ввести
+                         сервер вручную» (the manual per-protocol editors) and «Импортировать из
+                         файла». Adding is QR + clipboard only, which is owner ruling C1.
+                     Both remain declared in the manifest and fully implemented; nothing was
+                     deleted, so restoring an entry point is one row. -->
 
-                        <ImageView
-                            android:layout_width="@dimen/tile_glyph"
-                            android:layout_height="@dimen/tile_glyph"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_subscriptions_24dp"
-                            app:tint="?attr/iconTintBlue" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_8"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_subs_list"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/settings_subs_list_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_marginStart="@dimen/space_4"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
-                    android:background="?attr/colorOutlineVariant" />
-
-                <!-- Другие способы добавления (MainHost.showAdvancedAddMethods).
-                     Владелец сократил меню «Добавить подписку» до QR и буфера обмена
-                     (OWNER C1). Три оставшихся способа — ссылка, сервер вручную, файл
-                     конфигурации — при этом переехали в код и не вызывались ниоткуда:
-                     рабочая функция без единого входа. Это их вход. Стоит сразу под
-                     «Списком подписок», потому что это второе, что делают с подпиской
-                     после того, как её добавили штатным путём. -->
-                <LinearLayout
-                    android:id="@+id/row_add_other"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="@dimen/row_min_height"
-                    android:orientation="horizontal"
-                    android:paddingStart="@dimen/space_16"
-                    android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
-
-                    <FrameLayout
-                        android:layout_width="@dimen/tile_size"
-                        android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
-
-                        <ImageView
-                            android:layout_width="@dimen/tile_glyph"
-                            android:layout_height="@dimen/tile_glyph"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_add_24dp"
-                            app:tint="?attr/iconTintBlue" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_8"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/add_other_methods_title"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/settings_add_other_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_marginStart="@dimen/space_4"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
-                    android:background="?attr/colorOutlineVariant" />
-
-                <!-- Автообновление подписки -->
+                <!-- Автообновление подписки — select popup, five intervals (П-27) -->
                 <LinearLayout
                     android:id="@+id/row_sub_auto_update"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row_top"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -1159,13 +1167,14 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_refresh_24dp"
-                            app:tint="?attr/iconTintBlue" />
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_12"
                         android:layout_weight="1"
                         android:text="@string/settings_sub_auto_update"
                         android:textAppearance="@style/TextAppearance.App.Body" />
@@ -1174,53 +1183,58 @@
                         android:id="@+id/value_sub_auto_update"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_8"
+                        android:ellipsize="end"
                         android:maxLines="1"
                         android:textAppearance="@style/TextAppearance.App.Subtitle"
-                        tools:text="24 часа" />
+                        android:textColor="?attr/colorOnSurface"
+                        tools:text="1 час" />
 
                     <ImageView
+                        android:id="@+id/caret_sub_auto_update"
                         android:layout_width="18dp"
                         android:layout_height="18dp"
                         android:layout_marginStart="@dimen/space_4"
                         android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
+                        app:srcCompat="@drawable/ic_arrow_drop_down"
                         app:tint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
+                    android:layout_height="@dimen/stroke_hairline"
                     android:background="?attr/colorOutlineVariant" />
 
-                <!-- Маршрутизация -->
+                <!-- Маршрутизация — opens RoutingSettingActivity -->
                 <LinearLayout
                     android:id="@+id/row_routing"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_purple">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_routing_24dp"
-                            app:tint="?attr/iconTintPurple" />
+                            app:srcCompat="@drawable/ic_nav_servers"
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
                     <TextView
@@ -1240,39 +1254,42 @@
                         app:tint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
+                    android:layout_height="@dimen/stroke_hairline"
                     android:background="?attr/colorOutlineVariant" />
 
-                <!-- Файлы ресурсов -->
+                <!-- Файлы ресурсов — opens UserAssetActivity -->
                 <LinearLayout
                     android:id="@+id/row_assets"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_green">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_file_24dp"
-                            app:tint="?attr/iconTintGreen" />
+                            app:srcCompat="@drawable/ic_source_code_24dp"
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
                     <TextView
@@ -1292,62 +1309,53 @@
                         app:tint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
+                    android:layout_height="@dimen/stroke_hairline"
                     android:background="?attr/colorOutlineVariant" />
 
-                <!-- Настройки подписок (ProviderSettingsActivity) -->
+                <!-- П-05: «Настройки подписок» — the only entry into ProviderSettingsActivity.
+                     A repository row, not one of §6's; see point 7 of the header for why its glyph
+                     moved to ic_subscriptions_24dp when Мультиплексирование took the `http` one. -->
                 <LinearLayout
                     android:id="@+id/row_provider"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row_bottom"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_orange">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_hub_provider"
-                            app:tint="?attr/iconTintOrange" />
+                            app:srcCompat="@drawable/ic_subscriptions_24dp"
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_provider"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/settings_provider_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
+                        android:text="@string/settings_provider"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
                     <ImageView
                         android:layout_width="18dp"
@@ -1365,6 +1373,7 @@
             style="@style/SettingsSectionLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:paddingTop="@dimen/space_22"
             android:text="@string/settings_section_devices" />
 
         <com.google.android.material.card.MaterialCardView
@@ -1372,44 +1381,51 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/screen_gutter"
             android:layout_marginEnd="@dimen/screen_gutter"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            app:strokeWidth="@dimen/stroke_hairline">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:clipChildren="false"
+                android:clipToPadding="false"
                 android:orientation="vertical">
 
-                <!-- Перенести подписку на ТВ -->
+                <!-- Перенести подписку на телевизор — opens TvSendActivity -->
                 <LinearLayout
                     android:id="@+id/row_tv_send"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row_top"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_tv_24dp"
-                            app:tint="?attr/iconTintBlue" />
+                            app:srcCompat="@drawable/ic_share_24dp"
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
                     <TextView
@@ -1429,34 +1445,35 @@
                         app:tint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
                 <View
                     android:id="@+id/divider_tv_receive"
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
-                    android:background="?attr/colorOutlineVariant"
-                    android:visibility="gone" />
+                    android:layout_height="@dimen/stroke_hairline"
+                    android:background="?attr/colorOutlineVariant" />
 
-                <!-- Принять подписку (Android TV only) -->
+                <!-- П-06: приём подписки на этом устройстве. Shown only on Android TV, and the fragment then hands row_tv_send the single-row corner (@drawable/bg_row_only) -->
                 <LinearLayout
                     android:id="@+id/row_tv_receive"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row_bottom"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12"
-                    android:visibility="gone">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_green">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -1464,7 +1481,7 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_tv_24dp"
-                            app:tint="?attr/iconTintGreen" />
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
                     <TextView
@@ -1491,6 +1508,7 @@
             style="@style/SettingsSectionLabel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:paddingTop="@dimen/space_22"
             android:text="@string/settings_section_about" />
 
         <com.google.android.material.card.MaterialCardView
@@ -1498,115 +1516,62 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/screen_gutter"
             android:layout_marginEnd="@dimen/screen_gutter"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp"
             app:strokeColor="?attr/colorOutlineVariant"
-            app:strokeWidth="1dp">
+            app:strokeWidth="@dimen/stroke_hairline">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:clipChildren="false"
+                android:clipToPadding="false"
                 android:orientation="vertical">
 
-                <!-- Расширенные настройки. SettingsActivity hosts the 19-preference tree; without
-                     this row it had no launch site anywhere in the app, so none of those settings
-                     had a reachable editor. -->
-                <LinearLayout
-                    android:id="@+id/row_advanced"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="@dimen/row_min_height"
-                    android:orientation="horizontal"
-                    android:paddingStart="@dimen/space_16"
-                    android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                <!-- REMOVED AT THE OWNER'S INSTRUCTION (2026-08-02): the «Дополнительно»
+                     row that opened SettingsActivity.
 
-                    <FrameLayout
-                        android:layout_width="@dimen/tile_size"
-                        android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
+                     WHAT THAT MAKES UNREACHABLE: the whole legacy preference tree in
+                     res/xml/pref_settings.xml — core/tunnel/DNS/fragmentation/delay-test and the
+                     «Маршрутизация по домену» option that was moved into it from the local-proxy
+                     screen. The settings this tab already exposes as first-class rows (mode,
+                     appearance, language, per-app routing, local proxy, routing, assets,
+                     подписка auto-update, boot) are unaffected — they read and write the same
+                     MMKV keys directly. SettingsActivity stays declared and implemented. -->
 
-                        <ImageView
-                            android:layout_width="@dimen/tile_glyph"
-                            android:layout_height="@dimen/tile_glyph"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_settings_24dp"
-                            app:tint="?attr/iconTintBlue" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_8"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_advanced"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
-
-                        <!-- Что за этой строкой: ядро, туннель, DNS, фрагментация, проверка
-                             задержки. Строка ведёт на «Дополнительно», куда переехала
-                             «Маршрутизация по домену» с экрана локального прокси. -->
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/adv_entry_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_marginStart="@dimen/space_4"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
-                    android:background="?attr/colorOutlineVariant" />
-
-                <!-- Журнал -->
+                <!-- Журнал — opens LogcatActivity -->
                 <LinearLayout
                     android:id="@+id/row_logs"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row_top"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_logcat_24dp"
-                            app:tint="?attr/iconTintBlue" />
+                            app:srcCompat="@drawable/ic_source_code_24dp"
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
                     <TextView
@@ -1626,144 +1591,34 @@
                         app:tint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
+                    android:layout_height="@dimen/stroke_hairline"
                     android:background="?attr/colorOutlineVariant" />
 
-                <!-- Проверить обновления -->
-                <LinearLayout
-                    android:id="@+id/row_check_update"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="@dimen/row_min_height"
-                    android:orientation="horizontal"
-                    android:paddingStart="@dimen/space_16"
-                    android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
-
-                    <FrameLayout
-                        android:layout_width="@dimen/tile_size"
-                        android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
-
-                        <ImageView
-                            android:layout_width="@dimen/tile_glyph"
-                            android:layout_height="@dimen/tile_glyph"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_check_update_24dp"
-                            app:tint="?attr/iconTintBlue" />
-                    </FrameLayout>
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_16"
-                        android:layout_weight="1"
-                        android:text="@string/settings_check_update"
-                        android:textAppearance="@style/TextAppearance.App.Body" />
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_marginStart="@dimen/space_4"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
-                    android:background="?attr/colorOutlineVariant" />
-
-                <!-- О приложении -->
-                <LinearLayout
-                    android:id="@+id/row_about"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="@dimen/row_min_height"
-                    android:orientation="horizontal"
-                    android:paddingStart="@dimen/space_16"
-                    android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
-
-                    <FrameLayout
-                        android:layout_width="@dimen/tile_size"
-                        android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_blue">
-
-                        <ImageView
-                            android:layout_width="@dimen/tile_glyph"
-                            android:layout_height="@dimen/tile_glyph"
-                            android:layout_gravity="center"
-                            android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_about_24dp"
-                            app:tint="?attr/iconTintBlue" />
-                    </FrameLayout>
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_16"
-                        android:layout_weight="1"
-                        android:text="@string/settings_about"
-                        android:textAppearance="@style/TextAppearance.App.Body" />
-
-                    <TextView
-                        android:id="@+id/value_about"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="@dimen/space_8"
-                        android:maxLines="1"
-                        android:textAppearance="@style/TextAppearance.App.Subtitle"
-                        tools:text="1.0.0" />
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_marginStart="@dimen/space_4"
-                        android:importantForAccessibility="no"
-                        app:srcCompat="@drawable/ic_chevron_right"
-                        app:tint="?attr/colorOnSurfaceVariant" />
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
-                    android:background="?attr/colorOutlineVariant" />
-
-                <!-- Резервное копирование -->
+                <!-- Резервное копирование — opens BackupActivity -->
                 <LinearLayout
                     android:id="@+id/row_backup"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_green">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -1771,7 +1626,7 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_backup_24dp"
-                            app:tint="?attr/iconTintGreen" />
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
                     <TextView
@@ -1791,31 +1646,34 @@
                         app:tint="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
 
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="72dp"
+                    android:layout_height="@dimen/stroke_hairline"
                     android:background="?attr/colorOutlineVariant" />
 
-                <!-- Схемы URL-адресов -->
+                <!-- П-07: Схемы ссылок — opens UrlSchemeListActivity -->
                 <LinearLayout
                     android:id="@+id/row_url_scheme"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="?attr/selectableItemBackground"
+                    android:background="@drawable/bg_row"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
                     android:minHeight="@dimen/row_min_height"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
                     android:paddingEnd="@dimen/space_16"
-                    android:paddingVertical="@dimen/space_12">
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
 
                     <FrameLayout
                         android:layout_width="@dimen/tile_size"
                         android:layout_height="@dimen/tile_size"
-                        android:background="@drawable/bg_icon_purple">
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
 
                         <ImageView
                             android:layout_width="@dimen/tile_glyph"
@@ -1823,30 +1681,136 @@
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
                             app:srcCompat="@drawable/ic_hub_url_scheme"
-                            app:tint="?attr/iconTintPurple" />
+                            app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 
-                    <LinearLayout
+                    <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="@dimen/space_16"
-                        android:layout_marginEnd="@dimen/space_8"
                         android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:text="@string/settings_url_scheme"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/settings_url_scheme"
-                            android:textAppearance="@style/TextAppearance.App.Body" />
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="@dimen/space_4"
+                        android:importantForAccessibility="no"
+                        app:srcCompat="@drawable/ic_chevron_right"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="@dimen/space_4"
-                            android:text="@string/settings_url_scheme_sub"
-                            android:textAppearance="@style/TextAppearance.App.Subtitle" />
-                    </LinearLayout>
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/stroke_hairline"
+                    android:background="?attr/colorOutlineVariant" />
+
+                <!-- Проверить обновления — opens CheckUpdateActivity -->
+                <LinearLayout
+                    android:id="@+id/row_check_update"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_row"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="@dimen/row_min_height"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
+
+                    <FrameLayout
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
+
+                        <ImageView
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
+                            android:layout_gravity="center"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_refresh_24dp"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_weight="1"
+                        android:text="@string/settings_check_update"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_marginStart="@dimen/space_4"
+                        android:importantForAccessibility="no"
+                        app:srcCompat="@drawable/ic_chevron_right"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
+
+                <!-- §6: the hairline runs the full width of the card, not inset past the tile. -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/stroke_hairline"
+                    android:background="?attr/colorOutlineVariant" />
+
+                <!-- О приложении — the version is a value, and the row still navigates -->
+                <LinearLayout
+                    android:id="@+id/row_about"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_row_bottom"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="@dimen/row_min_height"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/space_16"
+                    android:paddingTop="@dimen/space_10"
+                    android:paddingEnd="@dimen/space_16"
+                    android:paddingBottom="@dimen/space_10"
+                    android:stateListAnimator="@anim/press_row">
+
+                    <FrameLayout
+                        android:layout_width="@dimen/tile_size"
+                        android:layout_height="@dimen/tile_size"
+                        android:background="@drawable/bg_tile_neutral"
+                        android:backgroundTint="?attr/colorSurfaceContainerHighest">
+
+                        <ImageView
+                            android:layout_width="@dimen/tile_glyph"
+                            android:layout_height="@dimen/tile_glyph"
+                            android:layout_gravity="center"
+                            android:importantForAccessibility="no"
+                            app:srcCompat="@drawable/ic_support_24dp"
+                            app:tint="?attr/colorOnSurfaceVariant" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_16"
+                        android:layout_marginEnd="@dimen/space_12"
+                        android:layout_weight="1"
+                        android:text="@string/settings_about"
+                        android:textAppearance="@style/TextAppearance.App.Body" />
+
+                    <TextView
+                        android:id="@+id/value_about"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textAppearance="@style/TextAppearance.App.Subtitle"
+                        tools:text="2.2.1" />
 
                     <ImageView
                         android:layout_width="18dp"
@@ -1858,6 +1822,5 @@
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

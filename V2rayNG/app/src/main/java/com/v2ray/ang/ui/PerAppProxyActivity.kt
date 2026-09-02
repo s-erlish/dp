@@ -2,7 +2,6 @@ package com.v2ray.ang.ui
 
 import android.os.Bundle
 import android.text.TextUtils
-import android.view.View
 import androidx.activity.viewModels
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
@@ -17,10 +16,12 @@ import com.v2ray.ang.dto.UrlContentRequest
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.extension.v2RayApplication
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.handler.RussianAppsPreset
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.ui.component.EmptyStateBinder
 import com.v2ray.ang.ui.component.RowBinder
+import com.v2ray.ang.ui.component.SelectPopup
 import com.v2ray.ang.ui.component.SkeletonBinder
 import com.v2ray.ang.ui.component.SubPage
 import com.v2ray.ang.ui.component.ToolbarBinder
@@ -54,9 +55,17 @@ import java.text.Collator
  * **The mode is one row, not two switches.** `PREF_PER_APP_PROXY` and `PREF_BYPASS_APPS` are two
  * booleans encoding three states, and the old screen showed them as two independent switches - one
  * of which was meaningless while the other was off, with the explanation hidden behind a second
- * tappable target that fired a toast. They are one `Row.Value` here, cycling «Все приложения» ->
- * «Только выбранные» -> «Кроме выбранных» in place, with the subtitle stating what the current mode
- * actually does. Both preferences keep their existing meaning and their existing keys.
+ * tappable target that fired a toast. They are one `Row.Value` here, opening §6's select popup on
+ * all three modes. Both preferences keep their existing meaning and their existing keys.
+ *
+ * **NEITHER ROW ON THIS SCREEN CARRIES A SUBTITLE** (owner report 0.4.9: «там где режим, надо под
+ * ним текст убрать… и у российских приложений тоже текст убери ниже»). Both explanations ran past
+ * the row's two lines and arrived as «Отмеченные — напрямую, остальные…» and «Госуслуги, банки, Mir
+ * Pay, Ozon, Wildberries, Яндекс, операторы — и…»: a subtitle clipped mid-sentence promises an
+ * explanation and then withholds it, which is strictly worse than the row that never offered one.
+ * The value «Кроме выбранных» is the mode's own name and already says it, and the набор's contents
+ * are one tap away behind «Показать приложения набора» in the actions sheet. Both rows are §6's
+ * 61dp «без подписи» height now instead of 77.
  */
 class PerAppProxyActivity : BaseActivity() {
 
@@ -65,6 +74,7 @@ class PerAppProxyActivity : BaseActivity() {
     private val viewModel: PerAppProxyViewModel by viewModels()
     private val adapter by lazy {
         PerAppProxyAdapter(
+            scope = lifecycleScope,
             isSelected = viewModel::contains,
             onToggle = { packageName ->
                 viewModel.toggle(packageName)
@@ -76,6 +86,17 @@ class PerAppProxyActivity : BaseActivity() {
     private var appsAll: List<AppInfo> = emptyList()
     private var query: String = ""
     private var loadFailed = false
+
+    /**
+     * «Показать приложения набора»: the list below is restricted to the preset's packages.
+     *
+     * This is how the preset's CONTENTS are made visible, and it is deliberately not a second
+     * screen. The user sees the same rows they already understand — real icon, real name, working
+     * switch — and can still overrule any single one of them while the filter is up. A preset the
+     * user cannot see inside is indistinguishable from a hard-coded list, which is exactly what the
+     * owner asked this not to be.
+     */
+    private var presetFilter = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         SubPage.installTransitions(this)
@@ -103,14 +124,23 @@ class PerAppProxyActivity : BaseActivity() {
         }
 
         bindModeRow()
+        bindPresetRow()
         loadApps()
     }
 
     // ---------------------------------------------------------------- mode
 
     /**
-     * The three modes, in cycle order. The pair of booleans behind them is unchanged - this is a
-     * presentation of the existing preferences, not a new setting.
+     * The three modes, in the order the popup offers them - widest first, then the two narrowings.
+     * The pair of booleans behind them is unchanged; this is a presentation of the existing
+     * preferences, not a new setting, and [Mode.ordinal] is the index [SelectPopup] marks and
+     * returns.
+     *
+     * [hintRes] is no longer shown: the row lost its subtitle in 0.4.9 (see the class doc). It is
+     * kept rather than deleted because it is the only thing still holding `perapp_mode_*_hint`
+     * together with the mode it belongs to — the strings survive the removal on purpose, and a
+     * hint that has drifted away from its mode is worse than no hint at all when one is wanted
+     * again (the sheet in [showListActions] is where it would go).
      */
     private enum class Mode(val labelRes: Int, val hintRes: Int) {
         ALL(R.string.perapp_mode_all, R.string.perapp_mode_all_hint),
@@ -131,25 +161,112 @@ class PerAppProxyActivity : BaseActivity() {
         bindModeRow()
     }
 
+    /**
+     * «Режим» — handoff README §6, «Выбор из списка — окошко у значения».
+     *
+     * It used to CYCLE, and that is what the owner objected to: «у режима надо тоже сделать такую
+     * же всплывающую менюшку, как у днс пинга и у плюсика, чтобы можно было выбрать, а то кликом
+     * это странно». A tap advanced the value one step, so the two modes the user was not on cost
+     * one and two taps, the list of what was even available was never shown, and the row's promise
+     * («this changes here») was true while its behaviour («you may choose») was not. Every other
+     * value picker in the product - DNS, Пинг, Доменная стратегия, and the «+» on Главная - opens
+     * [SelectPopup]; this one now does too, with the current mode marked.
+     *
+     * `select_popup_w_default` and not a bespoke width: §6's width table measures the nine pickers
+     * on Настройки, and this «Режим» is not one of them - `select_popup_w_mode` was sized to «Только
+     * прокси», which is three characters shorter than «Только выбранные» (TOKENS.md).
+     */
     private fun bindModeRow() {
         val mode = currentMode()
         RowBinder.bind(
             root = binding.rowMode.root,
             title = getString(R.string.perapp_mode_row),
-            subtitle = getString(mode.hintRes),
-            glyph = R.drawable.ic_per_apps_24dp,
+            // NO SUBTITLE (0.4.9). «Отмеченные — напрямую, остальные…» never fitted, and the value
+            // on the right of this same row is the mode's name, which is the short form of it.
+            // The prototype's «Режим обхода» carries the globe and the row under it a different
+            // glyph: §5.3 makes a group tiled only when its glyphs DIFFER, and two identical
+            // tiles down the left edge is the generated-settings tell.
+            glyph = R.drawable.ic_globe_24dp,
             value = getString(mode.labelRes),
-            // The unfold glyph is the promise that the value changes HERE - no screen, no dialog
-            // (22-components 8.1). Three options is exactly the count that grammar is for.
+            // The CARET, and now it means what it draws: a caret is «the list of values opens
+            // here», where a chevron would promise a screen. It also turns 180° while the popup
+            // is up, which is the half of §6's interaction the row itself owns.
             trailing = RowBinder.Trailing.Glyph(
                 icon = R.drawable.ic_arrow_drop_down,
                 contentDescription = null,
             ),
             onClick = {
-                val next = Mode.entries[(mode.ordinal + 1) % Mode.entries.size]
-                applyMode(next)
+                SelectPopup.show(
+                    anchor = binding.rowMode.root,
+                    options = Mode.entries.map { getString(it.labelRes) },
+                    selectedIndex = mode.ordinal,
+                    valueView = binding.rowMode.rowValue,
+                    caret = binding.rowMode.rowTrailingGlyph,
+                ) { picked -> applyMode(Mode.entries[picked]) }
             },
         )
+        // The card cannot clip (§11 grabl 4 - the popup would be sliced off at its bottom edge), so
+        // the two rows inside it carry the card's corners themselves.
+        RowBinder.edge(binding.rowMode.root, RowBinder.Edge.TOP)
+    }
+
+    // -------------------------------------------------------------- preset
+
+    /**
+     * The «Российские приложения» row: one switch, applying and un-applying a NAMED set.
+     *
+     * NO SUBTITLE (0.4.9). «Госуслуги, банки, Mir Pay, Ozon, Wildberries, Яндекс, операторы — идут
+     * напрямую, мимо VPN» is a list, and a list clipped at «— и…» after two lines names four of its
+     * members and hides the rest, which reads as an incomplete promise rather than a summary. The
+     * набор's real contents stay one tap away, in full and with real icons, behind «Показать
+     * приложения набора». The accessible name below still says how many of its apps this phone
+     * actually has — a preset that lists forty packages and matches three should say so rather than
+     * implying it is doing forty apps' worth of work.
+     */
+    private fun bindPresetRow() {
+        val installed = appsAll.count { RussianAppsPreset.contains(it.packageName) }
+        RowBinder.bind(
+            root = binding.rowRuPreset.root,
+            title = getString(R.string.perapp_ru_preset),
+            glyph = R.drawable.ic_per_apps_24dp,
+            trailing = RowBinder.Trailing.Toggle(
+                checked = RussianAppsPreset.isApplied(),
+                onCheckedChange = { on -> togglePreset(on) },
+            ),
+        )
+        binding.rowRuPreset.root.contentDescription = getString(
+            R.string.perapp_ru_preset_installed,
+            installed,
+        )
+        // Second half of the un-clipped card above: this row is its bottom edge.
+        RowBinder.edge(binding.rowRuPreset.root, RowBinder.Edge.BOTTOM)
+    }
+
+    /**
+     * Applies or un-applies the preset, and NEVER restarts the tunnel to do it.
+     *
+     * Applying adds only what is missing; un-applying gives back only what applying took, so an app
+     * the user ticked by hand before ever touching the switch survives it (see
+     * [RussianAppsPreset.applyTo] / [RussianAppsPreset.removeFrom]).
+     *
+     * The mode is moved to «Кроме выбранных» when it is «Все приложения», because the selection has
+     * no effect at all there and a switch that visibly does nothing is worse than no switch. That
+     * one step DOES mark a restart, exactly as the mode row itself does — it is a change of what the
+     * tunnel carries, not a preset detail — so the flip is offered only when the user actually asks
+     * for the preset, never on the silent first-run seeding.
+     */
+    private fun togglePreset(on: Boolean) {
+        val current = viewModel.getAll()
+        if (on) {
+            viewModel.applyPresetQuietly(added = RussianAppsPreset.applyTo(current), removed = emptySet())
+            if (currentMode() == Mode.ALL) applyMode(Mode.EXCEPT)
+            toastSuccess(R.string.perapp_ru_preset_pending)
+        } else {
+            viewModel.applyPresetQuietly(added = emptySet(), removed = RussianAppsPreset.removeFrom())
+        }
+        bindPresetRow()
+        adapter.refreshSelection()
+        updateMeta()
     }
 
     // ---------------------------------------------------------------- list
@@ -174,16 +291,24 @@ class PerAppProxyActivity : BaseActivity() {
                 loadFailed = true
                 LogUtil.e(ANG_PACKAGE, "Error loading apps", it)
             }
+            bindPresetRow()
             applyFilter()
         }
     }
 
     private fun applyFilter() {
         val key = query.trim().uppercase()
-        val visible = if (key.isEmpty()) {
-            appsAll
+        // The набор filter and the search compose: showing the набор and then typing narrows within
+        // it, rather than one silently cancelling the other.
+        val pool = if (presetFilter) {
+            appsAll.filter { RussianAppsPreset.contains(it.packageName) }
         } else {
-            appsAll.filter {
+            appsAll
+        }
+        val visible = if (key.isEmpty()) {
+            pool
+        } else {
+            pool.filter {
                 it.appName.uppercase().contains(key) || it.packageName.uppercase().contains(key)
             }
         }
@@ -245,6 +370,22 @@ class PerAppProxyActivity : BaseActivity() {
                 )
             }
 
+            isEmpty && presetFilter -> {
+                binding.recyclerView.isVisible = false
+                EmptyStateBinder.bind(
+                    root = binding.emptyState.root,
+                    glyph = R.drawable.ic_per_apps_24dp,
+                    title = getString(R.string.perapp_ru_preset_empty_title),
+                    line = getString(R.string.perapp_ru_preset_empty_line),
+                    actionLabel = getString(R.string.perapp_ru_preset_show_off),
+                    emphasis = EmptyStateBinder.Emphasis.TERTIARY,
+                    onAction = {
+                        presetFilter = false
+                        applyFilter()
+                    },
+                )
+            }
+
             isEmpty -> {
                 binding.recyclerView.isVisible = false
                 EmptyStateBinder.bind(
@@ -285,6 +426,16 @@ class PerAppProxyActivity : BaseActivity() {
             .action(R.string.perapp_action_invert, enabled = visible.isNotEmpty()) {
                 visible.forEach { viewModel.toggle(it) }
                 afterBulkChange()
+            }
+            .action(
+                labelRes = if (presetFilter) {
+                    R.string.perapp_ru_preset_show_off
+                } else {
+                    R.string.perapp_ru_preset_show
+                },
+            ) {
+                presetFilter = !presetFilter
+                applyFilter()
             }
             .action(
                 labelRes = R.string.perapp_action_auto,

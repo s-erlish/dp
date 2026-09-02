@@ -3,6 +3,7 @@ package com.v2ray.ang.tv
 import android.os.Bundle
 import android.view.View
 import android.widget.RadioButton
+import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
@@ -13,6 +14,9 @@ import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.helper.QRCodeScannerHelper
 import com.v2ray.ang.ui.BaseActivity
+import com.v2ray.ang.ui.component.SubPage
+import com.v2ray.ang.ui.component.ToolbarBinder
+import com.v2ray.ang.ui.component.pressFeedback
 import com.v2ray.ang.util.LogUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -49,21 +53,55 @@ class TvSendActivity : BaseActivity() {
     private var scanLaunched = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
         scannerHelper = QRCodeScannerHelper(this)
-        setContentViewWithToolbar(binding.root, title = getString(R.string.tv_send_title))
+        // Handoff README §7: the sub-page lekalo draws the title at 24sp/700 UNDER the
+        // back control, with the instructions as the header's note — neither of which
+        // activity_base's 16sp MaterialToolbar can do, so the header lives in the
+        // screen's own layout and the base layout is out of the picture.
+        setContentView(binding.root)
+        ToolbarBinder.bind(
+            root = binding.toolbar.root,
+            title = getString(R.string.tv_send_title),
+            activity = this,
+        )
+        ToolbarBinder.attachTo(binding.toolbar.root, binding.mainContent)
+        binding.toolbar.toolbarNote.text = getString(R.string.tv_send_instructions)
+        binding.toolbar.toolbarNote.isVisible = true
 
         subscriptions = MmkvManager.decodeSubscriptions()
             .filter { it.subscription.url.isNotEmpty() }
 
+        binding.btnScan.pressFeedback(R.anim.press_row)
+        binding.btnSend.pressFeedback(R.anim.press_row)
         binding.btnScan.setOnClickListener { startScan() }
         binding.btnSend.setOnClickListener { sendSelected() }
 
         if (subscriptions.isEmpty()) {
-            binding.btnScan.isEnabled = false
+            setActionEnabled(binding.btnScan, false)
             setStatus(getString(R.string.tv_send_no_subs))
         }
     }
+
+    /**
+     * §7 turned both actions into rows, and a row is a `LinearLayout`: it takes
+     * `isEnabled` like any View — a disabled one stops firing `onClick` — but it has no
+     * MaterialButton tint to grey out with. R6 says a disabled control is drawn at alpha
+     * 0.38 with the reason beside it, so the alpha is set here and the reason is
+     * @string/tv_send_no_subs in @id/tv_status.
+     */
+    private fun setActionEnabled(row: View, enabled: Boolean) {
+        row.isEnabled = enabled
+        row.alpha = if (enabled) 1f else 0.38f
+    }
+
+    // The progress indicator moved into activity_tv_send.xml with the header, so the
+    // base layout's cached one is never inflated. «Отправка на телевизор…» still shows
+    // a bar rather than only a line of text.
+    override fun showLoading() = runOnUiThread { binding.progressBar.isVisible = true }
+
+    override fun hideLoading() = runOnUiThread { binding.progressBar.isVisible = false }
 
     override fun onResume() {
         super.onResume()
@@ -106,10 +144,10 @@ class TvSendActivity : BaseActivity() {
             binding.radioSubs.addView(rb)
         }
         binding.radioSubs.setOnCheckedChangeListener { _, checkedId ->
-            binding.btnSend.isEnabled = checkedId != -1
+            setActionEnabled(binding.btnSend, checkedId != -1)
         }
         binding.layoutPick.visibility = View.VISIBLE
-        binding.btnSend.isEnabled = false
+        setActionEnabled(binding.btnSend, false)
     }
 
     private fun selectedSubscription(): SubscriptionCache? {

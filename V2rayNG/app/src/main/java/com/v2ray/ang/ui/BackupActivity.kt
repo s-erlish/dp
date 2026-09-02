@@ -63,6 +63,9 @@ class BackupActivity : HelperBaseActivity() {
             root = binding.toolbar.root,
             title = getString(R.string.backup_title),
             activity = this,
+            // §7's optional 13sp note: the prototype says what the copy IS before the rows say
+            // what you can do with it.
+            note = getString(R.string.backup_note),
         )
         ToolbarBinder.attachTo(binding.toolbar.root, binding.mainContent)
 
@@ -83,7 +86,9 @@ class BackupActivity : HelperBaseActivity() {
             title = getString(R.string.backup_action_create),
             subtitle = getString(R.string.backup_action_create_hint),
             glyph = R.drawable.ic_backup_24dp,
-            trailing = RowBinder.Trailing.None,
+            // The prototype gives all three data rows a chevron: each one opens the system
+            // file picker, which is a screen, and a chevron is the promise of one.
+            trailing = RowBinder.Trailing.Chevron,
             enabled = !busy,
             onClick = if (busy) null else ({ backupViaLocal() }),
         )
@@ -92,15 +97,16 @@ class BackupActivity : HelperBaseActivity() {
             title = getString(R.string.backup_action_restore),
             subtitle = getString(R.string.backup_action_restore_hint),
             glyph = R.drawable.ic_restore_24dp,
-            trailing = RowBinder.Trailing.None,
+            trailing = RowBinder.Trailing.Chevron,
             enabled = !busy,
             onClick = if (busy) null else ({ confirmRestore { restoreViaLocal() } }),
         )
         RowBinder.bind(
             root = binding.rowShare.root,
             title = getString(R.string.backup_action_share),
+            subtitle = getString(R.string.backup_action_share_hint),
             glyph = R.drawable.ic_share_24dp,
-            trailing = RowBinder.Trailing.None,
+            trailing = RowBinder.Trailing.Chevron,
             enabled = !busy,
             onClick = if (busy) null else ({ shareBackup() }),
         )

@@ -13,6 +13,11 @@
     <string name="devices_delete_cancel">Отмена</string>
     <string name="devices_delete_cd">Удалить устройство</string>
     <string name="devices_deleted">Устройство удалено</string>
+    <!-- README §7 «Устройства», взято из прототипа дословно: своё устройство помечено акцентом
+         и не удаляется; удалённое гаснет с этой подписью и через 700 мс уходит из списка. -->
+    <string name="devices_this_device">Это устройство</string>
+    <string name="devices_disconnected">Отключено от подписки</string>
+    <string name="devices_footnote">Удалённое устройство отключается от подписки и освобождает слот.</string>
     <string name="devices_last_active">Активно: %1$s</string>
     <string name="devices_unknown_model">Неизвестное устройство</string>
     <string name="devices_hwid">ID: %1$s</string>

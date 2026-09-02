@@ -1,23 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  ============================================================================
-  THE SUB-SCREEN EDITORS. Every string the settings and server sub-pages show.
-  24-tab-conformance.md A-18 to A-36, 00-rules.md 9.
-  ============================================================================
-
-  These screens used to speak in four registers at once: upstream English left in
-  values/, Russian hard-coded in Kotlin, «**» glued onto a system app's name by
-  String.format, and menu titles that never appear anywhere a finger can reach. One
-  file, one register: Russian, sentence case, formal «вы», hyphen never a dash, no
-  emoji, no final period on a label, a period only where a sentence ends.
-
-  Naming: the prefix is the screen, so a row's copy is findable from the layout that
-  shows it - perapp_, routing_ed_, subs_, asset_, log_, about_, upd_, backup_, srv_.
-  The shared empty and retry grammar is `editor_*` and every screen reuses it rather
-  than writing its own «Ничего не найдено».
--->
 <resources>
-
     <!-- ==================================================================
          SHARED - the empty, error and search grammar of 24-tab-conformance 0.4
          ================================================================== -->
@@ -41,9 +23,15 @@
     <string name="perapp_mode_all">Все приложения</string>
     <string name="perapp_mode_selected">Только выбранные</string>
     <string name="perapp_mode_except">Кроме выбранных</string>
+    <!-- NOT DISPLAYED since 0.4.9. The «Режим» row lost its subtitle on owner report - these
+         three ran to «Отмеченные — напрямую, остальные…» in the row's two lines, and a sentence
+         clipped mid-clause promises an explanation it does not give. They are kept, and kept next
+         to the mode each belongs to (PerAppProxyActivity.Mode.hintRes still names them), for the
+         day one of them is wanted somewhere it can be read whole - the actions sheet, a help
+         screen. Do not wire them back into the row. -->
     <string name="perapp_mode_all_hint">Через VPN идут все приложения</string>
-    <string name="perapp_mode_selected_hint">Через VPN идут только отмеченные приложения</string>
-    <string name="perapp_mode_except_hint">Отмеченные приложения идут напрямую, остальные через VPN</string>
+    <string name="perapp_mode_selected_hint">Отмеченные идут через прокси, остальные напрямую</string>
+    <string name="perapp_mode_except_hint">Отмеченные идут напрямую, остальные через прокси</string>
     <string name="perapp_search_hint">Поиск по приложениям</string>
     <string name="perapp_section_user">Ваши приложения</string>
     <string name="perapp_section_system">Системные приложения</string>
@@ -59,20 +47,34 @@
     <string name="perapp_empty_line">Ни одно установленное приложение не запрашивает доступ в сеть.</string>
     <string name="perapp_error_title">Не удалось загрузить список</string>
     <string name="perapp_error_line">Проверьте, что приложению разрешено читать список программ, и повторите.</string>
+    <!-- «Российские приложения» — the named bypass preset. The count is of what is actually on
+         this phone, so the row is honest about how much it is doing.
+         perapp_ru_preset_hint is NOT DISPLAYED since 0.4.9: it is a list of seven, and the row
+         showed «Госуслуги, банки, Mir Pay, Ozon, Wildberries, Яндекс, операторы — и…», naming four
+         members and hiding the rest. It has NO READER now, in Kotlin or in a layout. Kept because
+         it is the only written statement of what the набор is for, and because the place it
+         belongs is a sheet or a help line where it can be read whole - not a two-line row. -->
+    <string name="perapp_ru_preset">Российские приложения</string>
+    <string name="perapp_ru_preset_installed">Установлено на этом устройстве: %1$d</string>
+    <string name="perapp_ru_preset_show">Показать приложения набора</string>
+    <string name="perapp_ru_preset_show_off">Показать все приложения</string>
+    <string name="perapp_ru_preset_empty_title">Ни одного приложения из набора</string>
+    <string name="perapp_ru_preset_empty_line">На этом устройстве нет приложений из набора. Он ничего не изменит, пока вы не установите хотя бы одно.</string>
+    <string name="perapp_ru_preset_pending">Набор применён. Изменения вступят в силу при следующем подключении.</string>
     <string name="perapp_picker_title">Выбор приложений</string>
-    <string name="perapp_picker_done">Готово</string>
     <string name="perapp_picker_selected">Выбрано: %1$d</string>
 
     <!-- ==================================================================
          A-20 settings/routing - Маршрутизация
          ================================================================== -->
     <string name="routing_title">Маршрутизация</string>
-    <string name="routing_domain_strategy">Стратегия доменов</string>
+    <string name="routing_domain_strategy">Доменная стратегия</string>
     <string name="routing_import_confirm">Текущие правила будут заменены набором из этого источника. Продолжить?</string>
-    <string name="routing_section_rules">Правила</string>
+    <string name="routing_section_rules">Настройки правил маршрутизации</string>
     <string name="routing_section_actions">Наборы и обмен</string>
-    <string name="routing_rule_on">Включено</string>
-    <string name="routing_rule_off">Выключено</string>
+    <!-- The accessible name of the rule row's own switch, restored from 5e8cd54's chk_enable.
+         It names the ACTION on the object, because the row already says which rule it is. -->
+    <string name="routing_rule_enabled_cd">Включить правило</string>
     <string name="routing_rule_locked">Защищено</string>
     <string name="routing_action_add">Добавить правило</string>
     <string name="routing_action_presets">Готовые наборы</string>
@@ -84,7 +86,7 @@
     <string name="routing_export_empty">Экспортировать нечего: список правил пуст</string>
     <string name="routing_import_done">Набор правил загружен</string>
     <string name="routing_import_failed">Не удалось загрузить набор. Проверьте данные и повторите.</string>
-    <string name="routing_strategy_cd">Сменить стратегию доменов</string>
+    <string name="routing_strategy_cd">Сменить доменную стратегию</string>
 
     <!-- A-21 settings/routing/rule/{id} - Правило -->
     <string name="routing_ed_title_new">Новое правило</string>
@@ -132,7 +134,6 @@
     <string name="subs_updated">Обновлено %1$s</string>
     <string name="subs_never_updated">Ещё не обновлялась</string>
     <string name="subs_action_edit">Изменить</string>
-    <string name="subs_action_share">Поделиться ссылкой</string>
     <string name="subs_action_qrcode">Показать QR-код</string>
     <string name="subs_action_copy">Скопировать ссылку</string>
     <string name="subs_action_delete">Удалить подписку</string>
@@ -176,8 +177,8 @@
          A-25 settings/assets - Файлы ресурсов
          ================================================================== -->
     <string name="asset_title">Файлы ресурсов</string>
-    <string name="asset_source">Источник файлов</string>
-    <string name="asset_section_files">Файлы</string>
+    <string name="asset_source">Источник Geo-файлов</string>
+    <string name="asset_section_files">Файлы ресурсов</string>
     <string name="asset_action_add_file">Добавить файл с устройства</string>
     <string name="asset_action_add_url">Добавить по ссылке</string>
     <string name="asset_action_add_qrcode">Добавить по QR-коду</string>
@@ -189,7 +190,7 @@
     <string name="asset_action_edit">Изменить ссылку</string>
     <string name="asset_action_delete">Удалить файл</string>
     <string name="asset_delete_confirm">Удалить файл? Его можно будет скачать снова.</string>
-    <string name="asset_source_cd">Сменить источник файлов</string>
+    <string name="asset_source_cd">Сменить источник Geo-файлов</string>
     <string name="asset_downloading">Загружаем файлы…</string>
     <string name="asset_download_failed">Не удалось скачать файлы. Проверьте сеть и повторите.</string>
 
@@ -211,13 +212,11 @@
     <string name="log_search_hint">Поиск по журналу</string>
     <string name="log_empty_title">Записей пока нет</string>
     <string name="log_empty_line">Журнал заполнится при следующем подключении.</string>
-    <string name="log_action_copy">Скопировать всё</string>
+    <string name="log_action_copy">Копировать</string>
     <string name="log_action_share">Поделиться файлом</string>
-    <string name="log_action_clear">Очистить журнал</string>
-    <string name="log_copy_hint">Долгое нажатие копирует строку</string>
+    <string name="log_action_clear">Очистить</string>
     <string name="log_level_error">Ошибка</string>
     <string name="log_level_warn">Внимание</string>
-    <string name="log_level_info">Инфо</string>
     <string name="log_cleared">Журнал очищен</string>
     <string name="log_share_failed">Не удалось подготовить файл журнала</string>
 
@@ -231,31 +230,67 @@
     <string name="about_version_cd">Скопировать версию</string>
     <string name="about_package">Идентификатор</string>
     <string name="about_package_cd">Скопировать идентификатор</string>
-    <string name="about_core">Ядро</string>
-    <string name="about_url_schemes">Схемы URL-адресов</string>
-    <string name="about_log">Журнал</string>
     <string name="about_check_update">Проверить обновления</string>
     <string name="about_source_code">Исходный код</string>
     <string name="about_feedback">Обратная связь</string>
-    <string name="about_telegram">Telegram-канал</string>
-    <string name="about_licenses">Лицензии</string>
+    <string name="about_telegram">Канал в Telegram</string>
+    <string name="about_licenses">Лицензии открытого ПО</string>
     <string name="about_privacy">Политика конфиденциальности</string>
 
     <!-- ==================================================================
          A-36 Проверка обновлений
          ================================================================== -->
-    <string name="upd_title">Обновления</string>
-    <string name="upd_prerelease">Проверять тестовые сборки</string>
+    <string name="upd_title">Проверить обновление</string>
+    <string name="upd_prerelease">Искать предварительный выпуск</string>
+    <!-- The version caption §7 draws under the card: «departament 2.2.1». The core build
+         follows it in brackets because that is what a bug report needs. -->
+    <string name="upd_version_line">departament %1$s</string>
     <string name="upd_prerelease_hint">Ранние версии выходят чаще и могут работать нестабильно</string>
-    <string name="upd_action_check">Проверить сейчас</string>
+    <string name="upd_action_check">Проверить обновление</string>
     <string name="upd_checking">Проверяем обновления…</string>
     <string name="upd_none_title">Обновлений нет</string>
     <string name="upd_none_line">Установлена последняя версия.</string>
     <string name="upd_found_title">Доступна версия %1$s</string>
-    <string name="upd_found_line">Скачайте и установите новую версию вручную.</string>
-    <string name="upd_action_download">Скачать</string>
+    <string name="upd_found_line">Скачаем и установим обновление. Данные и подписка останутся на месте.</string>
+    <string name="upd_action_download">Обновить</string>
+
+    <!-- Скачивание. Определённый прогресс, пока сервер прислал длину; иначе одна строка без цифр,
+         потому что «73%» без знаменателя — это не прогресс, а украшение. -->
+    <string name="upd_downloading">Скачиваем обновление…</string>
+    <string name="upd_downloading_size">%1$.1f МБ из %2$.1f МБ</string>
+    <string name="upd_downloading_done">Скачано %1$.1f МБ</string>
+    <string name="upd_action_cancel">Отменить</string>
+
+    <!-- Файл скачан и проверен: пакет наш, версия выше установленной. -->
+    <string name="upd_ready_title">Обновление готово</string>
+    <string name="upd_ready_line">Осталось подтвердить установку в системном окне.</string>
+    <string name="upd_action_install">Установить</string>
+
+    <!-- Установка из неизвестных источников: не ошибка, а недостающее разрешение.
+
+         Порядок фраз перевёрнут вместе с правкой тире (00-rules 1.4.11): раньше строка начиналась
+         с просьбы и объясняла её после длинного тире. Теперь сначала состояние, потом действие —
+         так экран отвечает на вопрос «почему я тут оказался» прежде, чем что-то требует. -->
+    <string name="upd_permission_title">Нужно разрешение на установку</string>
+    <string name="upd_permission_line">Обновление уже скачано. Разрешите departament устанавливать приложения.</string>
+    <string name="upd_action_permission">Открыть настройки</string>
+
+    <!-- Отказы. У каждого своя причина, и «Повторить» стоит рядом с ней (G2). -->
     <string name="upd_error_title">Не удалось проверить обновления</string>
-    <string name="upd_error_line">Проверьте сеть и повторите.</string>
+    <string name="upd_error_unreachable">Не удалось связаться с сервером обновлений. Проверьте сеть и повторите.</string>
+    <string name="upd_error_no_channel_title">Обновления недоступны</string>
+    <string name="upd_error_no_channel">В этой сборке нет канала обновлений. Скачайте новую версию с сайта departament.</string>
+    <string name="upd_error_no_release">Пока не опубликовано ни одной версии.</string>
+    <string name="upd_error_no_asset">Для вашего устройства сборки в этой версии нет.</string>
+    <string name="upd_error_download_title">Не удалось скачать обновление</string>
+    <string name="upd_error_download">Связь прервалась или не хватило места. Повторите.</string>
+    <string name="upd_error_foreign_title">Файл не от departament</string>
+    <string name="upd_error_foreign">Скачанный файл оказался другим приложением, поэтому он удалён. Обновитесь вручную с сайта.</string>
+    <string name="upd_error_not_newer_title">Эта версия не новее</string>
+    <string name="upd_error_not_newer">Система откажется её установить. Дождитесь следующей сборки.</string>
+    <string name="upd_error_installer_title">Установщик не открылся</string>
+    <string name="upd_error_installer">Откройте скачанный файл вручную или обновитесь с сайта.</string>
+    <string name="upd_action_open_releases">Открыть страницу загрузки</string>
 
     <!-- ==================================================================
          A-34 settings/about/urlschemes - Схемы URL-адресов
@@ -271,18 +306,20 @@
     <!-- ==================================================================
          A-29 settings/data - Данные и резервные копии
          ================================================================== -->
-    <string name="backup_title">Данные и резервные копии</string>
-    <string name="backup_grp_device">На устройстве</string>
-    <string name="backup_grp_cloud">Облачная копия</string>
-    <string name="backup_action_create">Создать копию на устройстве</string>
-    <string name="backup_action_create_hint">Сохранит серверы, подписки и настройки в один файл</string>
+    <string name="backup_title">Резервное копирование</string>
+    <string name="backup_note">Файл с серверами и настройками</string>
+    <string name="backup_grp_device">Данные</string>
+    <string name="backup_grp_cloud">Облако</string>
+    <string name="backup_action_create">Сохранить копию</string>
+    <string name="backup_action_create_hint">Все серверы и настройки в один файл</string>
     <string name="backup_action_restore">Восстановить из файла</string>
-    <string name="backup_action_restore_hint">Заменит текущие настройки содержимым файла</string>
-    <string name="backup_action_share">Поделиться копией</string>
+    <string name="backup_action_restore_hint">Заменит текущие сервера</string>
+    <string name="backup_action_share">Поделиться конфигурацией</string>
+    <string name="backup_action_share_hint">Отправить файл в другое приложение</string>
     <string name="backup_action_webdav_setup">Настройки WebDAV</string>
     <string name="backup_action_webdav_backup">Выгрузить копию в облако</string>
     <string name="backup_action_webdav_restore">Восстановить из облака</string>
-    <string name="backup_webdav_not_set">Адрес не указан</string>
+    <string name="backup_webdav_not_set">Не настроено</string>
     <string name="backup_webdav_required">Сначала укажите адрес WebDAV</string>
     <string name="backup_busy">Выполняем…</string>
     <string name="backup_created">Копия создана</string>
@@ -302,9 +339,6 @@
     <!-- ==================================================================
          A-13 servers/server/{guid} - формы серверов
          ================================================================== -->
-    <string name="srv_section_main">Основное</string>
-    <string name="srv_section_transport">Транспорт</string>
-    <string name="srv_section_security">Шифрование</string>
     <string name="srv_section_members">Участники цепочки</string>
     <string name="srv_delete">Удалить сервер</string>
     <string name="srv_delete_confirm">Удалить сервер? Отменить это действие нельзя.</string>
@@ -316,19 +350,140 @@
     <string name="srv_chain_step">Шаг %1$d</string>
     <string name="srv_chain_pick">Выберите сервер</string>
     <string name="srv_chain_remove_step">Убрать шаг</string>
-    <string name="srv_chain_step_empty">Выберите сервер для шага %1$d</string>
+    <!-- Отказы при сохранении цепочки. Обе строки были с подстановкой (номер шага, список имён)
+         и уходили в CharSequence-дверь, которая ничего не показывает; вторую вдобавок отсеивал
+         `isCounterReport`, потому что в именах серверов есть цифры. Нажатие «Сохранить» с пустым
+         шагом не делало ВООБЩЕ ничего. Теперь это предложения без подстановки: их видно. -->
+    <string name="srv_chain_step_empty">В цепочке остался пустой шаг. Выберите для него сервер.</string>
     <string name="srv_chain_no_servers">Пока нет серверов, из которых можно собрать цепочку</string>
     <string name="srv_group_title">Группа серверов</string>
     <string name="srv_group_type">Тип группы</string>
     <string name="srv_group_sub">Подписка</string>
     <string name="srv_group_filter">Фильтр серверов</string>
     <string name="srv_group_filter_hint">Оставьте пустым, чтобы взять все серверы подписки</string>
-    <string name="srv_group_empty_title">В группе нет серверов</string>
-    <string name="srv_group_empty_line">Добавьте серверы, чтобы группа заработала.</string>
     <string name="srv_custom_title">Своя конфигурация</string>
-    <string name="srv_config_hint">Вставьте JSON-конфигурацию целиком</string>
     <string name="srv_config_invalid">Конфигурация не разобрана. Проверьте JSON и повторите.</string>
     <string name="srv_name_required">Укажите название сервера</string>
+
+    <!-- ОТКАЗЫ ФОРМЫ «сервер вручную» (ServerActivity).
+         Раньше на месте каждого стояла ПОДПИСЬ ПОЛЯ («Название», «Адрес», «Порт», «Пароль»),
+         и ни одна из них не была в разрешённых NoticePolicy - то есть «Сохранить» с пустым
+         адресом не делало вообще ничего: экран стоял, ответа не было. Подпись поля и так
+         написана над полем; сообщению нужно назвать, ЧТО сделать. -->
+    <string name="srv_address_required">Укажите адрес сервера</string>
+    <string name="srv_port_required">Укажите порт: число от 1 до 65535</string>
+    <string name="srv_id_required">Укажите идентификатор пользователя</string>
+    <string name="srv_password_required">Укажите пароль</string>
+    <string name="srv_secret_key_required">Укажите закрытый ключ</string>
+    <!-- ПОЛЯ, БЕЗ КОТОРЫХ ПРОТОКОЛ НЕ ПОДНИМЕТСЯ. Сохранённый без них сервер - это не
+         сохранённый сервер, а будущее «не подключается» без объяснения: пустой открытый
+         ключ уходит в конфиг как есть и рукопожатие не состоится, пустое шифрование
+         VLESS ядро не принимает, пустой порт Hysteria2 роняет сборку конфига на toInt().
+         Проверка стоит на СОХРАНЕНИИ, поэтому уже сохранённую запись всегда можно
+         открыть и починить. -->
+    <string name="srv_public_key_required">Укажите открытый ключ сервера</string>
+    <string name="srv_public_key_required_reality">Укажите открытый ключ сервера: без него REALITY не соединится</string>
+    <string name="srv_encryption_required">Укажите шифрование: для VLESS это почти всегда none</string>
+    <string name="srv_tls_required">Для Trojan нужно выбрать TLS</string>
+    <string name="srv_json_invalid">Проверьте JSON: он не разобрался</string>
+
+    <!-- ==================================================================
+         A-13 «СЕРВЕР ВРУЧНУЮ» (ServerActivity) - восемь протокольных форм.
+
+         Восемь экранов - последнее место, где приложение выглядело форком
+         v2rayNG: голый EditText под TextView, шкала отступов из форка и ни
+         одного поля с состоянием ошибки. Формы собраны из тех же деталей,
+         что «Группа серверов» и «Подписка»: подпись сверху, поле 56 с
+         зарезервированной строкой подсказки, отказ ПОД полем.
+
+         ПОДПИСЬ ГОВОРИТ, ЧТО ЭТО ЗА ПОЛЕ; ПОДСКАЗКА - ЧТО В НЕГО ПИСАТЬ.
+         В форке половина подписей несла инструкцию в скобках («MTU
+         (необязательно, по умолчанию 1420)»), то есть подпись читалась как
+         предложение и переставала быть именем поля. Скобки вынесены в
+         helperText - строку, которая под полем и так зарезервирована.
+         ================================================================== -->
+
+    <!-- Заголовок экрана - имя протокола. Технический идентификатор, 1.4.10.
+         EConfigType.toString() давал «SHADOWSOCKS» и «WIREGUARD»: имена этих
+         двух проектов пишутся не так, а капс запрещён (0.4.3). -->
+    <!-- Заголовок экрана: русское подлежащее плюс имя протокола. «VLESS» в одиночку
+         выпадает из ряда соседей по семейству - «Группа серверов», «Своя
+         конфигурация», «Цепочка прокси»: те названы существительными по-русски.
+         Имя протокола остаётся как есть - это технический идентификатор (1.4.10). -->
+    <string name="srv_title_fmt">Сервер %1$s</string>
+    <string name="srv_proto_vmess" translatable="false">VMess</string>
+    <string name="srv_proto_vless" translatable="false">VLESS</string>
+    <string name="srv_proto_trojan" translatable="false">Trojan</string>
+    <string name="srv_proto_shadowsocks" translatable="false">Shadowsocks</string>
+    <string name="srv_proto_socks" translatable="false">SOCKS</string>
+    <string name="srv_proto_http" translatable="false">HTTP</string>
+    <string name="srv_proto_wireguard" translatable="false">WireGuard</string>
+    <string name="srv_proto_hysteria2" translatable="false">Hysteria2</string>
+
+    <!-- Заголовки групп. Предложением, полужирным, без капса (0.4.3, 1.4.7). -->
+    <string name="srv_section_access">Доступ</string>
+    <string name="srv_section_tls">Шифрование канала</string>
+    <string name="srv_section_keys">Ключи</string>
+    <string name="srv_section_interface">Интерфейс</string>
+    <string name="srv_section_advanced">Дополнительно</string>
+
+    <!-- Подписи, из которых вынута инструкция в скобках. -->
+    <string name="srv_user_label">Пользователь</string>
+    <string name="srv_preshared_key_label">Дополнительный ключ шифрования</string>
+    <string name="srv_reserved_label" translatable="false">Reserved</string>
+    <string name="srv_local_address_label">Локальный адрес</string>
+    <string name="srv_mtu_label" translatable="false">MTU</string>
+    <string name="srv_kcp_mtu_label" translatable="false">mKCP MTU</string>
+    <string name="srv_kcp_tti_label" translatable="false">mKCP TTI</string>
+    <string name="srv_port_hop_label">Смена портов</string>
+    <string name="srv_bandwidth_down_label">Входящая полоса</string>
+    <string name="srv_bandwidth_up_label">Исходящая полоса</string>
+    <string name="srv_xhttp_extra_label" translatable="false">XHTTP Extra</string>
+    <string name="srv_final_mask_label" translatable="false">FinalMask</string>
+
+    <!-- Подсказки под полями. -->
+    <string name="srv_hint_optional">Можно оставить пустым</string>
+    <string name="srv_hint_pinned_ca256">SHA-256. Можно оставить пустым</string>
+    <string name="srv_hint_address">Домен или IP-адрес сервера</string>
+    <string name="srv_hint_port">От 1 до 65535</string>
+    <string name="srv_hint_reserved">Три числа через запятую. Можно оставить пустым</string>
+    <string name="srv_hint_local_address">IPv4 и IPv6 через запятую. Можно оставить пустым</string>
+    <string name="srv_hint_mtu">По умолчанию 1420</string>
+    <string name="srv_hint_kcp_mtu">По умолчанию 1350</string>
+    <string name="srv_hint_kcp_tti">По умолчанию 50</string>
+    <string name="srv_hint_port_hop">Заменяет порт выше. Можно оставить пустым</string>
+    <string name="srv_hint_port_hop_interval">В секундах. Можно оставить пустым</string>
+    <string name="srv_hint_bandwidth">Число и единица, например 100 m. Допустимы k, m, g, t</string>
+    <string name="srv_hint_xhttp_extra">Необработанный JSON вида { XHTTPObject }</string>
+    <string name="srv_hint_final_mask">Необработанный JSON вида { FinalMaskObject }</string>
+    <string name="srv_hint_encryption">Для VLESS почти всегда none</string>
+
+    <!-- Примеры значения в пустом поле. Плейсхолдер - это пример, а не подпись (7.4). -->
+    <string name="srv_ph_address" translatable="false">example.com</string>
+    <!-- Значение, которого VLESS ждёт в поле «Шифрование» по умолчанию. Технический
+         идентификатор, не текст интерфейса. -->
+    <string name="srv_encryption_default" translatable="false">none</string>
+
+    <!-- Выбор значения из списка. Поле открывает лист с вариантами: Spinner в
+         разрешённый набор компонентов не входит (11.2), а поле, в отличие от
+         строки настроек, несёт ту же строку отказа, что и соседи по форме. -->
+    <string name="srv_pick_value">Выберите значение</string>
+    <string name="srv_saving_cd">Сохранение</string>
+    <string name="srv_value_none">Нет</string>
+    <string name="srv_value_not_applicable">Не применимо</string>
+    <string name="srv_value_default">Как в настройках</string>
+    <string name="srv_value_yes">Да</string>
+    <string name="srv_value_no">Нет</string>
+
+    <!-- ОТКАЗЫ. Каждый называет, что исправить, и приходит ПОД своё поле, а не
+         поверх экрана: тост поверх формы не показывает, какое из двадцати полей
+         он имеет в виду. -->
+    <string name="srv_address_invalid">В адресе не должно быть пробелов и косых черт. Укажите домен или IP</string>
+    <string name="srv_number_invalid">Введите целое число больше нуля</string>
+    <string name="srv_reserved_invalid">Здесь нужны три числа через запятую, например 0,0,0</string>
+    <string name="srv_bandwidth_invalid">Укажите число и единицу, например 100 m</string>
+    <string name="srv_editor_unavailable">Для этого типа сервера формы нет. Откройте его как свою конфигурацию</string>
+    <string name="srv_config_unreadable">Сервер не открылся: запись повреждена. Удалите его и добавьте заново</string>
 
     <!-- ==================================================================
          RUSSIAN REPLACEMENTS FOR THE UPSTREAM ENGLISH THESE SCREENS STILL SHOWED
@@ -348,12 +503,20 @@
 
     <string name="perapp_unknown_app">Неопознанный трафик</string>
 
-    <string name="subs_update_done">Обновлено серверов: %1$d</string>
+    <!-- ИТОГ «Обновить все».
+         `subs_update_done` («Обновлено серверов: %1$d») и `subs_update_result` («Серверов: … ·
+         обновлено: …, с ошибкой: …») УДАЛЕНЫ. Обе строились через getString и уходили в
+         CharSequence-дверь, которая по правилу 4 NoticePolicy не показывает ничего, а вторая ещё
+         и распознавалась как счётчик. То есть «Обновить все» молчал ОБО ВСЁМ, кроме случая «нет
+         подписок»: неудача выглядела ровно как успех.
+         Успех и дальше молчит (правило 1 - строки перерисовались, это и есть подтверждение), а у
+         неудачи теперь есть предложение с причиной и следующим шагом. -->
     <string name="subs_update_none">Нет подписок для обновления</string>
-    <string name="subs_update_result">Серверов: %1$d · обновлено: %2$d, с ошибкой: %3$d, пропущено: %4$d</string>
+    <string name="subs_update_failed">Не удалось обновить подписки. Проверьте сеть и повторите.</string>
+    <string name="subs_update_partial">Часть подписок не обновилась. Проверьте сеть и повторите.</string>
+    <string name="subs_update_skipped">Обновлять нечего: подписки выключены или их срок истёк.</string>
 
     <string name="asset_copy_failed">Не удалось скопировать файл</string>
-    <string name="asset_download_done">Обновлено файлов: %1$d</string>
 
     <string name="scheme_import_done">Импорт выполнен</string>
     <string name="scheme_import_failed">Не удалось импортировать</string>
@@ -361,8 +524,7 @@
     <string name="srv_group_sub_all">Все подписки</string>
     <string name="srv_delete_selected">Нельзя удалить выбранный сервер</string>
     <string name="srv_chain_too_few">В цепочке нужно минимум два шага</string>
-    <string name="srv_chain_invalid_members">Эти серверы нельзя использовать в цепочке: %1$s</string>
+    <string name="srv_chain_invalid_members">Не все шаги ведут на обычный сервер. Выберите для них другой.</string>
     <string name="srv_config_label">Конфигурация</string>
     <string name="srv_config_note">Порт входящего подключения должен совпадать с настройками приложения.</string>
-
 </resources>

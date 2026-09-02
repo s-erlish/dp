@@ -49,6 +49,16 @@ object SkeletonBinder {
         // A crossfade left over from a previous swap() runs on the ViewPropertyAnimator, which the
         // animator map does not hold. Stop it too, or it fights this one over the same alpha.
         view.animate().cancel()
+        // AND IT STOPS WHEN THE SCREEN GOES, WHICH NOTHING USED TO MAKE IT DO. This pulse is
+        // INFINITE, and an infinite ObjectAnimator is not stopped by its target leaving the window:
+        // it stays registered with the AnimationHandler, holds the view — and through it the whole
+        // dead view tree and its Activity — and keeps waking the compositor for the life of the
+        // process. Every call site pairs showAfterDelay with cancel/swap on the load's completion
+        // path, and that is exactly the path a user who backs out mid-load never reaches: the app
+        // list behind Прокси по приложениям is slow enough to need a skeleton, which is the same
+        // thing as saying it is slow enough to be left. The pending 300ms post is the same story
+        // one step earlier — it survives detach too and would START a pulse on a dead view.
+        installDetachGuard(view)
         if (view.reducedMotion()) {
             hold(view)
             return
@@ -80,7 +90,33 @@ object SkeletonBinder {
      */
     fun showAfterDelay(view: View) {
         view.removeCallbacks(view.showRunnable())
+        installDetachGuard(view)
         view.postDelayed(view.showRunnable(), APPEAR_AFTER_MS)
+    }
+
+    /**
+     * Stops the pulse and drops the pending show the moment the view leaves the window — see the
+     * note in [pulse] for what it costs not to.
+     *
+     * Installed ONCE per view and kept in a weak map beside [pendingShows], because both entry
+     * points call it and a listener added on every call would pile up on the same view. It stays
+     * installed across a detach: a fragment view can come back, and the guard is then still there
+     * for the next load. It deliberately does NOT touch alpha or visibility the way [cancel] does —
+     * the skeleton's shape is the screen's business, and this only stops motion.
+     */
+    private fun installDetachGuard(view: View) {
+        if (detachGuards.containsKey(view)) return
+        val guard = object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) = Unit
+
+            override fun onViewDetachedFromWindow(v: View) {
+                v.removeCallbacks(v.showRunnable())
+                RunningAnimators.cancel(v)
+                v.animate().cancel()
+            }
+        }
+        detachGuards[view] = guard
+        view.addOnAttachStateChangeListener(guard)
     }
 
     /** Drops a pending [showAfterDelay] and stops any pulse, without touching the content. */
@@ -138,6 +174,9 @@ object SkeletonBinder {
     }
 
     private val pendingShows = WeakHashMap<View, Runnable>()
+
+    /** One detach guard per view; see [installDetachGuard]. */
+    private val detachGuards = WeakHashMap<View, View.OnAttachStateChangeListener>()
 
     private const val PULSE_LOW = 0.45f
     private const val PULSE_HIGH = 1.0f

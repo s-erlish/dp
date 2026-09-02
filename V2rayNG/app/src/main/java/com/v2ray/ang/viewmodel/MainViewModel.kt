@@ -12,7 +12,6 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.v2ray.ang.AngApplication
 import com.v2ray.ang.AppConfig
-import com.v2ray.ang.R
 import com.v2ray.ang.dto.GroupMapItem
 import com.v2ray.ang.dto.SubscriptionUpdateResult
 import com.v2ray.ang.dto.TestServiceMessage
@@ -24,7 +23,6 @@ import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.isGroupType
 import com.v2ray.ang.template.TemplateManager
 import com.v2ray.ang.util.JsonUtil
-import com.v2ray.ang.extension.matchesPattern
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
@@ -46,53 +44,66 @@ import kotlinx.coroutines.sync.withPermit
 import com.v2ray.ang.enums.PingMethod
 import kotlinx.coroutines.withContext
 import java.util.Collections
-import java.util.regex.PatternSyntaxException
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var serverList = mutableListOf<String>() // MmkvManager.decodeServerList()
     var subscriptionId: String = MmkvManager.decodeSettingsString(AppConfig.CACHE_SUBSCRIPTION_ID, "").orEmpty()
-    var keywordFilter = ""
 
-    // Protocol filter for the Servers tab chips ("Все" = null). Applied in updateCache().
-    var protocolFilter: com.v2ray.ang.enums.EConfigType? = null
+    /**
+     * THE TWO OTHER FILTERS THAT USED TO NARROW [serversCache] ARE GONE, and the reason is the same
+     * for both: the surface that set them is gone and nothing has set them since.
+     *
+     * `keywordFilter` was the Серверы tab's search box and `protocolFilter` its protocol chips.
+     * With the tab removed, `filterConfig()` and `applyProtocolFilter()` had no callers, so both
+     * fields held their initial value for the life of the process — and every reader of them was a
+     * branch that could only ever go one way, including a `Regex` compiled per rebuild against a
+     * string that was always empty.
+     *
+     * **[serversCache] IS A VIEW AND [subscriptionId] IS THE ONE THING THAT STILL NARROWS IT.** That
+     * distinction is the one to keep: a filtered-to-zero cache is not an empty store, and code that
+     * mistakes the two takes the whole bottom navigation off screen (see
+     * `MainActivity.updateBottomNavVisibility`). A search added here later must not be able to
+     * reintroduce that.
+     */
     val serversCache = mutableListOf<ServersCache>()
     val isRunning by lazy { MutableLiveData<Boolean>() }
+
+    /**
+     * THE SERVER THE LIVE TUNNEL IS ACTUALLY ON — which is not the same thing as the selected one,
+     * and the whole «Переподключиться» offer exists because it is not.
+     *
+     * Picking a server while a tunnel is up SELECTS it and leaves the connection alone
+     * (`MainActivity.setSelectServer`), so the moment the user declines that offer the selection
+     * runs AHEAD of the tunnel and stays ahead. Nothing in this process could tell the two apart:
+     * the core runs in `:RunSoLibV2RayDaemon` and its `currentConfig` is that process's field, so
+     * the shell only ever had `getSelectServer()` to go on — and that is the selection, by
+     * definition. This field closes that gap without asking the daemon anything.
+     *
+     * Written from the daemon's own state broadcasts, never guessed:
+     *  - a START that succeeded ran `startContextService`, which reads `getSelectServer()` at that
+     *    instant, so the selection IS the running server at exactly that moment and only then;
+     *  - a plain RUNNING is the handshake answer to `MSG_REGISTER_CLIENT` (a fresh Activity asking
+     *    a core that was already up). It adopts the selection ONLY when nothing is known yet,
+     *    because after a process restart there is no better answer, and overwriting a value we do
+     *    know would erase the very divergence this field exists to record;
+     *  - anything that means "not running" clears it.
+     */
+    var runningGuid: String? = null
+        private set
     val updateListAction by lazy { MutableLiveData<Int>() }
-    val updateTestResultAction by lazy { MutableLiveData<String>() }
     val updateSpeedAction by lazy { MutableLiveData<Pair<Long, Long>>() }
     val delayResultAction by lazy { MutableLiveData<Long>() }
 
-    // Emitted after a "fast connect" test finishes: carries the chosen server guid
-    // (or null when no server produced a valid latency). Guarded as a one-shot event
-    // so the retained value is not replayed (and re-acted on) after recreate/rotation.
-    val fastConnectAction by lazy { MutableLiveData<String?>() }
-    private var pendingFastConnect = false
-    private var fastConnectEventPending = false
-    private var fastConnectExcludeGuid: String? = null
+    // NO AUTO-FALLBACK STATE HERE ANY MORE. «Переключаться на более быстрый сервер» is gone by the
+    // owner's instruction, and the bookkeeping it needed went with it: the fast-connect event
+    // LiveData and its one-shot guard, the "already fired this session" latch and the "our own
+    // restart is in flight" flag. They had no readers left once Главная dropped its half — keeping
+    // them would have left a working switch with nothing but the wiring cut.
+    //
+    // What is NOT touched, because the owner asked for the switching to go and nothing else
+    // (`PORT-DELTA.md` П-26): [testAllServers] and all four check methods, «обновить», the
+    // 30-second probe behind the «мс» figure on Главная, and picking a сервер by hand.
 
-    // Whether the one-shot auto-fallback has already fired for the current user-initiated
-    // session. Lives in the ViewModel so it survives Activity recreate (rotation/theme change)
-    // and is NOT reset by the fallback's own service restart — prevents reconnect loops.
-    var autoFallbackUsed = false
-
-    // True only while the auto-fallback's own stop→start restart is in flight: set when the
-    // fallback commits, released when the restart is actually issued (or abandoned). The anti-loop
-    // invariant rests on [autoFallbackUsed] surviving that restart, and this flag is what lets
-    // the disconnect handler tell the internal restart apart from a genuine user disconnect
-    // instead of leaving the distinction implicit in "nothing happens to clear the flag".
-    // It must NOT be released merely because a tunnel is up — the core reports "running" again on
-    // every client registration, and clearing it there would expose the internal stop.
-    var fallbackInProgress = false
-
-    /**
-     * Returns true exactly once per emitted fast-connect result, so observers ignore
-     * the LiveData value replayed when the Activity is recreated.
-     */
-    fun consumeFastConnectEvent(): Boolean {
-        val v = fastConnectEventPending
-        fastConnectEventPending = false
-        return v
-    }
     /**
      * The scope every latency measurement runs in.
      *
@@ -170,7 +181,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * whether or not a registration was needed.
      */
     fun startListenBroadcast() {
-        isRunning.value = false
+        // «NOT RUNNING» IS ONLY PUBLISHED WHEN NOTHING IS KNOWN YET. This is called again on every
+        // Activity recreate — a rotation, a theme change, a language change — and this ViewModel
+        // OUTLIVES all three, so it already holds the answer at that point. Overwriting it with
+        // `false` threw that answer away for the few hundred milliseconds until the daemon replied
+        // to the handshake below, and in that window the screen showed a live tunnel as
+        // disconnected: the session clock stopped and restarted, the hero played its exit, and the
+        // connect object offered to CONNECT something that was already connected — a press there
+        // used to arrive at the daemon as a duplicate start and tear the tunnel down (see
+        // `CoreVpnService.onStartCommand`).
+        //
+        // A cold start still seeds `false`, because then it is true: nothing is running that this
+        // process knows of, and the screen has to paint something while the handshake is in flight.
+        if (isRunning.value == null) isRunning.value = false
         if (!broadcastRegistered) {
             val mFilter = IntentFilter(AppConfig.BROADCAST_ACTION_ACTIVITY)
             ContextCompat.registerReceiver(getApplication(), mMsgReceiver, mFilter, Utils.receiverFlags())
@@ -196,8 +219,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Reloads the server list based on current subscription filter.
+     *
+     * THE SELECTION IS REPAIRED FIRST, and this is the one place in the app that does it. Every
+     * path that can invalidate the selection ends here — an import, a delete, a subscription
+     * refresh (including the unattended one, see [AppConfig.MSG_STATE_SERVERS_CHANGED]), a finished
+     * check — so a list that has servers is a list with one of them selected, by construction. See
+     * [MmkvManager.ensureSelectedServer].
      */
     fun reloadServerList() {
+        MmkvManager.ensureSelectedServer()
+
         serverList = if (subscriptionId.isEmpty()) {
             MmkvManager.decodeAllServerList()
         } else {
@@ -206,6 +237,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         updateCache()
         updateListAction.value = -1
+    }
+
+    /**
+     * Re-reads the store ONLY when it no longer agrees with what this cache holds.
+     *
+     * The cache is a snapshot of guids, and a subscription refresh mints new ones for every server
+     * it replaces — so after one has run, every row on screen addresses a profile that has been
+     * deleted. Tapping such a row stored a dead guid as the selection, and from that moment Главная
+     * said «Выберите сервер в списке ниже» over a full list and the connect object was disabled.
+     *
+     * The refresh announces itself now, but an announcement can be missed (the app was not running,
+     * the broadcast was dropped), so the shell also asks this on every resume. The comparison is a
+     * list of strings against a list of strings — no profile is parsed unless something actually
+     * changed, which is what keeps it off the "лишняя нагрузка" list.
+     *
+     * @return true when the list was stale and has been reloaded.
+     */
+    fun reloadServerListIfStale(): Boolean {
+        val stored = if (subscriptionId.isEmpty()) {
+            MmkvManager.decodeAllServerList()
+        } else {
+            MmkvManager.decodeServerList(subscriptionId)
+        }
+        val listMatches = stored == serverList
+        val selectionHealthy = stored.isEmpty() || MmkvManager.getSelectServer() != null
+        if (listMatches && selectionHealthy) return false
+        reloadServerList()
+        return true
     }
 
     /**
@@ -221,55 +280,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Swaps the positions of two servers.
-     * @param fromPosition The initial position of the server.
-     * @param toPosition The target position of the server.
-     */
-    fun swapServer(fromPosition: Int, toPosition: Int) {
-        if (subscriptionId.isEmpty()) {
-            return
-        }
-
-        Collections.swap(serverList, fromPosition, toPosition)
-        Collections.swap(serversCache, fromPosition, toPosition)
-
-        MmkvManager.encodeServerList(serverList, subscriptionId)
-    }
+    // `swapServer()` USED TO STAND HERE: the drag-to-reorder write behind
+    // `MainRecyclerAdapter.onItemMove`. That adapter answers the move `false` and no
+    // `ItemTouchHelper` is attached to Главная's list, so nothing has been able to reach this since
+    // the Серверы tab went. The provider's own order is what the list shows, and
+    // `SettingsManager.applyServerSortOrder` is what rewrites it.
 
     /**
-     * Updates the cache of servers.
+     * Updates the cache of servers: every profile of [subscriptionId] (or of the whole store when
+     * it is blank), decoded once, in the stored order.
+     *
+     * The keyword and protocol branches that used to sit inside this loop are gone with the fields
+     * that fed them — @see [serversCache].
      */
     @Synchronized
     fun updateCache() {
         serversCache.clear()
-        val kw = keywordFilter.trim()
-        val searchRegex = try {
-            if (kw.isNotEmpty()) Regex(kw, setOf(RegexOption.IGNORE_CASE)) else null
-        } catch (e: PatternSyntaxException) {
-            null // Fallback to literal search if regex is invalid
-        }
         for (guid in serverList) {
             val profile = MmkvManager.decodeServerConfig(guid) ?: continue
-            // Protocol filter (Servers tab chips). Null = "Все" (show every protocol).
-            val pf = protocolFilter
-            if (pf != null && profile.configType != pf) continue
-            if (kw.isEmpty()) {
-                serversCache.add(ServersCache(guid, profile))
-                continue
-            }
-
-            val remarks = profile.remarks
-            val description = profile.description.orEmpty()
-            val server = profile.server.orEmpty()
-            val protocol = profile.configType.name
-            if (remarks.matchesPattern(searchRegex, kw)
-                || description.matchesPattern(searchRegex, kw)
-                || server.matchesPattern(searchRegex, kw)
-                || protocol.matchesPattern(searchRegex, kw)
-            ) {
-                serversCache.add(ServersCache(guid, profile))
-            }
+            serversCache.add(ServersCache(guid, profile))
         }
     }
 
@@ -454,7 +483,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 TestServiceMessage(
                     key = AppConfig.MSG_MEASURE_CONFIG_START,
                     subscriptionId = subscriptionId,
-                    serverGuids = if (keywordFilter.isNotEmpty()) serversCopy.map { it.guid } else emptyList()
+                    // Empty = "let the service resolve the set from subscriptionId", which is what
+                    // this has always sent: the explicit list was only ever built for a keyword
+                    // filter, and there is none. @see serversCache
+                    serverGuids = emptyList()
                 )
             )
         }
@@ -508,83 +540,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Runs a real-ping test across the current server list and, once finished,
-     * automatically selects the lowest-latency server and signals the UI to connect.
-     * Used by the "fast connect" action.
-     */
-    fun fastConnect(excludeGuid: String? = null) {
-        pendingFastConnect = true
-        fastConnectExcludeGuid = excludeGuid
-        testAllRealPing()
-    }
+    // `fastConnect()` and `selectFastestServer()` USED TO STAND HERE, and they are gone on the
+    // owner's word: «надо убрать в целом эту функцию о переключении на более быстрый сервер».
+    // Between them they were the acting half of the auto-fallback — measure every сервер, take the
+    // lowest latency, move the selection onto it and hand it to Главная to restart the tunnel on.
+    // The deciding half (Главная's post-connect health probe) and the setting are already gone;
+    // [SettingsManager.retireAutoFallback] additionally forces the stored key false on every start,
+    // so an install that once had it on cannot bring it back.
+    //
+    // Do not reintroduce a "pick the fastest for the user" path here. The failure mode is the one
+    // the owner objected to: the app quietly moving him off the сервер he chose.
 
-    /**
-     * Picks the server with the smallest positive latency from the current cache
-     * and marks it as the selected server.
-     *
-     * @return the selected server guid, or null if no server has a valid latency.
-     */
-    private fun selectFastestServer(excludeGuid: String? = null): String? {
-        var bestGuid: String? = null
-        var bestDelay = Long.MAX_VALUE
-        serversCache.forEach { sc ->
-            if (sc.guid == excludeGuid) return@forEach
-            val delay = MmkvManager.decodeServerAffiliationInfo(sc.guid)?.testDelayMillis ?: -1L
-            if (delay in 1 until bestDelay) {
-                bestDelay = delay
-                bestGuid = sc.guid
-            }
-        }
-        bestGuid?.let { MmkvManager.setSelectServer(it) }
-        return bestGuid
-    }
-
-    /**
-     * Changes the subscription ID.
-     * @param id The new subscription ID.
-     */
-    fun subscriptionIdChanged(id: String) {
-        if (subscriptionId != id) {
-            subscriptionId = id
-            MmkvManager.encodeSettings(AppConfig.CACHE_SUBSCRIPTION_ID, subscriptionId)
-        }
-        reloadServerList()
-    }
-
-    /**
-     * Gets the subscriptions.
-     * @param context The context.
-     * @return A pair of lists containing the subscription IDs and remarks.
-     */
-    fun getSubscriptions(context: Context): List<GroupMapItem> {
-        val subscriptions = MmkvManager.decodeSubscriptions()
-        if (subscriptionId.isNotEmpty()
-            && !subscriptions.map { it.guid }.contains(subscriptionId)
-        ) {
-            subscriptionIdChanged("")
-        }
-
-        val groups = mutableListOf<GroupMapItem>()
-        if (MmkvManager.decodeSettingsBool(AppConfig.PREF_GROUP_ALL_DISPLAY)) {
-            groups.add(
-                GroupMapItem(
-                    id = "",
-                    remarks = context.getString(R.string.filter_config_all)
-                )
-            )
-        }
-        // Pinned subscriptions come first (stable sort preserves original order otherwise).
-        subscriptions.sortedByDescending { it.subscription.pinned }.forEach { sub ->
-            groups.add(
-                GroupMapItem(
-                    id = sub.guid,
-                    remarks = sub.subscription.remarks
-                )
-            )
-        }
-        return groups
-    }
+    // `subscriptionIdChanged()` and `getSubscriptions()` USED TO STAND HERE, and they went
+    // together: the second built the подписка picker's rows and was the only caller of the first.
+    // Both belonged to the Серверы tab's group selector, which the owner removed — Главная shows
+    // every server in one provider-grouped list and its карусель is built from [getProviderGroups].
+    // `subscriptionId` itself stays: it is still what narrows the cache, and the shell writes it.
 
     /**
      * Gets the position of a server by its GUID.
@@ -612,7 +583,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun removeAllServer(): Int {
         val count =
-            if (subscriptionId.isEmpty() && keywordFilter.isEmpty()) {
+            if (subscriptionId.isEmpty()) {
                 MmkvManager.removeAllServer()
             } else {
                 val serversCopy = serversCache.toList()
@@ -645,7 +616,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * @return The number of removed servers.
      */
     fun removeInvalidServer(): Int {
-        val candidates = if (subscriptionId.isEmpty() && keywordFilter.isEmpty()) {
+        val candidates = if (subscriptionId.isEmpty()) {
             MmkvManager.decodeAllServerList()
         } else {
             serversCache.map { it.guid }
@@ -678,19 +649,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun sortByTestResultsForSub(subId: String) {
         data class ServerDelay(var guid: String, var testDelayMillis: Long)
 
-        val serverDelays = mutableListOf<ServerDelay>()
-        val serverListToSort = MmkvManager.decodeServerList(subId)
+        // Fenced: this reads a list and writes it back, and `:bg` can be replacing the same list
+        // from a subscription refresh at that moment. See [MmkvManager.inServerListTransaction].
+        MmkvManager.inServerListTransaction {
+            val serverDelays = mutableListOf<ServerDelay>()
+            val serverListToSort = MmkvManager.decodeServerList(subId)
 
-        serverListToSort.forEach { key ->
-            val delay = MmkvManager.decodeServerAffiliationInfo(key)?.testDelayMillis ?: 0L
-            serverDelays.add(ServerDelay(key, if (delay <= 0L) 999999 else delay))
+            serverListToSort.forEach { key ->
+                val delay = MmkvManager.decodeServerAffiliationInfo(key)?.testDelayMillis ?: 0L
+                serverDelays.add(ServerDelay(key, if (delay <= 0L) 999999 else delay))
+            }
+            serverDelays.sortBy { it.testDelayMillis }
+
+            val sortedServerList = serverDelays.map { it.guid }.toMutableList()
+
+            // Save the sorted list for this subscription
+            MmkvManager.encodeServerList(sortedServerList, subId)
         }
-        serverDelays.sortBy { it.testDelayMillis }
-
-        val sortedServerList = serverDelays.map { it.guid }.toMutableList()
-
-        // Save the sorted list for this subscription
-        MmkvManager.encodeServerList(sortedServerList, subId)
     }
 
 
@@ -704,47 +679,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Filters the configuration by a keyword.
-     * @param keyword The keyword to filter by.
-     */
-    fun filterConfig(keyword: String) {
-        if (keyword == keywordFilter) {
-            return
-        }
-        keywordFilter = keyword
-        reloadServerList()
-    }
+    // `filterConfig()`, `applyProtocolFilter()` and `availableProtocols()` USED TO STAND HERE.
+    // They were the Серверы tab's search box and its protocol chips — the writers behind the two
+    // filter fields described on [serversCache] — and they lost their surface with the tab. Nothing
+    // has called any of them since, so the filters they set could only ever hold their initial
+    // value.
 
     /**
-     * Sets the protocol filter (Servers tab chips) and reloads the list.
-     * @param type The protocol to keep, or null for "Все" (all protocols).
-     */
-    fun applyProtocolFilter(type: com.v2ray.ang.enums.EConfigType?) {
-        if (protocolFilter == type) return
-        protocolFilter = type
-        reloadServerList()
-    }
-
-    /**
-     * Distinct protocol types present in the full (unfiltered) server list,
-     * used to build the Servers tab filter chips. Order follows first appearance.
-     */
-    fun availableProtocols(): List<com.v2ray.ang.enums.EConfigType> {
-        val result = mutableListOf<com.v2ray.ang.enums.EConfigType>()
-        for (guid in serverList) {
-            val type = MmkvManager.decodeServerConfig(guid)?.configType ?: continue
-            if (!result.contains(type)) result.add(type)
-        }
-        return result
-    }
-
-    /**
-     * Real subscription groups (providers), pinned-first, used as section headers
-     * on the Servers tab. Excludes the synthetic "All" pseudo-group.
+     * The подписки the user actually has, pinned first.
+     *
+     * `__default_subscription__` IS EXCLUDED, AND THAT IS THE FIX FOR THE PHANTOM CARD.
+     * It is not a подписка: it is the internal storage bucket that holds servers with no
+     * subscription of their own, and `SettingsManager.migrateServerListToSubscriptions` calls
+     * `ensureDefaultSubscription()` before it checks whether there is anything to migrate — so
+     * every fresh install writes a `SubscriptionItem(remarks = "Default")` under that key, and
+     * `MmkvManager.initSubsList` then adopts every key in `subStorage` as the subscription list.
+     *
+     * Drawn as a card it becomes «Подписка» (the heading falls back for a blank or "Default"
+     * remark) with «Ещё не обновлялась» and an empty body — the second, nameless подписка the
+     * owner saw appear next to his real one the moment he added it: «при добавлении пишет другую
+     * подписку без названия». It only surfaced after the first add because with no servers at all
+     * the gate block replaces the carousel entirely.
+     *
+     * Nothing is lost by leaving it out. Servers in that bucket still reach the list —
+     * `MmkvManager.decodeAllServerList` reads it explicitly, and `MainRecyclerAdapter.rebuildRows`
+     * collects everything without a matching подписка into its own «Локальные» section.
      */
     fun getProviderGroups(): List<GroupMapItem> {
         return MmkvManager.decodeSubscriptions()
+            .filterNot { it.guid == AppConfig.DEFAULT_SUBSCRIPTION_ID }
             .sortedByDescending { it.subscription.pinned }
             .map { GroupMapItem(id = it.guid, remarks = it.subscription.remarks) }
     }
@@ -762,7 +725,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Called once a whole check has finished, whichever method ran it, and nowhere else: this is
-     * what drives «удалять недоступные» / «сортировать» after a test and the fast-connect pick.
+     * what drives «удалять недоступные» / «сортировать» after a test. It used to also pick a
+     * сервер for the retired auto-fallback; it does not choose for the user any more.
      *
      * @param autoRemoveInvalid whether this method's failures are evidence that a server is
      *        unreachable. TCP connect and the proxied real delay say yes. Direct HTTP and ICMP say
@@ -781,16 +745,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 sortByTestResults()
             }
 
-            val fastestGuid = if (pendingFastConnect) selectFastestServer(fastConnectExcludeGuid) else null
-
             withContext(Dispatchers.Main) {
                 reloadServerList()
-                if (pendingFastConnect) {
-                    pendingFastConnect = false
-                    fastConnectExcludeGuid = null
-                    fastConnectEventPending = true
-                    fastConnectAction.value = fastestGuid
-                }
             }
         }
     }
@@ -799,11 +755,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         override fun onReceive(ctx: Context?, intent: Intent?) {
             when (intent?.getIntExtra("key", 0)) {
                 AppConfig.MSG_STATE_RUNNING -> {
+                    // The handshake answer: a core that was already up telling a fresh Activity so.
+                    // It carries no guid, and the selection may already have moved past the tunnel,
+                    // so it only fills [runningGuid] in when nothing is known — see that field.
                     isRunning.value = true
+                    if (runningGuid == null) runningGuid = MmkvManager.getSelectServer()
                 }
 
                 AppConfig.MSG_STATE_NOT_RUNNING -> {
                     isRunning.value = false
+                    runningGuid = null
                 }
 
                 AppConfig.MSG_STATE_START_SUCCESS -> {
@@ -811,6 +772,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // the connected state with the neutral gray «Прокси подключён» toast + shield,
                     // driven by MainActivity's isRunning observer.
                     isRunning.value = true
+                    // A start that just succeeded ran on whatever the selection held when
+                    // `startContextService` read it, so this is the one moment the two are the same
+                    // thing — and therefore the one moment worth recording.
+                    runningGuid = MmkvManager.getSelectServer()
                 }
 
                 AppConfig.MSG_STATE_START_FAILURE -> {
@@ -818,15 +783,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // neutral gray «Не удалось подключиться» toast (via connectInProgress) when
                     // this flips isRunning to false during an in-progress connect.
                     isRunning.value = false
+                    runningGuid = null
                 }
 
                 AppConfig.MSG_STATE_STOP_SUCCESS -> {
                     isRunning.value = false
+                    runningGuid = null
                 }
 
-                AppConfig.MSG_MEASURE_DELAY_SUCCESS -> {
-                    updateTestResultAction.value = intent.getStringExtra("content")
+                AppConfig.MSG_STATE_SERVERS_CHANGED -> {
+                    // A подписка refresh replaced this провайдер's servers, in a worker that owns no
+                    // list. Everything on screen is addressing guids that no longer exist, so the
+                    // cache is rebuilt from the store — which also repairs the selection
+                    // (reloadServerList). Receivers run on the main thread, so the LiveData set
+                    // inside is on the right one.
+                    reloadServerList()
                 }
+
+                // NO `MSG_MEASURE_DELAY_SUCCESS` BRANCH ANY MORE. It carried the 30-second probe's
+                // human-readable sentence — «Успешно, задержка 123 мс», optionally with the exit IP
+                // — for a status line this product does not have, and the one observer it reached
+                // (`HomeFragment`'s [updateTestResultAction]) never read the string: it rebuilt the
+                // whole server list instead, twice per probe, decoding every подписка out of MMKV to
+                // do it. The daemon no longer sends it; what the screen reads is the NUMBER, on the
+                // channel below. @see CoreServiceManager.measureV2rayDelay
 
                 AppConfig.MSG_STATE_DELAY_RESULT -> {
                     (intent.getSerializableExtra("content") as? Long)?.let {
@@ -846,11 +826,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     updateListAction.value = getPosition(content ?: "")
                 }
 
-                AppConfig.MSG_MEASURE_CONFIG_NOTIFY -> {
-                    val content = intent.getStringExtra("content")
-                    updateTestResultAction.value =
-                        getApplication<AngApplication>().getString(R.string.connection_runing_task_left, content)
-                }
+                // NO `MSG_MEASURE_CONFIG_NOTIFY` BRANCH ANY MORE, AND NO BATCH PROGRESS CHANNEL
+                // BEHIND IT. `CoreTestService` broadcast one of these per finished server, on top
+                // of the `MSG_MEASURE_CONFIG_SUCCESS` it already sent for the same server, and it
+                // carried nothing but an internal tally («3 / 57») that no surface has printed
+                // since the shade stopped showing it. The one observer left — `HomeFragment`'s
+                // `updateTestResultAction` — read none of the text and answered every message with
+                // `refreshServerList(-1)`: a full rebuild plus `notifyDataSetChanged()` over the
+                // whole list. So each server of a check cost a targeted repaint of its own row AND
+                // a repaint of every other row on screen, in bursts, on the main thread. The row
+                // that changed is named by SUCCESS above; a batch that ends is announced by FINISH
+                // below. Nothing else was ever read.
 
                 AppConfig.MSG_MEASURE_CONFIG_FINISH -> {
                     val content = intent.getStringExtra("content")

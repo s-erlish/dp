@@ -2,12 +2,23 @@ package com.v2ray.ang.ui
 
 import android.content.Intent
 import android.os.Bundle
+import androidx.lifecycle.lifecycleScope
+import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
-import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.AngConfigManager
+import com.v2ray.ang.util.LogUtil
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
+/**
+ * The launcher shortcut «Сканировать QR»: scan a подписка's QR without opening the app first.
+ *
+ * It is one of the four ways to ADD a подписка and it must behave exactly like the add menu's own
+ * QR route — same importer, same outcomes, same words.
+ */
 class ScScannerActivity : HelperBaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -18,27 +29,54 @@ class ScScannerActivity : HelperBaseActivity() {
 
     private fun importQRcode() {
         launchQRCodeScanner { scanResult ->
-            if (scanResult != null) {
-                val result = AngConfigManager.importBatchConfig(scanResult, "", false)
-
-                when {
-                    result.countSub > 0 -> {
-                        val loaded = result.subFetch?.configCount ?: 0
-                        if (loaded > 0) {
-                            toastSuccess("Серверы добавлены: $loaded")
-                        } else {
-                            toastError("Не удалось загрузить серверы подписки")
-                        }
-                    }
-                    result.count > 0 -> toastSuccess(getString(R.string.title_import_config_count, result.count))
-                    result.subDuplicate -> toast("Подписка уже добавлена")
-                    result.subRejected -> toast("Эта ссылка не от departament. Используйте подписку из нашего бота.")
-                    else -> toastError(R.string.toast_failure)
-                }
-
-                startActivity(Intent(this, MainActivity::class.java))
+            if (scanResult == null) {
+                // A cancelled scan is not a failure: nothing is reported and nothing is imported.
+                finish()
+                return@launchQRCodeScanner
             }
-            finish()
+            // OFF THE MAIN THREAD, AND THAT IS THE WHOLE POINT OF THIS COROUTINE.
+            //
+            // `AngConfigManager.importBatchConfig` fetches the подписка over HTTP the moment the
+            // scanned text is a subscription link — importBatchConfig -> updateConfigViaSub ->
+            // `HttpUtil.getUrlContentWithUserAgentEx` — and Android answers a network call made on
+            // the main thread with NetworkOnMainThreadException, a RuntimeException nothing on this
+            // path catches. Every QR the departament bot hands out IS a subscription link, so this
+            // shortcut crashed on the only input it exists for.
+            //
+            // The in-app add menu has always imported on Dispatchers.IO
+            // (`MainActivity.importBatchConfig`); this route was the one that did not.
+            lifecycleScope.launch(Dispatchers.IO) {
+                val outcome = runCatching { AngConfigManager.importBatchConfig(scanResult, "", false) }
+                withContext(Dispatchers.Main) {
+                    outcome
+                        .onSuccess { showImportResult(it) }
+                        .onFailure {
+                            LogUtil.e(AppConfig.TAG, "Failed to import scanned config", it)
+                            toastError(R.string.notice_add_failed)
+                        }
+                    startActivity(Intent(this@ScScannerActivity, MainActivity::class.java))
+                    finish()
+                }
+            }
+        }
+    }
+
+    /**
+     * The same outcomes, and the same silence on success, as `MainActivity.showImportResult` — the
+     * QR route is the one the owner was looking at when he asked for the layer to go, so the two
+     * paths cannot answer differently.
+     */
+    private fun showImportResult(result: AngConfigManager.ImportResult) {
+        when {
+            // Added, but the подписка fetched nothing: Главная will open on an empty state, which
+            // does not explain itself. Everything else that succeeded is visible on that screen.
+            result.countSub > 0 ->
+                if ((result.subFetch?.configCount ?: 0) <= 0) toastError(R.string.import_sub_empty)
+
+            result.count > 0 -> Unit
+            result.subDuplicate -> toast(R.string.import_sub_duplicate)
+            result.subRejected -> toast(R.string.import_sub_foreign)
+            else -> toastError(R.string.notice_add_failed)
         }
     }
 }

@@ -139,7 +139,7 @@ class ServerGroupActivity : BaseActivity() {
             onClick = {
                 EditorActionsSheet(this, getString(R.string.srv_group_sub)).apply {
                     subNames.forEachIndexed { index, name ->
-                        action(label = name) {
+                        action(label = name, selected = index == subIndex) {
                             subIndex = index
                             bindSubRow()
                         }

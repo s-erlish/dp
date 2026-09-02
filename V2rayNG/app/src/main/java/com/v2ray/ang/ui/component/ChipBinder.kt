@@ -133,6 +133,6 @@ object ChipBinder {
         Tone.ACCENT -> themeColor(com.google.android.material.R.attr.colorOnPrimaryContainer)
         Tone.OK -> ContextCompat.getColor(context, R.color.color_success_text)
         Tone.WARN -> ContextCompat.getColor(context, R.color.color_warning_text)
-        Tone.ERROR -> ContextCompat.getColor(context, R.color.color_destructive_text)
+        Tone.ERROR -> themeColor(R.attr.colorDestructiveText)
     }
 }

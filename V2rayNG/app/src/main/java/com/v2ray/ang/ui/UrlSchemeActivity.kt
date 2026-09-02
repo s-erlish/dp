@@ -59,11 +59,24 @@ class UrlSchemeActivity : BaseActivity() {
                     }
                 }
             }
-
-            startActivity(Intent(this, MainActivity::class.java))
-            finish()
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Error processing URL scheme", e)
+        } finally {
+            // THE HAND-OFF IS IN `finally`, AND THAT IS THE WHOLE OF THE SECOND HALF OF THIS FIX.
+            //
+            // This Activity is a trampoline: it has no interface of its own (it inflates
+            // `activity_logcat` purely to have a content view) and its entire job is to act on the
+            // link and then open Главная. Both of those lines used to sit INSIDE the `try`, after
+            // the dispatch — so any throw above them was caught, logged, and left the trampoline
+            // standing: the user, who had just shared a piece of text to departament, was looking
+            // at an empty «Журнал» screen with no toolbar, no content and no way forward except
+            // the back gesture, and the app never opened.
+            //
+            // A link we could not act on still ends where every link ends. The failure is reported
+            // by the branch that hit it (`toastError`), and Главная is where the user can see what
+            // did or did not arrive.
+            startActivity(Intent(this, MainActivity::class.java))
+            finish()
         }
     }
 
@@ -89,8 +102,12 @@ class UrlSchemeActivity : BaseActivity() {
 
             "disconnect", "close" -> CoreServiceManager.stopVService(this)
 
+            // `isTunnelUp`, NEVER `isRunning`: this Activity runs in the UI process, where the
+            // core controller has never started anything and answers «не подключено» for the life
+            // of the app. So `depv://toggle` only ever connected — it could not see the tunnel it
+            // was being asked to switch off. @see CoreServiceManager.isTunnelUp
             "toggle" -> {
-                if (CoreServiceManager.isRunning()) {
+                if (CoreServiceManager.isTunnelUp()) {
                     CoreServiceManager.stopVService(this)
                 } else {
                     CoreServiceManager.startVServiceFromToggle(this)
@@ -156,7 +173,10 @@ class UrlSchemeActivity : BaseActivity() {
     private fun importRoutingRules(json: String, apply: Boolean) {
         lifecycleScope.launch(Dispatchers.IO) {
             val result = SettingsManager.resetRoutingRulesets(json)
-            if (result && apply && CoreServiceManager.isRunning()) {
+            // Same cross-process reading as `toggle` above: asked with `isRunning` this was always
+            // false, so `onadd` saved the rules and never applied them to the live core — the one
+            // thing that distinguishes it from `add`. @see CoreServiceManager.isTunnelUp
+            if (result && apply && CoreServiceManager.isTunnelUp()) {
                 MessageUtil.sendMsg2Service(this@UrlSchemeActivity, AppConfig.MSG_STATE_RESTART, "")
             }
             withContext(Dispatchers.Main) {
@@ -175,7 +195,20 @@ class UrlSchemeActivity : BaseActivity() {
         }
         LogUtil.i(AppConfig.TAG, uriString)
 
-        var decodedUrl = URLDecoder.decode(uriString, "UTF-8")
+        // A SHARED STRING IS NOT A PERCENT-ENCODED ONE, and `URLDecoder.decode` is not merciful
+        // about the difference: a lone `%` — or one followed by anything that is not two hex
+        // digits — is an IllegalArgumentException, not a passthrough. This method is reached from
+        // ACTION_SEND, i.e. from «Поделиться» in any app, so «Скидка 50% на тариф» is enough to
+        // throw; it is also reached from `depv://add/…`, where an operator's link can carry the
+        // same character. The throw took the whole of `onCreate` with it (see the `finally`
+        // there), so the share ended in a blank screen instead of an answer.
+        //
+        // Text that is not encoded is used exactly as it arrived, which is what the importer wants
+        // anyway: `vless://…#Имя` is a valid link and decoding it was never load-bearing.
+        var decodedUrl = runCatching { URLDecoder.decode(uriString, "UTF-8") }.getOrElse {
+            LogUtil.i(AppConfig.TAG, "URL scheme: the payload is not percent-encoded, using it as it arrived")
+            uriString
+        }
         val uri = Uri.parse(decodedUrl)
         if (uri != null) {
             if (uri.fragment.isNullOrEmpty() && !fragment.isNullOrEmpty()) {

@@ -16,6 +16,10 @@ import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
+import com.v2ray.ang.ui.component.SubPage
+import com.v2ray.ang.ui.component.ToolbarBinder
+import com.v2ray.ang.ui.component.onSingleClick
+import com.v2ray.ang.ui.component.restoreChecked
 import com.v2ray.ang.util.HttpUtil
 
 /**
@@ -25,22 +29,36 @@ import com.v2ray.ang.util.HttpUtil
  * surface, so the screen, its title and its copy say подписка.
  *
  * Groups four cards:
- *  1. ОБНОВЛЕНИЕ    — auto-update toggle + interval picker + update notification toggle.
+ *  1. ОБНОВЛЕНИЕ    — auto-update toggle + update notification toggle.
  *  2. ПРИ ЗАПУСКЕ    — update-on-launch / ping-on-launch / ping-on-update toggles.
- *  3. СЕТЬ           — HWID toggle + subscription User-Agent editor.
- *  4. СПИСОК СЕРВЕРОВ — server list sort order (single choice).
+ *  3. СЕТЬ           — HWID toggle + the User-Agent this app sends (a read-out, not a control).
+ *
+ * «СПИСОК СЕРВЕРОВ» БОЛЬШЕ НЕТ: «убери кнопку сортировка серверов и текст выше "список серверов"
+ * вообще убери функцию». Секция состояла из одной строки, поэтому вместе со строкой ушёл и её
+ * заголовок. Механика сортировки не удалена — [SettingsManager.applyServerSortOrder],
+ * `AppConfig.SERVER_SORT_*` и строки `ps_sort_*` на месте и в сборке; у них просто больше нет
+ * читателя на экране.
+ *
+ * **EVERY ROW HERE IS ONE HEIGHT, 60dp, and neither half of that was free.** Owner report 0.4.9,
+ * «в настройках подписок такая же тема с высотой, надо фиксить»: four rows carried an unbounded
+ * second line (two of them ran to three lines) and every switch carried Material's 48dp
+ * `minTouchTargetSize` floor, 8dp above the 40dp tile — five different row heights from two
+ * unrelated causes. Both are fixed in `activity_provider_settings.xml`, which explains them; the
+ * dropped subtitles are still in `values/strings_provider.xml`, unread and commented as such.
  *
  * Wiring notes:
- *  - Auto-update + interval are applied to the app's existing per-subscription auto-update
- *    mechanism ([com.v2ray.ang.dto.entities.SubscriptionItem.autoUpdate] /
+ *  - Auto-update is applied to the app's existing per-subscription auto-update mechanism
+ *    ([com.v2ray.ang.dto.entities.SubscriptionItem.autoUpdate] /
  *    [com.v2ray.ang.dto.entities.SubscriptionItem.updateInterval]) across every stored
- *    subscription, then rescheduled via [SubscriptionUpdater.sync]. This mirrors the global
- *    picker in MainActivity's settings tab — it changes real update behavior.
- *  - Every other row writes an [AppConfig] preference that the rest of the app reads: HWID and
- *    the User-Agent are consumed by the subscription fetch, the notification and the
- *    launch/update actions by [SubscriptionUpdater], the sort order by
- *    [SettingsManager.applyServerSortOrder]. Defaults live in [SettingsManager], not here, so
- *    the switch state and the behaviour can never drift apart.
+ *    subscription, then rescheduled via [SubscriptionUpdater.sync]. The INTERVAL itself is chosen
+ *    on the Настройки tab and not here any more — the block at the end of the ОБНОВЛЕНИЕ section
+ *    below records why that is a duplicate removed and not a capability lost.
+ *  - Every other row writes an [AppConfig] preference that the rest of the app reads: HWID is
+ *    consumed by the subscription fetch, the notification and the launch/update actions by
+ *    [SubscriptionUpdater], the sort order by [SettingsManager.applyServerSortOrder]. Defaults
+ *    live in [SettingsManager], not here, so the switch state and the behaviour can never drift
+ *    apart. The User-Agent row is the exception and writes nothing: it REPORTS what
+ *    [currentUserAgent] resolves, and the key behind it is still honoured by the fetch.
  */
 class ProviderSettingsActivity : BaseActivity() {
 
@@ -63,23 +81,23 @@ class ProviderSettingsActivity : BaseActivity() {
         private const val ALPHA_DISABLED = 0.38f
     }
 
-    /** Interval options (minutes) offered by the interval picker: 1/2/6/12/24 hours. */
-    private val intervalValues = longArrayOf(60L, 120L, 360L, 720L, 1440L)
-
-    /** Sort-order values persisted for the server list. */
-    private val sortValues = arrayOf(
-        AppConfig.SERVER_SORT_DEFAULT,
-        AppConfig.SERVER_SORT_PING,
-        AppConfig.SERVER_SORT_NAME
-    )
-
     override fun onCreate(savedInstanceState: Bundle?) {
+        SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
-        setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = getString(R.string.ps_title))
+        // Handoff README §7: the sub-page lekalo draws the title at 24sp/700 UNDER a 44dp
+        // back control, which activity_base's 16sp MaterialToolbar cannot do, so the header
+        // is @layout/view_sub_header inside this screen's own layout. Nothing else moves —
+        // the screen never used the base layout's progress bar.
+        setContentView(binding.root)
+        ToolbarBinder.bind(
+            root = binding.toolbar.root,
+            title = getString(R.string.ps_title),
+            activity = this,
+        )
+        ToolbarBinder.attachTo(binding.toolbar.root, binding.mainContent)
 
         // ОБНОВЛЕНИЕ
         binding.rowAutoUpdate.setOnClickListener { toggleAutoUpdate() }
-        binding.rowInterval.setOnClickListener { pickInterval() }
         binding.rowNotify.setOnClickListener {
             toggleBool(AppConfig.PREF_SUB_NOTIFY_ON_UPDATE, binding.switchNotify, SettingsManager.isNotifyOnSubscriptionUpdate())
         }
@@ -97,10 +115,18 @@ class ProviderSettingsActivity : BaseActivity() {
 
         // СЕТЬ
         binding.rowSendHwid.setOnClickListener { toggleSendHwid() }
-        binding.rowUserAgent.setOnClickListener { editUserAgent() }
+        // @id/row_user_agent IS DELIBERATELY NOT WIRED (owner 0.4.9: «убери возможность настройки
+        // user agent, чтобы жил было некликабельно»). It is Row.Fact — it reports the User-Agent
+        // subscription fetches actually send and leads nowhere. The layout clears its
+        // clickable/focusable/press so it is not a TalkBack or D-pad stop either. [editUserAgent]
+        // below is kept, unreferenced, on purpose; its own comment says why.
 
-        // СПИСОК СЕРВЕРОВ
-        binding.rowSortOrder.setOnClickListener { pickSortOrder() }
+        // СОХРАНЁННЫЙ ПОРЯДОК ПРИВОДИТСЯ К ИСХОДНОМУ, И ЭТО НЕ УБОРКА, А ИСПРАВЛЕНИЕ.
+        // Снять управление и оставить значение лежать значило бы запереть всех, у кого выбрано
+        // «По пингу» или «По имени», в этом порядке навсегда: экрана, чтобы вернуть, больше нет.
+        // Сбрасывается ровно один раз — при следующем заходе значение уже исходное и ветка не
+        // выполняется, так что это не переписывание чужого выбора на каждом открытии.
+        resetServerSortOrder()
 
         bindState()
     }
@@ -118,26 +144,18 @@ class ProviderSettingsActivity : BaseActivity() {
     /** Reflect all persisted values/toggle states into the rows. */
     private fun bindState() {
         // With no подписка stored there is nothing for a schedule to apply to: toggling the switch
-        // wrote to an empty list and looked like it had worked. The two rows say so instead.
+        // wrote to an empty list and looked like it had worked. The row says so by going inert.
         val hasSubscriptions = MmkvManager.decodeSubscriptions().isNotEmpty()
         setRowEnabled(binding.rowAutoUpdate, hasSubscriptions)
-        setRowEnabled(binding.rowInterval, hasSubscriptions)
-        binding.switchAutoUpdate.isChecked = hasSubscriptions && isAutoUpdateOn()
-        binding.valueInterval.text = if (hasSubscriptions) {
-            intervalLabel(storedIntervalMinutes())
-        } else {
-            getString(R.string.ps_no_subs_value)
-        }
-        binding.switchNotify.isChecked = SettingsManager.isNotifyOnSubscriptionUpdate()
+        binding.switchAutoUpdate.restoreChecked(hasSubscriptions && isAutoUpdateOn())
+        binding.switchNotify.restoreChecked(SettingsManager.isNotifyOnSubscriptionUpdate())
 
-        binding.switchUpdateOnLaunch.isChecked = SettingsManager.isUpdateSubscriptionOnLaunch()
-        binding.switchPingOnLaunch.isChecked = SettingsManager.isPingOnLaunch()
-        binding.switchPingOnUpdate.isChecked = SettingsManager.isPingOnSubscriptionUpdate()
+        binding.switchUpdateOnLaunch.restoreChecked(SettingsManager.isUpdateSubscriptionOnLaunch())
+        binding.switchPingOnLaunch.restoreChecked(SettingsManager.isPingOnLaunch())
+        binding.switchPingOnUpdate.restoreChecked(SettingsManager.isPingOnSubscriptionUpdate())
 
-        binding.switchSendHwid.isChecked = SettingsManager.isSendHwid()
+        binding.switchSendHwid.restoreChecked(SettingsManager.isSendHwid())
         binding.valueUserAgent.text = currentUserAgent()
-
-        binding.valueSortOrder.text = getString(sortLabelRes(currentSortOrder()))
     }
 
     // ---------------- ОБНОВЛЕНИЕ ----------------
@@ -159,20 +177,6 @@ class ProviderSettingsActivity : BaseActivity() {
     }
 
     /**
-     * A подписка can carry an interval that is not one of the five offered here - the form in
-     * `SubEditActivity` takes any number of minutes. Such a value is shown as it is; the old `else`
-     * branch fell back to «1 ч» and so reported an interval the scheduler was not using.
-     */
-    private fun intervalLabel(minutes: Long): String = when (minutes) {
-        60L -> getString(R.string.ps_interval_1h)
-        120L -> getString(R.string.ps_interval_2h)
-        360L -> getString(R.string.ps_interval_6h)
-        720L -> getString(R.string.ps_interval_12h)
-        1440L -> getString(R.string.ps_interval_24h)
-        else -> getString(R.string.settings_sub_auto_update_minutes, minutes)
-    }
-
-    /**
      * Enable/disable auto-update across every stored subscription, then reschedule the
      * WorkManager task so the change takes effect immediately.
      */
@@ -189,30 +193,18 @@ class ProviderSettingsActivity : BaseActivity() {
         binding.switchAutoUpdate.isChecked = enable
     }
 
-    /**
-     * Single-choice interval picker. Persists the chosen interval locally and applies it to
-     * every subscription (turning auto-update on), then reschedules the updater.
-     */
-    private fun pickInterval() {
-        val entries = intervalValues.map { intervalLabel(it) }.toTypedArray()
-        val idx = intervalValues.indexOf(storedIntervalMinutes()).coerceAtLeast(0)
-        AlertDialog.Builder(this)
-            .setTitle(R.string.ps_interval)
-            .setSingleChoiceItems(entries, idx) { dialog, which ->
-                val minutes = intervalValues[which]
-                MmkvManager.decodeSubscriptions().forEach { cache ->
-                    val item = cache.subscription
-                    item.autoUpdate = true
-                    item.updateInterval = minutes
-                    MmkvManager.encodeSubscription(cache.guid, item)
-                }
-                SubscriptionUpdater.sync(forceReschedule = true)
-                bindState()
-                dialog.dismiss()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
+    // «ИНТЕРВАЛ ОБНОВЛЕНИЯ» IS NOT ON THIS SCREEN ANY MORE (owner 0.4.9: «он уже и так вынесен в
+    // общий список настроек»). Checked before removing rather than after: this screen's picker and
+    // the Настройки tab's «Автообновление подписки» wrote THE SAME STORAGE — SubscriptionItem
+    // .updateInterval and .autoUpdate on every stored подписка, followed by the same
+    // SubscriptionUpdater.sync(forceReschedule = true). There is no per-screen key (see the note on
+    // [DEFAULT_INTERVAL_MINUTES]), so nothing here was the sole writer of anything. The surviving
+    // control is [SettingsTabFragment.pickSubAutoUpdate]; it also offers «Выключено», which this
+    // list could not. The only value that stops being offerable is «2 ч» — the tab's list is
+    // 1/3/6/12/24 ч and Выкл — and an interval of 120 already stored survives and reads as «120 мин»
+    // there, because both screens fall back to the same settings_sub_auto_update_minutes.
+    // [storedIntervalMinutes] stays: [toggleAutoUpdate] needs it to turn auto-update back on at the
+    // interval that was last in force rather than at a number invented here.
 
     // ---------------- СЕТЬ ----------------
 
@@ -239,7 +231,20 @@ class ProviderSettingsActivity : BaseActivity() {
      * The value is validated HERE, on entry, and a rejected one is never stored: a User-Agent that
      * cannot travel in an HTTP header is silently replaced at fetch time, so storing it would put
      * a string in this row that the app will never send — and the row exists to say what is sent.
+     *
+     * **NOTHING CALLS THIS SINCE 0.4.9, AND IT IS KEPT ON PURPOSE** — «убери возможность настройки
+     * user agent, чтобы жил было некликабельно». What the owner asked for is that the row stop
+     * being a control, and that is done where a row's behaviour belongs: @id/row_user_agent no
+     * longer takes taps. Deleting the editor is a different act, and it is the one thing that could
+     * not be undone in a line — [AppConfig.PREF_SUB_USER_AGENT] is a LIVE key that
+     * [currentUserAgent] reads and every subscription fetch honours, so a value stored by an older
+     * build still travels, and the code that can change or clear it is this. Re-wiring it is one
+     * `onSingleClick`; rewriting the validation from the header rules is not.
+     *
+     * It also keeps `ps_user_agent_hint` and `ps_user_agent_error` attached to the thing they
+     * describe, which is the same reason `PerAppProxyActivity.Mode.hintRes` was retained.
      */
+    @Suppress("unused")
     private fun editUserAgent() {
         val field = TextInputLayout(this).apply {
             hint = getString(R.string.ps_user_agent_hint)
@@ -295,33 +300,24 @@ class ProviderSettingsActivity : BaseActivity() {
         return invalid
     }
 
-    // ---------------- СПИСОК СЕРВЕРОВ ----------------
+    // ---------------- порядок серверов ----------------
 
-    private fun currentSortOrder(): String = SettingsManager.getServerSortOrder()
-
-    private fun sortLabelRes(value: String): Int = when (value) {
-        AppConfig.SERVER_SORT_PING -> R.string.ps_sort_ping
-        AppConfig.SERVER_SORT_NAME -> R.string.ps_sort_name
-        else -> R.string.ps_sort_default
-    }
-
-    private fun pickSortOrder() {
-        val entries = sortValues.map { getString(sortLabelRes(it)) }.toTypedArray()
-        val idx = sortValues.indexOf(currentSortOrder()).coerceAtLeast(0)
-        AlertDialog.Builder(this)
-            .setTitle(R.string.ps_sort_order)
-            .setSingleChoiceItems(entries, idx) { dialog, which ->
-                MmkvManager.encodeSettings(AppConfig.PREF_SERVER_SORT_ORDER, sortValues[which])
-                // Order lives in storage, so reorder now — the servers list renders what is stored
-                // and never re-sorts on its own. It also holds its rows from before this screen was
-                // opened, so ask it to rebuild; otherwise the new order only shows after a restart.
-                SettingsManager.applyServerSortOrder()
-                SettingsChangeManager.makeSetupGroupTab()
-                bindState()
-                dialog.dismiss()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+    /**
+     * Возвращает список серверов к исходному порядку, если он был изменён, и делает это один раз.
+     *
+     * Управление сортировкой снято с экрана по указанию владельца. Само хранимое значение при этом
+     * никуда не девается, и вот это как раз и было бы дефектом: у того, кто когда-то выбрал «По
+     * пингу», список остался бы отсортированным по пингу навсегда, без единого способа вернуть —
+     * тихая необратимая настройка хуже отсутствующей.
+     *
+     * Ветка отрабатывает только когда есть что менять, поэтому со второго захода она не делает
+     * ничего и не спорит с пользователем на каждом открытии экрана.
+     */
+    private fun resetServerSortOrder() {
+        if (SettingsManager.getServerSortOrder() == AppConfig.SERVER_SORT_DEFAULT) return
+        MmkvManager.encodeSettings(AppConfig.PREF_SERVER_SORT_ORDER, AppConfig.SERVER_SORT_DEFAULT)
+        SettingsManager.applyServerSortOrder()
+        SettingsChangeManager.makeSetupGroupTab()
     }
 
     // ---------------- helpers ----------------

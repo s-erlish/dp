@@ -6,15 +6,21 @@ import android.view.View
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.LinearLayout
+import androidx.core.widget.NestedScrollView
 import androidx.core.widget.doAfterTextChanged
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
+import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.handler.SettingsManager
+import com.v2ray.ang.ui.component.SubPage
+import com.v2ray.ang.ui.component.ToolbarBinder
+import com.v2ray.ang.ui.component.onSingleClick
+import com.v2ray.ang.ui.component.restoreChecked
 import com.v2ray.ang.util.Utils
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -72,12 +78,24 @@ class LocalProxyActivity : BaseActivity() {
     private var hotspotPasswordVisible = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
-        setContentViewWithToolbar(
-            R.layout.activity_local_proxy,
-            showHomeAsUp = true,
-            title = getString(R.string.title_local_proxy)
+        // Handoff README §7: the sub-page lekalo puts a 24sp/700 title UNDER a 44dp back
+        // control, which activity_base's 16sp MaterialToolbar cannot draw. The header is
+        // @layout/view_sub_header inside the screen's own layout, so this goes through
+        // setContentView + ToolbarBinder like every other sub-page rather than through
+        // setContentViewWithToolbar. Nothing else about the screen changes: it never used
+        // the base layout's progress bar, and the back affordance still closes through
+        // SubPage so the exit transition matches the entrance.
+        setContentView(R.layout.activity_local_proxy)
+
+        val header = findViewById<View>(R.id.toolbar)
+        ToolbarBinder.bind(
+            root = header,
+            title = getString(R.string.title_local_proxy),
+            activity = this,
         )
+        ToolbarBinder.attachTo(header, findViewById<NestedScrollView>(R.id.main_content))
 
         bindSocksSection()
         bindLocalProxySection()
@@ -104,7 +122,9 @@ class LocalProxyActivity : BaseActivity() {
         etSocksPass.setText(pass ?: "")
 
         val authOn = !user.isNullOrEmpty() && !pass.isNullOrEmpty()
-        switchSocksAuth.isChecked = authOn
+        // Read back, not chosen: restore the position instead of morphing the thumb across on the
+        // screen's first frame. @see restoreChecked
+        switchSocksAuth.restoreChecked(authOn)
         setSocksDetailsVisible(authOn)
 
         findViewById<View>(R.id.row_socks_auth).setOnClickListener { switchSocksAuth.toggle() }
@@ -148,13 +168,15 @@ class LocalProxyActivity : BaseActivity() {
         btnTogglePass.setOnClickListener { togglePasswordVisibility() }
         findViewById<ImageButton>(R.id.btn_copy_user).setOnClickListener {
             Utils.setClipboard(this, etSocksUser.text.toString())
-            toastSuccess(R.string.lp_copied)
+            toast(R.string.notice_copied)
         }
         findViewById<ImageButton>(R.id.btn_copy_pass).setOnClickListener {
             Utils.setClipboard(this, etSocksPass.text.toString())
-            toastSuccess(R.string.lp_copied)
+            toast(R.string.notice_copied)
         }
-        findViewById<MaterialButton>(R.id.btn_reset_creds).setOnClickListener {
+        // Guarded: each tap mints a NEW login and password, so a doubled one throws away the
+        // pair the user was just shown and hands them a second one.
+        findViewById<MaterialButton>(R.id.btn_reset_creds).onSingleClick {
             generateAndFillCreds()
             toastSuccess(R.string.lp_creds_reset)
         }
@@ -266,7 +288,7 @@ class LocalProxyActivity : BaseActivity() {
     private fun bindSwitchRow(rowId: Int, switchId: Int, initial: Boolean, onChange: (Boolean) -> Unit) {
         val row = findViewById<View>(rowId)
         val sw = findViewById<MaterialSwitch>(switchId)
-        sw.isChecked = initial
+        sw.restoreChecked(initial)
         row.setOnClickListener { sw.toggle() }
         sw.setOnCheckedChangeListener { _, isChecked ->
             onChange(isChecked)
@@ -285,7 +307,7 @@ class LocalProxyActivity : BaseActivity() {
         btnToggleHotspotPass = findViewById(R.id.btn_toggle_hotspot_pass)
 
         val enabled = MmkvManager.decodeSettingsBool(AppConfig.PREF_PROXY_SHARING, false)
-        switchHotspot.isChecked = enabled
+        switchHotspot.restoreChecked(enabled)
         groupHotspotDetails.visibility = if (enabled) View.VISIBLE else View.GONE
         if (enabled) {
             // Ядро включит LAN-инбаунд только с авторизацией: гарантируем наличие кред.
@@ -309,15 +331,15 @@ class LocalProxyActivity : BaseActivity() {
         btnToggleHotspotPass.setOnClickListener { setHotspotPasswordVisible(!hotspotPasswordVisible) }
         findViewById<ImageButton>(R.id.btn_copy_hotspot_endpoint).setOnClickListener {
             Utils.setClipboard(this, etHotspotEndpoint.text.toString())
-            toastSuccess(R.string.lp_copied)
+            toast(R.string.notice_copied)
         }
         findViewById<ImageButton>(R.id.btn_copy_hotspot_user).setOnClickListener {
             Utils.setClipboard(this, etHotspotUser.text.toString())
-            toastSuccess(R.string.lp_copied)
+            toast(R.string.notice_copied)
         }
         findViewById<ImageButton>(R.id.btn_copy_hotspot_pass).setOnClickListener {
             Utils.setClipboard(this, etHotspotPass.text.toString())
-            toastSuccess(R.string.lp_copied)
+            toast(R.string.notice_copied)
         }
     }
 

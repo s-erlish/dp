@@ -130,8 +130,13 @@ class ServerProxyChainActivity : BaseActivity() {
      */
     private fun showStepActions(position: Int) {
         val sheet = EditorActionsSheet(this, getString(R.string.srv_chain_step, position + 1))
+        val current = memberAdapter.getMembers().getOrNull(position)
         allRemarks.forEach { remark ->
-            sheet.action(label = remark, glyph = R.drawable.ic_globe_24dp) {
+            sheet.action(
+                label = remark,
+                glyph = R.drawable.ic_globe_24dp,
+                selected = remark == current,
+            ) {
                 memberAdapter.setRemark(position, remark)
             }
         }
@@ -163,9 +168,8 @@ class ServerProxyChainActivity : BaseActivity() {
         }
 
         val members = memberAdapter.getMembers().map { it.trim() }
-        val emptyStep = members.indexOfFirst { it.isEmpty() }
-        if (emptyStep >= 0) {
-            toastError(getString(R.string.srv_chain_step_empty, emptyStep + 1))
+        if (members.any { it.isEmpty() }) {
+            toastError(R.string.srv_chain_step_empty)
             return
         }
         if (members.size < MIN_CHAIN_MEMBERS) {
@@ -178,7 +182,7 @@ class ServerProxyChainActivity : BaseActivity() {
             profile == null || profile.configType.isComplexType()
         }
         if (invalid.isNotEmpty()) {
-            toastError(getString(R.string.srv_chain_invalid_members, invalid.joinToString(", ")))
+            toastError(R.string.srv_chain_invalid_members)
             return
         }
 
@@ -246,7 +250,6 @@ class ServerProxyChainActivity : BaseActivity() {
             refreshEmptyState()
         }
 
-        override fun onShare(url: String) {}
 
         override fun onRefreshData() {
             refreshEmptyState()
