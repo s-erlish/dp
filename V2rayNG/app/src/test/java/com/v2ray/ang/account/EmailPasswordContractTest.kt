@@ -10,6 +10,7 @@ import com.v2ray.ang.auth.dto.SetPasswordRequestDto
 import com.v2ray.ang.auth.dto.UserProfileDto
 import com.v2ray.ang.auth.dto.canSetPassword
 import com.v2ray.ang.auth.dto.emailArrived
+import com.v2ray.ang.auth.dto.emailSignInWorks
 import com.v2ray.ang.auth.serverCode
 import com.v2ray.ang.auth.serverMessage
 import com.v2ray.ang.viewmodel.AuthViewModel
@@ -152,6 +153,42 @@ class EmailPasswordContractTest {
         assertFalse(old.hasPassword)
         assertTrue(old.onboardingCompleted)
         assertTrue(old.canSetPassword())
+    }
+
+    // endregion
+
+    // region что показывает строка «Почта»
+
+    /**
+     * Три состояния строки, и решает их ДРУГОЙ вопрос, чем тот, по которому предлагается шаг.
+     * Строка отвечает «работает ли вход по почте», шаг — «примет ли панель set-password».
+     */
+    @Test
+    fun `the row asks whether e-mail sign-in works, not whether a password may be set`() {
+        // Адреса нет: входить нечем и не с чего.
+        assertFalse(UserProfileDto(email = "", hasPassword = false).emailSignInWorks())
+        assertFalse(UserProfileDto(email = "", hasPassword = true).emailSignInWorks())
+        // Адрес есть, пароля нет: ровно тот случай, ради которого третье состояние и появилось.
+        assertFalse(UserProfileDto(email = "a@b.ru", hasPassword = false).emailSignInWorks())
+        // Оба на месте.
+        assertTrue(UserProfileDto(email = "a@b.ru", hasPassword = true).emailSignInWorks())
+    }
+
+    /**
+     * Единственный случай, где два вопроса расходятся, и где перепутать их видно на экране:
+     * пароль настоящий, онбоардинг не завершён. Входить можно (панель проверяет только хеш), а
+     * `set-password` панель ещё примет. Строка, спрошенная про шаг, сказала бы «нужен пароль»
+     * человеку, которому он не нужен.
+     */
+    @Test
+    fun `an unfinished onboarding with a real password still signs in`() {
+        val profile = UserProfileDto(
+            email = "a@b.ru",
+            hasPassword = true,
+            onboardingCompleted = false,
+        )
+        assertTrue(profile.emailSignInWorks())
+        assertTrue(profile.canSetPassword())
     }
 
     // endregion

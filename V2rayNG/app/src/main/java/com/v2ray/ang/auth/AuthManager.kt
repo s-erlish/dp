@@ -277,6 +277,17 @@ class AuthManager(
     suspend fun setPassword(newPassword: String) {
         if (!BackendConfig.isConfigured()) throw ApiError.NotConfigured
         api.setPassword(newPassword)
+        // THE FLAG IS THE OTHER HALF OF THE ERRAND. `set-password` is refused only when
+        // `passwordHash && onboardingCompleted`, so without this the endpoint stays open on an
+        // account that now has a password: the step could be walked a second time, and what this
+        // app believes about the account would part company with what the site shows.
+        //
+        // Swallowed on failure, both of them, and in this order. The password is SAVED by the time
+        // either runs; reporting a failed follow-up as a failed errand would tell the user their
+        // password did not take when it did. The profile is re-read last so it carries the flag
+        // this call just set — `hasPassword` and `onboardingCompleted` are what the «Почта» row and
+        // the next «Сменить почту» read.
+        runCatching { api.completeOnboarding() }
         runCatching { AccountSession.updateProfile(api.getMe()) }
     }
 

@@ -59,6 +59,12 @@ interface DepartamentApiClient {
     suspend fun setPassword(newPassword: String)
 
     /**
+     * Sets `onboardingCompleted` on the account. Always called straight after a successful
+     * [setPassword] and never on its own: together they are what «пароль задан» means to the panel.
+     */
+    suspend fun completeOnboarding()
+
+    /**
      * Sends the «подтвердите новый адрес» letter to [newEmail]. [currentPassword] must be supplied
      * when the account has one; omitting it then is answered 400 `PASSWORD_REQUIRED` and getting it
      * wrong 401 `INVALID_PASSWORD` (see [serverCode]) — neither of which is a dead session. Returns

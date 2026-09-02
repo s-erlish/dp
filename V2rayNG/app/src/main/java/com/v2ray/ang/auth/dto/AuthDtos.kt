@@ -242,6 +242,19 @@ data class UserProfileDto(
 fun UserProfileDto.canSetPassword(): Boolean = !hasPassword || !onboardingCompleted
 
 /**
+ * **Can this account actually sign in with its e-mail?** Both halves, never either: the panel's
+ * login looks up the account by address and then verifies a password hash, so an attached address
+ * with no password behind it is an identifier and not a way in.
+ *
+ * Deliberately NOT [canSetPassword]. That one mirrors the panel's set-password gate and is true for
+ * an account whose password is real but whose onboarding is unfinished — an account that signs in
+ * perfectly well. The «Почта» row asks this question, the password step asks that one, and the
+ * single case where they disagree is exactly the one that would put «Нужен пароль для входа» under
+ * an address that has never needed anything.
+ */
+fun UserProfileDto.emailSignInWorks(): Boolean = email.isNotBlank() && hasPassword
+
+/**
  * **Has the address the app is waiting on actually arrived?** The one decision the confirmation
  * poll makes, kept here as a function of the profile rather than inline in the loop, because both
  * of its halves are easy to get wrong in a way that never raises anything — it just waits forever.

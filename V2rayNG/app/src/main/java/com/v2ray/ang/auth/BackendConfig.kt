@@ -119,6 +119,17 @@ object BackendConfig {
         const val setPassword = "/client/set-password"
 
         /**
+         * Marks the account's onboarding finished. Body-less; the whole effect is
+         * `onboardingCompleted = true`.
+         *
+         * It is the SECOND half of [setPassword], not an errand of its own. The panel refuses a
+         * set-password only when `passwordHash && onboardingCompleted`, so leaving the flag alone
+         * keeps the endpoint open on an account that already has a password: the step could be
+         * walked twice, and the app's idea of the account would drift from the site's.
+         */
+        const val completeOnboarding = "/client/complete-onboarding"
+
+        /**
          * Replace the address the account already has: `{newEmail, currentPassword?}`. The password
          * is the panel's account-takeover guard and is required only of accounts that HAVE one.
          *

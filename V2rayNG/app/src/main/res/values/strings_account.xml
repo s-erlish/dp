@@ -71,6 +71,15 @@
     <string name="account_login_telegram">Telegram</string>
     <string name="account_login_telegram_linked">Привязан · %1$s</string>
     <string name="account_login_telegram_unlinked">Не привязан</string>
+    <!-- ТРЕТЬЕ СОСТОЯНИЕ СТРОКИ «ПОЧТА», и оно существует потому, что привязка адреса пароля НЕ
+         задаёт: `verify-link-email` на панели пишет только `email`. Аккаунт с адресом и без пароля
+         по этой почте не пускает, и до сих пор строка про это молчала — говорила «Привязан» и вела
+         в смену адреса, то есть предлагала чинить не то.
+
+         СОСТОЯНИЕ ВПЕРЕДИ АДРЕСА, как и у «Привязан · …». Строка в одну линию с многоточием: если
+         адрес длинный, обрезается он, а не новость. Тап ведёт в «Придумайте пароль» — тот же шаг,
+         что и сразу после привязки. -->
+    <string name="account_login_email_no_password">Нужен пароль для входа · %1$s</string>
     <!-- «в аккаунте добавь кнопку где способы входа туда сайт, чтобы можно было привязать почту
          с сайта». One word, and it is the SAME word the two sign-in surfaces use for this door, so
          the row and the button are recognisably one thing.
