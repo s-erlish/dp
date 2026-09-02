@@ -462,17 +462,27 @@ class BuyTariffActivity : BaseActivity() {
             " · " + getString(R.string.buy_tariff_traffic, trafficStr)
 
 
-        // §7: «справа цена от и "в месяц"». The rate is derived from the tariff's own price
-        // options, so a catalog that changes its terms changes this without a code change; a
-        // tariff with no options shows nothing rather than a zero.
-        val monthly = monthlyRate(tariff)
-        if (monthly == null) {
+        // Цена входа в тариф: стоимость САМОГО КОРОТКОГО срока, ровно как её задали в панели.
+        // Здесь бралась самая выгодная ставка за месяц по всем срокам, и заголовок карточки врал:
+        // у тарифа с ценами 150 за месяц и 400 за три стояло «135» — числа, которого нет ни в одном
+        // ценнике и за которое нельзя купить. Выгода длинных сроков подписана у самих сроков внутри
+        // карточки, где рядом стоит и настоящая цена, и срок, за который её платят.
+        // Тариф без пригодных сроков не показывает ничего, а не ноль.
+        val entry = entryOption(tariff)
+        if (entry == null) {
             tvFrom.visibility = View.GONE
             tvPeriod.visibility = View.GONE
         } else {
             tvFrom.visibility = View.VISIBLE
             tvPeriod.visibility = View.VISIBLE
-            tvFrom.text = formatMoney(monthly, tariff.currency)
+            tvFrom.text = formatMoney(entry.price, tariff.currency)
+            // «в месяц» пишем только когда срок и есть месяц: цена за 90 дней с подписью «в месяц»
+            // — то же враньё, другими словами.
+            tvPeriod.text = if (entry.durationDays == 30) {
+                getString(R.string.buy_per_month)
+            } else {
+                getString(R.string.buy_option_duration, entry.durationDays)
+            }
         }
 
         val key = tariffKey(tariff)
@@ -1086,10 +1096,10 @@ class BuyTariffActivity : BaseActivity() {
      * catalog returns are the terms this compares. A term shorter than a month still divides by
      * its real length, so a weekly plan is not advertised at a monthly price.
      */
-    private fun monthlyRate(tariff: TariffDto): Double? =
+    private fun entryOption(tariff: TariffDto): PriceOptionDto? =
         optionsOf(tariff)
             .filter { it.durationDays > 0 && it.price > 0.0 }
-            .minOfOrNull { it.price / (it.durationDays / DAYS_PER_MONTH) }
+            .minByOrNull { it.durationDays }
 
     /**
      * «Выгода N ₽» for [option]: what the same span would cost at the SHORTEST term's rate, minus
