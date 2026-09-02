@@ -193,18 +193,18 @@ object MmkvManager {
     }
 
     /**
+     * [withServerListLock] for a caller outside this object that read-modify-writes a server list —
+     * a reorder, a sort. Same rules: short, and never around I/O.
+     */
+    fun <T> inServerListTransaction(block: () -> T): T = withServerListLock(block)
+
+    /**
      * Encodes the server list for a given subscription.
      * Saves to the subscription's serverList (including default subscription for ungrouped servers).
      *
      * @param serverList The list of server GUIDs.
      * @param subscriptionId The subscription ID.
      */
-    /**
-     * [withServerListLock] for a caller outside this object that read-modify-writes a server list —
-     * a reorder, a sort. Same rules: short, and never around I/O.
-     */
-    fun <T> inServerListTransaction(block: () -> T): T = withServerListLock(block)
-
     fun encodeServerList(serverList: MutableList<String>, subscriptionId: String) {
         val subId = getSubscriptionId(subscriptionId)
         val key = "$KEY_SUB_SERVER_PREFIX$subId"
