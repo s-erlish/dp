@@ -1600,7 +1600,10 @@ class LoginActivity : BaseActivity() {
             // The user's next move is in another app; a keyboard over the sentence telling them so
             // is the one thing this screen must not do.
             hideKeyboard()
-            if (waiting) resetVerifyBeat()
+            // Unconditional, including for the block that has no ring: the beat's check lives in
+            // the same 40dp slot, and a block that opened with somebody else's check still showing
+            // would be reporting a success that has not happened.
+            resetVerifyBeat()
             reveal(mail.slotVerify)
             mail.root.smoothScrollTo(0, 0)
         } else {
