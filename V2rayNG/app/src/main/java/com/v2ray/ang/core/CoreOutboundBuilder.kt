@@ -21,9 +21,46 @@ import com.v2ray.ang.util.Utils
  */
 object CoreOutboundBuilder {
 
-    /** Dispatches a profile to protocol-specific outbound builder. */
+    /**
+     * Dispatches a profile to protocol-specific outbound builder.
+     *
+     * **ONE BAD PROFILE IS ONE SKIPPED PROFILE, NOT A DEAD CONFIG.**
+     *
+     * Every protocol builder below writes the port as `serverPort.orEmpty().toInt()`, and a stored
+     * profile can honestly carry something that is not a number: a subscription line whose port
+     * field the провайдер left blank or wrote as `443/tcp`, an imported template, a row hand-edited
+     * in «Изменить». That threw `NumberFormatException` straight out of here — and the callers of
+     * this function are `mapNotNull { convert(it) }` over a POLICY GROUP's or a CHAIN's members, so
+     * the throw left the loop, left `buildUnifiedConfig`, and was caught only by the blanket handler
+     * in `CoreConfigManager.getV2rayConfig`. One unparsable port among twenty healthy серверы and
+     * the whole group refused to connect, with «For input string» as the reason on screen.
+     *
+     * The contract of this function is already "null when this profile cannot be an outbound", and
+     * every caller honours it by skipping that member. So a broken profile answers null and says in
+     * «Журнал» WHICH profile and WHY, instead of taking the other nineteen down with it. A single
+     * server that is broken this way still fails to connect — there is nothing else it could do —
+     * but now the log names it.
+     */
     fun convert(profileItem: ProfileItem): OutboundBean? {
-        val outbound = when (profileItem.configType) {
+        val outbound = try {
+            convertOrThrow(profileItem)
+        } catch (e: Exception) {
+            LogUtil.w(
+                AppConfig.TAG,
+                "Server «${profileItem.remarks}» skipped: its stored settings are not usable (${e.message ?: e.javaClass.simpleName})"
+            )
+            null
+        }
+
+        outbound ?: return null
+        val ret = updateOutboundWithGlobalSettings(outbound)
+        if (!ret) return null
+        return outbound
+    }
+
+    /** The dispatch itself. Throws on a profile whose stored fields cannot be read; see [convert]. */
+    private fun convertOrThrow(profileItem: ProfileItem): OutboundBean? =
+        when (profileItem.configType) {
             EConfigType.VMESS -> toOutboundVmess(profileItem)
             EConfigType.SHADOWSOCKS -> toOutboundShadowsocks(profileItem)
             EConfigType.SOCKS -> toOutboundSocks(profileItem)
@@ -34,12 +71,6 @@ object CoreOutboundBuilder {
             EConfigType.HTTP -> toOutboundHttp(profileItem)
             else -> null
         }
-
-        outbound ?: return null
-        val ret = updateOutboundWithGlobalSettings(outbound)
-        if (!ret) return null
-        return outbound
-    }
 
     /** Applies global outbound options (mux, protocol-specific tweaks, etc.). */
     private fun updateOutboundWithGlobalSettings(outbound: OutboundBean): Boolean {

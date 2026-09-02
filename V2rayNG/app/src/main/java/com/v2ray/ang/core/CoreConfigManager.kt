@@ -342,6 +342,23 @@ object CoreConfigManager {
             )
         }
 
+        // A CONFIG WITHOUT THE PRIMARY OUTBOUND IS NOT A CONFIG, IT IS A LEAK.
+        //
+        // The template's placeholder `proxy` outbound was removed above, so at this point the only
+        // outbounds a skipped primary leaves behind are `direct` (freedom) and `block` — and Xray
+        // sends anything that matches no rule through the FIRST outbound in the list. The core would
+        // have started, the shade would have said «Подключено», and every byte would have gone out
+        // unproxied. Every skip in [buildOutbounds] is a `LogUtil.w` and a `return`, and each of them
+        // could reach this state: a profile whose stored settings cannot be read (see
+        // [CoreOutboundBuilder.convert]), a policy group whose members are all broken, a resolved
+        // entry with no profiles at all.
+        //
+        // Failing here instead means «Не удалось подключиться» with the reason in «Журнал» — the
+        // honest answer, and the only safe one.
+        if (primaryResolvedOutbound.tag !in existingTags) {
+            error("No usable outbound for «${primaryResolvedOutbound.profile.remarks}»: check the server's settings")
+        }
+
         // User routing rules (policyGroupBalancerTags rewrites TAG_PROXY→balancer when main is POLICYGROUP).
         configureRouting(configContext, v2rayConfig, policyGroupBalancerTags)
         configureFakeDns(v2rayConfig)
