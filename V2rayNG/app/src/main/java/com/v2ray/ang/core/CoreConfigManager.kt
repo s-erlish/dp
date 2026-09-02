@@ -42,7 +42,15 @@ object CoreConfigManager {
             if (configContext.isCustom) {
                 return buildV2rayCustomConfig(configContext)
             }
-            return toConfigResult(configContext, buildUnifiedConfig(configContext))
+            val v2rayConfig = buildUnifiedConfig(configContext)
+            // THE PRE-RESOLUTION BELONGS TO THE CONNECT AND TO NOTHING ELSE. It used to be the last
+            // line of [buildUnifiedConfig], which the latency test also goes through — and the very
+            // next thing the test does is `postProcessForSpeedtest`, whose `v2rayConfig.dns = null`
+            // throws away the only thing the lookups produced. So «Проверить все» over 100 серверов
+            // performed 100 blocking DNS queries whose answers were discarded three lines later,
+            // and the native `measureOutboundDelay` then resolved every one of them again itself.
+            resolveOutboundDomainsToHosts(v2rayConfig)
+            return toConfigResult(configContext, v2rayConfig)
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to get V2ray config", e)
             return ConfigResult(
@@ -390,7 +398,6 @@ object CoreConfigManager {
 
         applyObservability(v2rayConfig, balancerStrategies)
         applySpeedDisabled(v2rayConfig)
-        resolveOutboundDomainsToHosts(v2rayConfig)
 
         return v2rayConfig
     }
@@ -1044,6 +1051,10 @@ object CoreConfigManager {
      * Both are the same fix: do the lookups on worker threads (no main-thread network policy to
      * violate), all at once rather than one after another, and give the whole batch ONE budget. The
      * cost of the step becomes the slowest single name, capped — not the sum of all of them.
+     *
+     * Called from [getV2rayConfig] alone. It is NOT part of [buildUnifiedConfig] any more: the
+     * latency test builds through the same function and then drops `dns` entirely, so every
+     * measured сервер used to pay for a lookup nobody read.
      */
     private fun resolveOutboundDomainsToHosts(v2rayConfig: V2rayConfig) {
         if (MmkvManager.decodeSettingsString(AppConfig.PREF_OUTBOUND_DOMAIN_RESOLVE_METHOD, "1") != "1") {
