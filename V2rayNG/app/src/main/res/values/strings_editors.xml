@@ -378,6 +378,88 @@
     <string name="srv_json_invalid">Проверьте JSON: он не разобрался</string>
 
     <!-- ==================================================================
+         A-13 «СЕРВЕР ВРУЧНУЮ» (ServerActivity) - восемь протокольных форм.
+
+         Восемь экранов - последнее место, где приложение выглядело форком
+         v2rayNG: голый EditText под TextView, шкала отступов из форка и ни
+         одного поля с состоянием ошибки. Формы собраны из тех же деталей,
+         что «Группа серверов» и «Подписка»: подпись сверху, поле 56 с
+         зарезервированной строкой подсказки, отказ ПОД полем.
+
+         ПОДПИСЬ ГОВОРИТ, ЧТО ЭТО ЗА ПОЛЕ; ПОДСКАЗКА - ЧТО В НЕГО ПИСАТЬ.
+         В форке половина подписей несла инструкцию в скобках («MTU
+         (необязательно, по умолчанию 1420)»), то есть подпись читалась как
+         предложение и переставала быть именем поля. Скобки вынесены в
+         helperText - строку, которая под полем и так зарезервирована.
+         ================================================================== -->
+
+    <!-- Заголовок экрана - имя протокола. Технический идентификатор, 1.4.10.
+         EConfigType.toString() давал «SHADOWSOCKS» и «WIREGUARD»: имена этих
+         двух проектов пишутся не так, а капс запрещён (0.4.3). -->
+    <string name="srv_proto_vmess" translatable="false">VMess</string>
+    <string name="srv_proto_vless" translatable="false">VLESS</string>
+    <string name="srv_proto_trojan" translatable="false">Trojan</string>
+    <string name="srv_proto_shadowsocks" translatable="false">Shadowsocks</string>
+    <string name="srv_proto_socks" translatable="false">SOCKS</string>
+    <string name="srv_proto_http" translatable="false">HTTP</string>
+    <string name="srv_proto_wireguard" translatable="false">WireGuard</string>
+    <string name="srv_proto_hysteria2" translatable="false">Hysteria2</string>
+
+    <!-- Заголовки групп. Предложением, полужирным, без капса (0.4.3, 1.4.7). -->
+    <string name="srv_section_access">Доступ</string>
+    <string name="srv_section_tls">Шифрование канала</string>
+    <string name="srv_section_keys">Ключи</string>
+    <string name="srv_section_interface">Интерфейс</string>
+    <string name="srv_section_advanced">Дополнительно</string>
+
+    <!-- Подписи, из которых вынута инструкция в скобках. -->
+    <string name="srv_user_label">Пользователь</string>
+    <string name="srv_preshared_key_label">Дополнительный ключ шифрования</string>
+    <string name="srv_reserved_label" translatable="false">Reserved</string>
+    <string name="srv_local_address_label">Локальный адрес</string>
+    <string name="srv_mtu_label" translatable="false">MTU</string>
+    <string name="srv_kcp_mtu_label" translatable="false">mKCP MTU</string>
+    <string name="srv_kcp_tti_label" translatable="false">mKCP TTI</string>
+    <string name="srv_port_hop_label">Смена портов</string>
+    <string name="srv_bandwidth_down_label">Входящая полоса</string>
+    <string name="srv_bandwidth_up_label">Исходящая полоса</string>
+    <string name="srv_xhttp_extra_label" translatable="false">XHTTP Extra</string>
+    <string name="srv_final_mask_label" translatable="false">FinalMask</string>
+
+    <!-- Подсказки под полями. -->
+    <string name="srv_hint_optional">Можно оставить пустым</string>
+    <string name="srv_hint_address">Домен или IP-адрес сервера</string>
+    <string name="srv_hint_port">От 1 до 65535</string>
+    <string name="srv_hint_reserved">Три числа через запятую. Можно оставить пустым</string>
+    <string name="srv_hint_local_address">IPv4 и IPv6 через запятую. Можно оставить пустым</string>
+    <string name="srv_hint_mtu">По умолчанию 1420</string>
+    <string name="srv_hint_kcp_mtu">По умолчанию 1350</string>
+    <string name="srv_hint_kcp_tti">По умолчанию 50</string>
+    <string name="srv_hint_port_hop">Заменяет порт выше. Можно оставить пустым</string>
+    <string name="srv_hint_port_hop_interval">В секундах. Можно оставить пустым</string>
+    <string name="srv_hint_bandwidth">Число и единица, например 100 m. Допустимы k, m, g, t</string>
+    <string name="srv_hint_xhttp_extra">Необработанный JSON вида { XHTTPObject }</string>
+    <string name="srv_hint_final_mask">Необработанный JSON вида { FinalMaskObject }</string>
+    <string name="srv_hint_encryption">Для VLESS почти всегда none</string>
+
+    <!-- Примеры значения в пустом поле. Плейсхолдер - это пример, а не подпись (7.4). -->
+    <string name="srv_ph_address" translatable="false">example.com</string>
+
+    <!-- Выбор значения из списка. Поле открывает лист с вариантами: Spinner в
+         разрешённый набор компонентов не входит (11.2), а поле, в отличие от
+         строки настроек, несёт ту же строку отказа, что и соседи по форме. -->
+    <string name="srv_pick_value">Выберите значение</string>
+
+    <!-- ОТКАЗЫ. Каждый называет, что исправить, и приходит ПОД своё поле, а не
+         поверх экрана: тост поверх формы не показывает, какое из двадцати полей
+         он имеет в виду. -->
+    <string name="srv_address_invalid">В адресе не должно быть пробелов и косых черт. Укажите домен или IP</string>
+    <string name="srv_number_invalid">Введите целое число больше нуля</string>
+    <string name="srv_reserved_invalid">Здесь нужны три числа через запятую, например 0,0,0</string>
+    <string name="srv_bandwidth_invalid">Укажите число и единицу, например 100 m</string>
+    <string name="srv_editor_unavailable">Для этого типа сервера формы нет. Откройте его как свою конфигурацию</string>
+
+    <!-- ==================================================================
          RUSSIAN REPLACEMENTS FOR THE UPSTREAM ENGLISH THESE SCREENS STILL SHOWED
 
          Every screen in this file was rebuilt, but sixteen of the messages they
