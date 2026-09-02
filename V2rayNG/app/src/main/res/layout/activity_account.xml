@@ -320,10 +320,10 @@
                 app:strokeColor="?attr/colorOutline"
                 app:strokeWidth="@dimen/ob_stroke" />
 
-            <!-- The owner's ruling, folded into one control: e-mail, OTP, 2FA and Google
-                 are not carried into the interface, and «Войти через сайт» is what stands
-                 for all of them. The code behind them is untouched — this button opens
-                 LoginActivity.MODE_SITE, which is where that form still lives. -->
+            <!-- One control for everything the address can do: sign in, and — since
+                 registration came home — create the account in the first place. The button
+                 opens LoginActivity.MODE_SITE, which is where that form lives; the form
+                 decides between the two errands with its own segment. -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_signed_out_site"
                 style="@style/Widget.Departament.Button.Secondary.Tall"
@@ -334,7 +334,7 @@
                 android:textAppearance="@style/TextAppearance.App.Button"
                 app:backgroundTint="@color/ob_pill_container"
                 app:cornerRadius="@dimen/radius_button"
-                app:icon="@drawable/ic_ob_site"
+                app:icon="@drawable/ic_ob_mail"
                 app:iconTint="?attr/colorOnSurfaceVariant"
                 app:strokeColor="?attr/colorOutline"
                 app:strokeWidth="@dimen/ob_stroke" />
@@ -1116,10 +1116,10 @@
                     android:layout_height="@dimen/stroke_hairline"
                     android:background="?attr/colorOutlineVariant" />
 
-                <!-- «Сайт» — the same word the two sign-in surfaces use for this door, so
-                     «Войти через сайт» and this row are recognisably the same thing. The
-                     glyph is @drawable/ic_ob_site, already drawn for the start screen; a
-                     second site glyph would be a second name for one mark. -->
+                <!-- «Почта» — the same word the two sign-in surfaces use for this door, so
+                     «Войти по почте» and this row are recognisably the same thing. The glyph
+                     is @drawable/ic_ob_mail, already drawn for the start screen; a second
+                     envelope would be a second name for one mark. -->
                 <LinearLayout
                     android:id="@+id/row_login_site"
                     style="@style/Widget.Departament.Row.Navigation"
@@ -1136,7 +1136,7 @@
                             android:layout_height="@dimen/tile_glyph"
                             android:layout_gravity="center"
                             android:importantForAccessibility="no"
-                            app:srcCompat="@drawable/ic_ob_site"
+                            app:srcCompat="@drawable/ic_ob_mail"
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </FrameLayout>
 

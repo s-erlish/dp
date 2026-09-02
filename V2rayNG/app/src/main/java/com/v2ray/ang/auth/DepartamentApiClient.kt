@@ -10,6 +10,7 @@ import com.v2ray.ang.auth.dto.PaymentsDto
 import com.v2ray.ang.auth.dto.PromoDto
 import com.v2ray.ang.auth.dto.PublicConfigDto
 import com.v2ray.ang.auth.dto.ReferralStatsDto
+import com.v2ray.ang.auth.dto.RegisterResult
 import com.v2ray.ang.auth.dto.ServerStatusDto
 import com.v2ray.ang.auth.dto.PrimarySubscriptionDto
 import com.v2ray.ang.auth.dto.SubscriptionAllDto
@@ -34,6 +35,7 @@ interface DepartamentApiClient {
     // Auth
     suspend fun createTelegramLoginToken(): TelegramTokenDto
     suspend fun checkTelegramLogin(token: String): TelegramCheckResult
+    suspend fun register(email: String, password: String, referralCode: String? = null): RegisterResult
     suspend fun login(email: String, password: String): LoginResult
     suspend fun login2fa(tempToken: String, code: String): AuthResult
     suspend fun loginGoogle(idToken: String, referralCode: String? = null): AuthResult

@@ -5,6 +5,7 @@ import com.google.gson.annotations.SerializedName
 /**
  * Auth endpoints of the Departament backend (JWT, 7-day, NO refresh).
  *
+ *  POST /client/auth/register              -> [RegisterResult] (Success | RequiresVerification)
  *  POST /client/auth/telegram-login-token  -> [TelegramTokenDto]
  *  GET  /client/auth/telegram-login-check  -> 404 NotYet / 200 Confirmed / 410 Expired ([TelegramCheckResult])
  *  POST /client/auth/login                 -> [LoginResult] (Success | Requires2FA)
@@ -18,6 +19,17 @@ import com.google.gson.annotations.SerializedName
 data class LoginRequestDto(
     val email: String,
     val password: String,
+)
+
+/**
+ * POST /client/auth/register. The password must be at least 8 characters — the panel refuses a
+ * shorter one with 400, so the form gates on the same number rather than letting the server say it.
+ * [referralCode] is optional and is sent only when the app has one to pass on.
+ */
+data class RegisterRequestDto(
+    val email: String,
+    val password: String,
+    val referralCode: String? = null,
 )
 
 data class TwoFaLoginRequestDto(
@@ -47,6 +59,18 @@ data class TelegramCheckResponseDto(
     val justCreated: Boolean = false,
 )
 
+/**
+ * Raw 201 body of POST /client/auth/register, in EITHER of the two shapes the panel answers with:
+ * `{token, client}` when e-mail verification is switched off (a session, immediately), or
+ * `{message, requiresVerification}` when it is on and a confirmation letter has been sent.
+ */
+data class RegisterResponseDto(
+    val token: String? = null,
+    val client: UserProfileDto? = null,
+    val requiresVerification: Boolean = false,
+    val message: String? = null,
+)
+
 /** Raw body of POST /client/auth/login (either shape). */
 data class LoginResponseDto(
     val token: String? = null,
@@ -73,6 +97,25 @@ sealed interface TelegramCheckResult {
         val client: UserProfileDto,
         val justCreated: Boolean,
     ) : TelegramCheckResult
+}
+
+/**
+ * Outcome of POST /client/auth/register.
+ *
+ * The two cases are a property of the PANEL, not of the request: the same body registers a session
+ * outright on an installation with verification disabled and only sends a letter on one with it
+ * enabled, so the app has to be able to finish either way.
+ */
+sealed interface RegisterResult {
+    /** Verification is off on this panel — the account exists and the session is already issued. */
+    data class Success(val token: String, val client: UserProfileDto) : RegisterResult
+
+    /**
+     * Verification is on: a letter is on its way and there is no token yet. [message] is the
+     * panel's own sentence about it, kept for the log — the waiting screen writes its own copy,
+     * which names the address the letter went to.
+     */
+    data class RequiresVerification(val message: String?) : RegisterResult
 }
 
 /** Outcome of POST /client/auth/login. */

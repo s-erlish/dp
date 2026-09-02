@@ -27,26 +27,60 @@
     <string name="auth_link_tg_body">Подтвердите привязку в Telegram. Аккаунт останется тем же.</string>
     <string name="auth_link_awaiting_body">Подтвердите привязку в открывшемся приложении</string>
 
-    <!-- NEW (2026-08-17). The door into this surface is «Войти через сайт» on both
-         the start screen and the gate, so the surface behind it may not be headed
-         «Вход по почте» — one tap, two names for the same place, and the second one
-         is a method the owner has taken out of the interface. The fields below keep
-         their own labels: «Электронная почта» names a FIELD, not the way in. -->
-    <string name="auth_site_title">Вход через сайт</string>
+    <!-- The toolbar names the page, and the page is what the door promised: the door on
+         the start screen and on the gate says «Войти по почте», so this says «Вход по
+         почте». It read «Вход через сайт» while registration still happened in a
+         browser; nothing on this surface goes to a browser any more, so the word went
+         with it. In the registration mode the bar says @string/auth_register_title —
+         the segment above chooses the errand, and the bar states which one is on
+         screen. The fields keep their own labels: «Электронная почта» names a FIELD. -->
+    <string name="auth_site_title">Вход по почте</string>
+    <string name="auth_register_title">Регистрация</string>
     <!-- Kept: the surface's previous heading. See @string/auth_btn_email. -->
     <string name="auth_email_label">Электронная почта</string>
     <string name="auth_email_placeholder">name@example.com</string>
     <string name="auth_password_label">Пароль</string>
     <string name="auth_btn_signin">Войти</string>
 
-    <!-- The two account errands the app cannot finish itself: the backend client
-         carries no register / password-reset call, so both are honest browser
-         hand-offs and the subtitle says where they land. A label promising an
-         in-app form would be a lie (00-rules.md 9.1). -->
-    <string name="auth_row_register">Создать аккаунт</string>
-    <string name="auth_row_register_sub">Регистрация на departament.site</string>
+    <!-- ONE errand the app still cannot finish itself. The backend client carries no
+         password-reset call, so this one is an honest browser hand-off and the subtitle
+         says where it lands (00-rules.md 9.1).
+
+         «Создать аккаунт» IS NO LONGER A ROW HERE, and its two strings are gone with it
+         rather than left to lie: the row opened departament.site/register in a browser,
+         and «регистрации внутри приложения не увидел, там регистрация через сайт идёт».
+         Registration is the segment at the top of this form now, and the words «Создать
+         аккаунт» are the button that finishes it — see @string/auth_btn_register. -->
     <string name="auth_row_reset">Восстановить пароль</string>
     <string name="auth_row_reset_sub">Сброс пароля на departament.site</string>
+
+    <!-- ===================== вход ⇄ регистрация ===================== -->
+    <!-- The segmented control at the top of the form: two errands, one set of fields,
+         and the segment says which one the button below will do. -->
+    <string name="auth_seg_signin">Вход</string>
+    <string name="auth_seg_register">Регистрация</string>
+    <string name="auth_btn_register">Создать аккаунт</string>
+    <!-- The password rule is stated BEFORE it is broken, on the reserved line under the
+         field, and turns into the error only if the rule is actually broken. The panel
+         refuses a shorter password with 400, so the form holds the same number.
+
+         THE TWO SENTENCES DIFFER IN WORDS, not only in colour (00-rules.md 6.3): a line
+         that goes red without changing what it says would be signalling with the hue
+         alone, and the reader who cannot see the hue would get no signal at all. -->
+    <string name="auth_password_hint">Не менее 8 символов</string>
+    <string name="auth_password_short">Пароль слишком короткий — нужно не менее 8 символов</string>
+    <string name="auth_password_repeat_label">Повторите пароль</string>
+    <string name="auth_password_mismatch">Пароли не совпадают</string>
+
+    <!-- ===================== подтверждение почты ===================== -->
+    <!-- В ПИСЬМЕ ССЫЛКА, А НЕ КОД — проверено владельцем. Поэтому здесь нечего вводить:
+         экран объясняет, что открыть, и сам ловит момент, когда ссылку открыли (вход
+         начинает отвечать 200). Отсюда и «остальное сделаем сами» — это обещание, за
+         которым стоит опрос, а не вежливая фраза. %1$s — адрес, на который ушло письмо. -->
+    <string name="auth_verify_title">Подтвердите почту</string>
+    <string name="auth_verify_body">Мы отправили ссылку на %1$s. Откройте её, чтобы подтвердить вход — остальное сделаем сами.</string>
+    <string name="auth_verify_resend">Отправить снова</string>
+    <string name="auth_verify_back">Вернуться ко входу</string>
 
     <!-- ===================== 2FA ===================== -->
     <string name="auth_2fa_label">Код из приложения-аутентификатора</string>

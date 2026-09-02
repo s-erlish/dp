@@ -18,11 +18,13 @@ import android.view.WindowManager
 import android.view.animation.AnimationUtils
 import android.view.autofill.AutofillManager
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
 import androidx.annotation.AttrRes
 import androidx.annotation.ColorInt
+import androidx.annotation.StringRes
 import androidx.browser.customtabs.CustomTabColorSchemeParams
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.ContextCompat
@@ -62,12 +64,14 @@ import kotlinx.coroutines.launch
  *
  * ```
  * A · the gate            «Войти через Telegram»  ← contour pill, Telegram glyph #2AABEE
- *     │                   «Войти через сайт»        the same pill, muted glyph
+ *     │                   «Войти по почте»          the same pill, envelope glyph
  *     └ awaiting          the universal 56dp ledger row, not a centred hero spinner
  *
- * B · «Вход через сайт»   email + password → «Войти»
- *     ├ 2FA               replaces the password slot; six cells over one real field
- *     └ two rows          «Создать аккаунт» / «Восстановить пароль» → departament.site
+ * B · «Вход по почте»     сегмент «Вход | Регистрация» → email + password → «Войти»
+ *     ├ регистрация      the same fields plus «Повторите пароль» → «Создать аккаунт»
+ *     ├ подтверждение    the letter carries a LINK: a wait, a poll, and no field
+ *     ├ 2FA              replaces the password slot; six cells over one real field
+ *     └ one row          «Восстановить пароль» → departament.site
  * ```
  *
  * **The redesign pass (2026-08-17).** The owner opened this screen and found the version that
@@ -78,7 +82,8 @@ import kotlinx.coroutines.launch
  * are no filled surfaces left here: every action is the start screen's 52dp contour pill, so the
  * two sign-in surfaces a user can meet look like one product. And «Войти по почте» is off the
  * screen — the owner's ruling folds e-mail, OTP, 2FA and Google into one «Войти через сайт», which
- * opens this very form. Nothing was deleted to do it.
+ * opens this very form. Nothing was deleted to do it. (That name lasted until registration came
+ * home and the door was renamed «Войти по почте» — see below.)
  *
  * **Every method that worked before still works**, through the same entry points: a plain launch
  * lands on A, [EXTRA_MODE] = [MODE_SITE] lands straight on B, [MODE_TELEGRAM] lands on A (where
@@ -112,11 +117,26 @@ import kotlinx.coroutines.launch
  * `AlertDialog` that put the raw HTTP body on screen (14-auth.md 13.3, D-14.F). The cause goes to
  * the log; the customer gets a sentence that names the fix.
  *
- * **What is deliberately absent rather than disabled**: registration, magic link, password reset,
- * the browser hand-off and Google. `DepartamentApiClient` carries no call for any of them, so a
- * control here would advertise a feature instead of offering one. The two errands the site *can*
- * finish are rows that name their destination, and they end where this screen starts: back here,
- * signing in with an email and a password.
+ * **REGISTRATION CAME HOME (2026-09-02).** «а регистрации внутри приложения не увидел, там
+ * регистрация через сайт идёт, а не через приложение» — and the owner was reading the screen
+ * correctly: «Создать аккаунт» was a row that opened `departament.site/register` in a browser,
+ * because the client carried no register call. It carries one now
+ * ([com.v2ray.ang.auth.AuthManager.beginRegister]), so the row is gone and the errand is a SEGMENT
+ * at the top of the form — «Вход | Регистрация» — over the same fields, with «Повторите пароль»
+ * appearing for the second of them. The door on the way in was renamed with it: «Войти через
+ * сайт» became «Войти по почте», because nothing behind it goes to a site any more.
+ *
+ * **The letter carries a LINK, not a code** (checked by the owner on the live panel). That single
+ * fact decides the whole confirmation step: there is nothing to type, so no field is drawn, and the
+ * app watches for the link being opened instead of asking about it — the poll re-tries the LOGIN
+ * with the credentials just registered, which answers 401 until the address is proved and 200 the
+ * moment it is. The user's part is to open the letter; ours is to notice.
+ *
+ * **What is deliberately absent rather than disabled**: magic link, password reset, the browser
+ * hand-off and Google. `DepartamentApiClient` carries no call for any of them, so a control here
+ * would advertise a feature instead of offering one. The one errand the site *can* finish is a row
+ * that names its destination, and it ends where this screen starts: back here, signing in with an
+ * email and a password.
  */
 class LoginActivity : BaseActivity() {
 
@@ -127,6 +147,15 @@ class LoginActivity : BaseActivity() {
     private enum class Page { GATE, MAIL }
 
     private var page = Page.GATE
+
+    /**
+     * Which errand surface B is on. It is not a page and not a machine state: the form is the same
+     * form either way, and this only decides whether the repeat field is in it, what the button
+     * says, and which of the two names the toolbar carries. The segment is its only author.
+     */
+    private enum class FormMode { SIGN_IN, REGISTER }
+
+    private var formMode = FormMode.SIGN_IN
 
     /** True in [EXTRA_LINK] mode: the flow attaches Telegram to the session that already exists. */
     private var linkMode = false
@@ -150,7 +179,7 @@ class LoginActivity : BaseActivity() {
      * ([MODE_TELEGRAM_START]). Cancelling that attempt leaves nothing behind it: the gate's idle
      * stack asks the question the caller's own button has already answered, so Back closes the
      * screen from there instead of stranding the user on it. Cleared the moment the user starts an
-     * attempt himself or takes the gate's «Войти через сайт» — from then on the gate is a surface
+     * attempt himself or takes the gate's «Войти по почте» — from then on the gate is a surface
      * he has actually used, and Back belongs on it.
      */
     private var telegramEntry = false
@@ -183,6 +212,12 @@ class LoginActivity : BaseActivity() {
         adjustWindowForKeyboard()
 
         linkMode = intent.getBooleanExtra(EXTRA_LINK, false)
+        // The segment's own state. The fields restore themselves (they have ids), so without this
+        // a rotation halfway through a registration would hand back the address and both passwords
+        // on a form that had quietly become «Вход» — repeat field gone, and its content with it.
+        formMode = savedInstanceState?.getString(STATE_FORM_MODE)
+            ?.let { saved -> FormMode.entries.firstOrNull { it.name == saved } }
+            ?: FormMode.SIGN_IN
         val mode = intent.getStringExtra(EXTRA_MODE)
         telegramEntry = !linkMode && mode == MODE_TELEGRAM_START
         gateReachable = !linkMode && !telegramEntry && mode != MODE_SITE
@@ -223,6 +258,11 @@ class LoginActivity : BaseActivity() {
         // machine has to be in it before the first frame is drawn rather than be nudged into it
         // afterwards. First creation only: a rotation must not mint a second token.
         if ((linkMode || telegramEntry) && savedInstanceState == null) viewModel.startTelegramLogin()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_FORM_MODE, formMode.name)
     }
 
     // ------------------------------------------------------------------ chrome
@@ -266,6 +306,10 @@ class LoginActivity : BaseActivity() {
                         viewModel.cancelTelegramLogin()
                         if (telegramEntry) SubPage.close(this@LoginActivity)
                     }
+
+                    // The confirmation wait is a step on surface B, so Back leaves the STEP and
+                    // stays on the form — the same rung the 2FA code sits on.
+                    state is AuthUiState.EmailVerification -> leaveVerification()
 
                     page == Page.MAIL && gateReachable -> goToGate()
 
@@ -313,14 +357,14 @@ class LoginActivity : BaseActivity() {
             viewModel.startTelegramLogin()
         }
         gate.btnGateOpenTelegram.onSingleClick { reopenTelegram() }
-        // Both «Войти через сайт» take the identical path. The idle one used to just swap the page,
+        // Both «Войти по почте» take the identical path. The idle one used to just swap the page,
         // which meant a tap during the token mint left the poll running: the user reached the form,
         // and a second later Telegram opened over it on its own.
         //
         // The ids still say `email` because they always did and an @+id is wired to logic, not to
-        // copy; the LABEL is the owner's «Войти через сайт», set in the layout. What is behind them
-        // is untouched: the e-mail form, its OTP step and its 2FA are all still in the build and
-        // still reachable — they have simply stopped being a door the interface names.
+        // copy; the LABEL is the owner's «Войти по почте», set in the layout. What is behind them
+        // is untouched — and it is a door the interface names again: the form it opens now carries
+        // registration as well as sign-in, which is why the label names the method and not a site.
         gate.btnGateEmail.onSingleClick { goToMail() }
         gate.btnGateEmailAlt.onSingleClick { goToMail() }
     }
@@ -341,6 +385,10 @@ class LoginActivity : BaseActivity() {
         // close the screen out from under a page the gate itself opened.
         gateReachable = true
         telegramEntry = false
+        // The door says «Войти по почте», so it opens on «Вход» — every time, including after a
+        // registration the user backed out of. A button that lands on the other errand because of
+        // something that happened before Back was pressed is a button whose label is a coin toss.
+        setFormMode(FormMode.SIGN_IN)
         showPage(Page.MAIL)
     }
 
@@ -406,7 +454,14 @@ class LoginActivity : BaseActivity() {
         }
         mail.etEmail.setOnFocusChangeListener { _, focused -> if (!focused) validateEmail() }
         mail.etPassword.doAfterTextChanged {
-            setFieldError(mail.tilPassword, mail.errPassword, null)
+            resetPasswordLine()
+            // The repeat is judged against the password, so editing either one re-judges the pair.
+            validateConfirm()
+            clearScreenError()
+            updateSubmitEnabled()
+        }
+        mail.etConfirm.doAfterTextChanged {
+            validateConfirm()
             clearScreenError()
             updateSubmitEnabled()
         }
@@ -421,7 +476,24 @@ class LoginActivity : BaseActivity() {
                 false
             }
         }
+        // The password's own IME key changes with the errand: «Далее» to the repeat field while
+        // registering, «Готово» when there is nothing under it. Both land on the same submit().
         mail.etPassword.setOnEditorActionListener { _, actionId, _ ->
+            when (actionId) {
+                EditorInfo.IME_ACTION_NEXT -> {
+                    mail.etConfirm.requestFocus()
+                    true
+                }
+
+                EditorInfo.IME_ACTION_DONE -> {
+                    submit()
+                    true
+                }
+
+                else -> false
+            }
+        }
+        mail.etConfirm.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_DONE) {
                 submit()
                 true
@@ -430,11 +502,122 @@ class LoginActivity : BaseActivity() {
             }
         }
 
+        // The segment is the only author of [formMode]; everything else reads it.
+        mail.segMode.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            setFormMode(if (checkedId == R.id.seg_register) FormMode.REGISTER else FormMode.SIGN_IN)
+        }
+
         mail.btnSubmit.onSingleClick(Haptic.PRESS) { submit() }
-        mail.btnCancel2fa.onSingleClick { viewModel.cancelTwoFactor() }
+        // One control, two steps, one meaning: leave the step and stay on the screen.
+        mail.btnStepBack.onSingleClick {
+            when (viewModel.state.value) {
+                is AuthUiState.TwoFactor -> viewModel.cancelTwoFactor()
+                is AuthUiState.EmailVerification -> leaveVerification()
+                else -> Unit
+            }
+        }
 
         setupOtp()
+        applyFormMode()
         updateSubmitEnabled()
+    }
+
+    /**
+     * The segment moved. The fields do not: the address and the password the user has already typed
+     * are the same address and password for either errand, so switching tabs never clears them.
+     *
+     * What DOES go is the other errand's verdict — a «Неверная почта или пароль» left over a form
+     * that is now creating an account is an answer to a question nobody asked any more.
+     */
+    private fun setFormMode(mode: FormMode) {
+        if (formMode == mode) return
+        formMode = mode
+        clearScreenError()
+        setFieldError(binding.mail.tilConfirm, binding.mail.errConfirm, null)
+        applyFormMode()
+        updateSubmitEnabled()
+    }
+
+    /**
+     * Draws whatever [formMode] currently says, and is the ONLY place that does. Called on entry
+     * and on every segment change; deliberately safe to call twice.
+     *
+     * The repeat field is the only structural difference between the two errands, which is why they
+     * are a segment over one form rather than two forms: everything else here is a label.
+     */
+    private fun applyFormMode() {
+        val mail = binding.mail
+        val register = formMode == FormMode.REGISTER
+        val stepped = viewModel.state.value.let {
+            it is AuthUiState.TwoFactor || it is AuthUiState.EmailVerification
+        }
+
+        mail.segSignin.setTextAppearance(
+            if (register) R.style.TextAppearance_App_Title_Medium else R.style.TextAppearance_App_Title_Segment_Active
+        )
+        mail.segRegister.setTextAppearance(
+            if (register) R.style.TextAppearance_App_Title_Segment_Active else R.style.TextAppearance_App_Title_Medium
+        )
+        if (mail.segMode.checkedButtonId != if (register) R.id.seg_register else R.id.seg_signin) {
+            mail.segMode.check(if (register) R.id.seg_register else R.id.seg_signin)
+        }
+
+        mail.slotConfirm.isVisible = register && !stepped
+        mail.etPassword.imeOptions =
+            if (register) EditorInfo.IME_ACTION_NEXT else EditorInfo.IME_ACTION_DONE
+        // imeOptions is read when the input connection is opened, so a field that is ALREADY under
+        // the caret keeps the old key until it is asked again. Switching the segment mid-password
+        // would otherwise leave «Готово» sitting over a form with one more field to fill.
+        if (mail.etPassword.hasFocus()) {
+            getSystemService(InputMethodManager::class.java)?.restartInput(mail.etPassword)
+        }
+        resetPasswordLine()
+
+        // «Восстановить пароль» answers a question only the sign-in errand asks. An account that
+        // does not exist yet has no password to restore.
+        mail.authHairline.isVisible = !register && !stepped
+        mail.altMethods.isVisible = !register && !stepped
+
+        mail.btnSubmit.setText(submitLabelRes())
+        applyToolbarTitle()
+    }
+
+    /**
+     * The reserved line under the password, in its resting state: the RULE while registering («Не
+     * менее 8 символов», muted), nothing at all while signing in. It is the same line the failure
+     * uses, so stating the rule costs no height and breaking it moves nothing.
+     */
+    private fun resetPasswordLine() {
+        val line = binding.mail.errPassword
+        if (formMode == FormMode.REGISTER) {
+            line.setTextAppearance(R.style.TextAppearance_App_Caption)
+            line.text = getString(R.string.auth_password_hint)
+            line.visibility = View.VISIBLE
+        } else {
+            line.setTextAppearance(R.style.TextAppearance_App_Caption_Error)
+            line.text = ""
+            line.visibility = View.INVISIBLE
+        }
+        fieldStrokeDefault?.let { binding.mail.tilPassword.setBoxStrokeColorStateList(it) }
+    }
+
+    /** What the one primary control is called right now — state first, then the segment. */
+    @StringRes
+    private fun submitLabelRes(): Int = when {
+        viewModel.state.value is AuthUiState.TwoFactor -> R.string.auth_btn_2fa
+        viewModel.state.value is AuthUiState.EmailVerification -> R.string.auth_verify_resend
+        formMode == FormMode.REGISTER -> R.string.auth_btn_register
+        else -> R.string.auth_btn_signin
+    }
+
+    /** The bar names the page, and on surface B the segment decides which page that is. */
+    private fun applyToolbarTitle() {
+        binding.toolbar.toolbarTitle.text = when {
+            page == Page.GATE -> ""
+            formMode == FormMode.REGISTER -> getString(R.string.auth_register_title)
+            else -> getString(R.string.auth_site_title)
+        }
     }
 
     /**
@@ -511,27 +694,22 @@ class LoginActivity : BaseActivity() {
     }
 
     /**
-     * The two errands the app cannot finish itself. They are rows and not buttons because they are
-     * navigations, and their subtitle names the destination: a label promising an in-app form would
+     * The one errand the app still cannot finish itself. It is a row and not a button because it is
+     * a navigation, and its subtitle names the destination: a label promising an in-app form would
      * be lying about what the tap does (00-rules.md 9.1).
+     *
+     * It used to have a twin — «Создать аккаунт», opening `departament.site/register`. That errand
+     * is not a navigation any more; it is the segment at the top of this form.
      */
     private fun setupRows() = bindRows(enabled = true)
 
     /**
      * @param enabled false while a request is in flight. It goes through [RowBinder] rather than
      * through `root.isEnabled`, which is what this used to do: `isEnabled` on a ViewGroup makes the
-     * row inert without changing a pixel of it, so the two errands looked perfectly tappable and
+     * row inert without changing a pixel of it, so the errand looked perfectly tappable and
      * swallowed every tap. The binder takes the whole control to R6's 0.38 and drops the listener.
      */
     private fun bindRows(enabled: Boolean) {
-        RowBinder.bind(
-            root = binding.mail.rowRegister.root,
-            title = getString(R.string.auth_row_register),
-            subtitle = getString(R.string.auth_row_register_sub),
-            trailing = RowBinder.Trailing.Chevron,
-            enabled = enabled,
-            onClick = { openInBrowser(REGISTER_URL) },
-        )
         RowBinder.bind(
             root = binding.mail.rowReset.root,
             title = getString(R.string.auth_row_reset),
@@ -552,6 +730,10 @@ class LoginActivity : BaseActivity() {
                 if (code.length == OTP_LENGTH) viewModel.submit2fa(code)
             }
 
+            // The waiting screen's primary action is «Отправить снова». There is nothing to
+            // validate: the address it re-sends to is the one it already sent to.
+            is AuthUiState.EmailVerification -> viewModel.resendVerification()
+
             is AuthUiState.Idle -> {
                 if (!validateEmail()) {
                     binding.mail.etEmail.requestFocus()
@@ -564,23 +746,66 @@ class LoginActivity : BaseActivity() {
                     // from the IME's «Готово» — which used to move focus to the field the caret
                     // was already in, i.e. do nothing at all and say nothing. The reserved line
                     // below the box is exactly what it is for.
-                    setFieldError(
-                        binding.mail.tilPassword,
-                        binding.mail.errPassword,
-                        getString(R.string.auth_password_required),
-                    )
+                    setPasswordError(getString(R.string.auth_password_required))
                     binding.mail.etPassword.requestFocus()
                     return
                 }
-                viewModel.loginSite(
-                    binding.mail.etEmail.text?.toString()?.trim().orEmpty(),
-                    password,
-                )
+                val email = binding.mail.etEmail.text?.toString()?.trim().orEmpty()
+                if (formMode == FormMode.SIGN_IN) {
+                    viewModel.loginSite(email, password)
+                    return
+                }
+
+                // Registration is gated on the panel's own rule (8 characters) rather than on a
+                // 400 coming back to say so, and on the repeat matching — the one thing the panel
+                // cannot check for us at all.
+                if (password.length < MIN_PASSWORD_LENGTH) {
+                    setPasswordError(getString(R.string.auth_password_short))
+                    binding.mail.etPassword.requestFocus()
+                    return
+                }
+                if (!validateConfirm(force = true)) {
+                    binding.mail.etConfirm.requestFocus()
+                    return
+                }
+                viewModel.register(email, password)
             }
 
             // Something is already in flight; the CTA is not a target in that state.
             else -> Unit
         }
+    }
+
+    /**
+     * The repeat field's live verdict. Judged only once the user has typed something into it — a
+     * «Пароли не совпадают» under an empty box is an accusation about a field nobody has filled in
+     * yet — and only in the errand that has the field at all.
+     *
+     * @param force also judge an EMPTY repeat, for the submit path: the CTA is dark until the two
+     * match, so this is reachable from the IME's «Готово» alone, which is exactly when silence
+     * would leave the user pressing a key that does nothing.
+     */
+    private fun validateConfirm(force: Boolean = false): Boolean {
+        if (formMode != FormMode.REGISTER) {
+            setFieldError(binding.mail.tilConfirm, binding.mail.errConfirm, null)
+            return true
+        }
+        val password = binding.mail.etPassword.text?.toString().orEmpty()
+        val confirm = binding.mail.etConfirm.text?.toString().orEmpty()
+        val matches = confirm == password
+        val judge = force || confirm.isNotEmpty()
+        setFieldError(
+            binding.mail.tilConfirm,
+            binding.mail.errConfirm,
+            if (!judge || matches) null else getString(R.string.auth_password_mismatch),
+        )
+        return matches
+    }
+
+    /** A failure on the password line, which is the same line that carries the rule at rest. */
+    private fun setPasswordError(message: String) {
+        binding.mail.errPassword.setTextAppearance(R.style.TextAppearance_App_Caption_Error)
+        setFieldError(binding.mail.tilPassword, binding.mail.errPassword, message)
     }
 
     private fun validateEmail(): Boolean {
@@ -608,7 +833,8 @@ class LoginActivity : BaseActivity() {
      */
     private fun updateSubmitEnabled() {
         val state = viewModel.state.value
-        if (state is AuthUiState.Submitting || state is AuthUiState.Success) {
+        val resending = state is AuthUiState.EmailVerification && state.resending
+        if (state is AuthUiState.Submitting || state is AuthUiState.Success || resending) {
             binding.mail.btnSubmit.isEnabled = true
             return
         }
@@ -616,10 +842,22 @@ class LoginActivity : BaseActivity() {
             is AuthUiState.TwoFactor ->
                 binding.mail.otp.otpInput.text?.length == OTP_LENGTH
 
+            // «Отправить снова» needs nothing typed; it re-sends to an address already accepted.
+            is AuthUiState.EmailVerification -> true
+
             is AuthUiState.Idle -> {
                 val email = binding.mail.etEmail.text?.toString()?.trim().orEmpty()
-                Patterns.EMAIL_ADDRESS.matcher(email).matches() &&
-                    !binding.mail.etPassword.text.isNullOrEmpty()
+                val password = binding.mail.etPassword.text?.toString().orEmpty()
+                val addressed = Patterns.EMAIL_ADDRESS.matcher(email).matches()
+                if (formMode == FormMode.REGISTER) {
+                    // R9 layer 1 again, and the reason the rule is PRINTED under the field rather
+                    // than only enforced: a control that stays dark without saying why is a
+                    // guessing game.
+                    addressed && password.length >= MIN_PASSWORD_LENGTH &&
+                        binding.mail.etConfirm.text?.toString() == password
+                } else {
+                    addressed && password.isNotEmpty()
+                }
             }
 
             else -> false
@@ -650,6 +888,7 @@ class LoginActivity : BaseActivity() {
                 setGateLoading(false)
                 showAwaitingStack(false)
                 showTwoFactor(false)
+                showVerification(false)
                 setFormBusy(false)
             }
 
@@ -669,6 +908,15 @@ class LoginActivity : BaseActivity() {
             is AuthUiState.TwoFactor -> {
                 setFormBusy(false)
                 showTwoFactor(true)
+            }
+
+            is AuthUiState.EmailVerification -> {
+                binding.mail.verifyBody.text = getString(R.string.auth_verify_body, state.email)
+                showVerification(true)
+                // A second letter being asked for is the SUBMIT working, not the wait restarting:
+                // the ring keeps turning and the busy state goes on the button, exactly as it does
+                // for every other request this screen makes (R8).
+                setFormBusy(state.resending)
             }
 
             is AuthUiState.Success -> finishWithBeat()
@@ -696,7 +944,9 @@ class LoginActivity : BaseActivity() {
             return
         }
 
-        val message = getString(error.message)
+        // The panel's own sentence when it sent one — «Этот email уже зарегистрирован» is a better
+        // answer than anything a status code can be turned into — and this app's copy otherwise.
+        val message = error.text ?: getString(error.message)
         when (error.surface) {
             AuthViewModel.Surface.GATE -> {
                 gateError.text = message
@@ -767,8 +1017,14 @@ class LoginActivity : BaseActivity() {
         mail.pbSubmit.isVisible = busy
         mail.etEmail.isEnabled = !busy && !twoFactor
         mail.etPassword.isEnabled = !busy
+        mail.etConfirm.isEnabled = !busy
         mail.otp.otpInput.isEnabled = !busy
-        mail.btnCancel2fa.isEnabled = !busy
+        mail.btnStepBack.isEnabled = !busy
+        // The segment is a control like any other: it may not switch the errand out from under a
+        // request that is already carrying one out.
+        mail.segMode.isEnabled = !busy
+        mail.segSignin.isEnabled = !busy
+        mail.segRegister.isEnabled = !busy
         bindRows(enabled = !busy)
         if (busy) {
             mail.btnSubmit.contentDescription =
@@ -776,7 +1032,7 @@ class LoginActivity : BaseActivity() {
             mail.btnSubmit.text = ""
             mail.btnSubmit.isClickable = false
         } else {
-            mail.btnSubmit.setText(if (twoFactor) R.string.auth_btn_2fa else R.string.auth_btn_signin)
+            mail.btnSubmit.setText(submitLabelRes())
             mail.btnSubmit.contentDescription = null
             mail.btnSubmit.isClickable = true
         }
@@ -795,11 +1051,18 @@ class LoginActivity : BaseActivity() {
         if (mail.slotOtp.isVisible == active) return
 
         mail.slotPassword.isVisible = !active
-        mail.btnCancel2fa.isVisible = active
-        mail.authHairline.isVisible = !active
-        mail.altMethods.isVisible = !active
+        mail.segMode.isVisible = !active
+        mail.btnStepBack.isVisible = active
+        mail.btnStepBack.setText(R.string.auth_cancel)
         mail.etEmail.isEnabled = !active
-        mail.btnSubmit.setText(if (active) R.string.auth_btn_2fa else R.string.auth_btn_signin)
+        mail.btnSubmit.setText(submitLabelRes())
+        // Leaving the step hands the form back to whichever errand the segment is on — the repeat
+        // field and the «Восстановить пароль» row belong to the mode, not to this transition.
+        if (active) {
+            hideModeExtras()
+        } else {
+            applyFormMode()
+        }
 
         if (active) {
             showPage(Page.MAIL, animate = false)
@@ -819,6 +1082,66 @@ class LoginActivity : BaseActivity() {
     }
 
     /**
+     * The confirmation wait REPLACES the form, for the same reason the 2FA step replaces the
+     * password slot (6.7): the letter is out, the address is spoken for, and leaving the fields on
+     * screen would invite the user to fill in a form whose answer is already on its way to them.
+     *
+     * Nothing here is a text field, because the letter carries a LINK. The one thing the user can
+     * usefully do is open it, and the two controls under the ring are for the two ways that can go
+     * wrong: the letter did not arrive («Отправить снова»), or they would rather sign in to an
+     * account they already have («Вернуться ко входу»).
+     */
+    private fun showVerification(active: Boolean) {
+        val mail = binding.mail
+        // Same guard as [showTwoFactor]: only a real transition does anything, so the Idle render
+        // cannot re-run the "leave" branch on every emission.
+        if (mail.slotVerify.isVisible == active) return
+
+        mail.segMode.isVisible = !active
+        mail.slotEmail.isVisible = !active
+        mail.slotPassword.isVisible = !active
+        mail.btnStepBack.isVisible = active
+
+        if (active) {
+            hideModeExtras()
+            mail.btnStepBack.setText(R.string.auth_verify_back)
+            showPage(Page.MAIL, animate = false)
+            // The user's next move is in another app; a keyboard over the sentence telling them so
+            // is the one thing this screen must not do.
+            hideKeyboard()
+            resetVerifyBeat()
+            reveal(mail.slotVerify)
+            mail.root.smoothScrollTo(0, 0)
+        } else {
+            mail.slotVerify.isVisible = false
+            applyFormMode()
+        }
+        mail.btnSubmit.setText(submitLabelRes())
+    }
+
+    /** The parts of the form that belong to an errand, hidden while a STEP owns the screen. */
+    private fun hideModeExtras() {
+        binding.mail.slotConfirm.isVisible = false
+        binding.mail.authHairline.isVisible = false
+        binding.mail.altMethods.isVisible = false
+    }
+
+    /**
+     * «Вернуться ко входу», and it does what it says in that order: the segment goes back to «Вход»
+     * first, so the form the user lands on is the one the label promised, and only then is the wait
+     * abandoned. The account is untouched — the letter it sent is still valid.
+     */
+    private fun leaveVerification() {
+        setFormMode(FormMode.SIGN_IN)
+        viewModel.leaveVerification()
+    }
+
+    private fun resetVerifyBeat() {
+        binding.mail.verifyRingArc.alpha = 1f
+        binding.mail.verifyRingCheck.alpha = 0f
+    }
+
+    /**
      * Page swap inside this host. Surface B enters on the sub-page motion (12.2) so the transition
      * reads like the Activity push the spec describes, and leaves by reversing it.
      */
@@ -827,8 +1150,7 @@ class LoginActivity : BaseActivity() {
         val incoming = if (target == Page.MAIL) binding.mail.root else binding.gate.root
         val outgoing = if (target == Page.MAIL) binding.gate.root else binding.mail.root
 
-        binding.toolbar.toolbarTitle.text =
-            if (target == Page.MAIL) getString(R.string.auth_site_title) else ""
+        applyToolbarTitle()
         // NestedScrollView takes a scroll listener by assignment, so re-attaching per page swaps
         // the hairline's source instead of stacking a second listener, and re-syncs it on the spot.
         ToolbarBinder.attachTo(binding.toolbar.root, incoming)
@@ -867,13 +1189,25 @@ class LoginActivity : BaseActivity() {
     private fun finishWithBeat() {
         setResult(RESULT_OK)
         hideKeyboard()
-        val onRing = page == Page.GATE && binding.gate.gateStackAwaiting.isVisible
+        // The beat plays wherever the user is looking, and both waits own a ring: the gate's
+        // Telegram wait and this form's e-mail confirmation. Same arc, same check, same 440ms.
+        val onGateRing = page == Page.GATE && binding.gate.gateStackAwaiting.isVisible
+        val onVerifyRing = page == Page.MAIL && binding.mail.slotVerify.isVisible
         val animate = animationsEnabled()
         val step = durationOf(R.integer.motion_press_out)
 
-        if (onRing) {
-            val arc = binding.gate.gateRingArc
-            val check = binding.gate.gateRingCheck
+        if (onGateRing || onVerifyRing) {
+            val arc = if (onGateRing) binding.gate.gateRingArc else binding.mail.verifyRingArc
+            val check = if (onGateRing) binding.gate.gateRingCheck else binding.mail.verifyRingCheck
+            if (onVerifyRing) {
+                // The credentials for a confirmed registration were typed HERE, so the OS is told
+                // they worked; the Telegram wait has none to offer.
+                commitAutofill()
+                // A «Отправить снова» can still be in flight when the link is finally opened. Its
+                // spinner has nothing left to report, and two live indicators during a 440ms
+                // confirmation would be the screen contradicting itself.
+                binding.mail.pbSubmit.isVisible = false
+            }
             if (animate) {
                 arc.animate().alpha(0f).setDuration(durationOf(R.integer.motion_state)).start()
                 check.scaleX = BEAT_CHECK_FROM
@@ -1188,9 +1522,18 @@ class LoginActivity : BaseActivity() {
         /** The Latin token in the gate heading that carries the brand face (D-14.1). */
         private const val BRAND_TOKEN = "departament"
 
-        /** The public site, not the API host: registration and password reset live there. */
-        private const val REGISTER_URL = "https://departament.site/register"
+        /** Which errand the form was on, across a rotation. See [FormMode]. */
+        private const val STATE_FORM_MODE = "auth_form_mode"
+
+        /**
+         * The public site, not the API host. Only the password reset is left here: registration
+         * moved into this screen, and a browser hand-off for an errand the app can finish itself
+         * would be a worse version of a feature that already exists.
+         */
         private const val RESET_URL = "https://departament.site/forgot-password"
+
+        /** The panel's own floor for a new password. The form holds it so a 400 never has to. */
+        private const val MIN_PASSWORD_LENGTH = 8
 
         private const val OTP_LENGTH = 6
         private const val OTP_AUTOSUBMIT_DELAY_MS = 120L

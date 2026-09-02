@@ -22,6 +22,9 @@ import com.v2ray.ang.auth.dto.PromoDto
 import com.v2ray.ang.auth.dto.PromoRequestDto
 import com.v2ray.ang.auth.dto.PublicConfigDto
 import com.v2ray.ang.auth.dto.ReferralStatsDto
+import com.v2ray.ang.auth.dto.RegisterRequestDto
+import com.v2ray.ang.auth.dto.RegisterResponseDto
+import com.v2ray.ang.auth.dto.RegisterResult
 import com.v2ray.ang.auth.dto.RenameRequestDto
 import com.v2ray.ang.auth.dto.ServerStatusDto
 import com.v2ray.ang.auth.dto.PrimarySubscriptionDto
@@ -173,6 +176,27 @@ class DepartamentApiClientImpl(
                 }
                 else -> throw mapError(resp.code)
             }
+        }
+    }
+
+    /**
+     * Registration. Answers 201 in two shapes and BOTH are a success: a `{token, client}` body is a
+     * session (the panel has e-mail verification switched off), and a body without a token means a
+     * confirmation letter has been sent instead. Only a non-2xx is a failure, and it arrives here as
+     * an [ApiError] carrying the panel's own sentence — see [serverMessage].
+     */
+    override suspend fun register(email: String, password: String, referralCode: String?): RegisterResult {
+        val raw = postJson(
+            BackendConfig.Endpoints.register,
+            gson.toJson(RegisterRequestDto(email, password, referralCode)),
+            RegisterResponseDto::class.java,
+        )
+        val token = raw.token
+        val client = raw.client
+        return if (!token.isNullOrBlank() && client != null) {
+            RegisterResult.Success(token, client)
+        } else {
+            RegisterResult.RequiresVerification(raw.message)
         }
     }
 
@@ -399,8 +423,8 @@ class DepartamentApiClientImpl(
         403 -> ApiError.Server(403, detail)
         404 -> ApiError.NotFound
         410 -> ApiError.Gone
-        429 -> ApiError.RateLimited
-        502, 503 -> ApiError.ServiceUnavailable
+        429 -> ApiError.RateLimited(detail)
+        502, 503 -> ApiError.ServiceUnavailable(detail)
         else -> ApiError.Server(code, detail)
     }
 

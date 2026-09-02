@@ -365,7 +365,7 @@
                 android:layout_width="@dimen/glyph_20"
                 android:layout_height="@dimen/glyph_20"
                 android:importantForAccessibility="no"
-                android:src="@drawable/ic_ob_site"
+                android:src="@drawable/ic_ob_mail"
                 app:tint="?attr/colorOnSurfaceVariant" />
 
             <TextView
