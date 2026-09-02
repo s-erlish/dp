@@ -484,6 +484,10 @@ class ServerActivity : BaseActivity() {
             }.show()
         }
         field.onSingleClick { open() }
+        // The caret is a separate view inside the field and swallows the touch that lands on it,
+        // so it needs its own listener. `setEndIconOnClickListener` is Material's own hook and not
+        // the `View.setOnClickListener` SingleClick.kt reserves; the sheet it opens is idempotent,
+        // and «Подписка» wires its pickers the same way.
         layout.setEndIconOnClickListener { open() }
         field.setOnKeyListener { _, keyCode, event ->
             val opens = keyCode == KeyEvent.KEYCODE_ENTER ||
