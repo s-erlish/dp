@@ -62,9 +62,13 @@
     <string name="auth_btn_register">Создать аккаунт</string>
     <!-- The password rule is stated BEFORE it is broken, on the reserved line under the
          field, and turns into the error only if the rule is actually broken. The panel
-         refuses a shorter password with 400, so the form holds the same number. -->
+         refuses a shorter password with 400, so the form holds the same number.
+
+         THE TWO SENTENCES DIFFER IN WORDS, not only in colour (00-rules.md 6.3): a line
+         that goes red without changing what it says would be signalling with the hue
+         alone, and the reader who cannot see the hue would get no signal at all. -->
     <string name="auth_password_hint">Не менее 8 символов</string>
-    <string name="auth_password_short">Пароль короче 8 символов</string>
+    <string name="auth_password_short">Пароль слишком короткий — нужно не менее 8 символов</string>
     <string name="auth_password_repeat_label">Повторите пароль</string>
     <string name="auth_password_mismatch">Пароли не совпадают</string>
 
