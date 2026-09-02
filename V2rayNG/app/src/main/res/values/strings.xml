@@ -90,7 +90,10 @@
     <string name="server_lab_kcp_tti">mKCP TTI (необязательно, по умолчанию 50)</string>
     <string name="toast_success">Успешно</string>
     <string name="toast_incorrect_protocol">Неправильный протокол</string>
-    <string name="toast_decoding_failed">Невозможно декодировать</string>
+    <!-- Показывается, когда выбранная в галерее картинка не содержит QR-кода. «Невозможно
+         декодировать» называло операцию, а не то, что случилось, и не говорило, что делать
+         дальше; вдобавок строка не была разрешена в NoticePolicy и не показывалась вовсе. -->
+    <string name="toast_decoding_failed">В этом изображении нет QR-кода. Выберите другой файл.</string>
     <string name="title_file_chooser">Выберите файл</string>
     <string name="toast_require_file_manager">Установите файловый менеджер</string>
     <string name="toast_config_file_invalid">Файл не похож на сервер. Выберите другой файл.</string>

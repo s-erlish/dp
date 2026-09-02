@@ -148,6 +148,9 @@ object NoticePolicy {
         // The clipboard: the one outcome with no visible result of any kind.
         R.string.notice_copied,
         R.string.notice_copy_failed,
+        // Выбранная картинка не содержит QR-кода. Выбор файла закрывается, экран остаётся — и без
+        // этой строки не было ни ошибки, ни объяснения, почему ничего не произошло.
+        R.string.toast_decoding_failed,
         // Dead ends the app cannot resolve for the user.
         R.string.toast_require_file_manager,
         R.string.toast_permission_denied,
@@ -181,6 +184,10 @@ object NoticePolicy {
         R.string.account_avatar_error,
         R.string.account_checkout_no_browser,
         R.string.account_top_up_invalid,
+        // Платёж с баланса, который провайдер ещё проводит. Экран НЕ закрывается (это и есть
+        // замысел — дать увидеть, как он дойдёт), поэтому без этой строки нажатие «Оплатить»
+        // выглядело как нажатие, на которое ничего не ответили.
+        R.string.account_pay_pending,
         R.string.devices_error_delete,
         // The buy flow — departament's own screens, and each of these blocks a tap.
         R.string.buy_select_option_first,
