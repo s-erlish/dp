@@ -783,13 +783,15 @@ class ServerActivity : BaseActivity() {
             refuse(til_address, et_address, R.string.srv_address_invalid)
             return false
         }
-        // Hysteria2 can hop ports, so it is the one protocol whose server port may be left out.
-        if (editorType != EConfigType.HYSTERIA2) {
-            val port = Utils.parseInt(et_port.text.toString())
-            if (port <= 0 || port > MAX_PORT) {
-                refuse(til_port, et_port, R.string.srv_port_required)
-                return false
-            }
+        // Hysteria2 used to be exempt here, on the argument that port hopping replaces the port.
+        // It does not: `mport` is a query parameter on the URI, and the outbound is still built as
+        // `serverPort.orEmpty().toInt()` - so a Hysteria2 server saved without one threw on the way
+        // to the tunnel and the connection failed with nothing to read. The exemption let the form
+        // save a server that could never produce a config.
+        val port = Utils.parseInt(et_port.text.toString())
+        if (port <= 0 || port > MAX_PORT) {
+            refuse(til_port, et_port, R.string.srv_port_required)
+            return false
         }
         val config =
             MmkvManager.decodeServerConfig(editGuid) ?: ProfileItem.create(createConfigType)
@@ -812,11 +814,38 @@ class ServerActivity : BaseActivity() {
             )
             return false
         }
+        // VLESS carries an encryption on the user, and the core takes «none» rather than nothing:
+        // an empty box was written into the outbound verbatim and rejected there.
+        if (config.configType == EConfigType.VLESS &&
+            et_security != null &&
+            TextUtils.isEmpty(et_security?.text?.toString()?.trim())
+        ) {
+            refuse(til_security, et_security, R.string.srv_encryption_required)
+            return false
+        }
+        // WireGuard's peer key. `peer.publicKey = publicKey.orEmpty()` puts an empty string in the
+        // config and the handshake then has nothing to answer, so the tunnel never comes up.
+        if (config.configType == EConfigType.WIREGUARD &&
+            TextUtils.isEmpty(et_public_key?.text?.toString()?.trim())
+        ) {
+            refuse(til_public_key, et_public_key, R.string.srv_public_key_required)
+            return false
+        }
         if (et_stream_security != null &&
             config.configType == EConfigType.TROJAN &&
             TextUtils.isEmpty(streamSecuritys.getOrNull(streamSecurityIndex))
         ) {
             refuse(til_stream_security, et_stream_security, R.string.srv_tls_required)
+            return false
+        }
+        // REALITY verifies the server against its public key; `nullIfBlank()` drops an empty one
+        // and leaves the handshake with nothing to check. Scoped to REALITY: on plain TLS the same
+        // box is not used at all, and on «Нет» it is not even on screen.
+        if (et_stream_security != null &&
+            streamSecuritys.getOrNull(streamSecurityIndex) == REALITY &&
+            TextUtils.isEmpty(et_public_key?.text?.toString()?.trim())
+        ) {
+            refuse(til_public_key, et_public_key, R.string.srv_public_key_required_reality)
             return false
         }
         if (et_extra?.text?.toString().isNotNullEmpty()) {
