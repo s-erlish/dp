@@ -34,7 +34,6 @@
     <string name="toast_status_connecting">Подключение…</string>
 
     <!--ServerActivity-->
-    <string name="title_server">Сервер</string>
     <string name="menu_item_save_config">Сохранить сервер</string>
     <string name="menu_item_del_config">Удалить сервер</string>
     <string name="menu_item_import_config_qrcode">Импорт из QR-кода</string>
@@ -73,21 +72,13 @@
     <string name="server_lab_port3">Порт</string>
     <string name="server_lab_id3">Пароль</string>
     <string name="server_lab_security3">Безопасность</string>
-    <string name="server_lab_id4">Пароль (необязательно)</string>
-    <string name="server_lab_security4">Пользователь (необязательно)</string>
     <string name="server_lab_encryption">Шифрование</string>
     <string name="server_lab_flow">Поток</string>
     <string name="server_lab_public_key">Открытый ключ</string>
-    <string name="server_lab_preshared_key">Дополнительный ключ шифрования (необязательно)</string>
     <string name="server_lab_short_id">ShortID</string>
     <string name="server_lab_spider_x">SpiderX</string>
     <string name="server_lab_mldsa65_verify">mldsa65Verify</string>
     <string name="server_lab_secret_key">Закрытый ключ</string>
-    <string name="server_lab_reserved">Reserved (необязательно, через запятую)</string>
-    <string name="server_lab_local_address">Локальный адрес (необязательно, IPv4/IPv6 через запятую)</string>
-    <string name="server_lab_local_mtu">MTU (необязательно, по умолчанию 1420)</string>
-    <string name="server_lab_kcp_mtu">mKCP MTU (необязательно, по умолчанию 1350)</string>
-    <string name="server_lab_kcp_tti">mKCP TTI (необязательно, по умолчанию 50)</string>
     <string name="toast_success">Успешно</string>
     <string name="toast_incorrect_protocol">Неправильный протокол</string>
     <!-- Показывается, когда выбранная в галерее картинка не содержит QR-кода. «Невозможно
@@ -99,17 +90,12 @@
     <string name="toast_config_file_invalid">Файл не похож на сервер. Выберите другой файл.</string>
     <string name="toast_action_not_allowed">Это действие запрещено</string>
     <string name="server_obfs_password">Пароль obfs</string>
-    <string name="server_lab_port_hop">Смена портов (переопределяет порт)</string>
     <string name="server_lab_port_hop_interval">Интервал смены портов</string>
-    <string name="server_lab_bandwidth_down">Входящая пропускная способность (допускаются: k/m/g/t)</string>
-    <string name="server_lab_bandwidth_up">Исходящая пропускная способность (допускаются: k/m/g/t)</string>
     <string name="server_lab_xhttp_mode">Режим XHTTP</string>
-    <string name="server_lab_xhttp_extra">Необработанный JSON XHTTP Extra, формат: { XHTTPObject }</string>
-    <string name="server_lab_final_mask">Необработанный JSON FinalMask, формат: { FinalMaskObject }</string>
     <string name="server_lab_ech_config_list">ECHConfigList</string>
-    <string name="server_lab_pinned_ca256">Отпечаток сертификата (SHA-256)</string>
+    <string name="server_lab_pinned_ca256">Отпечаток сертификата</string>
     <string name="server_lab_browser_dialer">Использовать переадресацию браузера</string>
-    <string name="server_lab_browser_dialer_tip">Поддерживаются только исходящие соединения XHTTP (packet-up) и WS; настройки, связанные с TLS, могут быть проигнорированы или конфликтовать</string>
+    <string name="server_lab_browser_dialer_tip">Работает только с XHTTP в режиме packet-up и с WS. Настройки TLS при этом могут не примениться</string>
 
     <string name="toast_warning_pref_proxysharing_short">Доступ из LAN разрешён, убедитесь, что вы находитесь в доверенной сети</string>
 
