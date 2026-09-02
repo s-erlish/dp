@@ -310,12 +310,28 @@ object SubscriptionUpdater {
             // with the connect object disabled. This worker runs in its own process, so a broadcast
             // is the only way to reach the Activity — and it is sent only when servers actually
             // moved, so a refresh that changed nothing costs nothing.
+            // ЭТО ПОРЯДОК, А НЕ ПОСЛЕДОВАТЕЛЬНОСТЬ СТРОК: сортировка идёт ДО объявления.
+            //
+            // The refresh rewrote this subscription's server list in the провайдер's order, so a
+            // user who chose «по пингу» or «по имени» needs [applyServerSortOrder] to put it back.
+            // The broadcast used to go out FIRST, and it is what makes the interface process
+            // re-read the list — so the screen was rebuilt from the провайдер's order, and this
+            // line then rewrote the store behind it. The chosen sort did not appear until something
+            // else reloaded the list, which in practice meant leaving the app and coming back
+            // (`MainActivity.onResume` -> `reloadServerListIfStale`, whose list comparison is
+            // order-sensitive and so notices). Sorting first makes the announcement describe the
+            // store as it will actually be read.
+            //
+            // …AND IT ONLY RUNS WHEN SOMETHING WAS ACTUALLY IMPORTED, on the same condition as the
+            // broadcast. `applyServerSortOrder` reads and REWRITES every подписка's server list, in
+            // `:bg`, over MULTI_PROCESS_MODE stores; a refresh that imported nothing — an expired
+            // подписка, a disabled one, a провайдер that answered with the same list — has nothing
+            // to re-order, and a write from the background process is the one thing that can lose a
+            // concurrent write from the interface one.
             if (outcome.configCount > 0) {
+                SettingsManager.applyServerSortOrder()
                 MessageUtil.sendMsg2UI(applicationContext, AppConfig.MSG_STATE_SERVERS_CHANGED, "")
             }
-
-            // The refresh rewrote this subscription's server list in the provider's order.
-            SettingsManager.applyServerSortOrder()
 
             if (SettingsManager.isPingOnSubscriptionUpdate()) {
                 requestLatencyTest(applicationContext, subId)

@@ -205,6 +205,35 @@ object SelectPopup {
         session.catcher = catcher
         current = session
 
+        // ============================================================================
+        // THE OPEN POPUP LET GO OF ITS SCREEN ONLY IF THE SCREEN REMEMBERED TO ASK.
+        // ============================================================================
+        //
+        // [current] is a field on an `object`, i.e. a process-wide static, and a `Session` holds
+        // the anchor row, the popup body, the value label, the caret and the previously focused
+        // view — the whole of which reaches the Activity. Two of the six hosts took that down
+        // themselves (`HomeFragment.onDestroyView`, `SettingsTabFragment`); `MainActivity`'s
+        // «Добавить» menu, `PerAppProxyActivity`, `RoutingSettingActivity` and `UserAssetActivity`
+        // did not, and none of them has to: a component that borrows a screen is the thing that
+        // must give it back.
+        //
+        // Воспроизведение: Настройки → «Прокси по приложениям» → открыть окошко выбора → повернуть
+        // экран (или сменить тему/язык — это тот же пересоздающийся Activity). The Activity is
+        // destroyed with the popup open, nothing calls [dismiss], and the destroyed window stays
+        // reachable from this static for the rest of the process.
+        //
+        // Detachment is the one signal that covers every way a window can go, and it needs no
+        // cooperation from the host. The ordinary close path cannot be confused with it: [dismiss]
+        // clears [current] BEFORE `close()` removes the view, and a popup opened in the meantime is
+        // a different `Session`, so the identity check below is false in both cases and only a
+        // window that took its popup down with it gets here.
+        popup.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) = Unit
+            override fun onViewDetachedFromWindow(v: View) {
+                if (current?.popup === v) current = null
+            }
+        })
+
         session.liftAnchor()
         session.unclipAncestors()
         session.dimValue(open = true)

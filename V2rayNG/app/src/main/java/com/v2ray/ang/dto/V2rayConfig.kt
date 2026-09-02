@@ -370,7 +370,22 @@ data class V2rayConfig(
             ) {
                 return settings?.servers?.firstOrNull()?.port
             } else if (protocol.equals(EConfigType.WIREGUARD.name, true)) {
-                return settings?.peers?.firstOrNull()?.endpoint?.substringAfterLast(":")?.toInt()
+                // `toIntOrNull`, NEVER `toInt`. `endpoint` is free text out of a провайдер's
+                // XRAY_JSON template or a hand-edited profile, and `substringAfterLast(":")` on a
+                // value that carries no port hands back the WHOLE string — «example.com» for an
+                // endpoint written without one, «» for one ending in a bare colon. `toInt` threw
+                // NumberFormatException on both, and the two callers are unguarded:
+                //
+                //  - `MainViewModel.resolvePingHostPort`, on the MAIN thread, inside «Проверить
+                //    все» — one such peer in the list and the press крашило приложение;
+                //  - `CustomFmt.parse`, inside `AngConfigManager.parseCustomConfigServer`'s loop
+                //    over an XRAY_JSON array — the throw is caught by the array's own try, so ONE
+                //    bad peer discarded every server staged from that подписка and the refresh
+                //    imported nothing.
+                //
+                // "No port I can read" is a null port, which both callers already handle: the row
+                // is simply not pingable, and the profile keeps its address without one.
+                return settings?.peers?.firstOrNull()?.endpoint?.substringAfterLast(":")?.toIntOrNull()
             } else if (protocol.equals(EConfigType.HYSTERIA2.name, true)
                 || protocol.equals(EConfigType.HYSTERIA.name, true)
             ) {

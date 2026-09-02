@@ -1758,7 +1758,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * rebuilding a ViewPager2 once per server would thrash it for a change no card shows.
      */
     private fun refreshServerList(index: Int) {
-        val groups = mainViewModel.getProviderGroups()
         val all = mainViewModel.serversCache
         val pageSubId = homeMetaSubIds.getOrNull(homeMetaPage)
         val shown = if (pageSubId.isNullOrEmpty()) {
@@ -1771,7 +1770,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // list repaints the wrong row.
         val targetGuid = all.getOrNull(index)?.guid
         val shownIndex = targetGuid?.let { guid -> shown.indexOfFirst { it.guid == guid } } ?: -1
-        homeAdapter?.setSections(shown, groups, showHeaders = false, index = shownIndex)
+        homeAdapter?.setSections(shown, index = shownIndex)
     }
 
     /**
@@ -2441,16 +2440,12 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
             onDelayResult(time)
         }
 
-        mainViewModel.updateTestResultAction.observe(viewLifecycleOwner) {
-            // A BULK CHECK REPORTED PROGRESS, and that is now the only thing that gets here — the
-            // comment above this line used to say so while a second producer stood behind it. The
-            // 30-second probe of the ACTIVE server also published on this channel, so a full list
-            // rebuild (every подписка re-decoded out of MMKV, then notifyDataSetChanged) ran twice
-            // every thirty seconds for a message that named no server and changed no stored delay.
-            // That producer is gone; a batch's progress is bounded by the batch, which is what makes
-            // the rebuild affordable here. @see MainViewModel's receiver.
-            if (isBindingInitialized) refreshServerList(-1)
-        }
+        // NO `updateTestResultAction` OBSERVER ANY MORE, and no channel behind it. It answered a
+        // batch's progress message — one per finished server — with `refreshServerList(-1)`, a full
+        // rebuild and `notifyDataSetChanged()` over the whole list, for a string it never read and
+        // beside the targeted repaint the same server's result had already triggered. @see
+        // MainViewModel's receiver for what replaced it, which is nothing: the row that changed was
+        // always named on the other channel.
     }
 
     /**
