@@ -118,12 +118,16 @@ class ServerActivity : BaseActivity() {
     private val et_security: EditText? by lazy { findViewById(R.id.et_security) }
     private val sp_flow: Spinner? by lazy { findViewById(R.id.sp_flow) }
     private val sp_security: Spinner? by lazy { findViewById(R.id.sp_security) }
-    private val sp_stream_security: Spinner? by lazy { findViewById(R.id.sp_stream_security) }
-    private val sp_allow_insecure: Spinner? by lazy { findViewById(R.id.sp_allow_insecure) }
+    private val et_stream_security: EditText? by lazy { findViewById(R.id.et_stream_security) }
+    private val til_stream_security: TextInputLayout? by lazy { findViewById(R.id.til_stream_security) }
+    private val et_allow_insecure: EditText? by lazy { findViewById(R.id.et_allow_insecure) }
+    private val til_allow_insecure: TextInputLayout? by lazy { findViewById(R.id.til_allow_insecure) }
     private val container_allow_insecure: LinearLayout? by lazy { findViewById(R.id.lay_allow_insecure) }
     private val et_sni: EditText? by lazy { findViewById(R.id.et_sni) }
+    private val til_sni: TextInputLayout? by lazy { findViewById(R.id.til_sni) }
     private val container_sni: LinearLayout? by lazy { findViewById(R.id.lay_sni) }
-    private val sp_stream_fingerprint: Spinner? by lazy { findViewById(R.id.sp_stream_fingerprint) } //uTLS
+    private val et_stream_fingerprint: EditText? by lazy { findViewById(R.id.et_stream_fingerprint) } //uTLS
+    private val til_stream_fingerprint: TextInputLayout? by lazy { findViewById(R.id.til_stream_fingerprint) }
     private val container_fingerprint: LinearLayout? by lazy { findViewById(R.id.lay_stream_fingerprint) }
     private val et_network: EditText? by lazy { findViewById(R.id.et_network) }
     private val til_network: TextInputLayout? by lazy { findViewById(R.id.til_network) }
@@ -136,16 +140,21 @@ class ServerActivity : BaseActivity() {
     private val tv_path: TextView? by lazy { findViewById(R.id.tv_path) }
     private val et_path: EditText? by lazy { findViewById(R.id.et_path) }
     private val til_path: TextInputLayout? by lazy { findViewById(R.id.til_path) }
-    private val sp_stream_alpn: Spinner? by lazy { findViewById(R.id.sp_stream_alpn) } //uTLS
+    private val et_stream_alpn: EditText? by lazy { findViewById(R.id.et_stream_alpn) } //uTLS
+    private val til_stream_alpn: TextInputLayout? by lazy { findViewById(R.id.til_stream_alpn) }
     private val container_alpn: LinearLayout? by lazy { findViewById(R.id.lay_stream_alpn) }
     private val et_public_key: EditText? by lazy { findViewById(R.id.et_public_key) }
+    private val til_public_key: TextInputLayout? by lazy { findViewById(R.id.til_public_key) }
     private val et_preshared_key: EditText? by lazy { findViewById(R.id.et_preshared_key) }
     private val container_public_key: LinearLayout? by lazy { findViewById(R.id.lay_public_key) }
     private val et_short_id: EditText? by lazy { findViewById(R.id.et_short_id) }
+    private val til_short_id: TextInputLayout? by lazy { findViewById(R.id.til_short_id) }
     private val container_short_id: LinearLayout? by lazy { findViewById(R.id.lay_short_id) }
     private val et_spider_x: EditText? by lazy { findViewById(R.id.et_spider_x) }
+    private val til_spider_x: TextInputLayout? by lazy { findViewById(R.id.til_spider_x) }
     private val container_spider_x: LinearLayout? by lazy { findViewById(R.id.lay_spider_x) }
     private val et_mldsa65_verify: EditText? by lazy { findViewById(R.id.et_mldsa65_verify) }
+    private val til_mldsa65_verify: TextInputLayout? by lazy { findViewById(R.id.til_mldsa65_verify) }
     private val container_mldsa65_verify: LinearLayout? by lazy { findViewById(R.id.lay_mldsa65_verify) }
     private val et_reserved1: EditText? by lazy { findViewById(R.id.et_reserved1) }
     private val et_local_address: EditText? by lazy { findViewById(R.id.et_local_address) }
@@ -166,8 +175,10 @@ class ServerActivity : BaseActivity() {
     private val til_fm: TextInputLayout? by lazy { findViewById(R.id.til_fm) }
     private val layout_extra: LinearLayout? by lazy { findViewById(R.id.layout_extra) }
     private val et_ech_config_list: EditText? by lazy { findViewById(R.id.et_ech_config_list) }
+    private val til_ech_config_list: TextInputLayout? by lazy { findViewById(R.id.til_ech_config_list) }
     private val container_ech_config_list: LinearLayout? by lazy { findViewById(R.id.lay_ech_config_list) }
     private val et_pinned_ca256: EditText? by lazy { findViewById(R.id.et_pinned_ca256) }
+    private val til_pinned_ca256: TextInputLayout? by lazy { findViewById(R.id.til_pinned_ca256) }
     private val container_pinned_ca256: LinearLayout? by lazy { findViewById(R.id.lay_pinned_ca256) }
     private val layout_browser_dialer: LinearLayout? by lazy { findViewById(R.id.layout_browser_dialer) }
     private val et_browser_dialer_mode: EditText? by lazy { findViewById(R.id.et_browser_dialer_mode) }
@@ -185,6 +196,12 @@ class ServerActivity : BaseActivity() {
     private var networkIndex = 0
     private var headerTypeIndex = 0
     private var browserDialerIndex = 0
+
+    /** The four TLS choices, held the same way and for the same reason. */
+    private var streamSecurityIndex = 0
+    private var fingerprintIndex = 0
+    private var alpnIndex = 0
+    private var allowInsecureIndex = 0
 
     /** The server being edited, or null for a new one. Read by the pickers when they repopulate. */
     private var editedConfig: ProfileItem? = null
@@ -236,77 +253,6 @@ class ServerActivity : BaseActivity() {
         )
         findViewById<View>(R.id.row_delete).isVisible = editGuid.isNotEmpty() && !isRunning
 
-        sp_stream_security?.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(
-                parent: AdapterView<*>?,
-                view: View?,
-                position: Int,
-                id: Long,
-            ) {
-                val isBlank = streamSecuritys[position].isBlank()
-                val isTLS = streamSecuritys[position] == TLS
-
-                when {
-                    // Case 1: Null or blank
-                    isBlank -> {
-                        listOf(
-                            container_sni,
-                            container_fingerprint,
-                            container_alpn,
-                            container_allow_insecure,
-                            container_public_key,
-                            container_short_id,
-                            container_spider_x,
-                            container_mldsa65_verify,
-                            container_ech_config_list,
-                            container_pinned_ca256
-                        ).forEach { it?.visibility = View.GONE }
-                    }
-
-                    // Case 2: TLS value
-                    isTLS -> {
-                        listOf(
-                            container_sni,
-                            container_fingerprint,
-                            container_alpn,
-                            container_allow_insecure,
-                            container_ech_config_list,
-                            container_pinned_ca256
-                        ).forEach { it?.visibility = View.VISIBLE }
-                        listOf(
-                            container_public_key,
-                            container_short_id,
-                            container_spider_x,
-                            container_mldsa65_verify
-                        ).forEach { it?.visibility = View.GONE }
-                    }
-
-                    // Case 3: Other reality values
-                    else -> {
-                        listOf(
-                            container_sni,
-                            container_fingerprint
-                        ).forEach { it?.visibility = View.VISIBLE }
-                        listOf(
-                            container_alpn,
-                            container_allow_insecure,
-                            container_ech_config_list,
-                            container_pinned_ca256
-                        ).forEach { it?.visibility = View.GONE }
-                        listOf(
-                            container_public_key,
-                            container_short_id,
-                            container_spider_x,
-                            container_mldsa65_verify
-                        ).forEach { it?.visibility = View.VISIBLE }
-                    }
-                }
-            }
-
-            override fun onNothingSelected(p0: AdapterView<*>?) {
-                // do nothing
-            }
-        }
         if (config != null) {
             bindingServer(config)
         } else {
@@ -314,6 +260,97 @@ class ServerActivity : BaseActivity() {
         }
     }
 
+
+    // ------------------------------------------------------------------ шифрование канала
+
+    /** Draws the four TLS pickers from the current index state. */
+    private fun bindTlsSelects() {
+        bindSelect(
+            layout = til_stream_security,
+            field = et_stream_security,
+            title = getString(R.string.server_lab_stream_security),
+            options = optionLabels(streamSecuritys),
+            selectedIndex = streamSecurityIndex,
+        ) { picked -> applyStreamSecurity(picked) }
+
+        bindSelect(
+            layout = til_stream_fingerprint,
+            field = et_stream_fingerprint,
+            title = getString(R.string.server_lab_stream_fingerprint),
+            options = optionLabels(uTlsItems),
+            selectedIndex = fingerprintIndex,
+        ) { picked ->
+            fingerprintIndex = picked
+            bindTlsSelects()
+        }
+
+        bindSelect(
+            layout = til_stream_alpn,
+            field = et_stream_alpn,
+            title = getString(R.string.server_lab_stream_alpn),
+            options = optionLabels(alpns),
+            selectedIndex = alpnIndex,
+        ) { picked ->
+            alpnIndex = picked
+            bindTlsSelects()
+        }
+
+        bindSelect(
+            layout = til_allow_insecure,
+            field = et_allow_insecure,
+            title = getString(R.string.server_lab_allow_insecure),
+            options = allowInsecureLabels(),
+            selectedIndex = allowInsecureIndex,
+        ) { picked ->
+            allowInsecureIndex = picked
+            bindTlsSelects()
+        }
+    }
+
+    /**
+     * «Разрешать небезопасные соединения» is a yes/no with a third answer, and the third one is the
+     * default: an empty value means «whatever the app-wide setting says», which is what [saveTls]
+     * reads it as. A picker that offered «», «true» and «false» made the user work that out.
+     */
+    private fun allowInsecureLabels(): List<CharSequence> = allowinsecures.map { value ->
+        when (value) {
+            "true" -> getString(R.string.srv_value_yes)
+            "false" -> getString(R.string.srv_value_no)
+            else -> getString(R.string.srv_value_default)
+        }
+    }
+
+    /**
+     * The channel encryption changed, so the form shows the fields that belong to it.
+     *
+     * This is the body of the old `sp_stream_security` listener, with the same three cases: nothing
+     * (no channel encryption at all, so there is nothing under it to fill in), TLS, and REALITY.
+     */
+    private fun applyStreamSecurity(position: Int) {
+        if (et_stream_security == null) return
+        streamSecurityIndex = position.coerceIn(streamSecuritys.indices)
+        val value = streamSecuritys[streamSecurityIndex]
+
+        val tlsOnly = listOf(container_alpn, container_allow_insecure, container_ech_config_list, container_pinned_ca256)
+        val realityOnly = listOf(container_public_key, container_short_id, container_spider_x, container_mldsa65_verify)
+        val always = listOf(container_sni, container_fingerprint)
+
+        when {
+            value.isBlank() -> (always + tlsOnly + realityOnly).forEach { it?.isVisible = false }
+
+            value == TLS -> {
+                (always + tlsOnly).forEach { it?.isVisible = true }
+                realityOnly.forEach { it?.isVisible = false }
+            }
+
+            else -> {
+                (always + realityOnly).forEach { it?.isVisible = true }
+                tlsOnly.forEach { it?.isVisible = false }
+            }
+        }
+
+        bindTlsSelects()
+    }
 
     // ------------------------------------------------------------------ выбор значения
 
@@ -563,21 +600,16 @@ class ServerActivity : BaseActivity() {
 
         val streamSecurity = Utils.arrayFind(streamSecuritys, config.security.orEmpty())
         if (streamSecurity >= 0) {
-            sp_stream_security?.setSelection(streamSecurity)
             et_sni?.text = Utils.getEditable(config.sni)
-            config.fingerPrint?.let { it ->
-                val utlsIndex = Utils.arrayFind(uTlsItems, it)
-                utlsIndex.let { sp_stream_fingerprint?.setSelection(if (it >= 0) it else 0) }
+            config.fingerPrint?.let { fingerPrint ->
+                fingerprintIndex = Utils.arrayFind(uTlsItems, fingerPrint).coerceAtLeast(0)
             }
-            config.alpn?.let { it ->
-                val alpnIndex = Utils.arrayFind(alpns, it)
-                alpnIndex.let { sp_stream_alpn?.setSelection(if (it >= 0) it else 0) }
+            config.alpn?.let { alpn ->
+                alpnIndex = Utils.arrayFind(alpns, alpn).coerceAtLeast(0)
             }
             if (config.security == TLS) {
-                val allowinsecure = Utils.arrayFind(allowinsecures, config.insecure.toString())
-                if (allowinsecure >= 0) {
-                    sp_allow_insecure?.setSelection(allowinsecure)
-                }
+                allowInsecureIndex =
+                    Utils.arrayFind(allowinsecures, config.insecure.toString()).coerceAtLeast(0)
                 et_ech_config_list?.text = Utils.getEditable(config.echConfigList)
                 et_pinned_ca256?.text = Utils.getEditable(config.pinnedCA256)
             } else if (config.security == REALITY) {
@@ -586,6 +618,8 @@ class ServerActivity : BaseActivity() {
                 et_spider_x?.text = Utils.getEditable(config.spiderX.orEmpty())
                 et_mldsa65_verify?.text = Utils.getEditable(config.mldsa65Verify.orEmpty())
             }
+            // Last: it draws the four pickers and decides which of the fields above are on screen.
+            applyStreamSecurity(streamSecurity)
         }
 
         browserDialerIndex =
@@ -610,8 +644,10 @@ class ServerActivity : BaseActivity() {
         applyNetwork(0)
         et_request_host?.text = null
         et_path?.text = null
-        sp_stream_security?.setSelection(0)
-        sp_allow_insecure?.setSelection(0)
+        allowInsecureIndex = 0
+        fingerprintIndex = 0
+        alpnIndex = 0
+        applyStreamSecurity(0)
         et_sni?.text = null
 
         //et_security.text = null
@@ -684,11 +720,12 @@ class ServerActivity : BaseActivity() {
             }
             return false
         }
-        sp_stream_security?.let {
-            if (config.configType == EConfigType.TROJAN && TextUtils.isEmpty(streamSecuritys[it.selectedItemPosition])) {
-                toastError(R.string.srv_tls_required)
-                return false
-            }
+        if (et_stream_security != null &&
+            config.configType == EConfigType.TROJAN &&
+            TextUtils.isEmpty(streamSecuritys.getOrNull(streamSecurityIndex))
+        ) {
+            refuse(til_stream_security, et_stream_security, R.string.srv_tls_required)
+            return false
         }
         if (et_extra?.text?.toString().isNotNullEmpty()) {
             if (JsonUtil.parseString(et_extra?.text?.toString()) == null) {
@@ -771,6 +808,9 @@ class ServerActivity : BaseActivity() {
             til_remarks, til_address, til_port,
             til_network, til_header_type, til_request_host, til_path,
             til_kcp_mtu, til_kcp_tti, til_extra, til_fm, til_browser_dialer_mode,
+            til_stream_security, til_sni, til_stream_fingerprint, til_stream_alpn,
+            til_allow_insecure, til_ech_config_list, til_pinned_ca256,
+            til_public_key, til_short_id, til_spider_x, til_mldsa65_verify,
         ).forEach { it?.error = null }
     }
 
@@ -848,11 +888,10 @@ class ServerActivity : BaseActivity() {
     }
 
     private fun saveTls(config: ProfileItem) {
-        val streamSecurity = sp_stream_security?.selectedItemPosition ?: return
+        // Same guard as [saveStreamSettings]: no picker on screen, no TLS fields to write.
+        if (et_stream_security == null) return
         val sniField = et_sni?.text?.toString()?.trim()
-        val allowInsecureField = sp_allow_insecure?.selectedItemPosition
-        val utlsIndex = sp_stream_fingerprint?.selectedItemPosition ?: 0
-        val alpnIndex = sp_stream_alpn?.selectedItemPosition ?: 0
+        val allowInsecureField = et_allow_insecure?.let { allowInsecureIndex }
         val publicKey = et_public_key?.text?.toString()
         val shortId = et_short_id?.text?.toString()
         val spiderX = et_spider_x?.text?.toString()
@@ -867,10 +906,10 @@ class ServerActivity : BaseActivity() {
                 allowinsecures[allowInsecureField].toBoolean()
             }
 
-        config.security = streamSecuritys[streamSecurity]
+        config.security = streamSecuritys[streamSecurityIndex]
         config.insecure = allowInsecure
         config.sni = sniField
-        config.fingerPrint = uTlsItems[utlsIndex]
+        config.fingerPrint = uTlsItems[fingerprintIndex]
         config.alpn = alpns[alpnIndex]
         config.publicKey = publicKey
         config.shortId = shortId
