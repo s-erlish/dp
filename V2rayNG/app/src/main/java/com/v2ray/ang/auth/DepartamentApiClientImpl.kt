@@ -234,6 +234,11 @@ class DepartamentApiClientImpl(
         postQuoting(BackendConfig.Endpoints.setPassword, SetPasswordRequestDto(newPassword))
     }
 
+    /** @see DepartamentApiClient.completeOnboarding */
+    override suspend fun completeOnboarding() {
+        postQuoting(BackendConfig.Endpoints.completeOnboarding)
+    }
+
     /** @see DepartamentApiClient.changeEmailRequest */
     override suspend fun changeEmailRequest(newEmail: String, currentPassword: String?) {
         postQuoting(
@@ -398,11 +403,14 @@ class DepartamentApiClientImpl(
      * read off the socket and dropped — 200 is the whole answer, and the `{message}` in it is the
      * panel's copy of a sentence this app writes itself, with the address in it.
      */
-    private suspend fun postQuoting(path: String, body: Any) {
+    private suspend fun postQuoting(path: String, body: Any? = null) {
         ensureConfigured()
+        // A body-less POST still sends `{}`: the panel parses JSON on these routes, and an empty
+        // entity is not the same thing as an empty object to it.
+        val json = if (body == null) "{}" else gson.toJson(body)
         val req = Request.Builder()
             .url(urlOf(path).build())
-            .post(gson.toJson(body).toRequestBody(JSON))
+            .post(json.toRequestBody(JSON))
             .build()
         exchange(req) { resp ->
             val text = resp.body.string()
