@@ -42,6 +42,20 @@ interface DepartamentApiClient {
     suspend fun getMe(): UserProfileDto
 
     /**
+     * Asks the panel to e-mail a password-reset link to [email]. Returns on 200 and throws
+     * [ApiError] otherwise, carrying the panel's own sentence.
+     *
+     * **The 200 says nothing about the address.** The panel answers the same way for an account
+     * that exists and one that does not, on purpose, so that this endpoint cannot be used to
+     * enumerate customers. Callers must not turn it into «письмо отправлено на <адрес>».
+     *
+     * There is no second call to make. The link lands on the site, where the new password is typed;
+     * `password-reset/consume` is the site's to make and never this app's. Nothing on the profile
+     * changes either, so unlike [linkEmailRequest] there is nothing here to poll for.
+     */
+    suspend fun requestPasswordReset(email: String)
+
+    /**
      * Sends the «привяжите эту почту» letter to [email] for the session already signed in. Returns
      * on 200 (the letter is out) and throws [ApiError] otherwise, carrying the panel's own sentence
      * — «Почта уже привязана», «Эта почта уже используется другим аккаунтом» — which is the only

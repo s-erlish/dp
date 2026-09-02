@@ -71,7 +71,7 @@ import kotlinx.coroutines.launch
  *     ├ регистрация      the same fields plus «Повторите пароль» → «Создать аккаунт»
  *     ├ подтверждение    the letter carries a LINK: a wait, a poll, and no field
  *     ├ 2FA              replaces the password slot; six cells over one real field
- *     └ one row          «Восстановить пароль» → departament.site
+ *     └ восстановление   «Восстановить пароль» → тот же адрес, письмо, «отправлено»
  * ```
  *
  * **The redesign pass (2026-08-17).** The owner opened this screen and found the version that
@@ -177,11 +177,28 @@ import kotlinx.coroutines.launch
  * sharper question: not «есть ли адрес», which is already true and would end the wait on its first
  * round, but «стал ли он новым».
  *
- * **What is deliberately absent rather than disabled**: magic link, password reset, the browser
- * hand-off and Google. `DepartamentApiClient` carries no call for any of them, so a control here
- * would advertise a feature instead of offering one. The one errand the site *can* finish is a row
- * that names its destination, and it ends where this screen starts: back here, signing in with an
- * email and a password.
+ * **AND THE LAST ERRAND THAT STILL LEFT THE APP (2026-09-02): ВОССТАНОВЛЕНИЕ ПАРОЛЯ.** «Восстановить
+ * пароль» opened `departament.site/forgot-password` in a browser, for precisely the reason
+ * «Создать аккаунт» once did — the client carried no call. It carries one now
+ * ([com.v2ray.ang.auth.AuthManager.requestPasswordReset]), and the row opens a step of this same
+ * form: [FormMode.RESET], one field, «Отправить ссылку». The field is the one the user has already
+ * typed their address into, which is the whole reason the errand is a step here and not a screen
+ * somewhere else.
+ *
+ * **AND ITS «ОТПРАВЛЕНО» DOES NOT WAIT, because there is nothing to wait for.** The other two
+ * letters change something this app can ask about — a registration proves an address, a link
+ * writes one onto the profile — so a poll has a question and the ring is that question being
+ * asked. A new password changes neither, and the app never sees the token in the letter
+ * (`password-reset/consume` is the site's call, not ours). So the same block reports it with the
+ * ring swapped for a static tile: «Письмо отправлено», «Отправить снова», «Назад».
+ *
+ * **The copy over it is conditional and that is the panel's rule, not caution.** The endpoint
+ * answers a known address and an unknown one identically so it cannot be used to enumerate
+ * customers; «мы отправили письмо на <адрес>» would give away the answer it withholds.
+ *
+ * **What is deliberately absent rather than disabled**: magic link, the browser hand-off and
+ * Google. `DepartamentApiClient` carries no call for any of them, so a control here would
+ * advertise a feature instead of offering one.
  */
 class LoginActivity : BaseActivity() {
 
@@ -195,10 +212,16 @@ class LoginActivity : BaseActivity() {
 
     /**
      * Which errand surface B is on. It is not a page and not a machine state: the form is the same
-     * form either way, and this only decides whether the repeat field is in it, what the button
-     * says, and which of the two names the toolbar carries. The segment is its only author.
+     * form either way, and this only decides which fields are in it, what the button says, and
+     * which name the toolbar carries.
+     *
+     * The segment authors the first two. [RESET] is authored by the «Восстановить пароль» row at
+     * the foot of the sign-in form, which is why it is a third value here rather than a flag beside
+     * [emailLinkMode] and its siblings: those are fixed at entry and this one is reached, left and
+     * returned to while the screen is open — and it is saved and restored with the segment's own
+     * value for free ([STATE_FORM_MODE]), which a separate flag would have to duplicate.
      */
-    private enum class FormMode { SIGN_IN, REGISTER }
+    private enum class FormMode { SIGN_IN, REGISTER, RESET }
 
     private var formMode = FormMode.SIGN_IN
 
@@ -432,11 +455,22 @@ class LoginActivity : BaseActivity() {
                     // stays on the form — the same rung the 2FA code sits on.
                     state is AuthUiState.EmailVerification -> leaveVerification()
 
+                    // Same rung, and the same reason it is a rung at all: the form under this one
+                    // holds the address, and somebody who mistyped it has no other way to find out
+                    // (the panel answers identically whatever the address was).
+                    state is AuthUiState.PasswordResetSent -> leavePasswordReset()
+
                     // The password step is the exception on this ladder, and deliberately: there
                     // is no rung under it. The letter has been used, the address is attached, and
                     // the form that sent it would be a form for an errand already done. Back is
                     // «Пропустить» by another name, and both close.
                     state is AuthUiState.SetPassword -> SubPage.close(this@LoginActivity)
+
+                    // «Восстановить пароль» is a step of the form, so it hands the form back
+                    // before the form hands the screen back — ABOVE the gate rung, because the
+                    // screen may have opened straight onto the form (MODE_SITE), where that rung
+                    // closes the Activity and would take the sign-in form down with the step.
+                    !emailErrand && formMode == FormMode.RESET -> setFormMode(FormMode.SIGN_IN)
 
                     page == Page.MAIL && gateReachable -> goToGate()
 
@@ -654,6 +688,8 @@ class LoginActivity : BaseActivity() {
             when (viewModel.state.value) {
                 is AuthUiState.TwoFactor -> viewModel.cancelTwoFactor()
                 is AuthUiState.EmailVerification -> leaveVerification()
+                // «Назад»: one step, literally. See [leavePasswordReset].
+                is AuthUiState.PasswordResetSent -> leavePasswordReset()
                 // «Пропустить». Nothing is abandoned by leaving: the address is on the account, the
                 // result is already OK, and the password is offered again the next time this
                 // account touches its e-mail. The one control's third meaning, and still the same
@@ -713,7 +749,48 @@ class LoginActivity : BaseActivity() {
         val mail = binding.mail
         val register = formMode == FormMode.REGISTER
         val stepped = viewModel.state.value.let {
-            it is AuthUiState.TwoFactor || it is AuthUiState.EmailVerification
+            it is AuthUiState.TwoFactor || it is AuthUiState.EmailVerification ||
+                it is AuthUiState.PasswordResetSent
+        }
+        // The two steps take different things away. A code step replaces the PASSWORD and keeps
+        // the address on screen, read-only, so the user can see whose code they are typing (6.7);
+        // a letter replaces the whole form, because the address is spoken for and the answer is
+        // already on its way. Only the second kind takes the address slot with it.
+        val lettered = viewModel.state.value.let {
+            it is AuthUiState.EmailVerification || it is AuthUiState.PasswordResetSent
+        }
+
+        // «ВОССТАНОВИТЬ ПАРОЛЬ» IS NOT ONE OF THE SEGMENT'S TWO EITHER, and it takes the same exit
+        // the e-mail errands take, one rung earlier so that neither can be confused for the other:
+        // those belong to an account that is already signed in, this one to somebody who cannot get
+        // in at all. What is left on the form is one field — the very field they have already typed
+        // their address into, which is why the row lives at the foot of this form and not on a
+        // screen of its own. The segment would be asking a person who is locked out whether they
+        // would like to register instead; the row underneath would offer the errand they are on.
+        if (!emailErrand && formMode == FormMode.RESET) {
+            mail.segMode.isVisible = false
+            mail.slotEmail.isVisible = !lettered
+            mail.slotPassword.isVisible = false
+            mail.slotConfirm.isVisible = false
+            mail.slotLinkHint.isVisible = !stepped
+            mail.slotLinkHint.setText(R.string.auth_reset_hint)
+            mail.authHairline.isVisible = false
+            mail.altMethods.isVisible = false
+            mail.lblEmail.setText(R.string.auth_email_label)
+            // The address is the only field, so its key submits. imeOptions is read when the input
+            // connection opens, hence the restart for a field already under the caret.
+            mail.etEmail.imeOptions = EditorInfo.IME_ACTION_DONE
+            if (mail.etEmail.hasFocus()) {
+                getSystemService(InputMethodManager::class.java)?.restartInput(mail.etEmail)
+            }
+            resetPasswordLine()
+            // Nothing on the form itself needs a way out: the toolbar arrow and system Back both
+            // return to «Вход по почте» (see setupBack). The block AFTER the letter does, and its
+            // label is showVerification's.
+            mail.btnStepBack.isVisible = stepped
+            mail.btnSubmit.setText(submitLabelRes())
+            applyToolbarTitle()
+            return
         }
 
         // NEITHER E-MAIL ERRAND IS ONE OF THE SEGMENT'S TWO, so they return before any of the
@@ -785,8 +862,22 @@ class LoginActivity : BaseActivity() {
         mail.slotLinkHint.isVisible = false
         mail.lblEmail.setText(R.string.auth_email_label)
         mail.lblPassword.setText(R.string.auth_password_label)
+        // THE TWO FIELDS ARE STATED HERE AND NOT ONLY HIDDEN ELSEWHERE. Every other errand and
+        // step on this form takes one of them away — 2FA replaces the password, the waits replace
+        // both, «Восстановить пароль» drops the password — and each of those puts back only what
+        // it removed. Saying what the segment's own two errands look like is what makes coming
+        // BACK to them whole: without it, returning from the reset step left a sign-in form with
+        // no password box on it.
+        mail.slotEmail.isVisible = !lettered
+        mail.slotPassword.isVisible = !stepped
         // Sign-in and registration always have a password box under the address.
         mail.etEmail.imeOptions = EditorInfo.IME_ACTION_NEXT
+        // The reset step left it on «Готово», and imeOptions is read when the input connection
+        // opens: without this the key over a form that has just grown a password box again would
+        // still be the one that submits it.
+        if (mail.etEmail.hasFocus()) {
+            getSystemService(InputMethodManager::class.java)?.restartInput(mail.etEmail)
+        }
 
         mail.segSignin.setTextAppearance(
             if (register) R.style.TextAppearance_App_Title_Medium else R.style.TextAppearance_App_Title_Segment_Active
@@ -850,11 +941,13 @@ class LoginActivity : BaseActivity() {
     @StringRes
     private fun submitLabelRes(): Int = when {
         viewModel.state.value is AuthUiState.TwoFactor -> R.string.auth_btn_2fa
-        // «Отправить снова» is the waiting screen's action whichever letter is being waited on.
+        // «Отправить снова» is the sent screen's action whichever letter it is reporting, waited
+        // on or not.
         viewModel.state.value is AuthUiState.EmailVerification -> R.string.auth_verify_resend
+        viewModel.state.value is AuthUiState.PasswordResetSent -> R.string.auth_verify_resend
         viewModel.state.value is AuthUiState.SetPassword -> R.string.auth_set_password_submit
-        // Attaching and replacing send the same thing, so they say the same thing.
-        emailErrand -> R.string.auth_link_email_submit
+        // Attaching, replacing and restoring all send the same thing, so they say the same thing.
+        emailErrand || formMode == FormMode.RESET -> R.string.auth_link_email_submit
         formMode == FormMode.REGISTER -> R.string.auth_btn_register
         else -> R.string.auth_btn_signin
     }
@@ -872,6 +965,9 @@ class LoginActivity : BaseActivity() {
             // screen, and names them with a verb, like «Привязать Telegram» beside them.
             emailChangeMode -> getString(R.string.auth_change_email_title)
             emailLinkMode -> getString(R.string.auth_link_email_title)
+            // The bar carries the words of the row that opened the errand, and they are a verb like
+            // the two above: «Восстановить пароль».
+            formMode == FormMode.RESET -> getString(R.string.auth_row_reset)
             formMode == FormMode.REGISTER -> getString(R.string.auth_register_title)
             else -> getString(R.string.auth_site_title)
         }
@@ -951,12 +1047,15 @@ class LoginActivity : BaseActivity() {
     }
 
     /**
-     * The one errand the app still cannot finish itself. It is a row and not a button because it is
-     * a navigation, and its subtitle names the destination: a label promising an in-app form would
-     * be lying about what the tap does (00-rules.md 9.1).
+     * **«Восстановить пароль», and it no longer leaves the app.** The row used to open
+     * `departament.site/forgot-password` in a browser, for exactly the reason «Создать аккаунт»
+     * once did: the client carried no call. It carries one now
+     * ([com.v2ray.ang.auth.AuthManager.requestPasswordReset]), so the tap opens a step of THIS
+     * form — the address field the user has already filled in, one sentence, «Отправить ссылку».
      *
-     * It used to have a twin — «Создать аккаунт», opening `departament.site/register`. That errand
-     * is not a navigation any more; it is the segment at the top of this form.
+     * Still a row and not a button, because it is still a navigation: it takes the screen somewhere
+     * else, and a control that changes the page is a row in this design. What changed is the
+     * subtitle, which named a website while the tap led to one and now says what the tap does.
      */
     private fun setupRows() = bindRows(enabled = true)
 
@@ -973,7 +1072,7 @@ class LoginActivity : BaseActivity() {
             subtitle = getString(R.string.auth_row_reset_sub),
             trailing = RowBinder.Trailing.Chevron,
             enabled = enabled,
-            onClick = { openInBrowser(RESET_URL) },
+            onClick = { goToPasswordReset() },
         )
     }
 
@@ -990,6 +1089,10 @@ class LoginActivity : BaseActivity() {
             // The waiting screen's primary action is «Отправить снова». There is nothing to
             // validate: the address it re-sends to is the one it already sent to.
             is AuthUiState.EmailVerification -> viewModel.resendVerification()
+
+            // And the sent screen's, for the letter nobody is waiting on. Same action, same
+            // reason there is nothing to validate.
+            is AuthUiState.PasswordResetSent -> viewModel.resendPasswordReset()
 
             is AuthUiState.SetPassword -> {
                 val password = binding.mail.etPassword.text?.toString().orEmpty()
@@ -1012,6 +1115,15 @@ class LoginActivity : BaseActivity() {
                 if (!validateEmail()) {
                     binding.mail.etEmail.requestFocus()
                     binding.mail.root.smoothScrollTo(0, 0)
+                    return
+                }
+                // «Восстановить пароль»: the address is the whole request, and it is the address
+                // already in the field. No password is read here and none is sent — the person
+                // asking is the one who does not have it.
+                if (!emailErrand && formMode == FormMode.RESET) {
+                    viewModel.requestPasswordReset(
+                        binding.mail.etEmail.text?.toString()?.trim().orEmpty()
+                    )
                     return
                 }
                 if (emailErrand) {
@@ -1129,7 +1241,8 @@ class LoginActivity : BaseActivity() {
      */
     private fun updateSubmitEnabled() {
         val state = viewModel.state.value
-        val resending = state is AuthUiState.EmailVerification && state.resending
+        val resending = (state is AuthUiState.EmailVerification && state.resending) ||
+            (state is AuthUiState.PasswordResetSent && state.resending)
         val savingPassword = state is AuthUiState.SetPassword && state.busy
         if (state is AuthUiState.Submitting || state is AuthUiState.Success ||
             resending || savingPassword
@@ -1143,6 +1256,7 @@ class LoginActivity : BaseActivity() {
 
             // «Отправить снова» needs nothing typed; it re-sends to an address already accepted.
             is AuthUiState.EmailVerification -> true
+            is AuthUiState.PasswordResetSent -> true
 
             is AuthUiState.SetPassword -> {
                 val password = binding.mail.etPassword.text?.toString().orEmpty()
@@ -1159,6 +1273,9 @@ class LoginActivity : BaseActivity() {
                     // password when the account has one, and nothing else: it is an existing
                     // password, so there is no length to hold it to.
                     addressed && (!currentPasswordRequired || password.isNotEmpty())
+                } else if (formMode == FormMode.RESET) {
+                    // One field, one condition, and the password box is not even on screen.
+                    addressed
                 } else if (formMode == FormMode.REGISTER) {
                     // R9 layer 1 again, and the reason the rule is PRINTED under the field rather
                     // than only enforced: a control that stays dark without saying why is a
@@ -1242,6 +1359,19 @@ class LoginActivity : BaseActivity() {
                 // A second letter being asked for is the SUBMIT working, not the wait restarting:
                 // the ring keeps turning and the busy state goes on the button, exactly as it does
                 // for every other request this screen makes (R8).
+                setFormBusy(state.resending)
+            }
+
+            is AuthUiState.PasswordResetSent -> {
+                binding.mail.verifyTitle.setText(R.string.auth_sent_reset_title)
+                // CONDITIONAL, AND BY CONTRACT. The panel answers a known address and an unknown
+                // one identically so that this endpoint cannot be used to find out who has an
+                // account; «мы отправили письмо на <адрес>» would hand back the very answer it
+                // withholds. The address is still named, because the one thing the user has to
+                // check is whether it is the address they meant.
+                binding.mail.verifyBody.text =
+                    getString(R.string.auth_sent_reset_body, state.email)
+                showVerification(true, waiting = false)
                 setFormBusy(state.resending)
             }
 
@@ -1435,16 +1565,23 @@ class LoginActivity : BaseActivity() {
     }
 
     /**
-     * The confirmation wait REPLACES the form, for the same reason the 2FA step replaces the
-     * password slot (6.7): the letter is out, the address is spoken for, and leaving the fields on
-     * screen would invite the user to fill in a form whose answer is already on its way to them.
+     * The block a letter leaves behind REPLACES the form, for the same reason the 2FA step replaces
+     * the password slot (6.7): the letter is out, the address is spoken for, and leaving the fields
+     * on screen would invite the user to fill in a form whose answer is already on its way to them.
      *
      * Nothing here is a text field, because the letter carries a LINK. The one thing the user can
-     * usefully do is open it, and the two controls under the ring are for the two ways that can go
-     * wrong: the letter did not arrive («Отправить снова»), or they would rather sign in to an
-     * account they already have («Вернуться ко входу»).
+     * usefully do is open it, and the two controls under the indicator are for the two ways that
+     * can go wrong: the letter did not arrive («Отправить снова»), or they are on the wrong errand
+     * («Вернуться ко входу» / «Назад»).
+     *
+     * @param waiting whether the app is actually WATCHING for the link to be opened. True for the
+     * three letters that change something the app can see — a registration proves an address, a
+     * link or a change writes one onto the profile — and the turning ring is that watching. False
+     * for the password reset, which changes nothing the app can ask about: the errand ended when
+     * the panel answered, so the indicator is the static tile and the ring never starts. Borrowing
+     * the ring here would be the interface claiming to wait for something.
      */
-    private fun showVerification(active: Boolean) {
+    private fun showVerification(active: Boolean, waiting: Boolean = true) {
         val mail = binding.mail
         // Same guard as [showTwoFactor]: only a real transition does anything, so the Idle render
         // cannot re-run the "leave" branch on every emission.
@@ -1457,23 +1594,69 @@ class LoginActivity : BaseActivity() {
 
         if (active) {
             hideModeExtras()
+            // One indicator or the other, never both, and never neither: the slot keeps its 40dp
+            // leading tile so the two blocks share one silhouette.
+            mail.verifyRingArc.isVisible = waiting
+            mail.verifyMailTile.isVisible = !waiting
+            mail.verifyMailGlyph.isVisible = !waiting
             // «Вернуться ко входу» is nonsense for somebody who is already signed in: behind this
-            // step there is the address form, not a way in. The label says which one it is.
+            // step there is the address form, not a way in. Nor for the reset, where the form
+            // behind it is the one to come back to after a typo. The label says which one it is.
             mail.btnStepBack.setText(
-                if (emailLinkMode) R.string.auth_link_email_back else R.string.auth_verify_back
+                if (emailLinkMode || formMode == FormMode.RESET) {
+                    R.string.auth_link_email_back
+                } else {
+                    R.string.auth_verify_back
+                }
             )
             showPage(Page.MAIL, animate = false)
             // The user's next move is in another app; a keyboard over the sentence telling them so
             // is the one thing this screen must not do.
             hideKeyboard()
+            // Unconditional, including for the block that has no ring: the beat's check lives in
+            // the same 40dp slot, and a block that opened with somebody else's check still showing
+            // would be reporting a success that has not happened.
             resetVerifyBeat()
             reveal(mail.slotVerify)
             mail.root.smoothScrollTo(0, 0)
         } else {
             mail.slotVerify.isVisible = false
             applyFormMode()
+            // Only «Назад» on «Письмо отправлено» arrives here with the reset form under it, and
+            // the reason to press it is an address that needs correcting — so the caret is put back
+            // in the one field on the form rather than left for the user to hunt for.
+            if (!emailErrand && formMode == FormMode.RESET) {
+                mail.etEmail.requestFocus()
+                showKeyboard(mail.etEmail)
+            }
         }
         mail.btnSubmit.setText(submitLabelRes())
+    }
+
+    /**
+     * «Восстановить пароль» at the foot of the sign-in form: the same form, one field, and that
+     * field already holds whatever address was typed above it. The step is not a screen of its own
+     * for exactly that reason — a person who has just failed to sign in has already given the app
+     * the address, and asking for it again on a fresh screen would be the app forgetting.
+     */
+    private fun goToPasswordReset() {
+        if (viewModel.state.value !is AuthUiState.Idle) return
+        setFormMode(FormMode.RESET)
+        binding.mail.root.smoothScrollTo(0, 0)
+        binding.mail.etEmail.requestFocus()
+        showKeyboard(binding.mail.etEmail)
+    }
+
+    /**
+     * «Назад» on «Письмо отправлено», and it is one step and not a way out of the errand: the form
+     * it returns to is the reset form, with the address still in it.
+     *
+     * That is the whole point of the rung. The panel answers a mistyped address exactly as it
+     * answers a real one, so a typo is invisible and «Отправить снова» would send the second letter
+     * to the same wrong place; the only cure is the field, and this is the way back to it.
+     */
+    private fun leavePasswordReset() {
+        viewModel.leaveVerification()
     }
 
     /**
@@ -1575,9 +1758,11 @@ class LoginActivity : BaseActivity() {
         if (target == Page.MAIL && viewModel.state.value is AuthUiState.Idle) {
             // The form opens on the field to fill first — unless the address is already there
             // (they came back from the 2FA step), where the password is next.
-            // …and the link errand has no password field at all, so the address is where the
-            // caret lands whether or not one has already been typed.
-            val focusOn = if (emailErrand || binding.mail.etEmail.text.isNullOrBlank()) {
+            // …and the link errand has no password field at all, and neither has the reset step,
+            // so the address is where the caret lands whether or not one has already been typed.
+            val focusOn = if (emailErrand || formMode == FormMode.RESET ||
+                binding.mail.etEmail.text.isNullOrBlank()
+            ) {
                 binding.mail.etEmail
             } else {
                 binding.mail.etPassword
@@ -1982,13 +2167,6 @@ class LoginActivity : BaseActivity() {
 
         /** Which errand the form was on, across a rotation. See [FormMode]. */
         private const val STATE_FORM_MODE = "auth_form_mode"
-
-        /**
-         * The public site, not the API host. Only the password reset is left here: registration
-         * moved into this screen, and a browser hand-off for an errand the app can finish itself
-         * would be a worse version of a feature that already exists.
-         */
-        private const val RESET_URL = "https://departament.site/forgot-password"
 
         /** The panel's own floor for a REGISTRATION password. The form holds it so a 400 never has to. */
         private const val MIN_PASSWORD_LENGTH = 8

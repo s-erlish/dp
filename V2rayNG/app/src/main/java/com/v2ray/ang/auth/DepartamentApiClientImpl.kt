@@ -19,6 +19,7 @@ import com.v2ray.ang.auth.dto.LoginResult
 import com.v2ray.ang.auth.dto.PaymentInitDto
 import com.v2ray.ang.auth.dto.PaymentRequestDto
 import com.v2ray.ang.auth.dto.PaymentResultDto
+import com.v2ray.ang.auth.dto.PasswordResetRequestDto
 import com.v2ray.ang.auth.dto.PaymentsDto
 import com.v2ray.ang.auth.dto.PromoDto
 import com.v2ray.ang.auth.dto.PromoRequestDto
@@ -223,6 +224,11 @@ class DepartamentApiClientImpl(
 
     override suspend fun getMe(): UserProfileDto =
         getJson(BackendConfig.Endpoints.me, UserProfileDto::class.java)
+
+    /** @see DepartamentApiClient.requestPasswordReset */
+    override suspend fun requestPasswordReset(email: String) {
+        postQuoting(BackendConfig.Endpoints.passwordResetRequest, PasswordResetRequestDto(email))
+    }
 
     /** @see DepartamentApiClient.linkEmailRequest */
     override suspend fun linkEmailRequest(email: String) {

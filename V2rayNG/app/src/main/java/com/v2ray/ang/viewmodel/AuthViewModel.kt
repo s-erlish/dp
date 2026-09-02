@@ -83,6 +83,28 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         ) : AuthUiState
 
         /**
+         * **«Письмо отправлено».** A password-reset link is out and NOTHING is being watched for.
+         *
+         * A separate state from [EmailVerification] because the difference is the whole of it: that
+         * one means «письмо ушло, и мы следим, когда по ссылке пройдут», and the ring on screen is
+         * that watching. A new password moves neither the login nor the profile, so there is no
+         * question to keep asking; the errand ended when the panel answered 200. Folding the two
+         * into one state would leave a ring turning over a wait that does not exist, which is the
+         * grammar of waiting borrowed for a screen that is not waiting.
+         *
+         * [resending] is «Отправить снова» working, exactly as it is on [EmailVerification]: the
+         * screen has to report the second request without leaving the screen that reports it.
+         *
+         * **[email] is what the letter was addressed to, and not a statement that anyone got it.**
+         * The panel answers the same 200 for an unknown address, so the copy over this state is
+         * conditional by contract.
+         */
+        data class PasswordResetSent(
+            val email: String,
+            val resending: Boolean = false,
+        ) : AuthUiState
+
+        /**
          * The address is attached (or replaced) and the account can still be given a password, so
          * the errand is not over: «Придумайте пароль» is on screen over the same two password
          * fields registration uses. [busy] is the request being in flight, exactly as [resending]
@@ -435,6 +457,44 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
     }
 
     /**
+     * **«Восстановить пароль».** One request, then a static «Письмо отправлено» — there is no wait
+     * after it and no ring, because nothing on the account changes until the link is opened on the
+     * site. See [AuthManager.requestPasswordReset].
+     *
+     * Also the «Отправить снова» action for that screen, through [resendPasswordReset], and it
+     * behaves like every other resend here: the screen STAYS put and the busy state goes on the
+     * button, rather than dropping the user back onto the form they have already filled in.
+     */
+    fun requestPasswordReset(email: String) {
+        loginJob?.cancel()
+        _error.value = null
+        pendingEmail = email
+        // No credential is taken by this errand and none may be left lying around from another one.
+        pendingPassword = null
+        pendingCurrentPassword = null
+        val resending = _state.value is AuthUiState.PasswordResetSent
+        _state.value = if (resending) {
+            AuthUiState.PasswordResetSent(email, resending = true)
+        } else {
+            AuthUiState.Submitting
+        }
+        loginJob = viewModelScope.launch {
+            try {
+                authManager.requestPasswordReset(email)
+                _state.value = AuthUiState.PasswordResetSent(email)
+            } catch (e: ApiError) {
+                fail(e, Surface.MAIL, quoteBackend = true, passwordReset = true)
+            }
+        }
+    }
+
+    /** «Отправить снова» on «Письмо отправлено»: the same letter, to the same address. */
+    fun resendPasswordReset() {
+        val email = pendingEmail ?: return
+        requestPasswordReset(email)
+    }
+
+    /**
      * «Вернуться ко входу»: abandons the wait and the poll with it, and forgets the credentials it
      * was holding. The account still exists and the letter is still valid — nothing here undoes the
      * registration, it only stops watching for it.
@@ -542,10 +602,12 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         surface: Surface,
         quoteBackend: Boolean = false,
         linkEmail: Boolean = false,
+        passwordReset: Boolean = false,
         @StringRes fallback: Int? = null,
     ) {
         val awaitingTelegram = _state.value is AuthUiState.TelegramAwaiting
         val verifying = _state.value is AuthUiState.EmailVerification
+        val resetSent = _state.value is AuthUiState.PasswordResetSent
         val onPasswordStep = _state.value is AuthUiState.SetPassword
         _state.value = when {
             surface == Surface.TWO_FACTOR -> {
@@ -558,6 +620,11 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
             // waiting with the reason printed on it. The address comes from the field that outlives
             // the state, never from the state being replaced.
             verifying -> pendingEmail?.let { AuthUiState.EmailVerification(it) } ?: AuthUiState.Idle
+
+            // Same reasoning for the reset's «Отправить снова»: the first letter, if there was one,
+            // is still on its way, so the screen that says so stays up with the reason printed on
+            // it rather than collapsing back to a form the user has already filled in.
+            resetSent -> pendingEmail?.let { AuthUiState.PasswordResetSent(it) } ?: AuthUiState.Idle
 
             // A refused password is not a failed e-mail errand — that one has already succeeded and
             // the caller's result is already set. The step stays up with the reason on it, its
@@ -572,7 +639,7 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
             // `fallback` is this app's own words for a refusal whose MEANING the panel named in a
             // code: if the sentence beside it ever goes missing, «Введите текущий пароль» is still
             // a better answer than whatever a status code maps to.
-            message = fallback ?: messageFor(cause, surface, awaitingTelegram, linkEmail),
+            message = fallback ?: messageFor(cause, surface, awaitingTelegram, linkEmail, passwordReset),
             surface = surface,
             // 12.11: an Unauthorized on the password step flashes both credential borders. On the
             // 2FA step the cells carry that signal instead, so the flash is not doubled.
@@ -634,6 +701,7 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
             surface: Surface = Surface.GATE,
             awaitingTelegram: Boolean = false,
             linkEmail: Boolean = false,
+            passwordReset: Boolean = false,
         ): Int = when {
             // A wrong TOTP code is not "wrong password": it names the authenticator app, because
             // that is where the user has to look.
@@ -642,6 +710,13 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
             // the seven-day token dying mid-errand. «Неверная почта или пароль» would name a
             // password nobody typed and send the user back to check a field that is not on screen.
             linkEmail && cause is ApiError.Unauthorized -> R.string.auth_err_session_expired
+            // «Восстановить пароль» takes NO session and NO password, so neither of the two
+            // readings above fits: «неверная почта или пароль» names a field that is not on the
+            // form and that the user is here precisely because they do not have, and «сессия
+            // истекла» names a session nobody opened. The panel's own sentence still wins over
+            // this — see the `quoteBackend` half of [fail] — so this is what is left when it sent
+            // none, and it says the one true thing: something went wrong, try again.
+            passwordReset && cause is ApiError.Unauthorized -> R.string.auth_err_generic
             cause is ApiError.Unauthorized -> R.string.auth_err_credentials
             cause is ApiError.Gone -> R.string.auth_err_gone
             cause is ApiError.RateLimited -> R.string.auth_err_rate_limited

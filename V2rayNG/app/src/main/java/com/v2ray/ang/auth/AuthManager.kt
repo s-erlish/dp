@@ -207,6 +207,27 @@ class AuthManager(
     }
 
     /**
+     * **«Восстановить пароль»: одна просьба, и на этом наша часть кончается.**
+     *
+     * A suspend call and not a [Flow], deliberately, because nothing follows the request. The other
+     * two letters this app sends start a WAIT — the app watches the login or the profile until the
+     * link is opened — and there is nothing of the sort to watch here: a new password changes
+     * neither, so a poll would ask a question whose answer never moves. Wearing the flow's shape
+     * would put a turning ring over an errand that finished the moment the panel answered.
+     *
+     * **The 200 is deliberately uninformative.** The panel answers the same way for an address it
+     * knows and one it does not, so that nobody can use this to enumerate customers, and the screen
+     * that follows has to keep that promise in its wording. See [DepartamentApiClient.requestPasswordReset].
+     *
+     * The link in the letter opens the SITE, which calls `password-reset/consume` with the token
+     * inside it. This app never sees that token, so it never makes that call.
+     */
+    suspend fun requestPasswordReset(email: String) {
+        if (!BackendConfig.isConfigured()) throw ApiError.NotConfigured
+        api.requestPasswordReset(email)
+    }
+
+    /**
      * **Attaching an e-mail to the account that is already signed in.**
      *
      * The errand a Telegram-only account arrives with: it has no address, so «Способы входа» has

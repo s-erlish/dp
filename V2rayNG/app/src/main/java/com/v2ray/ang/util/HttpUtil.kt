@@ -286,7 +286,7 @@ object HttpUtil {
                 .header("Accept", SUBSCRIPTION_ACCEPT)
                 .header("Connection", "close")
 
-            attachDeviceHeaders(request, requestBuilder)
+            attachDeviceHeaders(request, requestBuilder, currentUrl)
 
             applyEmbeddedBasicAuthHeader(currentUrl, requestBuilder)
 
@@ -336,12 +336,30 @@ object HttpUtil {
      * from [AppConfig.HEADER_DEVICE_MODEL] (the real model, not a User-Agent guess). All values
      * are stable across calls, so they never register new device entries.
      *
+     * **AND ONLY TO THE HOST THE SUBSCRIPTION WAS ADDRESSED TO.** [getUrlContentWithUserAgentEx]
+     * follows up to three redirects itself, building a fresh request per hop, and this used to be
+     * re-attached to every one of them — so a `Location:` pointing anywhere at all was enough to
+     * make the app hand a stranger the identifier that follows this install across every update it
+     * ever makes, plus the device model and the OS version beside it. Nobody in the middle needs
+     * any of that: the panel's device ledger lives on the host the request was made TO, and a
+     * provider that answers from a CDN still delivers the body without it.
+     *
+     * [currentUrl] is therefore compared against [UrlContentRequest.url] — the address the user
+     * (or the account import) actually gave us — and the headers go out only while the two name
+     * the same host. See [isOriginHost] for what "the same host" means and what it deliberately
+     * does not mean.
+     *
      * Every value goes through [isHeaderSafe] first. The model comes from `Build.MODEL`, which is
      * whatever the OEM wrote there and is not guaranteed ASCII; unchecked, one such device would
      * throw here and fail every subscription update forever. Degrading the panel's device label is
      * the acceptable half of that trade, losing the subscription is not.
      */
-    private fun attachDeviceHeaders(request: UrlContentRequest, requestBuilder: Request.Builder) {
+    internal fun attachDeviceHeaders(
+        request: UrlContentRequest,
+        requestBuilder: Request.Builder,
+        currentUrl: String,
+    ) {
+        if (!isOriginHost(request.url, currentUrl)) return
         val hwid = request.hwid?.takeIf { it.isNotBlank() && isHeaderSafe(it) } ?: return
         requestBuilder.addHeader(AppConfig.HEADER_HWID, hwid)
         requestBuilder.addHeader(AppConfig.HEADER_DEVICE_OS, "android")
@@ -352,7 +370,41 @@ object HttpUtil {
         )
     }
 
-    private fun applyEmbeddedBasicAuthHeader(rawUrl: String, requestBuilder: Request.Builder) {
+    /**
+     * **Is [url] still the host [originUrl] named?** The one question that decides whether the
+     * device identity travels on this hop.
+     *
+     * THE HOST, NOT THE ADDRESS. A подписка that redirects `http` -> `https`, or `/sub/abc` ->
+     * `/api/sub/abc`, is the same server answering about itself; refusing it would break working
+     * subscriptions to prevent nothing. Compared case-insensitively because DNS is, so `Example.com`
+     * and `example.com` are one host and not two.
+     *
+     * A SUBDOMAIN IS A DIFFERENT HOST. `cdn.example.com` is not `example.com` here, deliberately,
+     * and this is the strict end of the choice: a sibling host under one registrable domain is
+     * usually the same operator, but "usually" is the whole of the argument for it and the cost of
+     * being wrong is the identifier itself. Nothing in this app relies on such a redirect — the
+     * only subscription addresses it fetches are the ones the panel hands out and the ones a user
+     * pasted — so strictness costs nothing that is known to exist.
+     *
+     * False when either address will not parse: an unreadable origin is not a host we can claim to
+     * recognise, and silence is the safe answer to a question we cannot answer.
+     */
+    internal fun isOriginHost(originUrl: String?, url: String): Boolean {
+        val origin = runCatching { URL(originUrl) }.getOrNull()?.host?.takeIf { it.isNotBlank() }
+            ?: return false
+        val current = runCatching { URL(url) }.getOrNull()?.host?.takeIf { it.isNotBlank() }
+            ?: return false
+        return origin.equals(current, ignoreCase = true)
+    }
+
+    /**
+     * The `user:pass@` half of the address being fetched, turned into a `Authorization: Basic`
+     * header. Taken from [rawUrl] — the address of THIS hop — and never from the original, which is
+     * why a redirect has never been able to carry an embedded credential off to another host: a
+     * `Location` without userinfo simply produces no header. That is the shape [attachDeviceHeaders]
+     * was missing and now has.
+     */
+    internal fun applyEmbeddedBasicAuthHeader(rawUrl: String, requestBuilder: Request.Builder) {
         val parsed = runCatching { URL(rawUrl) }.getOrNull() ?: return
         parsed.userInfo?.let { userInfo ->
             val colon = userInfo.indexOf(':')

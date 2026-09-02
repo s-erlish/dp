@@ -96,6 +96,21 @@ object BackendConfig {
         const val me = "/client/auth/me"
 
         /**
+         * **«Восстановить пароль».** `{email}` in, 200 `{message}` out, and the same 200 whether
+         * the address has an account behind it or not: the panel refuses to say which, so nobody
+         * can use this endpoint to find out who is registered. The app must not undo that by
+         * phrasing its answer as a fact, which is why the screen after it says «если аккаунт
+         * существует» rather than «письмо отправлено на …».
+         *
+         * The letter carries a LINK, and the link opens the SITE, where the new password is typed.
+         * The panel has a `password-reset/consume` beside this one and the app deliberately does
+         * not call it: it never sees the token in the letter, so there is nothing to consume and
+         * nothing to poll for either. A password change moves nothing on the profile, so the wait
+         * that follows the OTHER letters this app sends would have no question to ask here.
+         */
+        const val passwordResetRequest = "/client/auth/password-reset/request"
+
+        /**
          * Attach an e-mail to the session already in flight: `{email}` in, a letter carrying a
          * LINK out. Deliberately NOT under `/client/auth` — the panel puts it on the client root,
          * because it is an errand of an account that exists rather than a way of getting one.
