@@ -464,9 +464,12 @@ object SettingsManager {
             subIds.add(DEFAULT_SUBSCRIPTION_ID)
         }
 
-        subIds.forEach { subId ->
+        // ONE FENCED READ-MODIFY-WRITE PER ПОДПИСКА. This runs in `:bg` right after a refresh and in
+        // the interface process at start-up, and it re-reads and rewrites every list — exactly the
+        // shape that loses a concurrent write. See [MmkvManager.inServerListTransaction].
+        subIds.forEach { subId -> MmkvManager.inServerListTransaction {
             val guids = MmkvManager.decodeServerList(subId)
-            if (guids.size < 2) return@forEach
+            if (guids.size < 2) return@inServerListTransaction
 
             // Each key is read once and then sorted, never re-read per comparison: this runs on the
             // main thread during startup and one key costs an MMKV read plus a JSON parse.
@@ -487,10 +490,10 @@ object SettingsManager {
                     .sortedBy { it.second }
                     .map { it.first }
 
-                else -> return@forEach
+                else -> return@inServerListTransaction
             }
             MmkvManager.encodeServerList(sorted.toMutableList(), subId)
-        }
+        } }
     }
 
     /**
