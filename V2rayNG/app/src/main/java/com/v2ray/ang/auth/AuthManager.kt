@@ -6,10 +6,16 @@ import com.v2ray.ang.auth.dto.RegisterResult
 import com.v2ray.ang.auth.dto.TelegramCheckResult
 import com.v2ray.ang.auth.dto.UserProfileDto
 import com.v2ray.ang.auth.dto.emailArrived
+import com.v2ray.ang.AppConfig
+import com.v2ray.ang.util.LogUtil
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 
 /**
  * Orchestrates the auth flows only (Telegram deep-link login, e-mail registration, e-mail/password
@@ -156,7 +162,12 @@ class AuthManager(
                     emit(LoginState.Error(e))
                     return@flow
                 }
-                emit(LoginState.Success(settleRegistration(result.client)))
+                // Fired BEFORE the success is reported, and not awaited at all: see
+                // [settleRegistration]. Once Success is out the screen plays its beat and closes,
+                // and the collector goes with it — an emit is the last place to put anything that
+                // still has to happen.
+                settleRegistration()
+                emit(LoginState.Success(result.client))
             }
 
             is RegisterResult.RequiresVerification -> {
@@ -197,7 +208,8 @@ class AuthManager(
                     emit(LoginState.Error(e))
                     return
                 }
-                emit(LoginState.Success(settleRegistration(result.client)))
+                settleRegistration()
+                emit(LoginState.Success(result.client))
                 return
             }
             // An account registered a minute ago cannot have TOTP on it, so Requires2FA is not a
@@ -217,25 +229,47 @@ class AuthManager(
      * примет повторную установку пароля, «Способы входа» будут звать на шаг, который аккаунту не
      * нужен, и то, что приложение думает об аккаунте, разойдётся с тем, что показывает сайт.
      *
-     * Те же правила, что у [setPassword], и по той же причине. Обе неудачи проглатываются: сессия
-     * к этому моменту уже сохранена, регистрация уже состоялась, и назвать неудачу довеска
-     * неудачей поручения значило бы сказать человеку, что аккаунт не создан, когда он создан.
-     * Порядок обязателен: сначала флаг, потом перечитать профиль, чтобы кэш нёс то, что этот вызов
-     * только что поставил.
+     * **И ЧЕЛОВЕК ЖДАТЬ ЭТОГО НЕ ДОЛЖЕН.** Оба запроса стояли между ответом панели и `Success`,
+     * то есть между «регистрация состоялась» и «экран закрылся»: на таймаутах это до тридцати пяти
+     * секунд, за которые не происходит ничего, что ему нужно. Сессия поднята
+     * [AccountSession.onAuthenticated] строкой выше — регистрация УЖЕ состоялась, — а отметка о
+     * первом входе и свежий профиль это служебная доводка. Поэтому здесь ничего не возвращается и
+     * ничего не ожидается: `Success` уходит с тем профилем, который приехал, а перечитанный
+     * разошлётся сам через [AccountSession.updateProfile] — «Способы входа», Главная и «Устройства»
+     * читают эту сессию потоком и обновятся, даже если человек уже ушёл на Главную.
      *
-     * Возвращает самый свежий профиль, какой есть: перечитанный, если он приехал, иначе тот, что
-     * пришёл с регистрацией. Экран получает его же, поэтому «Способы входа» говорят правду сразу,
-     * а не со следующего захода на вкладку.
+     * **Область корутины не принадлежит экрану**, и это здесь главное: доводка переживает и
+     * закрытие экрана, и смерть ViewModel вместе с её `viewModelScope`. Отсюда [settleScope] —
+     * один на процесс, с [SupervisorJob], чтобы упавшая доводка не забирала с собой следующую.
+     *
+     * Порядок внутри обязателен: сначала флаг, потом перечитать профиль, чтобы кэш нёс то, что
+     * этот вызов только что поставил.
+     *
+     * **Неудачи по-прежнему проглатываются, но больше не бесследно.** Аккаунт создан, войти по
+     * нему можно, и рассказывать про неудавшийся довесок человеку нечего; а вот аккаунт с
+     * незакрытым первым входом всплывёт потом — на «Способах входа», зовущих на ненужный шаг, — и
+     * без строки в журнале искать причину будет негде.
      *
      * Вызывается ТОЛЬКО там, где регистрация закончилась сессией, и только после
      * [AccountSession.onAuthenticated]: без сохранённого токена оба запроса ушли бы без
      * `Authorization` и вернулись бы 401.
      */
-    private suspend fun settleRegistration(profile: UserProfileDto): UserProfileDto {
-        runCatching { api.completeOnboarding() }
-        val refreshed = runCatching { api.getMe() }.getOrNull() ?: return profile
-        runCatching { AccountSession.updateProfile(refreshed) }
-        return refreshed
+    private fun settleRegistration() {
+        settleScope.launch {
+            runCatching { api.completeOnboarding() }.onFailure {
+                LogUtil.w(
+                    AppConfig.TAG,
+                    "Registration: onboarding was not marked complete, the account stays eligible " +
+                        "for a password step it does not need",
+                    it,
+                )
+            }
+            val refreshed = runCatching { api.getMe() }.getOrElse {
+                LogUtil.w(AppConfig.TAG, "Registration: the profile was not re-read", it)
+                return@launch
+            }
+            runCatching { AccountSession.updateProfile(refreshed) }
+        }
     }
 
     /**
@@ -407,6 +441,22 @@ class AuthManager(
     }
 
     private companion object {
+        /**
+         * **Где живёт доводка, которую никто не ждёт.** Один скоуп на процесс, а не поле
+         * экземпляра и тем более не `viewModelScope`: [settleRegistration] запускается ровно в тот
+         * момент, когда экран регистрации начинает закрываться, и всё, что привязано к экрану,
+         * будет отменено у неё под ногами.
+         *
+         * [SupervisorJob], потому что задачи здесь независимы: упавшая доводка одной регистрации
+         * не должна закрывать скоуп для следующей. [Dispatchers.IO], потому что это два сетевых
+         * запроса и ничего больше.
+         *
+         * Он намеренно НИКОГДА не отменяется: отменить его значило бы бросить ровно ту работу,
+         * ради которой он и заведён. Задач в нём в худшем случае столько, сколько регистраций за
+         * жизнь процесса, и каждая ограничена таймаутами клиента.
+         */
+        val settleScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
         /** 4s between rounds: the user is reading a letter, not watching a spinner tick. */
         const val VERIFY_POLL_INTERVAL_MS = 4_000L
 
