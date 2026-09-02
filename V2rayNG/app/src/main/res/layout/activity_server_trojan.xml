@@ -4,17 +4,16 @@
   A-13 servers/server/{guid} - форма «сервер вручную», Trojan.  H3 - R4.
   ============================================================================
 
-  РАМКА, общая у восьми протокольных форм и у трёх уже перенесённых редакторов
-  рядом («Группа серверов», «Своя конфигурация», «Цепочка прокси»):
+  ОДНО ПОЛЕ ДОСТУПА - пароль. Шифрование канала для Trojan обязательно, и если
+  его не выбрать, отказ приходит под тем полем, в котором его выбирают.
 
-      view_toolbar - бесшовная шапка подстраницы (0.4.6)
-      NestedScrollView - тело формы, снизу space_32
-      «Сохранить» - Primary.Tall в потоке, а не пункт меню ActionBar
-      «Удалить сервер» - Row.Destructive последней строкой
+  РАМКА, общая у восьми протокольных форм и у трёх перенесённых редакторов рядом:
+  бесшовная шапка подстраницы, тело в NestedScrollView, «Сохранить» - Primary.Tall
+  под последним полем, «Удалить сервер» - разрушающая строка.
 
-  Действия были иконками в ActionBar: галочка и корзина, без подписей, рядом
-  друг с другом. Сохранение - главное действие экрана и стоит в потоке под
-  последним полем; удаление - разрушающее, названо словами и стоит отдельно.
+  ЛЕКАЛО ПОЛЯ - layout_address_port.xml: заголовок группы предложением, подпись
+  сверху и всегда видимая, поле 56 радиусом 16, зарезервированная строка снизу -
+  подсказка, а при отказе сообщение о том, что исправить.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -42,29 +41,44 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="@dimen/padding_spacing_dp16">
+            android:orientation="vertical">
 
             <include layout="@layout/layout_address_port" />
 
-            <LinearLayout
+            <TextView
+                style="@style/SettingsSectionLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/padding_spacing_dp16"
-                android:orientation="vertical">
+                android:text="@string/srv_section_access" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/server_lab_id3" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:labelFor="@id/et_id"
+                android:paddingStart="@dimen/screen_gutter"
+                android:paddingEnd="@dimen/screen_gutter"
+                android:text="@string/server_lab_id3"
+                android:textAppearance="@style/TextAppearance.App.Title.Medium" />
 
-                <EditText
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_id"
+                style="@style/Widget.Departament.TextField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/screen_gutter"
+                android:layout_marginTop="@dimen/space_8"
+                android:layout_marginEnd="@dimen/screen_gutter">
+
+                <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_id"
+                    style="@style/Widget.Departament.TextField.EditText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="text" />
-
-            </LinearLayout>
+                    android:imeOptions="actionNext"
+                    android:inputType="textVisiblePassword"
+                    android:maxLines="1"
+                    tools:ignore="TextFields" />
+            </com.google.android.material.textfield.TextInputLayout>
 
             <include layout="@layout/layout_transport" />
 
