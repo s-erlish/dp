@@ -206,6 +206,9 @@ class ServerActivity : BaseActivity() {
     /** The server being edited, or null for a new one. Read by the pickers when they repopulate. */
     private var editedConfig: ProfileItem? = null
 
+    /** The protocol this screen is editing. Decided once in [onCreate], read by the pickers. */
+    private var editorType: EConfigType = EConfigType.VMESS
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         SubPage.installTransitions(this)
@@ -214,6 +217,7 @@ class ServerActivity : BaseActivity() {
         val config = MmkvManager.decodeServerConfig(editGuid)
         editedConfig = config
         val configType = config?.configType ?: createConfigType
+        editorType = configType
 
         val layoutId = when (configType) {
             EConfigType.VMESS -> R.layout.activity_server_vmess
@@ -263,13 +267,24 @@ class ServerActivity : BaseActivity() {
 
     // ------------------------------------------------------------------ шифрование канала
 
+    /**
+     * What the channel-encryption picker may offer.
+     *
+     * Hysteria2 has no REALITY, and its layout used to say so by reading a SECOND array
+     * (`streamsecuritys`) while the code indexed a third value out of the first one
+     * (`streamsecurityxs`). Two parallel tables that agree on their first two rows is not a rule,
+     * it is a coincidence that held. The rule is here, in one place.
+     */
+    private fun streamSecurityOptions(): Array<out String> =
+        if (editorType == EConfigType.HYSTERIA2) streamSecuritys.take(2).toTypedArray() else streamSecuritys
+
     /** Draws the four TLS pickers from the current index state. */
     private fun bindTlsSelects() {
         bindSelect(
             layout = til_stream_security,
             field = et_stream_security,
             title = getString(R.string.server_lab_stream_security),
-            options = optionLabels(streamSecuritys),
+            options = optionLabels(streamSecurityOptions()),
             selectedIndex = streamSecurityIndex,
         ) { picked -> applyStreamSecurity(picked) }
 
@@ -328,7 +343,7 @@ class ServerActivity : BaseActivity() {
      */
     private fun applyStreamSecurity(position: Int) {
         if (et_stream_security == null) return
-        streamSecurityIndex = position.coerceIn(streamSecuritys.indices)
+        streamSecurityIndex = position.coerceIn(streamSecurityOptions().indices)
         val value = streamSecuritys[streamSecurityIndex]
 
         val tlsOnly = listOf(container_alpn, container_allow_insecure, container_ech_config_list, container_pinned_ca256)
