@@ -7,6 +7,7 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.auth.dto.AddDevicesRequestDto
 import com.v2ray.ang.auth.dto.AuthResult
 import com.v2ray.ang.auth.dto.AutoRenewRequestDto
+import com.v2ray.ang.auth.dto.ChangeEmailRequestDto
 import com.v2ray.ang.auth.dto.DeleteDeviceRequestDto
 import com.v2ray.ang.auth.dto.DevicesDto
 import com.v2ray.ang.auth.dto.DevicesResult
@@ -28,6 +29,7 @@ import com.v2ray.ang.auth.dto.RegisterResponseDto
 import com.v2ray.ang.auth.dto.RegisterResult
 import com.v2ray.ang.auth.dto.RenameRequestDto
 import com.v2ray.ang.auth.dto.ServerStatusDto
+import com.v2ray.ang.auth.dto.SetPasswordRequestDto
 import com.v2ray.ang.auth.dto.PrimarySubscriptionDto
 import com.v2ray.ang.auth.dto.SubscriptionAllDto
 import com.v2ray.ang.auth.dto.TariffCatalogDto
@@ -222,31 +224,25 @@ class DepartamentApiClientImpl(
     override suspend fun getMe(): UserProfileDto =
         getJson(BackendConfig.Endpoints.me, UserProfileDto::class.java)
 
-    /**
-     * NOT [executeVoid], and not [postJson] either.
-     *
-     * `executeVoid` throws `mapError(code)` with no body behind it, and this is the one void call
-     * whose failure is worth quoting: 400 covers «Почта уже привязана», «Некорректный email» and
-     * «Эта почта уже используется другим аккаунтом» alike, and only the panel knows which of the
-     * three happened (see [serverMessage]). So the refusal is read and sanitized like every other
-     * quotable one.
-     *
-     * `postJson` would parse the SUCCESS body, and a 200 with an empty body would then be reported
-     * as a parse failure for a letter that has already been sent. The success body is read off the
-     * socket and dropped: 200 is the whole answer, and the `{message}` in it is the panel's copy of
-     * a sentence this app writes itself, with the address in it.
-     */
+    /** @see DepartamentApiClient.linkEmailRequest */
     override suspend fun linkEmailRequest(email: String) {
-        ensureConfigured()
-        val body = gson.toJson(LinkEmailRequestDto(email)).toRequestBody(JSON)
-        val req = Request.Builder()
-            .url(urlOf(BackendConfig.Endpoints.linkEmailRequest).build())
-            .post(body)
-            .build()
-        exchange(req) { resp ->
-            val text = resp.body.string()
-            if (!resp.isSuccessful) throw mapError(resp.code, sanitizeBody(text))
-        }
+        postQuoting(BackendConfig.Endpoints.linkEmailRequest, LinkEmailRequestDto(email))
+    }
+
+    /** @see DepartamentApiClient.setPassword */
+    override suspend fun setPassword(newPassword: String) {
+        postQuoting(BackendConfig.Endpoints.setPassword, SetPasswordRequestDto(newPassword))
+    }
+
+    /** @see DepartamentApiClient.changeEmailRequest */
+    override suspend fun changeEmailRequest(newEmail: String, currentPassword: String?) {
+        postQuoting(
+            BackendConfig.Endpoints.changeEmailRequest,
+            // Blank is not "absent": an empty string would fail the panel's own optional-string
+            // check as a VALUE and be compared against the hash, turning "I did not send one" into
+            // «Неверный пароль». Only a real null means the field was not sent.
+            ChangeEmailRequestDto(newEmail, currentPassword?.takeIf { it.isNotEmpty() }),
+        )
     }
 
     // endregion
@@ -385,6 +381,33 @@ class DepartamentApiClientImpl(
         ensureConfigured()
         val req = Request.Builder().url(urlOf(path).build()).post(json.toRequestBody(JSON)).build()
         return call(req, cls)
+    }
+
+    /**
+     * A POST whose ANSWER is «it worked», and whose FAILURE has to carry the panel's own words.
+     *
+     * NOT [executeVoid]: that throws `mapError(code)` with no body behind it, and every account
+     * errand that uses this helper is refused with a sentence only the panel can write — «Почта уже
+     * привязана», «Пароль уже установлен. Используйте смену пароля.», «Эта почта уже используется
+     * другим аккаунтом» — and sometimes with a `code` beside it that decides WHERE on screen the
+     * failure belongs ([serverCode]). So the refusal body is read and sanitized like every other
+     * quotable one.
+     *
+     * NOT [postJson] either: that parses the SUCCESS body, and a 200 with an empty body would then
+     * be reported as a parse failure for a letter that has already been sent. The success body is
+     * read off the socket and dropped — 200 is the whole answer, and the `{message}` in it is the
+     * panel's copy of a sentence this app writes itself, with the address in it.
+     */
+    private suspend fun postQuoting(path: String, body: Any) {
+        ensureConfigured()
+        val req = Request.Builder()
+            .url(urlOf(path).build())
+            .post(gson.toJson(body).toRequestBody(JSON))
+            .build()
+        exchange(req) { resp ->
+            val text = resp.body.string()
+            if (!resp.isSuccessful) throw mapError(resp.code, sanitizeBody(text))
+        }
     }
 
     private suspend fun <T> call(request: Request, cls: Class<T>): T = exchange(request) { resp ->

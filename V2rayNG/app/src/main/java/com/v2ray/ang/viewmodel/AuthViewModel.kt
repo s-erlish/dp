@@ -6,10 +6,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.v2ray.ang.R
 import com.v2ray.ang.auth.ApiError
+import com.v2ray.ang.auth.CODE_INVALID_PASSWORD
+import com.v2ray.ang.auth.CODE_PASSWORD_REQUIRED
 import com.v2ray.ang.auth.AuthManager
 import com.v2ray.ang.auth.AuthManager.LoginState
 import com.v2ray.ang.auth.dto.LoginResult
 import com.v2ray.ang.auth.dto.UserProfileDto
+import com.v2ray.ang.auth.dto.canSetPassword
+import com.v2ray.ang.auth.serverCode
 import com.v2ray.ang.auth.serverMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -78,12 +82,32 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
             val resending: Boolean = false,
         ) : AuthUiState
 
+        /**
+         * The address is attached (or replaced) and the account can still be given a password, so
+         * the errand is not over: «Придумайте пароль» is on screen over the same two password
+         * fields registration uses. [busy] is the request being in flight, exactly as [resending]
+         * is on [EmailVerification] — the step must report itself without leaving itself.
+         *
+         * **A STEP, NOT A GATE.** The e-mail errand has already succeeded by the time this appears
+         * (the caller's RESULT_OK is set on entry), so «Пропустить» and system Back both simply
+         * close. It exists because an address without a password is an identifier and not a way in,
+         * which is the whole reason the address was attached.
+         */
+        data class SetPassword(val busy: Boolean = false) : AuthUiState
+
         /** Session persisted. The UI plays the beat and hands back to the caller. */
         data class Success(val profile: UserProfileDto) : AuthUiState
     }
 
-    /** Which surface a failure belongs to, so the right line (or the right field) carries it. */
-    enum class Surface { GATE, MAIL, TWO_FACTOR }
+    /**
+     * Which surface a failure belongs to, so the right line (or the right field) carries it.
+     *
+     * [PASSWORD] is the one that names a FIELD rather than a screen, and it exists because the
+     * panel's change-email guard answers two failures whose fix is inside the password box and
+     * nowhere else: `PASSWORD_REQUIRED` («введите его») and `INVALID_PASSWORD` («он неверен»).
+     * Putting either on the screen-level line would leave the box that has to change unmarked.
+     */
+    enum class Surface { GATE, MAIL, TWO_FACTOR, PASSWORD }
 
     /**
      * A failure, already turned into copy. [credentialFlash] marks the one case where the two
@@ -100,6 +124,13 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
          * is then the whole answer.
          */
         val text: String? = null,
+        /**
+         * True for the one refusal that is also a form change: `PASSWORD_REQUIRED` on «Сменить
+         * почту». The screen drew no password box because the cached profile said the account had
+         * none; the panel says otherwise, and its answer has to be readable — so the box appears
+         * with the reason under it rather than the reason appearing under nothing.
+         */
+        val revealPasswordField: Boolean = false,
     )
 
     private val _state = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
@@ -136,8 +167,8 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
     private var pendingEmail: String? = null
     private var pendingPassword: String? = null
 
-    /** The two errands that end on [AuthUiState.EmailVerification]. @see verifyErrand */
-    private enum class VerifyErrand { REGISTER, LINK_EMAIL }
+    /** The three errands that end on [AuthUiState.EmailVerification]. @see verifyErrand */
+    private enum class VerifyErrand { REGISTER, LINK_EMAIL, CHANGE_EMAIL }
 
     /**
      * WHICH errand the wait belongs to, held beside the address for the same reason the address
@@ -146,6 +177,14 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
      * request re-posts the link request, with no password anywhere near it.
      */
     private var verifyErrand = VerifyErrand.REGISTER
+
+    /**
+     * The current password a change-email request was made with, held for «Отправить снова» beside
+     * the address and for the same reason: the resend re-posts the whole request, and the panel
+     * will refuse it again without the password. Cleared with everything else on the way out, and
+     * deliberately never written to [SavedStateHandle] — that Bundle can reach disk.
+     */
+    private var pendingCurrentPassword: String? = null
 
     /**
      * The deep link this process has already handed to Telegram. Survives configuration change in
@@ -277,7 +316,7 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
                     is LoginState.AwaitingEmailVerification ->
                         _state.value = AuthUiState.EmailVerification(managerState.email)
 
-                    is LoginState.Success -> _state.value = AuthUiState.Success(managerState.profile)
+                    is LoginState.Success -> settleEmailErrand(managerState.profile)
 
                     is LoginState.Error ->
                         fail(managerState.error, Surface.MAIL, quoteBackend = true, linkEmail = true)
@@ -291,12 +330,93 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         }
     }
 
+    /**
+     * **Смена почты у аккаунта, у которого адрес уже есть.** Same request/wait/poll shape as
+     * [requestEmailLink]; what differs is the guard in front of it ([currentPassword], required by
+     * the panel of any account that has one) and the sharper question the wait asks afterwards —
+     * the address has to become [newEmail], not merely exist.
+     *
+     * Also the «Отправить снова» action for that wait, through the same [resendVerification].
+     */
+    fun requestEmailChange(newEmail: String, currentPassword: String?) {
+        loginJob?.cancel()
+        _error.value = null
+        pendingEmail = newEmail
+        pendingPassword = null
+        pendingCurrentPassword = currentPassword
+        verifyErrand = VerifyErrand.CHANGE_EMAIL
+        val resending = _state.value is AuthUiState.EmailVerification
+        _state.value = if (resending) {
+            AuthUiState.EmailVerification(newEmail, resending = true)
+        } else {
+            AuthUiState.Submitting
+        }
+        loginJob = viewModelScope.launch {
+            authManager.beginChangeEmail(newEmail, currentPassword).collect { managerState ->
+                when (managerState) {
+                    is LoginState.AwaitingEmailVerification ->
+                        _state.value = AuthUiState.EmailVerification(managerState.email)
+
+                    is LoginState.Success -> settleEmailErrand(managerState.profile)
+
+                    is LoginState.Error -> failEmailChange(managerState.error)
+
+                    is LoginState.Idle, is LoginState.SiteLoading,
+                    is LoginState.AwaitingTelegram, is LoginState.Polling -> Unit
+                }
+            }
+        }
+    }
+
+    /**
+     * Where an e-mail errand actually ends. The address is on the account either way; the question
+     * left is whether this account can still sign in with it, and an account with no password
+     * cannot. The panel's own gate is mirrored so the step is offered only where it would be
+     * accepted — see `UserProfileDto.canSetPassword`.
+     */
+    private fun settleEmailErrand(profile: UserProfileDto) {
+        _state.value = if (profile.canSetPassword()) {
+            AuthUiState.SetPassword()
+        } else {
+            AuthUiState.Success(profile)
+        }
+    }
+
+    /**
+     * «Придумайте пароль», and the reason the address was attached at all. Minimum six characters
+     * — the panel's floor for THIS endpoint, held by the form so a 400 never has to say it.
+     *
+     * A failure returns to the step rather than to [AuthUiState.Idle]: the fields are still filled
+     * in, «Пропустить» is still the way out, and the e-mail errand behind it is still a success.
+     */
+    fun setPassword(newPassword: String) {
+        loginJob?.cancel()
+        _error.value = null
+        _state.value = AuthUiState.SetPassword(busy = true)
+        loginJob = viewModelScope.launch {
+            try {
+                authManager.setPassword(newPassword)
+                _state.value = AuthUiState.Success(
+                    authManager.currentProfile() ?: UserProfileDto()
+                )
+            } catch (e: ApiError) {
+                fail(e, Surface.MAIL, quoteBackend = true, linkEmail = true)
+            }
+        }
+    }
+
+    /** The profile this process is signed in with, or null. Read-only. */
+    fun currentProfile(): UserProfileDto? = authManager.currentProfile()
+
     /** «Отправить снова» on the waiting screen: the same letter, to the same address. */
     fun resendVerification() {
         val email = pendingEmail ?: return
         when (verifyErrand) {
             VerifyErrand.REGISTER -> pendingPassword?.let { register(email, it) }
             VerifyErrand.LINK_EMAIL -> requestEmailLink(email)
+            // The panel guards every change request, including the second one, so the password
+            // that got the first letter sent has to travel with this one too.
+            VerifyErrand.CHANGE_EMAIL -> requestEmailChange(email, pendingCurrentPassword)
         }
     }
 
@@ -310,6 +430,7 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         loginJob = null
         pendingEmail = null
         pendingPassword = null
+        pendingCurrentPassword = null
         verifyErrand = VerifyErrand.REGISTER
         _error.value = null
         _state.value = AuthUiState.Idle
@@ -377,6 +498,7 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         saved.remove<String>(KEY_TEMP_TOKEN)
         pendingEmail = null
         pendingPassword = null
+        pendingCurrentPassword = null
         verifyErrand = VerifyErrand.REGISTER
         _error.value = null
         _state.value = AuthUiState.Idle
@@ -406,9 +528,11 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         surface: Surface,
         quoteBackend: Boolean = false,
         linkEmail: Boolean = false,
+        @StringRes fallback: Int? = null,
     ) {
         val awaitingTelegram = _state.value is AuthUiState.TelegramAwaiting
         val verifying = _state.value is AuthUiState.EmailVerification
+        val onPasswordStep = _state.value is AuthUiState.SetPassword
         _state.value = when {
             surface == Surface.TWO_FACTOR -> {
                 val token: String? = saved[KEY_TEMP_TOKEN]
@@ -421,17 +545,54 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
             // the state, never from the state being replaced.
             verifying -> pendingEmail?.let { AuthUiState.EmailVerification(it) } ?: AuthUiState.Idle
 
+            // A refused password is not a failed e-mail errand — that one has already succeeded and
+            // the caller's result is already set. The step stays up with the reason on it, its
+            // fields still filled and «Пропустить» still the way out; dropping to Idle would put a
+            // sign-in form under somebody who is signed in.
+            onPasswordStep -> AuthUiState.SetPassword()
+
             else -> AuthUiState.Idle
         }
         if (cause is ApiError.RateLimited) startCooldown()
         _error.value = AuthError(
-            message = messageFor(cause, surface, awaitingTelegram, linkEmail),
+            // `fallback` is this app's own words for a refusal whose MEANING the panel named in a
+            // code: if the sentence beside it ever goes missing, «Введите текущий пароль» is still
+            // a better answer than whatever a status code maps to.
+            message = fallback ?: messageFor(cause, surface, awaitingTelegram, linkEmail),
             surface = surface,
             // 12.11: an Unauthorized on the password step flashes both credential borders. On the
             // 2FA step the cells carry that signal instead, so the flash is not doubled.
             credentialFlash = surface == Surface.MAIL && cause is ApiError.Unauthorized && !quoteBackend,
+            // The one failure that CHANGES the form rather than only annotating it: the account has
+            // a password the form did not know about, so the box has to appear before its own error
+            // can point at anything.
+            revealPasswordField = cause.serverCode() == CODE_PASSWORD_REQUIRED,
             text = if (quoteBackend) cause.serverMessage() else null,
         )
+    }
+
+    /**
+     * The change-email refusal, routed by the panel's own `code` rather than by its status.
+     *
+     * Two of the answers are about the password BOX and nothing else: 400 `PASSWORD_REQUIRED` means
+     * the account has a password this request did not carry (the profile said otherwise, so the
+     * form has to grow the field), and 401 `INVALID_PASSWORD` means it carried the wrong one. A
+     * bare 401 on a signed-in errand otherwise reads as «сессия истекла», which would send the user
+     * to sign in again over a password they simply mistyped — so the code is consulted first.
+     *
+     * Everything else is the screen's: «Эта почта уже используется другим аккаунтом», «Аккаунт
+     * заблокирован», «Отправка писем не настроена». All of them quoted from the panel.
+     */
+    private fun failEmailChange(cause: ApiError) {
+        when (cause.serverCode()) {
+            CODE_PASSWORD_REQUIRED ->
+                fail(cause, Surface.PASSWORD, quoteBackend = true, fallback = R.string.auth_password_required)
+
+            CODE_INVALID_PASSWORD ->
+                fail(cause, Surface.PASSWORD, quoteBackend = true, fallback = R.string.auth_password_wrong)
+
+            else -> fail(cause, Surface.MAIL, quoteBackend = true, linkEmail = true)
+        }
     }
 
     private fun startCooldown() {
