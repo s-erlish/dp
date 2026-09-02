@@ -63,10 +63,15 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         data class TwoFactor(val tempToken: String) : AuthUiState
 
         /**
-         * Registered, and the panel wants the address proved: a letter carrying a link is out and
-         * the login is being polled until it is opened. [resending] is true only while a second
-         * letter is being requested, so «Отправить снова» can report itself without the screen
-         * leaving the waiting state it is reporting from.
+         * A letter carrying a link is out and the backend is being polled until it is opened.
+         * [resending] is true only while a second letter is being requested, so «Отправить снова»
+         * can report itself without the screen leaving the waiting state it is reporting from.
+         *
+         * Two errands reach this state and it is deliberately ONE state: a registration whose
+         * address the panel wants proved, and a signed-in account attaching an address. The wait,
+         * the ring, the resend and the way out are identical; which errand is being waited on is
+         * the screen's own knowledge (it was opened for one of them) and, for the resend, the
+         * ViewModel's [verifyErrand].
          */
         data class EmailVerification(
             val email: String,
@@ -130,6 +135,17 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
      */
     private var pendingEmail: String? = null
     private var pendingPassword: String? = null
+
+    /** The two errands that end on [AuthUiState.EmailVerification]. @see verifyErrand */
+    private enum class VerifyErrand { REGISTER, LINK_EMAIL }
+
+    /**
+     * WHICH errand the wait belongs to, held beside the address for the same reason the address
+     * itself is held here: «Отправить снова» has to re-send the right letter, and the state it is
+     * pressed from is the state being rebuilt. Registration re-posts the registration; a link
+     * request re-posts the link request, with no password anywhere near it.
+     */
+    private var verifyErrand = VerifyErrand.REGISTER
 
     /**
      * The deep link this process has already handed to Telegram. Survives configuration change in
@@ -205,6 +221,7 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         _error.value = null
         pendingEmail = email
         pendingPassword = password
+        verifyErrand = VerifyErrand.REGISTER
         val resending = _state.value is AuthUiState.EmailVerification
         _state.value = if (resending) {
             AuthUiState.EmailVerification(email, resending = true)
@@ -230,11 +247,57 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         }
     }
 
-    /** «Отправить снова» on the waiting screen: the same registration, to the same address. */
+    /**
+     * **Привязка почты к аккаунту, в который уже вошли.** The errand behind the «Почта» row in
+     * «Способы входа»: an account created from Telegram has no address, and this is how it gets
+     * one. No password is taken and none is sent — the panel is being asked for a letter, and the
+     * Bearer token on the request already says whose account it is about.
+     *
+     * The shape is the registration's, and on purpose: one request, then the same wait. It is also
+     * the «Отправить снова» action for that wait — when it is called from the waiting screen the
+     * screen STAYS on it (`resending = true` keeps the ring turning) rather than dropping back to
+     * the form, for the same reason [register] does.
+     */
+    fun requestEmailLink(email: String) {
+        loginJob?.cancel()
+        _error.value = null
+        pendingEmail = email
+        // Nothing to remember and nothing to clear later: this errand never takes a password.
+        pendingPassword = null
+        verifyErrand = VerifyErrand.LINK_EMAIL
+        val resending = _state.value is AuthUiState.EmailVerification
+        _state.value = if (resending) {
+            AuthUiState.EmailVerification(email, resending = true)
+        } else {
+            AuthUiState.Submitting
+        }
+        loginJob = viewModelScope.launch {
+            authManager.beginLinkEmail(email).collect { managerState ->
+                when (managerState) {
+                    is LoginState.AwaitingEmailVerification ->
+                        _state.value = AuthUiState.EmailVerification(managerState.email)
+
+                    is LoginState.Success -> _state.value = AuthUiState.Success(managerState.profile)
+
+                    is LoginState.Error ->
+                        fail(managerState.error, Surface.MAIL, quoteBackend = true, linkEmail = true)
+
+                    // Not emitted on this flow: the Telegram and password states belong to the
+                    // other entry points.
+                    is LoginState.Idle, is LoginState.SiteLoading,
+                    is LoginState.AwaitingTelegram, is LoginState.Polling -> Unit
+                }
+            }
+        }
+    }
+
+    /** «Отправить снова» on the waiting screen: the same letter, to the same address. */
     fun resendVerification() {
         val email = pendingEmail ?: return
-        val password = pendingPassword ?: return
-        register(email, password)
+        when (verifyErrand) {
+            VerifyErrand.REGISTER -> pendingPassword?.let { register(email, it) }
+            VerifyErrand.LINK_EMAIL -> requestEmailLink(email)
+        }
     }
 
     /**
@@ -247,6 +310,7 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         loginJob = null
         pendingEmail = null
         pendingPassword = null
+        verifyErrand = VerifyErrand.REGISTER
         _error.value = null
         _state.value = AuthUiState.Idle
     }
@@ -313,6 +377,7 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         saved.remove<String>(KEY_TEMP_TOKEN)
         pendingEmail = null
         pendingPassword = null
+        verifyErrand = VerifyErrand.REGISTER
         _error.value = null
         _state.value = AuthUiState.Idle
     }
@@ -336,7 +401,12 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
      * step keeps its own state, so the user lands back on the six cells rather than on the password
      * field they already got right.
      */
-    private fun fail(cause: ApiError, surface: Surface, quoteBackend: Boolean = false) {
+    private fun fail(
+        cause: ApiError,
+        surface: Surface,
+        quoteBackend: Boolean = false,
+        linkEmail: Boolean = false,
+    ) {
         val awaitingTelegram = _state.value is AuthUiState.TelegramAwaiting
         val verifying = _state.value is AuthUiState.EmailVerification
         _state.value = when {
@@ -355,7 +425,7 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         }
         if (cause is ApiError.RateLimited) startCooldown()
         _error.value = AuthError(
-            message = messageFor(cause, surface, awaitingTelegram),
+            message = messageFor(cause, surface, awaitingTelegram, linkEmail),
             surface = surface,
             // 12.11: an Unauthorized on the password step flashes both credential borders. On the
             // 2FA step the cells carry that signal instead, so the flash is not doubled.
@@ -388,10 +458,15 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
             cause: ApiError,
             surface: Surface = Surface.GATE,
             awaitingTelegram: Boolean = false,
+            linkEmail: Boolean = false,
         ): Int = when {
             // A wrong TOTP code is not "wrong password": it names the authenticator app, because
             // that is where the user has to look.
             surface == Surface.TWO_FACTOR && cause is ApiError.Unauthorized -> R.string.auth_2fa_wrong
+            // Attaching an address is done BY a session rather than to obtain one, so a 401 here is
+            // the seven-day token dying mid-errand. «Неверная почта или пароль» would name a
+            // password nobody typed and send the user back to check a field that is not on screen.
+            linkEmail && cause is ApiError.Unauthorized -> R.string.auth_err_session_expired
             cause is ApiError.Unauthorized -> R.string.auth_err_credentials
             cause is ApiError.Gone -> R.string.auth_err_gone
             cause is ApiError.RateLimited -> R.string.auth_err_rate_limited

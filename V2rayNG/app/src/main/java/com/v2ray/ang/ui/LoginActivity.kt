@@ -132,6 +132,24 @@ import kotlinx.coroutines.launch
  * with the credentials just registered, which answers 401 until the address is proved and 200 the
  * moment it is. The user's part is to open the letter; ours is to notice.
  *
+ * **AND THE THIRD ERRAND ON THIS FORM (2026-09-02): ПРИВЯЗКА ПОЧТЫ.** The «Почта» row under
+ * «Способы входа» named an address when the account had one and did nothing at all when it did
+ * not — it opened [MODE_SITE], and the first thing `onCreate` does with a signed-in visitor is
+ * `finish()`. It is tapped in exactly one situation: somebody signed in through Telegram wants an
+ * address on the account. [MODE_LINK_EMAIL] is that errand.
+ *
+ * It is the same form with two thirds of it taken away — no segment, no password, no «Восстановить
+ * пароль» — because none of that belongs to it: the account exists, the request is signed by its
+ * token, and the panel is being asked for a letter rather than for a credential. What is left is
+ * one field, one sentence saying what will happen to the account (nothing: it stays the same one),
+ * and «Отправить ссылку».
+ *
+ * **The wait afterwards is the registration's wait**, deliberately and to the pixel — same ledger
+ * row, same ring, same success beat, same «Отправить снова» over a tertiary way out. Only the
+ * question being asked underneath differs: registration re-tries the LOGIN until the link is
+ * opened, this one re-reads the PROFILE until it carries an address
+ * ([com.v2ray.ang.auth.AuthManager.beginLinkEmail]).
+ *
  * **What is deliberately absent rather than disabled**: magic link, password reset, the browser
  * hand-off and Google. `DepartamentApiClient` carries no call for any of them, so a control here
  * would advertise a feature instead of offering one. The one errand the site *can* finish is a row
@@ -159,6 +177,17 @@ class LoginActivity : BaseActivity() {
 
     /** True in [EXTRA_LINK] mode: the flow attaches Telegram to the session that already exists. */
     private var linkMode = false
+
+    /**
+     * True in [MODE_LINK_EMAIL]: the form attaches an ADDRESS to the session that already exists.
+     *
+     * Not a [FormMode] and not a page. It is a property of the whole screen, fixed at entry and
+     * never changed afterwards — the segment that authors [FormMode] is not even on screen here —
+     * which is why it is a field beside [linkMode] rather than a third value on that enum. It
+     * decides which fields exist, what the button says, what the bar is called, and which of the
+     * two questions the wait afterwards is asking.
+     */
+    private var emailLinkMode = false
 
     /**
      * True when the gate sits behind the form, i.e. Back on surface B pops to surface A instead of
@@ -220,7 +249,12 @@ class LoginActivity : BaseActivity() {
             ?: FormMode.SIGN_IN
         val mode = intent.getStringExtra(EXTRA_MODE)
         telegramEntry = !linkMode && mode == MODE_TELEGRAM_START
-        gateReachable = !linkMode && !telegramEntry && mode != MODE_SITE
+        // A SESSION IS PART OF THIS MODE'S DEFINITION: the errand is «attach an address to the
+        // account I am signed into», so without one there is no account to attach it to. A launch
+        // that arrives signed out therefore lands on the ordinary sign-in form rather than on a
+        // form whose request would go out unauthenticated and come back 401.
+        emailLinkMode = !linkMode && mode == MODE_LINK_EMAIL && viewModel.isLoggedIn()
+        gateReachable = !linkMode && !telegramEntry && !emailLinkMode && mode != MODE_SITE
         // WHICH surface opens is NOT the same question as whether the gate is behind it. All three
         // of MODE_SITE, link mode and MODE_TELEGRAM_START make Back leave the screen rather than
         // pop to the gate — that is what [gateReachable] says — but only MODE_SITE starts on the
@@ -232,11 +266,13 @@ class LoginActivity : BaseActivity() {
         // MODE_TELEGRAM_START starts on the GATE for the very same reason: the awaiting stack it
         // is heading for is the gate's own, and it must be the gate's own, so that «Открыть
         // Telegram», the poll and Back behave exactly as they do for a user-started attempt.
+        // MODE_LINK_EMAIL falls through to the form, which is the whole of it.
         val startPage = if (gateReachable || linkMode || telegramEntry) Page.GATE else Page.MAIL
 
-        // Already signed in and this is an ordinary sign-in: there is nothing to do here. Link mode
-        // is the exception and the whole point — it is the signed-in user who attaches Telegram.
-        if (viewModel.isLoggedIn() && !linkMode) {
+        // Already signed in and this is an ordinary sign-in: there is nothing to do here. The two
+        // linking errands are the exception and the whole point — it is the signed-in user who
+        // attaches Telegram, and the signed-in user who attaches an address.
+        if (viewModel.isLoggedIn() && !linkMode && !emailLinkMode) {
             setResult(RESULT_OK)
             finish()
             return
@@ -468,12 +504,25 @@ class LoginActivity : BaseActivity() {
 
         // IME «Далее» / «Готово» run the same submit path as the button, through the same gate and
         // the same debounce. The two used to be separate functions that could disagree.
+        //
+        // THE ADDRESS IS THE LAST FIELD WHEN IT IS THE ONLY FIELD (14-auth.md 6.4). In the link
+        // errand «Далее» would move the caret to a password box that is not on screen, i.e. do
+        // nothing and say nothing; the key says «Готово» and submits instead. Set here, before the
+        // first input connection is opened, so it is never the wrong key even once.
+        if (emailLinkMode) mail.etEmail.imeOptions = EditorInfo.IME_ACTION_DONE
         mail.etEmail.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_NEXT) {
-                mail.etPassword.requestFocus()
-                true
-            } else {
-                false
+            when (actionId) {
+                EditorInfo.IME_ACTION_NEXT -> {
+                    mail.etPassword.requestFocus()
+                    true
+                }
+
+                EditorInfo.IME_ACTION_DONE -> {
+                    submit()
+                    true
+                }
+
+                else -> false
             }
         }
         // The password's own IME key changes with the errand: «Далее» to the repeat field while
@@ -553,6 +602,25 @@ class LoginActivity : BaseActivity() {
             it is AuthUiState.TwoFactor || it is AuthUiState.EmailVerification
         }
 
+        // THE LINK ERRAND IS NOT ONE OF THE SEGMENT'S TWO, so it returns before any of the
+        // segment's drawing runs. There is nothing to choose between (the account exists), no
+        // password to take (the panel is being asked for a letter) and no password to restore, so
+        // the segment, both password slots and the «Восстановить пароль» row are all absent rather
+        // than present and inert. What the slot holds instead is the sentence that says what the
+        // button will do — @id/slot_link_hint, 14-auth.md 6.4.
+        if (emailLinkMode) {
+            mail.segMode.isVisible = false
+            mail.slotPassword.isVisible = false
+            mail.slotConfirm.isVisible = false
+            mail.slotLinkHint.isVisible = !stepped
+            mail.authHairline.isVisible = false
+            mail.altMethods.isVisible = false
+            mail.btnSubmit.setText(submitLabelRes())
+            applyToolbarTitle()
+            return
+        }
+        mail.slotLinkHint.isVisible = false
+
         mail.segSignin.setTextAppearance(
             if (register) R.style.TextAppearance_App_Title_Medium else R.style.TextAppearance_App_Title_Segment_Active
         )
@@ -606,7 +674,9 @@ class LoginActivity : BaseActivity() {
     @StringRes
     private fun submitLabelRes(): Int = when {
         viewModel.state.value is AuthUiState.TwoFactor -> R.string.auth_btn_2fa
+        // «Отправить снова» is the waiting screen's action whichever letter is being waited on.
         viewModel.state.value is AuthUiState.EmailVerification -> R.string.auth_verify_resend
+        emailLinkMode -> R.string.auth_link_email_submit
         formMode == FormMode.REGISTER -> R.string.auth_btn_register
         else -> R.string.auth_btn_signin
     }
@@ -615,6 +685,8 @@ class LoginActivity : BaseActivity() {
     private fun applyToolbarTitle() {
         binding.toolbar.toolbarTitle.text = when {
             page == Page.GATE -> ""
+            // The link errand has no segment to consult: the bar names it for the whole screen.
+            emailLinkMode -> getString(R.string.auth_link_email_title)
             formMode == FormMode.REGISTER -> getString(R.string.auth_register_title)
             else -> getString(R.string.auth_site_title)
         }
@@ -740,6 +812,14 @@ class LoginActivity : BaseActivity() {
                     binding.mail.root.smoothScrollTo(0, 0)
                     return
                 }
+                // The link errand ends here: the address is the whole request, and the session it
+                // attaches to is the one the request already carries.
+                if (emailLinkMode) {
+                    viewModel.requestEmailLink(
+                        binding.mail.etEmail.text?.toString()?.trim().orEmpty()
+                    )
+                    return
+                }
                 val password = binding.mail.etPassword.text?.toString().orEmpty()
                 if (password.isEmpty()) {
                     // The CTA is already dark for an empty password, so this is only reachable
@@ -849,7 +929,11 @@ class LoginActivity : BaseActivity() {
                 val email = binding.mail.etEmail.text?.toString()?.trim().orEmpty()
                 val password = binding.mail.etPassword.text?.toString().orEmpty()
                 val addressed = Patterns.EMAIL_ADDRESS.matcher(email).matches()
-                if (formMode == FormMode.REGISTER) {
+                if (emailLinkMode) {
+                    // One field, so one condition. There is no password to be non-empty and no
+                    // repeat to match.
+                    addressed
+                } else if (formMode == FormMode.REGISTER) {
                     // R9 layer 1 again, and the reason the rule is PRINTED under the field rather
                     // than only enforced: a control that stays dark without saying why is a
                     // guessing game.
@@ -911,7 +995,24 @@ class LoginActivity : BaseActivity() {
             }
 
             is AuthUiState.EmailVerification -> {
-                binding.mail.verifyBody.text = getString(R.string.auth_verify_body, state.email)
+                // ONE WAIT, TWO ERRANDS, and the words are the only thing that separates them:
+                // registration is asking the user to prove an address so they can get in, this is
+                // asking them to open a link so an address joins an account they are already in.
+                binding.mail.verifyTitle.setText(
+                    if (emailLinkMode) {
+                        R.string.auth_link_email_sent_title
+                    } else {
+                        R.string.auth_verify_title
+                    }
+                )
+                binding.mail.verifyBody.text = getString(
+                    if (emailLinkMode) {
+                        R.string.auth_link_email_sent_body
+                    } else {
+                        R.string.auth_verify_body
+                    },
+                    state.email,
+                )
                 showVerification(true)
                 // A second letter being asked for is the SUBMIT working, not the wait restarting:
                 // the ring keeps turning and the busy state goes on the button, exactly as it does
@@ -1104,7 +1205,11 @@ class LoginActivity : BaseActivity() {
 
         if (active) {
             hideModeExtras()
-            mail.btnStepBack.setText(R.string.auth_verify_back)
+            // «Вернуться ко входу» is nonsense for somebody who is already signed in: behind this
+            // step there is the address form, not a way in. The label says which one it is.
+            mail.btnStepBack.setText(
+                if (emailLinkMode) R.string.auth_link_email_back else R.string.auth_verify_back
+            )
             showPage(Page.MAIL, animate = false)
             // The user's next move is in another app; a keyboard over the sentence telling them so
             // is the one thing this screen must not do.
@@ -1122,6 +1227,7 @@ class LoginActivity : BaseActivity() {
     /** The parts of the form that belong to an errand, hidden while a STEP owns the screen. */
     private fun hideModeExtras() {
         binding.mail.slotConfirm.isVisible = false
+        binding.mail.slotLinkHint.isVisible = false
         binding.mail.authHairline.isVisible = false
         binding.mail.altMethods.isVisible = false
     }
@@ -1132,7 +1238,9 @@ class LoginActivity : BaseActivity() {
      * abandoned. The account is untouched — the letter it sent is still valid.
      */
     private fun leaveVerification() {
-        setFormMode(FormMode.SIGN_IN)
+        // The segment belongs to the two sign-in errands; the link errand has none to hand the
+        // form back to, and moving one that is not on screen would only re-label a hidden control.
+        if (!emailLinkMode) setFormMode(FormMode.SIGN_IN)
         viewModel.leaveVerification()
     }
 
@@ -1167,7 +1275,9 @@ class LoginActivity : BaseActivity() {
         if (target == Page.MAIL && viewModel.state.value is AuthUiState.Idle) {
             // The form opens on the field to fill first — unless the address is already there
             // (they came back from the 2FA step), where the password is next.
-            val focusOn = if (binding.mail.etEmail.text.isNullOrBlank()) {
+            // …and the link errand has no password field at all, so the address is where the
+            // caret lands whether or not one has already been typed.
+            val focusOn = if (emailLinkMode || binding.mail.etEmail.text.isNullOrBlank()) {
                 binding.mail.etEmail
             } else {
                 binding.mail.etPassword
@@ -1515,6 +1625,16 @@ class LoginActivity : BaseActivity() {
          * link mode, which does mint on entry and does land on the awaiting stack.
          */
         const val MODE_TELEGRAM_START = "telegram_start"
+
+        /**
+         * Open the form as «Привязка почты»: one address field for the account that is ALREADY
+         * signed in, `POST /client/link-email-request`, then the confirmation wait.
+         *
+         * It is an [EXTRA_MODE] value rather than a second boolean beside [EXTRA_LINK] because it
+         * chooses a surface, which is exactly what that extra is for; [EXTRA_LINK] chooses what the
+         * GATE says, and the gate has no part in this errand. Requires a session — see `onCreate`.
+         */
+        const val MODE_LINK_EMAIL = "link_email"
 
         /** true → attach Telegram to the session that is already signed in (surface E). */
         const val EXTRA_LINK = "link_telegram"

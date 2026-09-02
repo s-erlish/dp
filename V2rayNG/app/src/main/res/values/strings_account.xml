@@ -78,8 +78,13 @@
          IT WAS «Сайт», on the grounds that the e-mail is what the row REPORTS while the site is the
          way in. The way in moved: registration and sign-in both happen in the app now, the door
          says «Войти по почте», and a row still called «Сайт» would send the user looking for a
-         browser that is no longer part of it. The row reports an address and opens the form that
-         proves one — both are the почта. -->
+         browser that is no longer part of it.
+
+         И СТРОКА НАКОНЕЦ ЧТО-ТО ДЕЛАЕТ. Она вела на экран входа, который для вошедшего человека
+         закрывается сам, — то есть для того единственного, кто по ней нажимает (вошёл через
+         Telegram, хочет добавить адрес), не делала ничего. Теперь она открывает «Привязку почты»:
+         одно поле, письмо со ссылкой, ожидание. Когда адрес есть, строка его называет и никуда не
+         ведёт — смены адреса в приложении нет. -->
     <string name="account_login_site">Почта</string>
 
     <!-- Payments history -->

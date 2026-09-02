@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.flow
 
 /**
  * Orchestrates the auth flows only (Telegram deep-link login, e-mail registration, e-mail/password
- * sign-in, TOTP 2FA).
+ * sign-in, TOTP 2FA, and attaching an e-mail to a session that already exists).
  * There is NO refresh/logout here — the JWT is 7-day and non-refreshable; session persistence is
  * delegated to [AccountSession]/[AuthTokenStore], subscription import to [AccountRepository].
  */
@@ -37,9 +37,14 @@ class AuthManager(
         object SiteLoading : LoginState
 
         /**
-         * Registration succeeded but the panel wants the address proved: a letter carrying a LINK
-         * (not a code — there is nothing for the user to type back) has been sent to [email], and
-         * [beginRegister] keeps polling the login until it is opened.
+         * A letter carrying a LINK (not a code — there is nothing for the user to type back) has
+         * been sent to [email], and the flow that emitted this keeps watching for it to be opened.
+         *
+         * TWO ERRANDS END UP HERE, and the wait is the same wait either way. [beginRegister] gets
+         * it when the panel wants a new account's address proved, and polls the LOGIN until it
+         * answers 200; [beginLinkEmail] gets it when a signed-in user attaches an address, and
+         * polls the PROFILE until it carries one. The question differs because the fact each is
+         * waiting for differs; the moment does not, so neither does the screen.
          */
         data class AwaitingEmailVerification(val email: String) : LoginState
 
@@ -196,6 +201,74 @@ class AuthManager(
             // An account registered a minute ago cannot have TOTP on it, so Requires2FA is not a
             // real answer here; keep waiting rather than stranding the user on a code prompt they
             // have no way to satisfy.
+        }
+    }
+
+    /**
+     * **Attaching an e-mail to the account that is already signed in.**
+     *
+     * The errand a Telegram-only account arrives with: it has no address, so «Способы входа» has
+     * nothing to report on its «Почта» row and the panel has no second way to let that person back
+     * in. `POST /client/link-email-request` carries the address alone — the Bearer token already
+     * says which account is asking, and no password is set here.
+     *
+     * A flow rather than a suspend call for the same reason registration is one: the errand does
+     * not end with the request. The 200 only means a letter is out, and the wait that follows is
+     * the user's, not the network's — so the state moves to [LoginState.AwaitingEmailVerification]
+     * and this flow sits on [pollUntilLinked] until the link is opened.
+     */
+    fun beginLinkEmail(email: String): Flow<LoginState> = flow {
+        if (!BackendConfig.isConfigured()) {
+            emit(LoginState.Error(ApiError.NotConfigured))
+            return@flow
+        }
+
+        try {
+            api.linkEmailRequest(email)
+        } catch (e: ApiError) {
+            emit(LoginState.Error(e))
+            return@flow
+        }
+
+        emit(LoginState.AwaitingEmailVerification(email))
+        pollUntilLinked()
+    }
+
+    /**
+     * Watches for the emailed link being opened, and — as in [pollUntilVerified] — it does so by
+     * asking the one question whose answer changes when it is. Here that question is not the login
+     * (this user is already signed in) but the PROFILE: `/client/auth/me` carries a blank `email`
+     * for a Telegram-only account and a real one the moment the site has run the confirmation
+     * behind the link.
+     *
+     * The address the letter went to is deliberately NOT compared against the one that comes back.
+     * The panel owns that value and may hand it back normalised — a different case, a trimmed
+     * alias — and an equality test would then wait forever for a link that was opened correctly.
+     * A profile that has an address where it had none is the whole signal.
+     *
+     * **Every failure here is swallowed, exactly as in [pollUntilVerified]**: an unread letter is
+     * not news, and neither is a network blip. Note this is also why the poll asks [api] directly
+     * rather than going through `AccountRepository` — a 401 on the identity endpoint ENDS THE
+     * SESSION there, and a token that died while a letter was in flight must not sign the user out
+     * from inside a background poll they cannot see.
+     *
+     * The profile is written back to [AccountSession] before the success is emitted, so the row
+     * that sent the user here reports the new address from cache rather than from a lucky reload.
+     */
+    private suspend fun FlowCollector<LoginState>.pollUntilLinked() {
+        val deadline = System.currentTimeMillis() + VERIFY_TIMEOUT_MS
+        while (System.currentTimeMillis() < deadline) {
+            delay(VERIFY_POLL_INTERVAL_MS)
+            val profile = try {
+                api.getMe()
+            } catch (e: ApiError) {
+                continue // Still unlinked, or a blip. Neither is news.
+            }
+            if (profile.email.isNotBlank()) {
+                AccountSession.updateProfile(profile)
+                emit(LoginState.Success(profile))
+                return
+            }
         }
     }
 

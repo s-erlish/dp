@@ -11,6 +11,7 @@ import com.v2ray.ang.auth.dto.DeleteDeviceRequestDto
 import com.v2ray.ang.auth.dto.DevicesDto
 import com.v2ray.ang.auth.dto.DevicesResult
 import com.v2ray.ang.auth.dto.GoogleLoginRequestDto
+import com.v2ray.ang.auth.dto.LinkEmailRequestDto
 import com.v2ray.ang.auth.dto.LoginRequestDto
 import com.v2ray.ang.auth.dto.LoginResponseDto
 import com.v2ray.ang.auth.dto.LoginResult
@@ -220,6 +221,33 @@ class DepartamentApiClientImpl(
 
     override suspend fun getMe(): UserProfileDto =
         getJson(BackendConfig.Endpoints.me, UserProfileDto::class.java)
+
+    /**
+     * NOT [executeVoid], and not [postJson] either.
+     *
+     * `executeVoid` throws `mapError(code)` with no body behind it, and this is the one void call
+     * whose failure is worth quoting: 400 covers «Почта уже привязана», «Некорректный email» and
+     * «Эта почта уже используется другим аккаунтом» alike, and only the panel knows which of the
+     * three happened (see [serverMessage]). So the refusal is read and sanitized like every other
+     * quotable one.
+     *
+     * `postJson` would parse the SUCCESS body, and a 200 with an empty body would then be reported
+     * as a parse failure for a letter that has already been sent. The success body is read off the
+     * socket and dropped: 200 is the whole answer, and the `{message}` in it is the panel's copy of
+     * a sentence this app writes itself, with the address in it.
+     */
+    override suspend fun linkEmailRequest(email: String) {
+        ensureConfigured()
+        val body = gson.toJson(LinkEmailRequestDto(email)).toRequestBody(JSON)
+        val req = Request.Builder()
+            .url(urlOf(BackendConfig.Endpoints.linkEmailRequest).build())
+            .post(body)
+            .build()
+        exchange(req) { resp ->
+            val text = resp.body.string()
+            if (!resp.isSuccessful) throw mapError(resp.code, sanitizeBody(text))
+        }
+    }
 
     // endregion
 
