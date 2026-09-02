@@ -117,15 +117,13 @@ class CoreTestService : Service() {
 
     private fun handleWorkerEvent(event: RealPingEvent, onWorkerDone: () -> Unit) {
         when (event) {
-            is RealPingEvent.Progress -> {
-                // PROGRESS GOES TO THE APP, NEVER TO THE SHADE. It used to be written into the
-                // foreground notification as «Запущено проверок: 10 / 10» — the batch's own
-                // bookkeeping, several times a second, on the lock screen of a user who had not
-                // asked for a check at all (the провайдер refresh runs one unattended). The
-                // broadcast below is unchanged, so the list still repaints as results land; only
-                // the shade stopped being told.
-                MessageUtil.sendMsg2UI(this, AppConfig.MSG_MEASURE_CONFIG_NOTIFY, event.text)
-            }
+            // THE BATCH'S PROGRESS TALLY IS NOT REPORTED ANYWHERE, and there is no longer an event
+            // for it. It went to the shade once («Запущено проверок: 10 / 10», on the lock screen
+            // of a user who had not asked for a check — the провайдер refresh runs one unattended),
+            // and after that it went to the app as a broadcast per finished server that no surface
+            // printed: the one observer answered it with a full list rebuild it did not need, since
+            // `Result` below already names the row that changed. Both the send and the count it
+            // carried are gone.
 
             is RealPingEvent.Result -> {
                 MmkvManager.encodeServerTestDelayMillis(event.guid, event.delayMillis)

@@ -302,7 +302,12 @@ object AppConfig {
     const val MSG_MEASURE_CONFIG_START = 7
     const val MSG_MEASURE_CONFIG_CANCEL = 71
     const val MSG_MEASURE_CONFIG_SUCCESS = 72
-    const val MSG_MEASURE_CONFIG_NOTIFY = 73
+
+    // 73 WAS `MSG_MEASURE_CONFIG_NOTIFY` — the batch's own «сделано / осталось» tally, broadcast
+    // across processes once per finished server and printed by nothing. Its one reader answered
+    // each message with a full list rebuild that the per-server 72 above had already made
+    // unnecessary. The number stays retired rather than reused: an old build on the same device can
+    // still be sending it.
     const val MSG_MEASURE_CONFIG_FINISH = 74
 
     /**

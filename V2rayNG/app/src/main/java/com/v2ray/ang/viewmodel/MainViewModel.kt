@@ -91,7 +91,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var runningGuid: String? = null
         private set
     val updateListAction by lazy { MutableLiveData<Int>() }
-    val updateTestResultAction by lazy { MutableLiveData<String>() }
     val updateSpeedAction by lazy { MutableLiveData<Pair<Long, Long>>() }
     val delayResultAction by lazy { MutableLiveData<Long>() }
 
@@ -823,13 +822,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     updateListAction.value = getPosition(content ?: "")
                 }
 
-                AppConfig.MSG_MEASURE_CONFIG_NOTIFY -> {
-                    // The batch's own progress figure, and it is a SIGNAL, not a sentence: the one
-                    // observer repaints the list and never reads the text. It used to be formatted
-                    // into «Запущено проверок: 10 / 10» here — the same internal tally the shade
-                    // was showing — so a string a person could read was being built for nobody.
-                    updateTestResultAction.value = intent.getStringExtra("content").orEmpty()
-                }
+                // NO `MSG_MEASURE_CONFIG_NOTIFY` BRANCH ANY MORE, AND NO BATCH PROGRESS CHANNEL
+                // BEHIND IT. `CoreTestService` broadcast one of these per finished server, on top
+                // of the `MSG_MEASURE_CONFIG_SUCCESS` it already sent for the same server, and it
+                // carried nothing but an internal tally («3 / 57») that no surface has printed
+                // since the shade stopped showing it. The one observer left — `HomeFragment`'s
+                // `updateTestResultAction` — read none of the text and answered every message with
+                // `refreshServerList(-1)`: a full rebuild plus `notifyDataSetChanged()` over the
+                // whole list. So each server of a check cost a targeted repaint of its own row AND
+                // a repaint of every other row on screen, in bursts, on the main thread. The row
+                // that changed is named by SUCCESS above; a batch that ends is announced by FINISH
+                // below. Nothing else was ever read.
 
                 AppConfig.MSG_MEASURE_CONFIG_FINISH -> {
                     val content = intent.getStringExtra("content")

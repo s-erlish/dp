@@ -15,7 +15,6 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Worker that runs a batch of real-ping tests independently.
@@ -31,23 +30,24 @@ class RealPingWorkerService(
     private val dispatcher = Executors.newFixedThreadPool(concurrency).asCoroutineDispatcher()
     private val scope = CoroutineScope(job + dispatcher + CoroutineName("RealPingBatchWorker"))
 
-    private val runningCount = AtomicInteger(0)
-    private val totalCount = AtomicInteger(0)
-
+    /**
+     * THE TWO PROGRESS COUNTERS ARE GONE WITH THE EVENT THEY FED.
+     *
+     * They produced «$left / $count» once per finished server, and neither number was what its name
+     * said: `totalCount` was incremented per job and then DECREMENTED on completion, so the
+     * "total" counted down as the batch ran. It did not matter, because nothing printed the string
+     * — see `CoreTestService.handleWorkerEvent`. What it cost was one cross-process broadcast per
+     * server and, at the far end, a full list rebuild. Results and the finish are what the app
+     * reads, and both are still sent.
+     */
     fun start() {
         val jobs = guids.map { guid ->
-            totalCount.incrementAndGet()
             scope.launch {
-                runningCount.incrementAndGet()
                 try {
                     val result = startRealPing(guid)
                     onEvent(RealPingEvent.Result(guid, result))
                 } catch (_: Throwable) {
                     // ignore
-                } finally {
-                    val count = totalCount.decrementAndGet()
-                    val left = runningCount.decrementAndGet()
-                    onEvent(RealPingEvent.Progress("$left / $count"))
                 }
             }
         }
