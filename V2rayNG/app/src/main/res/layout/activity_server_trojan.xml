@@ -84,15 +84,32 @@
 
             <include layout="@layout/layout_tls" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_save"
-                style="@style/Widget.Departament.Button.Primary.Tall"
+            <!-- СОСТОЯНИЕ «СОХРАНЯЕМ» (7.1, «держит ширину, прячет подпись, крутит дугу
+                 20dp»). Кнопка и дуга лежат в одном FrameLayout, поэтому кнопка не
+                 меняет ни размер, ни положение, пока идёт запись, а форма под ней не
+                 дёргается. -->
+            <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/screen_gutter"
                 android:layout_marginTop="@dimen/space_24"
-                android:layout_marginEnd="@dimen/screen_gutter"
-                android:text="@string/editor_save" />
+                android:layout_marginEnd="@dimen/screen_gutter">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_save"
+                    style="@style/Widget.Departament.Button.Primary.Tall"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/editor_save" />
+
+                <com.google.android.material.progressindicator.CircularProgressIndicator
+                    android:id="@+id/pb_save"
+                    style="@style/Widget.Departament.Progress.Circular.Inline.OnAccent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:visibility="gone" />
+            </FrameLayout>
 
             <include
                 android:id="@+id/row_delete"

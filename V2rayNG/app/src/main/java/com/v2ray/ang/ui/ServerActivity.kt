@@ -10,8 +10,10 @@ import android.widget.TextView
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
+import androidx.core.widget.doAfterTextChanged
 import androidx.core.widget.NestedScrollView
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.progressindicator.CircularProgressIndicator
 import com.google.android.material.textfield.TextInputLayout
 import com.v2ray.ang.AppConfig.DEFAULT_PORT
 import com.v2ray.ang.AppConfig.PREF_ALLOW_INSECURE
@@ -33,6 +35,7 @@ import com.v2ray.ang.handler.SettingsChangeManager
 import com.v2ray.ang.ui.component.RowBinder
 import com.v2ray.ang.ui.component.SubPage
 import com.v2ray.ang.ui.component.ToolbarBinder
+import com.v2ray.ang.ui.component.clearClick
 import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.util.Utils
@@ -199,6 +202,7 @@ class ServerActivity : BaseActivity() {
     private val et_browser_dialer_mode: EditText? by lazy { findViewById(R.id.et_browser_dialer_mode) }
     private val til_browser_dialer_mode: TextInputLayout? by lazy { findViewById(R.id.til_browser_dialer_mode) }
     private val btn_save: MaterialButton by lazy { findViewById(R.id.btn_save) }
+    private val pb_save: CircularProgressIndicator by lazy { findViewById(R.id.pb_save) }
 
     /**
      * The three transport choices, held as indices instead of `Spinner.selectedItemPosition`.
@@ -266,6 +270,7 @@ class ServerActivity : BaseActivity() {
         ToolbarBinder.attachTo(findViewById(R.id.toolbar), findViewById<NestedScrollView>(R.id.main_content))
 
         btn_save.onSingleClick { saveServer() }
+        watchErrorSlots()
 
         RowBinder.bind(
             root = findViewById(R.id.row_delete),
@@ -458,7 +463,7 @@ class ServerActivity : BaseActivity() {
         field.showSoftInputOnFocus = false
         layout.isEnabled = enabled
         if (!enabled) {
-            field.setOnClickListener(null)
+            field.clearClick()
             field.setOnKeyListener(null)
             layout.setEndIconOnClickListener(null)
             return
@@ -468,7 +473,7 @@ class ServerActivity : BaseActivity() {
                 options.forEachIndexed { index, label -> action(label = label) { onPick(index) } }
             }.show()
         }
-        field.setOnClickListener { open() }
+        field.onSingleClick { open() }
         layout.setEndIconOnClickListener { open() }
         field.setOnKeyListener { _, keyCode, event ->
             val opens = keyCode == KeyEvent.KEYCODE_ENTER ||
@@ -821,6 +826,16 @@ class ServerActivity : BaseActivity() {
             return false
         }
 
+        // Everything above answered; from here the screen is WRITING. The button keeps its size,
+        // drops its label and spins (00-rules.md 7.1) - and the write itself waits one frame so
+        // that state is on screen before it starts rather than after it has finished.
+        setSaving(true)
+        btn_save.post { commit(config) }
+        return true
+    }
+
+    /** The write, once every check has passed. */
+    private fun commit(config: ProfileItem) {
         saveCommon(config)
         saveStreamSettings(config)
         saveTls(config)
@@ -836,7 +851,29 @@ class ServerActivity : BaseActivity() {
         }
         toastSuccess(R.string.editor_saved)
         SubPage.close(this)
-        return true
+    }
+
+    /**
+     * The saving state, and the disabled state it is NOT.
+     *
+     * R8: the control holds its exact width, the label goes to alpha 0 rather than to nothing, a
+     * 20dp arc turns in its place, and the button is not drawn at the 0.38 a disabled control gets
+     * - it is busy, not unavailable. Everything the form can still be edited with goes quiet too,
+     * so a value cannot change between the checks and the write.
+     */
+    private fun setSaving(saving: Boolean) {
+        pb_save.isVisible = saving
+        btn_save.isClickable = !saving
+        if (saving) {
+            // The LABEL goes, not the button: alpha on the control would take its fill with it and
+            // draw the disabled look R6 reserves for a control that cannot be used at all.
+            btn_save.contentDescription = getString(R.string.srv_saving_cd)
+            btn_save.text = ""
+        } else {
+            btn_save.contentDescription = null
+            btn_save.setText(R.string.editor_save)
+        }
+        errorSlots().forEach { it?.isEnabled = !saving }
     }
 
     /**
@@ -886,20 +923,34 @@ class ServerActivity : BaseActivity() {
         return true
     }
 
+    /**
+     * A refusal stops being true the moment the user starts fixing it, so it leaves then rather
+     * than at the next «Сохранить». Wired once, over the same list [clearErrors] walks.
+     */
+    private fun watchErrorSlots() {
+        errorSlots().forEach { layout ->
+            val field = layout?.editText ?: return@forEach
+            field.doAfterTextChanged { if (layout.error != null) layout.error = null }
+        }
+    }
+
     /** Every field's error slot, emptied before a fresh pass. */
     private fun clearErrors() {
-        listOf<TextInputLayout?>(
-            til_remarks, til_address, til_port, til_id, til_security, til_flow, til_method,
-            til_network, til_header_type, til_request_host, til_path,
-            til_kcp_mtu, til_kcp_tti, til_extra, til_fm, til_browser_dialer_mode,
-            til_stream_security, til_sni, til_stream_fingerprint, til_stream_alpn,
-            til_preshared_key, til_reserved1, til_local_address, til_local_mtu,
-            til_obfs_password, til_port_hop, til_port_hop_interval,
-            til_bandwidth_down, til_bandwidth_up,
-            til_allow_insecure, til_ech_config_list, til_pinned_ca256,
-            til_public_key, til_short_id, til_spider_x, til_mldsa65_verify,
-        ).forEach { it?.error = null }
+        errorSlots().forEach { it?.error = null }
     }
+
+    /** Every field on every one of the eight forms that has an error slot to write into. */
+    private fun errorSlots(): List<TextInputLayout?> = listOf(
+        til_remarks, til_address, til_port, til_id, til_security, til_flow, til_method,
+        til_network, til_header_type, til_request_host, til_path,
+        til_kcp_mtu, til_kcp_tti, til_extra, til_fm, til_browser_dialer_mode,
+        til_stream_security, til_sni, til_stream_fingerprint, til_stream_alpn,
+        til_preshared_key, til_reserved1, til_local_address, til_local_mtu,
+        til_obfs_password, til_port_hop, til_port_hop_interval,
+        til_bandwidth_down, til_bandwidth_up,
+        til_allow_insecure, til_ech_config_list, til_pinned_ca256,
+        til_public_key, til_short_id, til_spider_x, til_mldsa65_verify,
+    )
 
     private fun saveCommon(config: ProfileItem) {
         config.remarks = et_remarks.text.toString().trim()
