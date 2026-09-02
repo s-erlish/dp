@@ -1,147 +1,184 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  ============================================================================
+  A-13 servers/server/{guid} - форма «сервер вручную», WireGuard.  H3 - R4.
+  ============================================================================
+
+  РАМКА, общая у восьми протокольных форм и у трёх уже перенесённых редакторов
+  рядом («Группа серверов», «Своя конфигурация», «Цепочка прокси»):
+
+      view_toolbar - бесшовная шапка подстраницы (0.4.6)
+      NestedScrollView - тело формы, снизу space_32
+      «Сохранить» - Primary.Tall в потоке, а не пункт меню ActionBar
+      «Удалить сервер» - Row.Destructive последней строкой
+
+  Действия были иконками в ActionBar: галочка и корзина, без подписей, рядом
+  друг с другом. Сохранение - главное действие экрана и стоит в потоке под
+  последним полем; удаление - разрушающее, названо словами и стоит отдельно.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true"
     android:background="?android:attr/colorBackground"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical"
     tools:context=".ui.ServerActivity">
 
-    <LinearLayout
+    <include
+        android:id="@+id/toolbar"
+        layout="@layout/view_toolbar" />
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/main_content"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="@dimen/padding_spacing_dp16">
-
-        <include layout="@layout/layout_address_port" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/padding_spacing_dp16"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/server_lab_secret_key" />
-
-            <EditText
-                android:id="@+id/et_id"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="text" />
-
-        </LinearLayout>
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/space_32"
+        android:scrollbars="none">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/padding_spacing_dp16"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:padding="@dimen/padding_spacing_dp16">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/server_lab_public_key" />
-
-
-            <EditText
-                android:id="@+id/et_public_key"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="text" />
-
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/padding_spacing_dp16"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/server_lab_preshared_key" />
-
-
-            <EditText
-                android:id="@+id/et_preshared_key"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="text" />
-
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/padding_spacing_dp16"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/server_lab_reserved" />
+            <include layout="@layout/layout_address_port" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:layout_marginTop="@dimen/padding_spacing_dp16"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/server_lab_secret_key" />
 
                 <EditText
-                    android:id="@+id/et_reserved1"
+                    android:id="@+id/et_id"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="text" />
 
             </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/padding_spacing_dp16"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/server_lab_public_key" />
+
+                <EditText
+                    android:id="@+id/et_public_key"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/padding_spacing_dp16"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/server_lab_preshared_key" />
+
+                <EditText
+                    android:id="@+id/et_preshared_key"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/padding_spacing_dp16"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/server_lab_reserved" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/et_reserved1"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="text" />
+
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/padding_spacing_dp16"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/server_lab_local_address" />
+
+                <EditText
+                    android:id="@+id/et_local_address"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/padding_spacing_dp16"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/server_lab_local_mtu" />
+
+                <EditText
+                    android:id="@+id/et_local_mtu"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number" />
+
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_save"
+                style="@style/Widget.Departament.Button.Primary.Tall"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/screen_gutter"
+                android:layout_marginTop="@dimen/space_24"
+                android:layout_marginEnd="@dimen/screen_gutter"
+                android:text="@string/editor_save" />
+
+            <include
+                android:id="@+id/row_delete"
+                layout="@layout/view_row" />
         </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/padding_spacing_dp16"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/server_lab_local_address" />
-
-            <EditText
-                android:id="@+id/et_local_address"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="text" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/padding_spacing_dp16"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/server_lab_local_mtu" />
-
-            <EditText
-                android:id="@+id/et_local_mtu"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="number" />
-
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/padding_spacing_dp16"
-            android:layout_marginBottom="@dimen/padding_spacing_dp16"
-            android:orientation="vertical" />
-
-    </LinearLayout>
-</ScrollView>
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

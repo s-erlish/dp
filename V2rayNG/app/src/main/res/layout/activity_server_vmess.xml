@@ -1,69 +1,108 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  ============================================================================
+  A-13 servers/server/{guid} - форма «сервер вручную», VMess.  H3 - R4.
+  ============================================================================
+
+  РАМКА, общая у восьми протокольных форм и у трёх уже перенесённых редакторов
+  рядом («Группа серверов», «Своя конфигурация», «Цепочка прокси»):
+
+      view_toolbar - бесшовная шапка подстраницы (0.4.6)
+      NestedScrollView - тело формы, снизу space_32
+      «Сохранить» - Primary.Tall в потоке, а не пункт меню ActionBar
+      «Удалить сервер» - Row.Destructive последней строкой
+
+  Действия были иконками в ActionBar: галочка и корзина, без подписей, рядом
+  друг с другом. Сохранение - главное действие экрана и стоит в потоке под
+  последним полем; удаление - разрушающее, названо словами и стоит отдельно.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true"
     android:background="?android:attr/colorBackground"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical"
     tools:context=".ui.ServerActivity">
 
-    <LinearLayout
+    <include
+        android:id="@+id/toolbar"
+        layout="@layout/view_toolbar" />
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/main_content"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="@dimen/padding_spacing_dp16">
-
-        <include layout="@layout/layout_address_port" />
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="@dimen/space_32"
+        android:scrollbars="none">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/padding_spacing_dp16"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:padding="@dimen/padding_spacing_dp16">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/server_lab_id" />
+            <include layout="@layout/layout_address_port" />
 
-            <EditText
-                android:id="@+id/et_id"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="text" />
+                android:layout_marginTop="@dimen/padding_spacing_dp16"
+                android:orientation="vertical">
 
-        </LinearLayout>
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/server_lab_id" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/padding_spacing_dp16"
-            android:orientation="vertical">
+                <EditText
+                    android:id="@+id/et_id"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="text" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/server_lab_security" />
+            </LinearLayout>
 
-            <Spinner
-                android:id="@+id/sp_security"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/padding_spacing_dp8"
-                android:layout_marginBottom="@dimen/padding_spacing_dp8"
-                android:entries="@array/securitys" />
+                android:layout_marginTop="@dimen/padding_spacing_dp16"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/server_lab_security" />
+
+                <Spinner
+                    android:id="@+id/sp_security"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/padding_spacing_dp8"
+                    android:layout_marginBottom="@dimen/padding_spacing_dp8"
+                    android:entries="@array/securitys" />
+            </LinearLayout>
+
+            <include layout="@layout/layout_transport" />
+
+            <include layout="@layout/layout_tls" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_save"
+                style="@style/Widget.Departament.Button.Primary.Tall"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/screen_gutter"
+                android:layout_marginTop="@dimen/space_24"
+                android:layout_marginEnd="@dimen/screen_gutter"
+                android:text="@string/editor_save" />
+
+            <include
+                android:id="@+id/row_delete"
+                layout="@layout/view_row" />
         </LinearLayout>
-
-        <include layout="@layout/layout_transport" />
-
-        <include layout="@layout/layout_tls" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/padding_spacing_dp16"
-            android:layout_marginBottom="@dimen/padding_spacing_dp16"
-            android:orientation="vertical" />
-
-    </LinearLayout>
-</ScrollView>
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

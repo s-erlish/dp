@@ -2,8 +2,6 @@ package com.v2ray.ang.ui
 
 import android.os.Bundle
 import android.text.TextUtils
-import android.view.Menu
-import android.view.MenuItem
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
@@ -13,7 +11,9 @@ import android.widget.Spinner
 import android.widget.TextView
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
-import com.v2ray.ang.AppConfig
+import androidx.core.view.isVisible
+import androidx.core.widget.NestedScrollView
+import com.google.android.material.button.MaterialButton
 import com.v2ray.ang.AppConfig.DEFAULT_PORT
 import com.v2ray.ang.AppConfig.PREF_ALLOW_INSECURE
 import com.v2ray.ang.AppConfig.REALITY
@@ -26,12 +26,15 @@ import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.enums.NetworkType
 import com.v2ray.ang.extension.isNotNullEmpty
 import com.v2ray.ang.extension.nullIfBlank
-import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsChangeManager
+import com.v2ray.ang.ui.component.RowBinder
+import com.v2ray.ang.ui.component.SubPage
+import com.v2ray.ang.ui.component.ToolbarBinder
+import com.v2ray.ang.ui.component.onSingleClick
 import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.util.Utils
 
@@ -147,14 +150,17 @@ class ServerActivity : BaseActivity() {
     private val container_pinned_ca256: LinearLayout? by lazy { findViewById(R.id.lay_pinned_ca256) }
     private val layout_browser_dialer: LinearLayout? by lazy { findViewById(R.id.layout_browser_dialer) }
     private val sp_browser_dialer_mode: Spinner? by lazy { findViewById(R.id.sp_browser_dialer_mode) }
+    private val btn_save: MaterialButton by lazy { findViewById(R.id.btn_save) }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
 
         val config = MmkvManager.decodeServerConfig(editGuid)
+        val configType = config?.configType ?: createConfigType
 
-        val layoutId = when (config?.configType ?: createConfigType) {
+        val layoutId = when (configType) {
             EConfigType.VMESS -> R.layout.activity_server_vmess
             EConfigType.SHADOWSOCKS -> R.layout.activity_server_shadowsocks
             EConfigType.SOCKS, EConfigType.HTTP -> R.layout.activity_server_socks
@@ -163,8 +169,34 @@ class ServerActivity : BaseActivity() {
             EConfigType.WIREGUARD -> R.layout.activity_server_wireguard
             EConfigType.HYSTERIA2 -> R.layout.activity_server_hysteria2
             else -> null
-        } ?: return
-        setContentViewWithToolbar(layoutId, showHomeAsUp = true, title = (config?.configType ?: createConfigType).toString())
+        }
+        // THE STATE THAT USED TO BE A BLANK SCREEN. `?: return` left the activity alive with no
+        // content view at all - a black rectangle with a back gesture and nothing else. A type this
+        // form cannot draw is now named and the screen closes (00-rules.md 15).
+        if (layoutId == null) {
+            toastError(R.string.srv_editor_unavailable)
+            SubPage.close(this)
+            return
+        }
+        setContentView(layoutId)
+
+        ToolbarBinder.bind(
+            root = findViewById(R.id.toolbar),
+            title = getString(protocolTitle(configType)),
+            activity = this,
+        )
+        ToolbarBinder.attachTo(findViewById(R.id.toolbar), findViewById<NestedScrollView>(R.id.main_content))
+
+        btn_save.onSingleClick { saveServer() }
+
+        RowBinder.bind(
+            root = findViewById(R.id.row_delete),
+            title = getString(R.string.srv_delete),
+            tone = RowBinder.RowTone.DESTRUCTIVE,
+            trailing = RowBinder.Trailing.None,
+            onClick = { deleteServer() },
+        )
+        findViewById<View>(R.id.row_delete).isVisible = editGuid.isNotEmpty() && !isRunning
 
         sp_network?.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(
@@ -542,8 +574,8 @@ class ServerActivity : BaseActivity() {
         if (isRunning) {
             SettingsChangeManager.makeRestartService()
         }
-        toastSuccess(R.string.toast_success)
-        finish()
+        toastSuccess(R.string.editor_saved)
+        SubPage.close(this)
         return true
     }
 
@@ -681,50 +713,45 @@ class ServerActivity : BaseActivity() {
     /**
      * delete server config
      */
-    private fun deleteServer(): Boolean {
-        if (editGuid.isNotEmpty()) {
-            if (editGuid != MmkvManager.getSelectServer()) {
-                if (MmkvManager.decodeSettingsBool(AppConfig.PREF_CONFIRM_REMOVE)) {
-                    AlertDialog.Builder(this).setMessage(R.string.del_config_comfirm)
-                        .setPositiveButton(android.R.string.ok) { _, _ ->
-                            MmkvManager.removeServer(editGuid)
-                            finish()
-                        }
-                        .setNegativeButton(android.R.string.cancel) { _, _ ->
-                            // do nothing
-                        }
-                        .show()
-                } else {
-                    MmkvManager.removeServer(editGuid)
-                    finish()
-                }
-            } else {
-                toast(R.string.toast_action_not_allowed)
+    /**
+     * Deleting from the form, always confirmed, in the words the neighbouring editors use.
+     *
+     * It used to ask only when `PREF_CONFIRM_REMOVE` was set - a key nothing in this app writes, so
+     * the branch was dead and the toolbar's bin glyph destroyed the server on the first tap with no
+     * way back (00-rules.md 7.5). The refusal on the running server was `toast_action_not_allowed`,
+     * a string that says a thing is not allowed without saying which thing.
+     */
+    private fun deleteServer() {
+        if (editGuid.isEmpty()) return
+        if (editGuid == MmkvManager.getSelectServer()) {
+            toastError(R.string.srv_delete_selected)
+            return
+        }
+        AlertDialog.Builder(this)
+            .setMessage(R.string.srv_delete_confirm)
+            .setPositiveButton(R.string.editor_delete) { _, _ ->
+                MmkvManager.removeServer(editGuid)
+                SubPage.close(this)
             }
-        }
-        return true
+            .setNegativeButton(R.string.editor_cancel, null)
+            .show()
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.action_server, menu)
-
-        val delButton = menu.findItem(R.id.del_config)
-        delButton?.isVisible = editGuid.isNotEmpty() && !isRunning
-
-        return super.onCreateOptionsMenu(menu)
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
-        R.id.del_config -> {
-            deleteServer()
-            true
-        }
-
-        R.id.save_config -> {
-            saveServer()
-            true
-        }
-
-        else -> super.onOptionsItemSelected(item)
+    /**
+     * The screen title is the PROTOCOL, and it is a technical identifier, so it stays Latin
+     * (00-rules.md 1.4.10). `EConfigType.toString()` printed the enum constant - «SHADOWSOCKS»,
+     * «WIREGUARD» - which is neither how those two projects spell their own names nor allowed by
+     * the no-caps rule (0.4.3).
+     */
+    @StringRes
+    private fun protocolTitle(type: EConfigType): Int = when (type) {
+        EConfigType.VMESS -> R.string.srv_proto_vmess
+        EConfigType.VLESS -> R.string.srv_proto_vless
+        EConfigType.TROJAN -> R.string.srv_proto_trojan
+        EConfigType.SHADOWSOCKS -> R.string.srv_proto_shadowsocks
+        EConfigType.SOCKS -> R.string.srv_proto_socks
+        EConfigType.HTTP -> R.string.srv_proto_http
+        EConfigType.WIREGUARD -> R.string.srv_proto_wireguard
+        else -> R.string.srv_proto_hysteria2
     }
 }
