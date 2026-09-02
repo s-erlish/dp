@@ -440,7 +440,7 @@ class AuthManager(
         return auth.client
     }
 
-    private companion object {
+    companion object {
         /**
          * **Где живёт доводка, которую никто не ждёт.** Один скоуп на процесс, а не поле
          * экземпляра и тем более не `viewModelScope`: [settleRegistration] запускается ровно в тот
@@ -456,6 +456,33 @@ class AuthManager(
          * жизнь процесса, и каждая ограничена таймаутами клиента.
          */
         val settleScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        /**
+         * Досылка одной только отметки о первом входе, без перечитывания профиля.
+         *
+         * Доводка после регистрации идёт вне ожидания, поэтому процесс может умереть между «сессия
+         * поднята» и «отметка ушла» — и досылать её станет некому. Симптом тихий и живучий:
+         * «Способы входа» зовут задать пароль тому, у кого он есть.
+         *
+         * Зовётся оттуда, где профиль УЖЕ прочитан и по нему видно, что отметка не дошла: пара
+         * «пароль есть, первый вход не закрыт» иначе не появляется. Перечитывать профиль здесь
+         * незачем — тот, кто позвал, только что это сделал.
+         *
+         * То же молчание, что у доводки: человеку рассказывать нечего, аккаунт работает, а причина
+         * остаётся в журнале.
+         */
+        fun settleOnboarding(api: DepartamentApiClient) {
+            settleScope.launch {
+                runCatching { api.completeOnboarding() }.onFailure {
+                    LogUtil.w(
+                        AppConfig.TAG,
+                        "Onboarding was not marked complete on retry, the account stays eligible " +
+                            "for a password step it does not need",
+                        it,
+                    )
+                }
+            }
+        }
 
         /** 4s between rounds: the user is reading a letter, not watching a spinner tick. */
         const val VERIFY_POLL_INTERVAL_MS = 4_000L
