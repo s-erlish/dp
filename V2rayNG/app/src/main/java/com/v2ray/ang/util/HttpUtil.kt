@@ -242,65 +242,15 @@ object HttpUtil {
         return UrlContentOutcome(null, UrlContentOutcome.NO_RESPONSE)
     }
 
-    /**
-     * Retrieves the content of a URL as a string with a custom User-Agent header.
-     *
-     * @param url The URL to fetch content from.
-     * @param timeout The timeout value in milliseconds.
-     * @param httpPort The HTTP port to use.
-     * @return The content of the URL as a string.
-     * @throws IOException If an I/O error occurs.
-     */
-    @Throws(IOException::class)
-    fun getUrlContentWithUserAgent(request: UrlContentRequest): String {
-        var currentUrl = request.url
-        var redirects = 0
-        val maxRedirects = 3
-
-        while (redirects++ < maxRedirects) {
-            if (currentUrl == null) continue
-            val client = buildOkHttpClient(request.timeout, request.httpPort, request.proxyUsername, request.proxyPassword, followRedirects = false)
-            val requestBuilder = Request.Builder()
-                .url(currentUrl)
-                .get()
-                .header("User-agent", resolveSubscriptionUserAgent(request.userAgent))
-                .header("Accept", SUBSCRIPTION_ACCEPT)
-                .header("Connection", "close")
-
-            attachDeviceHeaders(request, requestBuilder)
-
-            applyEmbeddedBasicAuthHeader(currentUrl, requestBuilder)
-
-            if (request.httpPort != 0 && !request.proxyUsername.isNullOrBlank() && !request.proxyPassword.isNullOrBlank()) {
-                requestBuilder.header("Proxy-Authorization", Credentials.basic(request.proxyUsername, request.proxyPassword))
-            }
-
-            client.newCall(requestBuilder.build()).execute().use { response ->
-                when {
-                    response.isRedirect -> {
-                        val location = response.header("Location")
-                        if (location.isNullOrEmpty()) {
-                            throw IOException("Redirect location not found")
-                        }
-                        currentUrl = resolveLocation(currentUrl, location)
-                        if (currentUrl.isNullOrEmpty()) {
-                            throw IOException("Failed to resolve redirect location")
-                        }
-                        continue
-                    }
-
-                    response.isSuccessful -> {
-                        return response.body?.string() ?: ""
-                    }
-
-                    else -> {
-                        throw IOException("Request failed with status code ${response.code}")
-                    }
-                }
-            }
-        }
-        throw IOException("Too many redirects")
-    }
+    // `getUrlContentWithUserAgent` USED TO STAND HERE: the same подписка GET as
+    // [getUrlContentWithUserAgentEx] below — same headers, same embedded basic auth, same device
+    // headers, same three-hop redirect loop — differing only in that it threw the response headers
+    // away and returned the body alone. It lost its last caller when the fetch started reading
+    // `subscription-userinfo` (which is what tells an expired подписка apart from an empty one) and
+    // the операторские directives beside it, and a second copy of a redirect loop is exactly the
+    // kind of thing that stays behind and then drifts: the Ex variant has since grown the HWID
+    // headers and the Accept negotiation, and this one would have had to grow them too, silently,
+    // to keep answering the same way. One fetch, one place.
 
     /**
      * Body plus selected response headers of a subscription fetch.

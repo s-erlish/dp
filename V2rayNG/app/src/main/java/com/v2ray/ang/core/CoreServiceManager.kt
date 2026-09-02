@@ -308,12 +308,6 @@ object CoreServiceManager {
     }
 
     /**
-     * Gets the name of the currently running server.
-     * @return The name of the running server.
-     */
-    fun getRunningServerName() = currentConfig?.remarks.orEmpty()
-
-    /**
      * Starts the context service for V2Ray.
      * Chooses between VPN service or Proxy-only service based on user settings.
      * @param context The context from which the service is started.

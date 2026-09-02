@@ -22,11 +22,9 @@ enum class PermissionType {
     /** Return the actual Android permission string */
     abstract fun getPermission(): String
 
-    /** Return a human-readable label for the permission */
-    fun getLabel(): String {
-        return when (this) {
-            CAMERA -> "Camera"
-            POST_NOTIFICATIONS -> "Notification"
-        }
-    }
+    // `getLabel()` USED TO STAND HERE and nothing has ever called it. It answered «Camera» and
+    // «Notification» — hardcoded English, in an app whose interface is Russian and whose every
+    // other user-facing word comes out of res/values/strings.xml. A label that cannot be shown to
+    // this product's user is not a label; the copy for a permission rationale belongs in strings,
+    // and the screen that needs one will ask for it there.
 }
