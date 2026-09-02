@@ -752,6 +752,13 @@ class LoginActivity : BaseActivity() {
             it is AuthUiState.TwoFactor || it is AuthUiState.EmailVerification ||
                 it is AuthUiState.PasswordResetSent
         }
+        // The two steps take different things away. A code step replaces the PASSWORD and keeps
+        // the address on screen, read-only, so the user can see whose code they are typing (6.7);
+        // a letter replaces the whole form, because the address is spoken for and the answer is
+        // already on its way. Only the second kind takes the address slot with it.
+        val lettered = viewModel.state.value.let {
+            it is AuthUiState.EmailVerification || it is AuthUiState.PasswordResetSent
+        }
 
         // «ВОССТАНОВИТЬ ПАРОЛЬ» IS NOT ONE OF THE SEGMENT'S TWO EITHER, and it takes the same exit
         // the e-mail errands take, one rung earlier so that neither can be confused for the other:
@@ -762,7 +769,7 @@ class LoginActivity : BaseActivity() {
         // would like to register instead; the row underneath would offer the errand they are on.
         if (!emailErrand && formMode == FormMode.RESET) {
             mail.segMode.isVisible = false
-            mail.slotEmail.isVisible = !stepped
+            mail.slotEmail.isVisible = !lettered
             mail.slotPassword.isVisible = false
             mail.slotConfirm.isVisible = false
             mail.slotLinkHint.isVisible = !stepped
@@ -861,10 +868,16 @@ class LoginActivity : BaseActivity() {
         // it removed. Saying what the segment's own two errands look like is what makes coming
         // BACK to them whole: without it, returning from the reset step left a sign-in form with
         // no password box on it.
-        mail.slotEmail.isVisible = !stepped
+        mail.slotEmail.isVisible = !lettered
         mail.slotPassword.isVisible = !stepped
         // Sign-in and registration always have a password box under the address.
         mail.etEmail.imeOptions = EditorInfo.IME_ACTION_NEXT
+        // The reset step left it on «Готово», and imeOptions is read when the input connection
+        // opens: without this the key over a form that has just grown a password box again would
+        // still be the one that submits it.
+        if (mail.etEmail.hasFocus()) {
+            getSystemService(InputMethodManager::class.java)?.restartInput(mail.etEmail)
+        }
 
         mail.segSignin.setTextAppearance(
             if (register) R.style.TextAppearance_App_Title_Medium else R.style.TextAppearance_App_Title_Segment_Active
