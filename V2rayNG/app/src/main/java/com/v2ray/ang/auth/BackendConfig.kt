@@ -89,6 +89,7 @@ object BackendConfig {
         // Auth
         const val telegramLoginToken = "/client/auth/telegram-login-token"
         const val telegramLoginCheck = "/client/auth/telegram-login-check"
+        const val register = "/client/auth/register"
         const val login = "/client/auth/login"
         const val twoFaLogin = "/client/auth/2fa-login"
         const val googleLogin = "/client/auth/google"

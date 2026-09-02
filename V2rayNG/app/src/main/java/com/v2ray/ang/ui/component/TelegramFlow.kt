@@ -75,7 +75,7 @@ object HomeHold {
  * правке. Поэтому поток вынесен целиком, [GateView] зовёт его так же, как `AccountFragment`, и под
  * ним по-прежнему работает тот самый `AuthManager.beginTelegramLogin()`, которым живёт
  * `AuthViewModel`. `LoginActivity` со всем, что у неё есть (почта, OTP, 2FA, Google, гейт с двумя
- * кнопками, `MODE_TELEGRAM_START`), остаётся в проекте и открывается строкой «Войти через сайт»:
+ * кнопками, `MODE_TELEGRAM_START`), остаётся в проекте и открывается строкой «Войти по почте»:
  * она перестала быть путём по умолчанию для ОДНОЙ кнопки, а не исчезла.
  *
  * ЖИЗНЬ ЭКЗЕМПЛЯРА — жизнь того, кто его держит. Работа идёт в `lifecycleScope` окна, слой висит в
@@ -133,7 +133,7 @@ class TelegramFlow(private val host: Host) {
      * Начать вход. Слой поднимается сразу, Telegram открывается, как только бэкенд выдаст ссылку.
      *
      * @return false, если бэкенда нет вовсе: входить некуда, и звать сюда нечего — держатель
-     * отправляет пользователя туда, где экран скажет это своими словами («Войти через сайт»).
+     * отправляет пользователя туда, где экран скажет это своими словами («Войти по почте»).
      * Повторный вызов на идущем потоке возвращает true и ничего не делает.
      */
     @MainThread
@@ -169,7 +169,10 @@ class TelegramFlow(private val host: Host) {
                         AuthViewModel.messageFor(state.error, awaitingTelegram = opened)
                     )
 
-                    is LoginState.Idle, is LoginState.SiteLoading -> Unit
+                    // Never emitted by the Telegram flow: the password path and the e-mail
+                    // verification wait belong to the sign-in screen's other two entry points.
+                    is LoginState.Idle, is LoginState.SiteLoading,
+                    is LoginState.AwaitingEmailVerification -> Unit
                 }
             }
         }

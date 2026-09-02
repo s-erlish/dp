@@ -362,7 +362,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
     }
 
     private val requestActivityLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        // FIRST, AND BEFORE ANY EARLY RETURN. A sign-in through «Войти через сайт» parks Главная on
+        // FIRST, AND BEFORE ANY EARLY RETURN. A sign-in through «Войти по почте» parks Главная on
         // the way out (see launchAuthScreen); this is the only place it can be let go, and the hold
         // also silences notices through NoticePolicy. Skipping it on one branch would leave the tab
         // parked and the app mute for the rest of the process — which is why it is not written after
@@ -839,7 +839,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * THE SIGN-IN THAT IS NOT A FLOW STILL GETS THE FLOW'S HAND-OFF.
      *
      * `GateView`'s Telegram and clipboard paths park Главная and let it go once its данные are in.
-     * `LoginActivity` — «Войти через сайт», and now the account tab's own two buttons — had neither
+     * `LoginActivity` — «Войти по почте», and now the account tab's own two buttons — had neither
      * half: it launched, came back, and Главная was simply there, so its rows arrived after the
      * screen exactly as they used to on the other two paths. Same shape, same defect, one path late.
      *

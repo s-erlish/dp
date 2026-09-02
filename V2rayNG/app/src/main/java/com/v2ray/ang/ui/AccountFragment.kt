@@ -345,7 +345,7 @@ class AccountFragment : Fragment() {
         // it — the very machinery Главная has used all along, now called from two places instead of
         // living in one.
         //
-        // «Войти через сайт» still opens LoginActivity, and correctly so: that one is a FORM, i.e.
+        // «Войти по почте» still opens LoginActivity, and correctly so: that one is a FORM, i.e.
         // genuinely another screen, and nothing about it duplicates the tap that opened it. The
         // gate and MODE_TELEGRAM_START are untouched and still reachable — «Привязать Telegram»
         // below goes through the gate, and every other caller of LoginActivity is unchanged.

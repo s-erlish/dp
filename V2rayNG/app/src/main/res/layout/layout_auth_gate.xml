@@ -223,7 +223,7 @@
                         android:textAppearance="@style/TextAppearance.App.Button"
                         app:backgroundTint="@color/ob_pill_container"
                         app:cornerRadius="@dimen/radius_button"
-                        app:icon="@drawable/ic_ob_site"
+                        app:icon="@drawable/ic_ob_mail"
                         app:iconTint="?attr/colorOnSurfaceVariant"
                         app:strokeColor="?attr/colorOutline"
                         app:strokeWidth="@dimen/ob_stroke" />
@@ -338,7 +338,7 @@
                         app:strokeColor="?attr/colorOutline"
                         app:strokeWidth="@dimen/ob_stroke" />
 
-                    <!-- The awaiting stack's own «Войти через сайт»; see @id/btn_gate_email
+                    <!-- The awaiting stack's own «Войти по почте»; see @id/btn_gate_email
                          above for why the id keeps the older word. -->
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_gate_email_alt"
@@ -350,7 +350,7 @@
                         android:textAppearance="@style/TextAppearance.App.Button"
                         app:backgroundTint="@color/ob_pill_container"
                         app:cornerRadius="@dimen/radius_button"
-                        app:icon="@drawable/ic_ob_site"
+                        app:icon="@drawable/ic_ob_mail"
                         app:iconTint="?attr/colorOnSurfaceVariant"
                         app:strokeColor="?attr/colorOutline"
                         app:strokeWidth="@dimen/ob_stroke" />

@@ -71,11 +71,16 @@
     <string name="account_login_telegram">Telegram</string>
     <string name="account_login_telegram_linked">Привязан · %1$s</string>
     <string name="account_login_telegram_unlinked">Не привязан</string>
-    <!-- NEW (2026-08-17). «в аккаунте добавь кнопку где способы входа туда сайт, чтобы можно было
-         привязать почту с сайта». One word, and it is the SAME word the two sign-in surfaces use
-         for this door («Войти через сайт»), so the row and the button are recognisably one thing.
-         Not «Почта»: the e-mail is what the row REPORTS, the site is the way in. -->
-    <string name="account_login_site">Сайт</string>
+    <!-- «в аккаунте добавь кнопку где способы входа туда сайт, чтобы можно было привязать почту
+         с сайта». One word, and it is the SAME word the two sign-in surfaces use for this door, so
+         the row and the button are recognisably one thing.
+
+         IT WAS «Сайт», on the grounds that the e-mail is what the row REPORTS while the site is the
+         way in. The way in moved: registration and sign-in both happen in the app now, the door
+         says «Войти по почте», and a row still called «Сайт» would send the user looking for a
+         browser that is no longer part of it. The row reports an address and opens the form that
+         proves one — both are the почта. -->
+    <string name="account_login_site">Почта</string>
 
     <!-- Payments history -->
     <string name="account_payment_pending">Платёж обрабатывается…</string>

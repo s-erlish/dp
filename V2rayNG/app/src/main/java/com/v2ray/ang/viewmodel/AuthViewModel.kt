@@ -10,6 +10,7 @@ import com.v2ray.ang.auth.AuthManager
 import com.v2ray.ang.auth.AuthManager.LoginState
 import com.v2ray.ang.auth.dto.LoginResult
 import com.v2ray.ang.auth.dto.UserProfileDto
+import com.v2ray.ang.auth.serverMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,6 +62,17 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         /** The backend accepted the password and wants the TOTP code. */
         data class TwoFactor(val tempToken: String) : AuthUiState
 
+        /**
+         * Registered, and the panel wants the address proved: a letter carrying a link is out and
+         * the login is being polled until it is opened. [resending] is true only while a second
+         * letter is being requested, so «Отправить снова» can report itself without the screen
+         * leaving the waiting state it is reporting from.
+         */
+        data class EmailVerification(
+            val email: String,
+            val resending: Boolean = false,
+        ) : AuthUiState
+
         /** Session persisted. The UI plays the beat and hands back to the caller. */
         data class Success(val profile: UserProfileDto) : AuthUiState
     }
@@ -76,6 +88,13 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         @param:StringRes @get:StringRes val message: Int,
         val surface: Surface,
         val credentialFlash: Boolean = false,
+        /**
+         * The panel's OWN sentence, when it sent one and the surface is allowed to quote it — the
+         * registration path, where a bare 400 covers both «Этот email уже зарегистрирован» and
+         * «Некорректные данные» and only the panel knows which. Null everywhere else, and [message]
+         * is then the whole answer.
+         */
+        val text: String? = null,
     )
 
     private val _state = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
@@ -93,6 +112,24 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
 
     private var loginJob: Job? = null
     private var cooldownJob: Job? = null
+
+    /**
+     * The credentials a registration was started with, held HERE and not inside
+     * [AuthUiState.EmailVerification].
+     *
+     * The address is what «Отправить снова» re-sends to and what the poll signs in with, and both
+     * outlive the state that named it: a failed resend puts the machine back into the waiting
+     * state, and reading the address out of the state it is being rebuilt from is circular — one
+     * error and the screen would be left with a resend button that has nothing to send and a poll
+     * with nobody to log in as. A ViewModel field survives every state change and every rotation,
+     * which is exactly the lifetime this pair needs.
+     *
+     * The password is deliberately NOT in [SavedStateHandle]: that Bundle can be written to disk by
+     * the platform, and a password does not belong there. Process death therefore ends the wait,
+     * which is correct — nothing else on this screen survives it either.
+     */
+    private var pendingEmail: String? = null
+    private var pendingPassword: String? = null
 
     /**
      * The deep link this process has already handed to Telegram. Survives configuration change in
@@ -130,9 +167,11 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
 
                     is LoginState.Error -> fail(managerState.error, Surface.GATE)
 
-                    // The manager never emits these on this flow: Idle would be a no-op and
-                    // SiteLoading belongs to the password path.
-                    is LoginState.Idle, is LoginState.SiteLoading -> Unit
+                    // The manager never emits these on this flow: Idle would be a no-op,
+                    // SiteLoading belongs to the password path and the verification wait belongs
+                    // to registration.
+                    is LoginState.Idle, is LoginState.SiteLoading,
+                    is LoginState.AwaitingEmailVerification -> Unit
                 }
             }
         }
@@ -146,6 +185,68 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         loginJob?.cancel()
         loginJob = null
         openedDeepLink = null
+        _error.value = null
+        _state.value = AuthUiState.Idle
+    }
+
+    /**
+     * Registration, in the app and not in a browser. Two answers are both successes: a panel with
+     * e-mail verification off signs the user straight in, one with it on sends a letter and the
+     * machine moves to [AuthUiState.EmailVerification] while [AuthManager] polls the login.
+     *
+     * Also the «Отправить снова» action — see [resendVerification]. When it is called from the
+     * waiting screen the screen STAYS on it (`resending = true` spins the ring in place) instead of
+     * dropping back to the form: the first letter may well arrive while the second is being asked
+     * for, and yanking the user off the screen that explains what to do with it would be a step
+     * backwards for a tap that meant "keep going".
+     */
+    fun register(email: String, password: String) {
+        loginJob?.cancel()
+        _error.value = null
+        pendingEmail = email
+        pendingPassword = password
+        val resending = _state.value is AuthUiState.EmailVerification
+        _state.value = if (resending) {
+            AuthUiState.EmailVerification(email, resending = true)
+        } else {
+            AuthUiState.Submitting
+        }
+        loginJob = viewModelScope.launch {
+            authManager.beginRegister(email, password).collect { managerState ->
+                when (managerState) {
+                    is LoginState.AwaitingEmailVerification ->
+                        _state.value = AuthUiState.EmailVerification(managerState.email)
+
+                    is LoginState.Success -> _state.value = AuthUiState.Success(managerState.profile)
+
+                    is LoginState.Error -> fail(managerState.error, Surface.MAIL, quoteBackend = true)
+
+                    // Not emitted on this flow: the Telegram and password states belong to the
+                    // other two entry points.
+                    is LoginState.Idle, is LoginState.SiteLoading,
+                    is LoginState.AwaitingTelegram, is LoginState.Polling -> Unit
+                }
+            }
+        }
+    }
+
+    /** «Отправить снова» on the waiting screen: the same registration, to the same address. */
+    fun resendVerification() {
+        val email = pendingEmail ?: return
+        val password = pendingPassword ?: return
+        register(email, password)
+    }
+
+    /**
+     * «Вернуться ко входу»: abandons the wait and the poll with it, and forgets the credentials it
+     * was holding. The account still exists and the letter is still valid — nothing here undoes the
+     * registration, it only stops watching for it.
+     */
+    fun leaveVerification() {
+        loginJob?.cancel()
+        loginJob = null
+        pendingEmail = null
+        pendingPassword = null
         _error.value = null
         _state.value = AuthUiState.Idle
     }
@@ -210,6 +311,8 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
         loginJob = null
         openedDeepLink = null
         saved.remove<String>(KEY_TEMP_TOKEN)
+        pendingEmail = null
+        pendingPassword = null
         _error.value = null
         _state.value = AuthUiState.Idle
     }
@@ -233,13 +336,22 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
      * step keeps its own state, so the user lands back on the six cells rather than on the password
      * field they already got right.
      */
-    private fun fail(cause: ApiError, surface: Surface) {
+    private fun fail(cause: ApiError, surface: Surface, quoteBackend: Boolean = false) {
         val awaitingTelegram = _state.value is AuthUiState.TelegramAwaiting
-        _state.value = if (surface == Surface.TWO_FACTOR) {
-            val token: String? = saved[KEY_TEMP_TOKEN]
-            if (token != null) AuthUiState.TwoFactor(token) else AuthUiState.Idle
-        } else {
-            AuthUiState.Idle
+        val verifying = _state.value is AuthUiState.EmailVerification
+        _state.value = when {
+            surface == Surface.TWO_FACTOR -> {
+                val token: String? = saved[KEY_TEMP_TOKEN]
+                if (token != null) AuthUiState.TwoFactor(token) else AuthUiState.Idle
+            }
+
+            // A failed «Отправить снова» is not a failed WAIT: the letter that is already out is
+            // still valid and the poll still has something to find, so the screen goes back to
+            // waiting with the reason printed on it. The address comes from the field that outlives
+            // the state, never from the state being replaced.
+            verifying -> pendingEmail?.let { AuthUiState.EmailVerification(it) } ?: AuthUiState.Idle
+
+            else -> AuthUiState.Idle
         }
         if (cause is ApiError.RateLimited) startCooldown()
         _error.value = AuthError(
@@ -247,7 +359,8 @@ class AuthViewModel(private val saved: SavedStateHandle) : ViewModel() {
             surface = surface,
             // 12.11: an Unauthorized on the password step flashes both credential borders. On the
             // 2FA step the cells carry that signal instead, so the flash is not doubled.
-            credentialFlash = surface == Surface.MAIL && cause is ApiError.Unauthorized,
+            credentialFlash = surface == Surface.MAIL && cause is ApiError.Unauthorized && !quoteBackend,
+            text = if (quoteBackend) cause.serverMessage() else null,
         )
     }
 

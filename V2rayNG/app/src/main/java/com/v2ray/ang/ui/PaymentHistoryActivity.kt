@@ -171,7 +171,7 @@ class PaymentHistoryActivity : BaseActivity() {
     }
 
     private fun messageFor(error: ApiError): Int = when (error) {
-        is ApiError.Network, ApiError.Timeout, ApiError.ServiceUnavailable ->
+        is ApiError.Network, ApiError.Timeout, is ApiError.ServiceUnavailable ->
             R.string.history_error_network
 
         else -> R.string.history_error_generic
