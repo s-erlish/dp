@@ -517,7 +517,27 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         }
     }
 
+    /**
+     * ОБНОВЛЕНИЕ АККАУНТА ПРИ ВОЗВРАЩЕНИИ - ЧЕРЕЗ ПОЛТОРЫ СЕКУНДЫ, А НЕ В КАДР ПОКАЗА.
+     *
+     * Каждое возвращение в приложение отправляло три запроса сразу - профиль, `/subscription/all`
+     * и `/client/subscription` - в тот самый момент, когда экран возвращается, и их ответы следом
+     * перерисовывали строку аккаунта и карточку подписки. На ПК то же самое добавляло рывков к
+     * возвращению из трея и отложено там на полторы секунды (`AccountViewModel.RefreshIfIdle`);
+     * здесь так же. Первые кадры принадлежат экрану, сеть подождёт.
+     *
+     * Если приложение за это время снова ушло ([onPause]), запросы не уходят вовсе: ответ некому
+     * смотреть, а следующее возвращение спросит заново.
+     *
+     * Порога простоя здесь нет и не добавлено: как и раньше, обновляется каждое возвращение, только
+     * позже. У ПК порог - 15 минут без обновления.
+     */
+    private val returnRefreshRunnable = Runnable { refreshAccountData() }
+
     private companion object {
+        /** Сколько экран возвращается без сети. Цифра ПК: `AccountViewModel.RefreshIfIdle`. */
+        const val RETURN_REFRESH_DELAY_MS = 1_500L
+
         // KEY_CONNECTION_START used to live here and the screen wrote it. It is now
         // CoreServiceManager.KEY_SESSION_STARTED_AT — same key, written beside the core loop, read
         // here through CoreServiceManager.sessionStartedAt(). See [startConnectionTimer].
@@ -699,9 +719,23 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         }
         // The FIRST resume after a fresh view has nothing to ask for: [observeAccount] asked, a
         // message ago, and the answers are still in flight. @see observeAccount
-        if (accountDataFetchedOnCreate) accountDataFetchedOnCreate = false else refreshAccountData()
+        // Every later one asks a moment after the screen is back, not in its first frame.
+        // @see returnRefreshRunnable
+        if (accountDataFetchedOnCreate) accountDataFetchedOnCreate = false else refreshAccountDataSoon()
         refreshServerSurfaces(-1)
         render()
+    }
+
+    /** The return-to-app half of [refreshAccountData]. @see returnRefreshRunnable */
+    private fun refreshAccountDataSoon() {
+        timerHandler.removeCallbacks(returnRefreshRunnable)
+        // Signed out there is nothing to fetch and the answer is local: it is settled now, in the
+        // same render as the rest of the resume, rather than a second and a half later.
+        if (!BackendConfig.isConfigured() || !AccountSession.isLoggedIn()) {
+            refreshAccountData()
+            return
+        }
+        timerHandler.postDelayed(returnRefreshRunnable, RETURN_REFRESH_DELAY_MS)
     }
 
     /**
@@ -749,6 +783,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // instant and blanks the readings. The session is not over; only the screen has gone.
         timerHandler.removeCallbacks(uptimeRunnable)
         stopLatencyProbe()
+        // Gone again before the account refresh went out: it does not go out. Every pause is
+        // followed by a resume before the screen can be seen again, and that resume asks afresh.
+        timerHandler.removeCallbacks(returnRefreshRunnable)
         super.onPause()
     }
 
@@ -802,6 +839,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         timerHandler.removeCallbacks(latencyRunnable)
         timerHandler.removeCallbacks(connectWatchdogRunnable)
         timerHandler.removeCallbacks(uptimeRunnable)
+        timerHandler.removeCallbacks(returnRefreshRunnable)
         ringAnimator?.cancel()
         ringAnimator = null
         // The arc's hand-back to the ring. Short, but it writes a stroke into three GradientDrawables
@@ -2523,7 +2561,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         refreshAccountData()
         // …AND [onResume] IS ABOUT TO ASK FOR THE SAME THING. The shell hosts its tabs with
         // show()/hide(), so a hidden tab stays RESUMED — which also means onResume ALWAYS follows
-        // onViewCreated, one main-thread message later, and it calls refreshAccountData() too.
+        // onViewCreated, one main-thread message later, and it asks for the account too
+        // ([refreshAccountDataSoon]).
         // Every creation of this screen with a signed-in account therefore fired the account's
         // whole fetch TWICE within a few milliseconds: `/client/profile` ran to completion both
         // times (refreshProfile keeps no job, so neither run cancels the other and both publish),
