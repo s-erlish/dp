@@ -111,8 +111,14 @@ object NotificationManager {
             return false
         }
 
-        // Reset last query time to avoid querying stats too soon after showing the notification
-        lastQueryTime = System.currentTimeMillis()
+        // Reset last query time to avoid querying stats too soon after showing the notification.
+        //
+        // ТОЛЬКО ДЛЯ НОВОГО ТУННЕЛЯ. [lastQueryTime] - начало окна, за которое копятся счётчики, и
+        // сдвигать его можно только вместе с их обнулением: новое ядро приходит с нулями, а здесь
+        // оно ещё не запущено. Повторный старт на живом туннеле (`CoreVpnService`, дубликат
+        // команды) тоже проходит через эту строку, и сдвиг окна без обнуления отдавал следующему
+        // опросу байты за прежнее окно, делённые на новое, более короткое - скачок скорости.
+        if (!CoreServiceManager.isRunning()) lastQueryTime = System.currentTimeMillis()
 
         val channel = ensureChannel(service)
 
@@ -574,13 +580,15 @@ object NotificationManager {
         val queryTime = System.currentTimeMillis()
         val sinceLastQueryIn = (queryTime - lastQueryTime)
 
-        // If the query interval is too short, skip this round to avoid excessive CPU usage
+        // If the query interval is too short, skip this round to avoid excessive CPU usage.
+        //
+        // THE WINDOW'S START STAYS WHERE IT IS. The counters were not read, so they still hold
+        // everything since the last query; moving the start to now handed the next query those
+        // bytes over a window it no longer measured, and the rate came out up to twice the truth.
         if (sinceLastQueryIn < QUERY_INTERVAL_MS) {
             LogUtil.w(AppConfig.TAG, "Query interval too short: ${sinceLastQueryIn}ms, skipping")
-            lastQueryTime = queryTime
             return
         }
-        val sinceLastQueryInSeconds = sinceLastQueryIn / 1000.0
 
         // THE DIRECT SIDE IS NOT SUMMED ANY MORE. Upstream separates proxied from direct traffic
         // because it reports both; this product reports one rate — what went through the tunnel —
@@ -600,9 +608,12 @@ object NotificationManager {
         // ONE TICK, TWO CONSUMERS. The rate goes to Главная's ledger and, since the owner asked for
         // it, to the expanded notification — from the SAME measurement at the SAME interval. Adding
         // a second job or a faster push for the shade would have paid twice for one number.
+        //
+        // The first query after the screen comes back is a catch-up, not a rate: see [TrafficRate].
+        // It still ran — it is what empties the counters — but what it publishes is zero.
         getService()?.let { svc ->
-            val downPerSec = (proxyDownlink / sinceLastQueryInSeconds).toLong()
-            val upPerSec = (proxyUplink / sinceLastQueryInSeconds).toLong()
+            val downPerSec = TrafficRate.perSecond(proxyDownlink, sinceLastQueryIn, QUERY_INTERVAL_MS)
+            val upPerSec = TrafficRate.perSecond(proxyUplink, sinceLastQueryIn, QUERY_INTERVAL_MS)
             MessageUtil.sendMsg2UI(svc, AppConfig.MSG_STATE_SPEED_UPDATE, longArrayOf(downPerSec, upPerSec))
             if (Posted(Shade.RUNNING, downPerSec, upPerSec) != lastPushed) pushSpeed(downPerSec, upPerSec)
         }
