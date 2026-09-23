@@ -34,6 +34,7 @@ object MmkvManager {
     private const val KEY_SUB_SERVER_PREFIX = "SUB_SERVERS_"
     private const val KEY_SUB_IDS = "SUB_IDS"
     private const val KEY_WEBDAV_CONFIG = "WEBDAV_CONFIG"
+    private const val KEY_SERVERS_REVISION = "SERVERS_REVISION"
 
     /**
      * The retired "measurement in flight" sentinel.
@@ -128,12 +129,13 @@ object MmkvManager {
     /**
      * The selected server — **and only when that server still exists.**
      *
-     * A STORED GUID IS NOT A SERVER, and that gap is the whole defect this guard closes. Every
-     * subscription refresh deletes each of a провайдер's profiles and mints new guids for the
-     * replacements ([removeServerViaSubid] + `AngConfigManager.parseCustomConfigServer`), and the
-     * refresh runs unattended — the periodic worker fires while the app is in the foreground. What
-     * it leaves behind, whenever the re-selection above it does not land, is this key pointing at a
-     * profile that no longer exists.
+     * A STORED GUID IS NOT A SERVER, and that gap is the whole defect this guard closes. A
+     * subscription refresh deletes every profile of a провайдер it does not recognise in the new
+     * answer and mints new guids for what is new ([removeServerViaSubid] +
+     * `AngConfigManager.parseCustomConfigServer`; a server that is still there keeps its guid, see
+     * [SubscriptionRefreshIdentity]), and the refresh runs unattended — the periodic worker fires
+     * while the app is in the foreground. What it leaves behind, whenever the re-selection above it
+     * does not land, is this key pointing at a profile that no longer exists.
      *
      * Nothing downstream could tell that apart from a real selection. `HomeFragment.resolveState`
      * read it, failed to decode the profile, and drew «Выберите сервер в списке ниже» with the
@@ -352,14 +354,20 @@ object MmkvManager {
      * install, with nothing able to read a single one of those entries again.
      *
      * @param subscriptionId The subscription ID.
+     * @param keep guids that the caller is about to write again under the same key — the servers a
+     *   refresh recognised in the new answer ([SubscriptionRefreshIdentity]). They leave the list
+     *   like every other row, because the caller rebuilds the list in the провайдер's order, but
+     *   their records stay: the delay under the guid is what «пинги не пропадают» means, and the
+     *   selection pointing at one of them is still a live selection, so it is not cleared either.
      */
-    fun removeServerViaSubid(subscriptionId: String?) {
+    fun removeServerViaSubid(subscriptionId: String?, keep: Set<String> = emptySet()) {
         val subId = getSubscriptionId(subscriptionId)
         withServerListLock {
             val serverList = decodeServerList(subId)
 
-            // Remove all servers in the list
+            // Remove every server in the list except the ones the caller is about to rewrite
             serverList.forEach { guid ->
+                if (guid in keep) return@forEach
                 if (getSelectServer() == guid) {
                     mainStorage.remove(KEY_SELECTED_SERVER)
                 }
@@ -370,6 +378,29 @@ object MmkvManager {
 
             serverList.clear()
             encodeServerList(serverList, subId)
+        }
+    }
+
+    /**
+     * Счётчик изменений содержимого серверов: растёт, когда обновление подписки на самом деле
+     * что-то поменяло - строку, её порядок или настройки под прежним guid.
+     *
+     * ЗАЧЕМ ОН, КОГДА ЕСТЬ СПИСОК guid. Пока каждое обновление выдавало серверам новые guid,
+     * сравнения списков хватало: изменилось хоть что-то - изменился и список. Теперь узнанный
+     * сервер сохраняет guid ([SubscriptionRefreshIdentity]), а у конфига провайдера под тем же
+     * guid вправе поменяться шаблон - адрес, транспорт, протокол. Список guid такого не видит, и
+     * экран, сверяющий только его (`MainViewModel.reloadServerListIfStale`,
+     * `MainRecyclerAdapter.pruneCustomProtoCache`), продолжал бы рисовать прежнее. Счётчик - та
+     * самая недостающая половина, и стоит одно чтение числа.
+     *
+     * В `mainStorage`, MULTI_PROCESS_MODE: пишет его `:bg`, а читает процесс интерфейса.
+     */
+    fun serversRevision(): Long = mainStorage.decodeLong(KEY_SERVERS_REVISION, 0L)
+
+    /** @see serversRevision */
+    fun markServersChanged() {
+        withServerListLock {
+            mainStorage.encode(KEY_SERVERS_REVISION, serversRevision() + 1)
         }
     }
 

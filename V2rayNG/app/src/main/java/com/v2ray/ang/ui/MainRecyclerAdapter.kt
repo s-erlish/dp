@@ -347,18 +347,26 @@ class MainRecyclerAdapter(
     /** The guid set [customProtoCache] was last aligned to. @see pruneCustomProtoCache */
     private var cachedProtoGuids: Set<String> = emptySet()
 
+    /** [MmkvManager.serversRevision] [customProtoCache] was last aligned to. @see pruneCustomProtoCache */
+    private var cachedProtoRevision = Long.MIN_VALUE
+
     /**
      * THE PARSE CACHE NEVER FORGOT A GUID, and a подписка refresh is what made that matter.
      *
-     * A refresh deletes every profile of a провайдер and mints a new guid for each replacement, so
-     * once one has run not a single cached key names a server that still exists — and the entries
-     * stayed, a fresh set per refresh, for the life of the adapter. Главная's list belongs to a tab
-     * the shell hides rather than replaces, so that life is the whole session.
+     * A refresh used to delete every profile of a провайдер and mint a new guid for each
+     * replacement, so once one had run not a single cached key named a server that still existed —
+     * and the entries stayed, a fresh set per refresh, for the life of the adapter. Главная's list
+     * belongs to a tab the shell hides rather than replaces, so that life is the whole session.
      *
      * Dropping the whole map when the guid SET changes also settles the second question — whether a
-     * cached value can still be trusted. A подписка refresh, an import and a delete all move the
-     * set, and those are the paths that replace a profile's CONTENT; what is left over is editing
-     * one profile in place, which keeps its guid and is the one case this cannot see.
+     * cached value can still be trusted. An import and a delete move the set; a подписка refresh
+     * moves it for every server it does not recognise. What the set cannot see is new content under
+     * an OLD guid, and a refresh makes exactly that now: a провайдер config is recognised by its name
+     * and keeps its guid while its template — protocol, transport, security, the three things this
+     * cache holds — may have changed (SubscriptionRefreshIdentity). So the map also goes when
+     * [MmkvManager.serversRevision] has moved, which a refresh does only when it changed something.
+     * What is left over is editing one profile in place, which keeps its guid and is the one case
+     * this cannot see.
      *
      * Checked only on a structural rebuild, and against the set rather than on every call, because
      * the other caller is a SINGLE-ROW refresh — one per server of a bulk latency check, arriving
@@ -369,8 +377,10 @@ class MainRecyclerAdapter(
     private fun pruneCustomProtoCache(structural: Boolean) {
         if (!structural) return
         val live = servers.mapTo(HashSet(servers.size)) { it.guid }
-        if (live == cachedProtoGuids) return
+        val revision = MmkvManager.serversRevision()
+        if (live == cachedProtoGuids && revision == cachedProtoRevision) return
         cachedProtoGuids = live
+        cachedProtoRevision = revision
         customProtoCache.clear()
     }
 

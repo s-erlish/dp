@@ -2717,9 +2717,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         //
         // `running ?: selected` picked the guid and then decoded once, so a running guid that no
         // longer names a stored profile produced NO profile at all instead of dropping through to
-        // the selection. That happens for real and it happens on a schedule: every подписка refresh
-        // deletes the profiles it replaces and writes new guids, so an hourly auto-update on a live
-        // tunnel leaves `runningGuid` pointing at a record that is gone. The connect wave closed
+        // the selection. That happens for real and it happens on a schedule: a подписка refresh
+        // deletes the profiles it does not recognise in the new answer and writes new guids for
+        // them, so an hourly auto-update that changed the running server on a live tunnel leaves
+        // `runningGuid` pointing at a record that is gone. The connect wave closed
         // the same hole for the SELECTED server — `getSelectServer` returns null for a vanished
         // profile — and this is the other half of it.
         //

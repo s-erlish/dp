@@ -323,14 +323,35 @@ object AngConfigManager {
             // wrote that emptiness back over the imported серверы. Parsing is already done by this
             // point, so the fence holds no I/O — see [MmkvManager.inServerListTransaction].
             if (configs.isNotEmpty()) {
-                MmkvManager.inServerListTransaction {
+                val replacement = MmkvManager.inServerListTransaction {
+                    // УЗНАННЫЙ СЕРВЕР ПЕРЕЗАПИСЫВАЕТСЯ ПОД ПРЕЖНИМ guid, И ЭТО ВСЁ, ЧТО ЗДЕСЬ НОВОГО.
+                    // Задержка и выбор держатся на guid, поэтому неизменившийся сервер после
+                    // обновления - та же строка, с тем же пингом и той же отметкой. См.
+                    // [SubscriptionRefreshIdentity]. Дописывание (append) ничего не заменяет, и ему
+                    // узнавать нечего.
+                    val beforeList = if (append) emptyList() else MmkvManager.decodeServerList(subid).toList()
+                    val previous = if (append) emptyList() else snapshotServers(subid)
+                    val reuse = keptGuids(previous, configs)
+                    val kept = reuse.filterNotNullTo(HashSet())
+                    // Выбранный сервер узнан - он и остаётся выбранным как есть, без поиска по имени.
+                    val keptSelected = MmkvManager.getSelectServer()?.takeIf { it in kept }
                     if (!append) {
-                        MmkvManager.removeServerViaSubid(subid)
+                        MmkvManager.removeServerViaSubid(subid, keep = kept)
                     }
-                    val keyToProfile = batchSaveConfigs(configs, subid)
-                    val matchKey = resolveSelectedKey(keyToProfile, removedSelected, subid, append)
-                    matchKey?.let { MmkvManager.setSelectServer(it) }
+                    val keyToProfile = batchSaveConfigs(configs, subid, reuse, previous)
+                    if (keptSelected == null) {
+                        val matchKey = resolveSelectedKey(keyToProfile, removedSelected, subid, append)
+                        matchKey?.let { MmkvManager.setSelectServer(it) }
+                    }
+                    if (append) null else Replacement(
+                        before = previous,
+                        beforeList = beforeList,
+                        afterList = MmkvManager.decodeServerList(subid).toList(),
+                        written = keyToProfile.mapValues { (_, profile) -> profile to null },
+                        kept = kept,
+                    )
                 }
+                replacement?.let { noteIfChanged(it) }
             }
 
             return configs.size
@@ -346,16 +367,29 @@ object AngConfigManager {
      *
      * @param configs The list of ProfileItem to save.
      * @param subid The subscription ID.
+     * @param reuse for each of [configs], the guid of the previous generation it was recognised as
+     *   ([keptGuids]), or null for a server that is new. A recognised server is written under its
+     *   old guid, so its delay and the selection pointing at it survive the refresh.
+     * @param previous the previous generation, for the time each recognised server was added.
      * @return Map of generated keys to their corresponding ProfileItem.
      */
-    private fun batchSaveConfigs(configs: List<ProfileItem>, subid: String): Map<String, ProfileItem> {
+    private fun batchSaveConfigs(
+        configs: List<ProfileItem>,
+        subid: String,
+        reuse: List<String?> = emptyList(),
+        previous: List<PreviousServer> = emptyList(),
+    ): Map<String, ProfileItem> {
         val keyToProfile = mutableMapOf<String, ProfileItem>()
+        val addedTimes = previous.associate { it.guid to it.profile.addedTime }
 
         // Read serverList once
         val serverList = MmkvManager.decodeServerList(subid)
 
-        configs.forEach { config ->
-            val key = Utils.getUuid()
+        configs.forEachIndexed { index, config ->
+            val kept = reuse.getOrNull(index)
+            val key = kept ?: Utils.getUuid()
+            // Тот же сервер - и в списке он с тех пор, как был добавлен впервые.
+            if (kept != null) addedTimes[kept]?.let { config.addedTime = it }
             // Save profile directly without updating serverList
             MmkvManager.encodeProfileDirect(key, JsonUtil.toJson(config))
 
@@ -368,6 +402,74 @@ object AngConfigManager {
         // Write serverList once
         MmkvManager.encodeServerList(serverList, subid)
         return keyToProfile
+    }
+
+    /**
+     * Сервер прошлого поколения, снятый перед заменой: guid, запись и сырой шаблон так, как он
+     * лежит в хранилище (у заблокированной подписки - зашифрованным; расшифровывается только в
+     * [noteIfChanged], вне блокировки списка).
+     */
+    private class PreviousServer(val guid: String, val profile: ProfileItem, val storedRaw: String?)
+
+    /** Что сделала одна замена серверов подписки - ровно то, что нужно [noteIfChanged]. */
+    private class Replacement(
+        val before: List<PreviousServer>,
+        val beforeList: List<String>,
+        val afterList: List<String>,
+        /** guid -> (запись, сырой шаблон открытым текстом или null), как они только что записаны. */
+        val written: Map<String, Pair<ProfileItem, String?>>,
+        val kept: Set<String>,
+    )
+
+    /** Серверы подписки [subid], как они лежат сейчас. Только внутри блокировки списка. */
+    private fun snapshotServers(subid: String): List<PreviousServer> =
+        MmkvManager.decodeServerList(subid).mapNotNull { guid ->
+            MmkvManager.decodeServerConfig(guid)?.let { PreviousServer(guid, it, MmkvManager.decodeServerRaw(guid)) }
+        }
+
+    /**
+     * guid прошлого поколения для каждого из [configs], в порядке [configs].
+     *
+     * [configs] приходят в ОБРАТНОМ порядке провайдера - так их собирает разбор и так их вставляет
+     * запись, каждый в голову списка. Узнавание же идёт в порядке провайдера
+     * ([SubscriptionRefreshIdentity.assign]: из двух неразличимых серверов первый в ответе получает
+     * первый прежний), поэтому список разворачивается туда и обратно.
+     */
+    private fun keptGuids(previous: List<PreviousServer>, configs: List<ProfileItem>): List<String?> {
+        if (previous.isEmpty()) return List(configs.size) { null }
+        return SubscriptionRefreshIdentity
+            .assign(previous.map { it.guid to it.profile }, configs.asReversed())
+            .asReversed()
+    }
+
+    /**
+     * Отмечает изменение содержимого ([MmkvManager.markServersChanged]), только если замена правда
+     * что-то поменяла: состав, порядок или настройки под прежним guid.
+     *
+     * Считается ВНЕ блокировки списка: у заблокированной подписки сравнение шаблонов - это
+     * расшифровка через Keystore на каждый узнанный сервер, а блокировку нельзя держать дольше
+     * чтения-записи (см. [MmkvManager.inServerListTransaction]). Любая ошибка сравнения считается
+     * изменением: лишнее перечитывание списка дешевле, чем экран с прежними настройками.
+     */
+    private fun noteIfChanged(replacement: Replacement) {
+        val changed = try {
+            val before = replacement.before.associateBy { it.guid }
+            replacement.beforeList != replacement.afterList || replacement.kept.any { guid ->
+                val old = before[guid] ?: return@any true
+                val (profile, raw) = replacement.written[guid] ?: return@any true
+                val oldRaw = if (old.profile.configType == EConfigType.CUSTOM) {
+                    TemplateManager.unwrapStoredRaw(old.storedRaw)
+                } else {
+                    null
+                }
+                SubscriptionRefreshIdentity.fingerprint(old.profile, oldRaw) !=
+                    SubscriptionRefreshIdentity.fingerprint(profile, raw)
+            }
+        } catch (e: Exception) {
+            LogUtil.w(AppConfig.TAG, "Could not compare the refreshed servers, treating them as changed: ${e.message}")
+            true
+        }
+        if (changed) MmkvManager.markServersChanged()
     }
 
     /**
@@ -570,22 +672,7 @@ object AngConfigManager {
                         staged.add(rawConfig to config)
                     }
                     if (staged.isNotEmpty()) {
-                        val removedSelected = getRemovedSelectedProfile(subid, append)
-                        if (!append) {
-                            MmkvManager.removeServerViaSubid(subid)
-                        }
-                        val keyToProfile = mutableMapOf<String, ProfileItem>()
-                        for ((rawConfig, config) in staged) {
-                            config.subscriptionId = subid
-                            config.locked = locked
-                            config.description = generateDescription(config)
-                            val key = MmkvManager.encodeServerConfig("", config)
-                            MmkvManager.encodeServerRaw(key, TemplateManager.wrapRawForStorage(rawConfig, locked))
-                            keyToProfile[key] = config
-                        }
-                        val matchKey = resolveSelectedKey(keyToProfile, removedSelected, subid, append)
-                        matchKey?.let { MmkvManager.setSelectServer(it) }
-                        return staged.size
+                        return replaceCustomServers(staged, subid, append, locked)
                     }
                     // Nothing in the array parsed. Fall through to the single-config path below
                     // rather than returning 0: that path guards its own delete on a successful
@@ -597,23 +684,19 @@ object AngConfigManager {
             }
 
             try {
-                // For compatibility
+                // For compatibility: a single config object rather than an array of them. The same
+                // replacement as the array's, so a lone провайдер config keeps its guid too.
                 val rawConfig = stripVendorRootKey(server)
-                val config = CustomFmt.parse(rawConfig) ?: return 0
-                config.subscriptionId = subid
-                config.locked = locked
-                config.description = generateDescription(config)
-                if (!append) {
-                    MmkvManager.removeServerViaSubid(subid)
-                }
-                val key = MmkvManager.encodeServerConfig("", config)
-                MmkvManager.encodeServerRaw(key, TemplateManager.wrapRawForStorage(rawConfig, locked))
-                return 1
+                val config = CustomFmt.parse(rawConfig)
+                return replaceCustomServers(listOf(rawConfig to config), subid, append, locked)
             } catch (e: Exception) {
                 LogUtil.e(AppConfig.TAG, "Failed to parse custom config server as single config", e)
             }
             return 0
         } else if (server.startsWith("[Interface]") && server.contains("[Peer]")) {
+            // A WireGuard conf file names its server by the time of the import
+            // (WireguardFmt.parseWireguardConfFile), so there is nothing to recognise it by across
+            // refreshes, and it keeps the plain replace.
             try {
                 val config = WireguardFmt.parseWireguardConfFile(server) ?: return R.string.toast_incorrect_protocol
                 config.description = generateDescription(config)
@@ -630,6 +713,73 @@ object AngConfigManager {
         } else {
             return 0
         }
+    }
+
+    /**
+     * Writes a провайдер's XRAY_JSON servers in place of the ones [subid] had, keeping the guid of
+     * every server it recognises (by name — [SubscriptionRefreshIdentity]) and returning how many
+     * were written.
+     *
+     * One fenced step, like the link-list branch ([parseBatchConfig]): the subscription's list is
+     * cleared and refilled here, and between the two writes it is EMPTY on disk, so a concurrent
+     * read-modify-write from the other process must not land in that gap. The per-server writes
+     * already took the lock one at a time; now the whole replacement does.
+     *
+     * @param staged (raw config, parsed profile) in REVERSE провайдер order — each is inserted at
+     *   the head of the list, so the stored list ends in the провайдер's order.
+     */
+    private fun replaceCustomServers(
+        staged: List<Pair<String, ProfileItem>>,
+        subid: String,
+        append: Boolean,
+        locked: Boolean,
+    ): Int {
+        for ((_, config) in staged) {
+            config.subscriptionId = subid
+            config.locked = locked
+            config.description = generateDescription(config)
+        }
+        // ШИФРУЕТСЯ ДО БЛОКИРОВКИ. Шаблон заблокированной подписки кладётся зашифрованным, а
+        // шифрование - это вызов в Keystore на каждый сервер; держать под ним блокировку списка,
+        // которую ждёт процесс интерфейса, незачем.
+        val stored = staged.map { (rawConfig, _) -> TemplateManager.wrapRawForStorage(rawConfig, locked) }
+        val removedSelected = getRemovedSelectedProfile(subid, append)
+        val replacement = MmkvManager.inServerListTransaction {
+            val beforeList = if (append) emptyList() else MmkvManager.decodeServerList(subid).toList()
+            val previous = if (append) emptyList() else snapshotServers(subid)
+            val reuse = keptGuids(previous, staged.map { it.second })
+            val kept = reuse.filterNotNullTo(HashSet())
+            // До записи: encodeServerConfig сам отмечает сервер, когда не отмечено ничего, и эта
+            // случайная отметка не должна сойти за узнанную.
+            val keptSelected = MmkvManager.getSelectServer()?.takeIf { it in kept }
+            if (!append) {
+                MmkvManager.removeServerViaSubid(subid, keep = kept)
+            }
+            val addedTimes = previous.associate { it.guid to it.profile.addedTime }
+            val keyToProfile = mutableMapOf<String, ProfileItem>()
+            val written = HashMap<String, Pair<ProfileItem, String?>>()
+            staged.forEachIndexed { index, (rawConfig, config) ->
+                val keptGuid = reuse[index]
+                if (keptGuid != null) addedTimes[keptGuid]?.let { config.addedTime = it }
+                val key = MmkvManager.encodeServerConfig(keptGuid.orEmpty(), config)
+                MmkvManager.encodeServerRaw(key, stored[index])
+                keyToProfile[key] = config
+                written[key] = config to rawConfig
+            }
+            if (keptSelected == null) {
+                val matchKey = resolveSelectedKey(keyToProfile, removedSelected, subid, append)
+                matchKey?.let { MmkvManager.setSelectServer(it) }
+            }
+            if (append) null else Replacement(
+                before = previous,
+                beforeList = beforeList,
+                afterList = MmkvManager.decodeServerList(subid).toList(),
+                written = written,
+                kept = kept,
+            )
+        }
+        replacement?.let { noteIfChanged(it) }
+        return staged.size
     }
 
     /**
@@ -1042,8 +1192,12 @@ object AngConfigManager {
      * @param subid The subscription ID.
      * @param append Whether to append the configurations.
      * @return The number of configurations parsed.
+     *
+     * `internal`, not private, for one reason: it is everything a refresh does with the answer once
+     * it has one, and AngConfigManagerRefreshTest drives it directly to prove that a refresh keeps
+     * what it should — [updateConfigViaSub] around it only adds the network.
      */
-    private fun parseConfigViaSub(server: String?, subid: String, append: Boolean): Int {
+    internal fun parseConfigViaSub(server: String?, subid: String, append: Boolean): Int {
         var count = parseBatchConfig(Utils.decode(server), subid, append)
         if (count <= 0) {
             count = parseBatchConfig(server, subid, append)

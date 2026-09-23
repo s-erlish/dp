@@ -27,6 +27,7 @@ import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SpeedtestManager
+import com.v2ray.ang.handler.SubscriptionRefreshIdentity
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.MessageUtil
 import com.v2ray.ang.util.Utils
@@ -90,6 +91,50 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     var runningGuid: String? = null
         private set
+
+    /**
+     * ОТПЕЧАТОК ТОГО, С ЧЕМ ТУННЕЛЬ ПОДНЯТ: не только какой сервер, но и в каких настройках.
+     *
+     * Пока обновление подписки выдавало каждому серверу новый guid, [runningGuid] отвечал на оба
+     * вопроса сразу: изменились настройки - изменился guid - строка уже «не та, на которой туннель»,
+     * и нажатие на неё предлагало «Переподключиться». Только он же предлагал это и после обновления,
+     * в котором не поменялось ничего. Теперь неизменившийся сервер сохраняет guid
+     * (`SubscriptionRefreshIdentity`), а конфиг провайдера сохраняет его и тогда, когда поменялся
+     * его шаблон. Этот отпечаток - вторая половина: предложение появляется, когда туннель на другом
+     * сервере ИЛИ на прежних настройках этого (см. [isTunnelOn]). Это то же правило, что на ПК
+     * (`MainWindowViewModel._runningServerFingerprint`): переподключать есть смысл, только если
+     * сервер правда изменился. Разница одна - на Android туннель сам не перезапускается, решает
+     * человек.
+     *
+     * Пишется там же, где [runningGuid], и с той же оговоркой: при рукопожатии после перезапуска
+     * процесса лучшего ответа, чем «то, что лежит сейчас», нет.
+     */
+    private var runningFingerprint: String? = null
+
+    /**
+     * Поднят ли туннель ровно на [guid] и ровно в тех настройках, что лежат под ним сейчас.
+     *
+     * Отпечаток, который не удалось прочитать, считается изменившимся: здесь это не перезапуск, а
+     * только предложение его сделать, и лишнее предложение дешевле пропущенного.
+     */
+    fun isTunnelOn(guid: String): Boolean {
+        if (runningGuid != guid) return false
+        val running = runningFingerprint ?: return false
+        return running == SubscriptionRefreshIdentity.fingerprintOfStored(guid)
+    }
+
+    /** Запоминает сервер, на котором туннель поднят, вместе с его отпечатком. */
+    private fun recordRunning(guid: String?) {
+        runningGuid = guid
+        runningFingerprint = guid?.let { SubscriptionRefreshIdentity.fingerprintOfStored(it) }
+    }
+
+    /**
+     * [MmkvManager.serversRevision] на момент последнего перечитывания списка. См.
+     * [reloadServerListIfStale].
+     */
+    private var seenServersRevision = Long.MIN_VALUE
+
     val updateListAction by lazy { MutableLiveData<Int>() }
     val updateSpeedAction by lazy { MutableLiveData<Pair<Long, Long>>() }
     val delayResultAction by lazy { MutableLiveData<Long>() }
@@ -229,6 +274,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun reloadServerList() {
         MmkvManager.ensureSelectedServer()
 
+        seenServersRevision = MmkvManager.serversRevision()
         serverList = if (subscriptionId.isEmpty()) {
             MmkvManager.decodeAllServerList()
         } else {
@@ -243,14 +289,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Re-reads the store ONLY when it no longer agrees with what this cache holds.
      *
      * The cache is a snapshot of guids, and a subscription refresh mints new ones for every server
-     * it replaces — so after one has run, every row on screen addresses a profile that has been
-     * deleted. Tapping such a row stored a dead guid as the selection, and from that moment Главная
-     * said «Выберите сервер в списке ниже» over a full list and the connect object was disabled.
+     * it does not recognise — so after one has run, a row on screen can address a profile that has
+     * been deleted. Tapping such a row stored a dead guid as the selection, and from that moment
+     * Главная said «Выберите сервер в списке ниже» over a full list and the connect object was
+     * disabled.
      *
      * The refresh announces itself now, but an announcement can be missed (the app was not running,
      * the broadcast was dropped), so the shell also asks this on every resume. The comparison is a
      * list of strings against a list of strings — no profile is parsed unless something actually
      * changed, which is what keeps it off the "лишняя нагрузка" list.
+     *
+     * …AND ONE NUMBER. A recognised server keeps its guid across a refresh now, and a провайдер's
+     * config may change under it (SubscriptionRefreshIdentity), which no list comparison can see.
+     * [MmkvManager.serversRevision] moves exactly when a refresh changed something, so a refresh that
+     * changed nothing still costs nothing here.
      *
      * @return true when the list was stale and has been reloaded.
      */
@@ -260,7 +312,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             MmkvManager.decodeServerList(subscriptionId)
         }
-        val listMatches = stored == serverList
+        val listMatches = stored == serverList && MmkvManager.serversRevision() == seenServersRevision
         val selectionHealthy = stored.isEmpty() || MmkvManager.getSelectServer() != null
         if (listMatches && selectionHealthy) return false
         reloadServerList()
@@ -759,12 +811,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // It carries no guid, and the selection may already have moved past the tunnel,
                     // so it only fills [runningGuid] in when nothing is known — see that field.
                     isRunning.value = true
-                    if (runningGuid == null) runningGuid = MmkvManager.getSelectServer()
+                    if (runningGuid == null) recordRunning(MmkvManager.getSelectServer())
                 }
 
                 AppConfig.MSG_STATE_NOT_RUNNING -> {
                     isRunning.value = false
-                    runningGuid = null
+                    recordRunning(null)
                 }
 
                 AppConfig.MSG_STATE_START_SUCCESS -> {
@@ -775,7 +827,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // A start that just succeeded ran on whatever the selection held when
                     // `startContextService` read it, so this is the one moment the two are the same
                     // thing — and therefore the one moment worth recording.
-                    runningGuid = MmkvManager.getSelectServer()
+                    recordRunning(MmkvManager.getSelectServer())
                 }
 
                 AppConfig.MSG_STATE_START_FAILURE -> {
@@ -783,20 +835,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // neutral gray «Не удалось подключиться» toast (via connectInProgress) when
                     // this flips isRunning to false during an in-progress connect.
                     isRunning.value = false
-                    runningGuid = null
+                    recordRunning(null)
                 }
 
                 AppConfig.MSG_STATE_STOP_SUCCESS -> {
                     isRunning.value = false
-                    runningGuid = null
+                    recordRunning(null)
                 }
 
                 AppConfig.MSG_STATE_SERVERS_CHANGED -> {
-                    // A подписка refresh replaced this провайдер's servers, in a worker that owns no
-                    // list. Everything on screen is addressing guids that no longer exist, so the
-                    // cache is rebuilt from the store — which also repairs the selection
-                    // (reloadServerList). Receivers run on the main thread, so the LiveData set
-                    // inside is on the right one.
+                    // A подписка refresh rewrote this провайдер's servers, in a worker that owns no
+                    // list: new rows, rows gone, a провайдер config changed under its old guid, and
+                    // the card's traffic and «обновлено» with them. So the cache is rebuilt from the
+                    // store — which also repairs the selection (reloadServerList). A refresh that
+                    // changed no server rebuilds the same rows with the same guids, delays and
+                    // selection, so nothing on screen moves. Receivers run on the main thread, so
+                    // the LiveData set inside is on the right one.
                     reloadServerList()
                 }
 
