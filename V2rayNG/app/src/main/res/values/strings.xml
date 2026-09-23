@@ -101,7 +101,6 @@
 
     <string name="title_qr_code">QR-код</string>
 
-    <string name="speed_zero" translatable="false">0 KB/s</string>
     <string name="bottom_nav_home">Главная</string>
     <string name="sub_pin">Закрепить подписку</string>
     <string name="sub_support">Поддержка</string>

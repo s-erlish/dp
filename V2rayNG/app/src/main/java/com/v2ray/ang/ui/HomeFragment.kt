@@ -517,7 +517,27 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         }
     }
 
+    /**
+     * ОБНОВЛЕНИЕ АККАУНТА ПРИ ВОЗВРАЩЕНИИ - ЧЕРЕЗ ПОЛТОРЫ СЕКУНДЫ, А НЕ В КАДР ПОКАЗА.
+     *
+     * Каждое возвращение в приложение отправляло три запроса сразу - профиль, `/subscription/all`
+     * и `/client/subscription` - в тот самый момент, когда экран возвращается, и их ответы следом
+     * перерисовывали строку аккаунта и карточку подписки. На ПК то же самое добавляло рывков к
+     * возвращению из трея и отложено там на полторы секунды (`AccountViewModel.RefreshIfIdle`);
+     * здесь так же. Первые кадры принадлежат экрану, сеть подождёт.
+     *
+     * Если приложение за это время снова ушло ([onPause]), запросы не уходят вовсе: ответ некому
+     * смотреть, а следующее возвращение спросит заново.
+     *
+     * Порога простоя здесь нет и не добавлено: как и раньше, обновляется каждое возвращение, только
+     * позже. У ПК порог - 15 минут без обновления.
+     */
+    private val returnRefreshRunnable = Runnable { refreshAccountData() }
+
     private companion object {
+        /** Сколько экран возвращается без сети. Цифра ПК: `AccountViewModel.RefreshIfIdle`. */
+        const val RETURN_REFRESH_DELAY_MS = 1_500L
+
         // KEY_CONNECTION_START used to live here and the screen wrote it. It is now
         // CoreServiceManager.KEY_SESSION_STARTED_AT — same key, written beside the core loop, read
         // here through CoreServiceManager.sessionStartedAt(). See [startConnectionTimer].
@@ -699,9 +719,23 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         }
         // The FIRST resume after a fresh view has nothing to ask for: [observeAccount] asked, a
         // message ago, and the answers are still in flight. @see observeAccount
-        if (accountDataFetchedOnCreate) accountDataFetchedOnCreate = false else refreshAccountData()
+        // Every later one asks a moment after the screen is back, not in its first frame.
+        // @see returnRefreshRunnable
+        if (accountDataFetchedOnCreate) accountDataFetchedOnCreate = false else refreshAccountDataSoon()
         refreshServerSurfaces(-1)
         render()
+    }
+
+    /** The return-to-app half of [refreshAccountData]. @see returnRefreshRunnable */
+    private fun refreshAccountDataSoon() {
+        timerHandler.removeCallbacks(returnRefreshRunnable)
+        // Signed out there is nothing to fetch and the answer is local: it is settled now, in the
+        // same render as the rest of the resume, rather than a second and a half later.
+        if (!BackendConfig.isConfigured() || !AccountSession.isLoggedIn()) {
+            refreshAccountData()
+            return
+        }
+        timerHandler.postDelayed(returnRefreshRunnable, RETURN_REFRESH_DELAY_MS)
     }
 
     /**
@@ -749,6 +783,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // instant and blanks the readings. The session is not over; only the screen has gone.
         timerHandler.removeCallbacks(uptimeRunnable)
         stopLatencyProbe()
+        // Gone again before the account refresh went out: it does not go out. Every pause is
+        // followed by a resume before the screen can be seen again, and that resume asks afresh.
+        timerHandler.removeCallbacks(returnRefreshRunnable)
         super.onPause()
     }
 
@@ -802,6 +839,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         timerHandler.removeCallbacks(latencyRunnable)
         timerHandler.removeCallbacks(connectWatchdogRunnable)
         timerHandler.removeCallbacks(uptimeRunnable)
+        timerHandler.removeCallbacks(returnRefreshRunnable)
         ringAnimator?.cancel()
         ringAnimator = null
         // The arc's hand-back to the ring. Short, but it writes a stroke into three GradientDrawables
@@ -2523,7 +2561,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         refreshAccountData()
         // …AND [onResume] IS ABOUT TO ASK FOR THE SAME THING. The shell hosts its tabs with
         // show()/hide(), so a hidden tab stays RESUMED — which also means onResume ALWAYS follows
-        // onViewCreated, one main-thread message later, and it calls refreshAccountData() too.
+        // onViewCreated, one main-thread message later, and it asks for the account too
+        // ([refreshAccountDataSoon]).
         // Every creation of this screen with a signed-in account therefore fired the account's
         // whole fetch TWICE within a few milliseconds: `/client/profile` ran to completion both
         // times (refreshProfile keeps no job, so neither run cancels the other and both publish),
@@ -2717,9 +2756,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         //
         // `running ?: selected` picked the guid and then decoded once, so a running guid that no
         // longer names a stored profile produced NO profile at all instead of dropping through to
-        // the selection. That happens for real and it happens on a schedule: every подписка refresh
-        // deletes the profiles it replaces and writes new guids, so an hourly auto-update on a live
-        // tunnel leaves `runningGuid` pointing at a record that is gone. The connect wave closed
+        // the selection. That happens for real and it happens on a schedule: a подписка refresh
+        // deletes the profiles it does not recognise in the new answer and writes new guids for
+        // them, so an hourly auto-update that changed the running server on a live tunnel leaves
+        // `runningGuid` pointing at a record that is gone. The connect wave closed
         // the same hole for the SELECTED server — `getSelectServer` returns null for a vanished
         // profile — and this is the other half of it.
         //
@@ -3292,7 +3332,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // THE LEDGER AND THE GATE ARE MUTUALLY EXCLUSIVE (13-start-screen.md §4), and on the first
         // run that is not a style rule, it is the difference between seeing «Добавить подписку» and
         // not. A gated screen has no tunnel to meter and never will until the user acts, so the row
-        // can only ever read «0 KB/s 00:00:00 0 KB/s» — 32dp of zeroes standing between the object
+        // can only ever read «0 КБ/с 00:00:00 0 КБ/с» — 32dp of zeroes standing between the object
         // and the one action on the screen. «стартовый экран кнопок нет для добавления и тд, еле
         // подписку добавил»: the block below has to reach the fold on a short phone.
         //
@@ -3412,11 +3452,12 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * reads zero at rest rather than blank: this row is the screen's ledger and it is always there.
      * The session clock is written by [uptimeRunnable], which owns it second by second.
      *
-     * THE UNIT RIDES WITH THE VALUE — «1,0 KB/s», not a bare «1,0» under a «Отдача, Мбит/с»
+     * THE UNIT RIDES WITH THE VALUE — «1,0 КБ/с», not a bare «1,0» under a «Отдача, Мбит/с»
      * caption. The captions are gone (the owner's reference has none) so there is nothing left to
      * hold the unit, and a bare figure whose scale is invisible is worse than no figure. This is
-     * `Long.toSpeedString`, which is what the anchor build printed here and what the whole app
-     * prints everywhere else, so the same rate can never read two different ways in one product.
+     * `Long.toSpeedString`, which is what the anchor build printed here (in Latin then, «1,0 KB/s»)
+     * and what the whole app prints everywhere else, so the same rate can never read two different
+     * ways in one product.
      */
     private fun paintFigures() {
         if (!isBindingInitialized) return
@@ -3712,7 +3753,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
-     * «Загрузить сервера», and the two different loads that hide behind one button.
+     * «Загрузить серверы», and the two different loads that hide behind one button.
      *
      * The owner: «если удалить свою подписку при вошедшем аккаунте, то пишет типа загрузить сервера
      * … и не работает кнопка, пишет не удалось загрузить, хотя должно работать».
@@ -3720,7 +3761,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * He is in a state this button had no branch for. Deleting the подписка from the card removes
      * the LOCAL copy — `MmkvManager.removeSubscription` drops it from the store and takes its
      * серверы with it — while the ACCOUNT still holds the подписка, which is exactly why the gate
-     * correctly reads «Подписка активна, сервера ещё не загружены». But the button called
+     * correctly reads «Подписка активна, серверы ещё не загружены». But the button called
      * `refreshSubscriptions()`, i.e. the shell's `updateConfigViaSubAll()`, which walks the LOCAL
      * подписки and refetches each one. There were none. It returned `successCount == 0` without a
      * single request going out, the shell reported «Не удалось обновить», and this screen then
@@ -4507,9 +4548,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     // ==================== Formatting ====================
 
     // The speed formatter that used to live here — one decimal of Мбит/с, with the unit stranded in
-    // a caption — went with the captions. `Long.toSpeedString` scales its own unit (B/s -> KB/s ->
-    // MB/s) and is what every other surface in the app already prints, so the same rate can no
-    // longer read two ways in one product. It is also what the reference build showed: «1,0 KB/s».
+    // a caption — went with the captions. `Long.toSpeedString` scales its own unit (КБ/с -> МБ/с)
+    // and is what every other surface in the app already prints, so the same rate can no longer
+    // read two ways in one product. It is also what the reference build showed, «1,0 KB/s», with
+    // the units in Russian now.
 
     /**
      * «14 августа» inside the current year, «14 августа 2027» otherwise. Never a numeric date on

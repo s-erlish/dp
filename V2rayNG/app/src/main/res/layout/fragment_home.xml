@@ -628,10 +628,12 @@
 
               THE ARROW IS THE LABEL. It costs one accent glyph instead of a two-word
               caption, it needs no translation, and it is what the anchor build drew.
-              The unit rides WITH the value (0 KB/s -> 1,2 MB/s), because that is what
-              @string/speed_zero and Long.toSpeedString have always produced and it is
-              what the owner's screenshot shows; the caption that used to own the unit
-              no longer exists to hold it.
+              The unit rides WITH the value (0 КБ/с -> 1,2 МБ/с), because that is what
+              the owner's screenshot shows; the caption that used to own the unit no
+              longer exists to hold it. The unit is Russian since the copy pass: the
+              same figures as his «1,0 KB/s», in the words the rest of the app uses
+              («12,4 ГБ»), and @string/home_speed_zero is exactly Long.toSpeedString's
+              zero.
 
               THE TWO VALUES HANG OFF THE CENTRE, AND THAT IS WHY THIS ROW LOOKED
               CROOKED. Three equal weights already put the timer on the true centre
@@ -694,7 +696,7 @@
                         android:maxLines="1"
                         android:text="@string/home_speed_zero"
                         android:textAppearance="@style/TextAppearance.App.Subtitle"
-                        tools:text="1,0 KB/s" />
+                        tools:text="1,0 КБ/с" />
                 </LinearLayout>
 
                 <!-- The session clock. Dead centre, because "how long have I been
@@ -737,7 +739,7 @@
                         android:maxLines="1"
                         android:text="@string/home_speed_zero"
                         android:textAppearance="@style/TextAppearance.App.Subtitle"
-                        tools:text="1,2 KB/s" />
+                        tools:text="1,2 КБ/с" />
                 </LinearLayout>
             </LinearLayout>
 

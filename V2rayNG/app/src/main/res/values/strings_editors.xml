@@ -313,7 +313,7 @@
     <string name="backup_action_create">Сохранить копию</string>
     <string name="backup_action_create_hint">Все серверы и настройки в один файл</string>
     <string name="backup_action_restore">Восстановить из файла</string>
-    <string name="backup_action_restore_hint">Заменит текущие сервера</string>
+    <string name="backup_action_restore_hint">Заменит текущие серверы</string>
     <string name="backup_action_share">Поделиться конфигурацией</string>
     <string name="backup_action_share_hint">Отправить файл в другое приложение</string>
     <string name="backup_action_webdav_setup">Настройки WebDAV</string>

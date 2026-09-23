@@ -622,7 +622,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * apiece plus one fetch per подписка, so its OWN bound is most of a minute — far past the point
      * where a screen that is not painting itself reads as a broken app rather than as a pause. Past
      * this the entrance plays regardless and Главная comes up in the state it is honestly in: on
-     * this path that is the gate block's «Подписка активна, сервера ещё не загружены», a screen with
+     * this path that is the gate block's «Подписка активна, серверы ещё не загружены», a screen with
      * a sentence and a button on it, which is a great deal better than nothing at all.
      *
      * A `postDelayed` and not an animator, because it is not a movement: it is a deadline, and
@@ -1554,10 +1554,11 @@ class MainActivity : HelperBaseActivity(), MainHost {
         // A ROW CAN NAME A SERVER THAT NO LONGER EXISTS, and storing that guid is what broke the
         // screen. The list on screen is a cache of guids; a подписка refresh — including the
         // unattended one, which runs in a worker while this Activity is in front — deletes every
-        // profile of that провайдер and mints new guids for the replacements. Until the cache is
-        // rebuilt, every row addresses a deleted profile, and this write used to accept one: from
-        // that moment the selection named nothing, Главная drew «Выберите сервер в списке ниже»
-        // over a full list, and the connect object was disabled. The answer is not a message, it is
+        // profile of that провайдер it does not recognise and mints new guids for what is new.
+        // Until the cache is rebuilt, such a row addresses a deleted profile, and this write used
+        // to accept one: from that moment the selection named nothing, Главная drew «Выберите
+        // сервер в списке ниже» over a full list, and the connect object was disabled. The answer
+        // is not a message, it is
         // the list: rebuild it from the store so the rows address real servers again, and let the
         // user's next tap land on one. (`MainViewModel.reloadServerList` also repairs the
         // selection, so the screen is never left with servers and nothing selected.)
@@ -1587,7 +1588,12 @@ class MainActivity : HelperBaseActivity(), MainHost {
         // Now the write is what the change gates, and the offer is gated by the only question it
         // was ever about: is the tunnel already on this server? While it is, there is nothing to
         // apply and silence is honest. While it is not, the way back is offered every time.
-        if (mainViewModel.isRunning.value == true && mainViewModel.runningGuid != guid) {
+        //
+        // «НА ЭТОМ СЕРВЕРЕ» ЗНАЧИТ «НА НЁМ И В ЕГО НЫНЕШНИХ НАСТРОЙКАХ». Обновление подписки
+        // сохраняет guid узнанного сервера, а конфиг провайдера узнаётся по имени и тогда, когда его
+        // шаблон поменялся - туннель при этом едет на прежнем. Сравнение одних guid промолчало бы
+        // как раз там, где переподключение что-то даёт; `isTunnelOn` сверяет ещё и отпечаток.
+        if (mainViewModel.isRunning.value == true && !mainViewModel.isTunnelOn(guid)) {
             promptApplySelectedServer(guid)
         }
     }
@@ -1647,13 +1653,14 @@ class MainActivity : HelperBaseActivity(), MainHost {
     override fun onResume() {
         super.onResume()
         // THE CACHE IS CHECKED AGAINST THE STORE FIRST, and only re-read when the two disagree.
-        // A подписка refresh replaces a провайдер's servers with new guids from a worker that owns
-        // no list; it announces itself now (MSG_STATE_SERVERS_CHANGED), but an app that was not
-        // running when it landed hears nothing. Every tab paints from `serversCache`, so a stale
-        // one means every row on screen addresses a profile that has been deleted — and the first
-        // tap on one of them left the app with no selection and a disabled connect object. The
-        // comparison is guid list against guid list; nothing is parsed and nothing repaints unless
-        // something actually moved.
+        // A подписка refresh rewrites a провайдер's servers from a worker that owns no list — new
+        // guids for what it does not recognise, new content under the guids it does; it announces
+        // itself now (MSG_STATE_SERVERS_CHANGED), but an app that was not running when it landed
+        // hears nothing. Every tab paints from `serversCache`, so a stale one can mean a row on
+        // screen addresses a profile that has been deleted — and the first tap on one of them left
+        // the app with no selection and a disabled connect object. The comparison is guid list
+        // against guid list plus one revision number; nothing is parsed and nothing repaints unless
+        // something actually moved, and a refresh that changed nothing moves nothing.
         if (mainViewModel.reloadServerListIfStale()) {
             homeFragment?.refreshSelectedServer()
         }
@@ -1961,7 +1968,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
                 // went out: no подписки stored at all, and every stored подписка skipped
                 // (`updateConfigViaSub` returns skipCount for one that is disabled or has no URL).
                 // Both told the user his connection was at fault, instantly, about a fetch that
-                // never happened — the same defect «Загрузить сервера» had, and the instant arrival
+                // never happened — the same defect «Загрузить серверы» had, and the instant arrival
                 // of the message is the tell in both. Only a fetch that actually failed says so;
                 // when there was nothing to fetch, the answer is that there was nothing to fetch.
                 // `SubSettingActivity.updateAll` already branches this way on the same result.

@@ -153,10 +153,13 @@ class UrlSchemeActivity : BaseActivity() {
 
     /**
      * Import already-decoded config content (a config / share-url payload) via the batch importer.
+     *
+     * Appends, like the in-app add menu: a link adds a server to the ones the user already has and
+     * never replaces them. @see AngConfigManager.replacesServers
      */
     private fun importDecodedConfig(content: String) {
         lifecycleScope.launch(Dispatchers.IO) {
-            val (count, countSub) = AngConfigManager.importBatchConfig(content, "", false)
+            val (count, countSub) = AngConfigManager.importBatchConfig(content, "", true)
             withContext(Dispatchers.Main) {
                 if (count + countSub > 0) {
                     toast(R.string.scheme_import_done)
@@ -215,8 +218,9 @@ class UrlSchemeActivity : BaseActivity() {
                 decodedUrl += "#${fragment}"
             }
             LogUtil.i(AppConfig.TAG, decodedUrl)
+            // Appends, like the in-app add menu — see [importDecodedConfig].
             lifecycleScope.launch(Dispatchers.IO) {
-                val (count, countSub) = AngConfigManager.importBatchConfig(decodedUrl, "", false)
+                val (count, countSub) = AngConfigManager.importBatchConfig(decodedUrl, "", true)
                 withContext(Dispatchers.Main) {
                     if (count + countSub > 0) {
                         toast(R.string.scheme_import_done)

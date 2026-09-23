@@ -45,8 +45,12 @@ class ScScannerActivity : HelperBaseActivity() {
             //
             // The in-app add menu has always imported on Dispatchers.IO
             // (`MainActivity.importBatchConfig`); this route was the one that did not.
+            //
+            // И ДОБАВЛЯЕТ, КАК ТО ЖЕ МЕНЮ (append = true). Здесь стояло `false` - «заменить», а без
+            // подписки заменялась корзина серверов, добавленных руками: сканирование одного сервера
+            // удаляло все остальные. @see AngConfigManager.replacesServers
             lifecycleScope.launch(Dispatchers.IO) {
-                val outcome = runCatching { AngConfigManager.importBatchConfig(scanResult, "", false) }
+                val outcome = runCatching { AngConfigManager.importBatchConfig(scanResult, "", true) }
                 withContext(Dispatchers.Main) {
                     outcome
                         .onSuccess { showImportResult(it) }

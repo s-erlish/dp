@@ -17,6 +17,7 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.dto.TestServiceMessage
 import com.v2ray.ang.dto.entities.SubscriptionCache
+import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.enums.NotificationChannelType
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.MessageUtil
@@ -25,6 +26,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -91,7 +95,7 @@ object SubscriptionUpdater {
                 scheduleOne(
                     context = context,
                     subId = sub.guid,
-                    shouldRun = sub.subscription.autoUpdate,
+                    shouldRun = shouldAutoUpdate(sub),
                     existingWorkPolicy = existingWorkPolicy
                 )
             }
@@ -120,9 +124,63 @@ object SubscriptionUpdater {
         scheduleOne(
             context = context,
             subId = subId,
-            shouldRun = subItem.autoUpdate,
+            shouldRun = shouldAutoUpdate(SubscriptionCache(subId, subItem)),
             existingWorkPolicy = ExistingPeriodicWorkPolicy.REPLACE
         )
+    }
+
+    // -------------------------------------------------------------------------
+    // What counts as a подписка, and what schedule a new one starts on
+    // -------------------------------------------------------------------------
+
+    /**
+     * НАСТОЯЩАЯ ПОДПИСКА - та, которую есть откуда качать.
+     *
+     * В списке подписок лежит ещё и служебная корзина `__default_subscription__`
+     * (`SettingsManager.ensureDefaultSubscription`) - место для серверов без подписки, без адреса,
+     * с `autoUpdate = true` по умолчанию. Расписание её не отличало: на каждой установке раз в час
+     * просыпался `:bg`, в шторке мелькало «Обновляем подписку», обновление пропускалось за
+     * отсутствием адреса, а следом, по «Проверять пинг после обновления», запрашивалась проверка
+     * задержки. И она же, первая в списке, отвечала экрану настроек, «какое сейчас автообновление».
+     */
+    internal fun isRealSubscription(sub: SubscriptionCache): Boolean =
+        sub.guid != AppConfig.DEFAULT_SUBSCRIPTION_ID && sub.subscription.url.isNotBlank()
+
+    /** Обновлять ли [sub] по расписанию: настоящая, включённая и с включённым автообновлением. */
+    internal fun shouldAutoUpdate(sub: SubscriptionCache): Boolean =
+        isRealSubscription(sub) && sub.subscription.enabled && sub.subscription.autoUpdate
+
+    /**
+     * Расписание, в котором сейчас стоит «Настройки → Автообновление подписки»: включено ли и раз
+     * в сколько минут, или null, когда настоящих подписок нет.
+     *
+     * Отдельного ключа у настройки нет нарочно (см. `ProviderSettingsActivity`): оба экрана пишут
+     * выбор в каждую подписку, и вторая копия могла бы разойтись с тем, по чему работает расписание.
+     * Значит, и прочитать выбор можно только с подписок: любая, что обновляется сама, - её
+     * интервал; ни одной - выключено (с интервалом первой, чтобы включение вернуло прежний).
+     */
+    internal fun scheduleOf(subs: List<SubscriptionCache>): Pair<Boolean, Long>? {
+        val real = subs.filter { isRealSubscription(it) }
+        val source = real.firstOrNull { it.subscription.autoUpdate } ?: real.firstOrNull() ?: return null
+        return source.subscription.autoUpdate to source.subscription.updateInterval
+    }
+
+    /** [scheduleOf] для того, что лежит в хранилище. */
+    fun currentSchedule(): Pair<Boolean, Long>? = scheduleOf(MmkvManager.decodeSubscriptions())
+
+    /**
+     * НОВАЯ ПОДПИСКА ВСТАЁТ В РАСПИСАНИЕ, КОТОРОЕ ЧЕЛОВЕК УЖЕ ВЫБРАЛ.
+     *
+     * Выбор в настройках записывается в подписки, которые есть в этот момент. Добавленная после
+     * него - из буфера, по QR-коду, с телевизора, из аккаунта - получала умолчание
+     * `SubscriptionItem`: включено, раз в час. Кто выбрал «Выключено» или «Раз в сутки», получал
+     * ещё одну подписку, которая качается каждый час, а строка настроек при этом показывала первую
+     * попавшуюся. Когда настоящих подписок ещё нет, остаётся умолчание.
+     */
+    fun applyCurrentSchedule(item: SubscriptionItem) {
+        val (enabled, minutes) = currentSchedule() ?: return
+        item.autoUpdate = enabled
+        item.updateInterval = minutes
     }
 
     /**
@@ -148,7 +206,7 @@ object SubscriptionUpdater {
     private fun updateAllNow(context: Context) {
         val rw = RemoteWorkManager.getInstance(context)
         MmkvManager.decodeSubscriptions()
-            .filter { it.subscription.enabled }
+            .filter { isRealSubscription(it) && it.subscription.enabled }
             .forEach { sub ->
                 val request = OneTimeWorkRequestBuilder<UpdateTask>()
                     .setConstraints(
@@ -246,10 +304,52 @@ object SubscriptionUpdater {
     /** Set by [updateAllNow]: refresh even when this subscription does not auto-update. */
     private const val KEY_FORCE = "force"
 
+    /**
+     * Сколько обновление при запуске считает подписку только что скачанной. Две минуты - это
+     * «одновременно» для двух путей, которые сходятся на старте, и ничего сверх того: обещание
+     * «обновлять при запуске» - это свежие данные на каждом запуске.
+     */
+    private const val LAUNCH_FRESH_WINDOW_MS = 2 * 60_000L
+
+    /**
+     * Скачана ли подписка так недавно, что ещё одна загрузка ничего не добавит.
+     *
+     * Время из будущего (часы переводили назад) свежим не считается, иначе подписка не
+     * обновлялась бы, пока часы его не догонят.
+     */
+    internal fun isFresh(lastUpdated: Long, now: Long, windowMillis: Long): Boolean =
+        lastUpdated in 1..now && now - lastUpdated < windowMillis
+
+    /**
+     * Окно свежести для задачи: для обновления при запуске - [LAUNCH_FRESH_WINDOW_MS], для
+     * расписания - половина интервала. Задача по расписанию просыпается раз в интервал, и
+     * обновление, случившееся в первой половине этого интервала (вручную, импортом аккаунта,
+     * при запуске), свою работу за этот период уже сделало. Дольше полутора интервалов подписка
+     * от этого без обновления не остаётся.
+     */
+    internal fun freshWindowMillis(force: Boolean, intervalMinutes: Long): Long =
+        if (force) {
+            LAUNCH_FRESH_WINDOW_MS
+        } else {
+            maxOf(AppConfig.SUBSCRIPTION_MIN_INTERVAL_MINUTES, intervalMinutes) * 60_000L / 2
+        }
+
+    /**
+     * ОДНА ПОДПИСКА - ОДНО ОБНОВЛЕНИЕ ЗА РАЗ, в пределах `:bg`.
+     *
+     * Задача по расписанию и обновление при запуске - две разные задачи WorkManager, и на старте
+     * они сходятся: та, что по расписанию, просрочена, пока телефон спал, а эта поставлена только
+     * что. Обе читали `lastUpdated` до того, как хоть одна его обновила, и обе качали одну и ту же
+     * подписку. Под замком вторая ждёт первую, перечитывает подписку и по [isFresh] видит, что
+     * качать уже нечего.
+     */
+    private val refreshLocks = ConcurrentHashMap<String, Mutex>()
+
+    private fun refreshLock(subId: String): Mutex = refreshLocks.computeIfAbsent(subId) { Mutex() }
+
     class UpdateTask(context: Context, params: WorkerParameters) :
         CoroutineWorker(context, params) {
 
-        @SuppressLint("MissingPermission")
         override suspend fun doWork(): Result {
             val subId = inputData.getString(KEY_SUB_ID)
             LogUtil.i(AppConfig.TAG, "SubscriptionUpdater automatic update starting: $subId")
@@ -259,14 +359,33 @@ object SubscriptionUpdater {
                 return Result.success()
             }
 
+            return refreshLock(subId).withLock { refresh(subId, inputData.getBoolean(KEY_FORCE, false)) }
+        }
+
+        @SuppressLint("MissingPermission")
+        private fun refresh(subId: String, force: Boolean): Result {
             val subItem = MmkvManager.decodeSubscription(subId)
             if (subItem == null) {
                 LogUtil.w(AppConfig.TAG, "SubscriptionUpdater: no subscription found for $subId")
                 return Result.success()
             }
 
-            if (!subItem.autoUpdate && !inputData.getBoolean(KEY_FORCE, false)) {
+            // До уведомления и до проверки пинга: подписке без адреса или выключенной обновляться
+            // нечем, и мигать в шторке «Обновляем подписку» ради пропуска незачем. См.
+            // [isRealSubscription]; задачи на такие подписки [sync] уже снимает, это - для тех, что
+            // стояли в очереди до этой сборки.
+            if (!isRealSubscription(SubscriptionCache(subId, subItem)) || !subItem.enabled) {
+                LogUtil.i(AppConfig.TAG, "SubscriptionUpdater: $subId has nothing to fetch, skip")
+                return Result.success()
+            }
+
+            if (!subItem.autoUpdate && !force) {
                 LogUtil.i(AppConfig.TAG, "SubscriptionUpdater: auto-update disabled for $subId, skip")
+                return Result.success()
+            }
+
+            if (isFresh(subItem.lastUpdated, System.currentTimeMillis(), freshWindowMillis(force, subItem.updateInterval))) {
+                LogUtil.i(AppConfig.TAG, "SubscriptionUpdater: $subId was fetched moments ago, skip")
                 return Result.success()
             }
 
@@ -303,13 +422,15 @@ object SubscriptionUpdater {
             // still goes away.
             NotificationHelper.cancel(NotificationChannelType.SUBSCRIPTION_UPDATE, applicationContext)
 
-            // THE UI IS TOLD, and it has to be: a refresh deletes every profile of this провайдер
-            // and mints a new guid for each replacement, while the screen keeps a cache of the old
-            // ones. Tapping a row from that stale cache stored a guid that no longer exists as the
-            // selection, and Главная then said «Выберите сервер в списке ниже» over a full list
-            // with the connect object disabled. This worker runs in its own process, so a broadcast
-            // is the only way to reach the Activity — and it is sent only when servers actually
-            // moved, so a refresh that changed nothing costs nothing.
+            // THE UI IS TOLD, and it has to be: a refresh deletes every profile of this провайдер it
+            // does not recognise and mints a new guid for what is new, while the screen keeps a
+            // cache of the old ones. Tapping a row from that stale cache stored a guid that no
+            // longer exists as the selection, and Главная then said «Выберите сервер в списке ниже»
+            // over a full list with the connect object disabled. The card's traffic and «обновлено»
+            // moved too. This worker runs in its own process, so a broadcast is the only way to
+            // reach the Activity — and it is sent only when something was imported. A refresh that
+            // recognised every server rebuilds the same rows under the same guids, so the screen
+            // repaints the card and nothing else visibly moves.
             // ЭТО ПОРЯДОК, А НЕ ПОСЛЕДОВАТЕЛЬНОСТЬ СТРОК: сортировка идёт ДО объявления.
             //
             // The refresh rewrote this subscription's server list in the провайдер's order, so a
@@ -333,7 +454,10 @@ object SubscriptionUpdater {
                 MessageUtil.sendMsg2UI(applicationContext, AppConfig.MSG_STATE_SERVERS_CHANGED, "")
             }
 
-            if (SettingsManager.isPingOnSubscriptionUpdate()) {
+            // ПИНГ - ПОСЛЕ ОБНОВЛЕНИЯ, А НЕ ПОСЛЕ ПОПЫТКИ. Проверка задержки - это запуск службы
+            // переднего плана из фона, и после отказа сети, истёкшей подписки или пропуска мерить
+            // нечего нового: серверы те же, что были.
+            if (outcome.configCount > 0 && SettingsManager.isPingOnSubscriptionUpdate()) {
                 requestLatencyTest(applicationContext, subId)
             }
 

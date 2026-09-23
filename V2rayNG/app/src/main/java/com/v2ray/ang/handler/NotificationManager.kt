@@ -111,8 +111,14 @@ object NotificationManager {
             return false
         }
 
-        // Reset last query time to avoid querying stats too soon after showing the notification
-        lastQueryTime = System.currentTimeMillis()
+        // Reset last query time to avoid querying stats too soon after showing the notification.
+        //
+        // ТОЛЬКО ДЛЯ НОВОГО ТУННЕЛЯ. [lastQueryTime] - начало окна, за которое копятся счётчики, и
+        // сдвигать его можно только вместе с их обнулением: новое ядро приходит с нулями, а здесь
+        // оно ещё не запущено. Повторный старт на живом туннеле (`CoreVpnService`, дубликат
+        // команды) тоже проходит через эту строку, и сдвиг окна без обнуления отдавал следующему
+        // опросу байты за прежнее окно, делённые на новое, более короткое - скачок скорости.
+        if (!CoreServiceManager.isRunning()) lastQueryTime = System.currentTimeMillis()
 
         val channel = ensureChannel(service)
 
@@ -170,7 +176,7 @@ object NotificationManager {
         val service = getService() ?: return
         val state = currentState()
         // A rate belongs to a live tunnel and to nothing else: a paused row does not carry
-        // «↓ 0 B/s», it carries «На паузе».
+        // «↓ 0 КБ/с», it carries «На паузе».
         if (state == Shade.RUNNING) {
             post(service, state, lastPushed?.down ?: 0L, lastPushed?.up ?: 0L)
         } else {
@@ -199,7 +205,7 @@ object NotificationManager {
      *                [ Остановить ]
      *
      *   РАБОТАЕТ     🇵🇱 Poland                                    00:11:52
-     *                ↓ 1,2 MB/s   ↑ 240 KB/s            (в развёрнутом виде)
+     *                ↓ 1,2 МБ/с   ↑ 240 КБ/с            (в развёрнутом виде)
      *                [ Пауза ]  [ Остановить ]
      *
      *   ПАУЗА        🇵🇱 Poland
@@ -424,7 +430,7 @@ object NotificationManager {
      *
      * The rate is returned to zero rather than blanked. Blanking it wrote `""` into the content
      * text, which prints an EMPTY line rather than removing one — the second line the owner
-     * reported — and a stopped meter that reads «↓ 0 KB/s ↑ 0 KB/s» is also simply true.
+     * reported — and a stopped meter that reads «↓ 0 КБ/с ↑ 0 КБ/с» is also simply true.
      */
     fun stopSpeedNotification() {
         speedNotificationJob?.let {
@@ -517,7 +523,7 @@ object NotificationManager {
         lastPushed = Posted(Shade.RUNNING, downPerSec, upPerSec)
     }
 
-    /** The expanded view's one line: «↓ 1,2 MB/s   ↑ 240 KB/s». */
+    /** The expanded view's one line: «↓ 1,2 МБ/с   ↑ 240 КБ/с». */
     private fun applySpeed(
         builder: NotificationCompat.Builder,
         context: Context,
@@ -556,7 +562,7 @@ object NotificationManager {
      * a tunnel is up for hours — and it used to end every single one of them with a
      * `NotificationManager.notify()`, i.e. a binder round trip into system_server that re-inflates
      * the row, whether or not a digit had changed. On an idle tunnel every one of those posted the
-     * identical «↓ 0 B/s ↑ 0 B/s».
+     * identical «↓ 0 КБ/с ↑ 0 КБ/с».
      *
      * Upstream had a guard for exactly this and this fork kept only its plumbing: `lastZeroSpeed`
      * was threaded in and out of this function and never branched on. It is replaced by the
@@ -574,13 +580,15 @@ object NotificationManager {
         val queryTime = System.currentTimeMillis()
         val sinceLastQueryIn = (queryTime - lastQueryTime)
 
-        // If the query interval is too short, skip this round to avoid excessive CPU usage
+        // If the query interval is too short, skip this round to avoid excessive CPU usage.
+        //
+        // THE WINDOW'S START STAYS WHERE IT IS. The counters were not read, so they still hold
+        // everything since the last query; moving the start to now handed the next query those
+        // bytes over a window it no longer measured, and the rate came out up to twice the truth.
         if (sinceLastQueryIn < QUERY_INTERVAL_MS) {
             LogUtil.w(AppConfig.TAG, "Query interval too short: ${sinceLastQueryIn}ms, skipping")
-            lastQueryTime = queryTime
             return
         }
-        val sinceLastQueryInSeconds = sinceLastQueryIn / 1000.0
 
         // THE DIRECT SIDE IS NOT SUMMED ANY MORE. Upstream separates proxied from direct traffic
         // because it reports both; this product reports one rate — what went through the tunnel —
@@ -600,9 +608,12 @@ object NotificationManager {
         // ONE TICK, TWO CONSUMERS. The rate goes to Главная's ledger and, since the owner asked for
         // it, to the expanded notification — from the SAME measurement at the SAME interval. Adding
         // a second job or a faster push for the shade would have paid twice for one number.
+        //
+        // The first query after the screen comes back is a catch-up, not a rate: see [TrafficRate].
+        // It still ran — it is what empties the counters — but what it publishes is zero.
         getService()?.let { svc ->
-            val downPerSec = (proxyDownlink / sinceLastQueryInSeconds).toLong()
-            val upPerSec = (proxyUplink / sinceLastQueryInSeconds).toLong()
+            val downPerSec = TrafficRate.perSecond(proxyDownlink, sinceLastQueryIn, QUERY_INTERVAL_MS)
+            val upPerSec = TrafficRate.perSecond(proxyUplink, sinceLastQueryIn, QUERY_INTERVAL_MS)
             MessageUtil.sendMsg2UI(svc, AppConfig.MSG_STATE_SPEED_UPDATE, longArrayOf(downPerSec, upPerSec))
             if (Posted(Shade.RUNNING, downPerSec, upPerSec) != lastPushed) pushSpeed(downPerSec, upPerSec)
         }
