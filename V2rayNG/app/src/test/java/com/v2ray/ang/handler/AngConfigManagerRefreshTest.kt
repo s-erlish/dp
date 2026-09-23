@@ -1,8 +1,5 @@
 package com.v2ray.ang.handler
 
-import android.text.TextUtils
-import android.util.Log
-import com.tencent.mmkv.MMKV
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -10,12 +7,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchers.anyInt
-import org.mockito.ArgumentMatchers.anyString
-import org.mockito.MockedStatic
-import org.mockito.Mockito
-import org.mockito.invocation.InvocationOnMock
 
 /**
  * ОБНОВЛЕНИЕ ПОДПИСКИ ЦЕЛИКОМ, КАК ЕГО ВИДИТ ХРАНИЛИЩЕ: что остаётся на месте, а что нет.
@@ -23,7 +14,7 @@ import org.mockito.invocation.InvocationOnMock
  * [AngConfigManager.parseConfigViaSub] - это всё, что обновление делает с ответом провайдера, когда
  * он уже скачан; и ручное «Обновить», и фоновое по расписанию, и импорт аккаунта приходят сюда. Тест
  * гоняет его по-настоящему, от разбора ответа до записей в MMKV, подменив только само MMKV: вместо
- * нативного хранилища - словарь на каждый ID.
+ * нативного хранилища - словарь на каждый ID ([InMemoryStores]).
  *
  * Эмулятора здесь нет, поэтому именно этот тест - доказательство того, о чём просил владелец:
  * обновление, в котором ничего не поменялось, оставляет серверам их guid, пинг и отметку выбора и
@@ -32,32 +23,15 @@ import org.mockito.invocation.InvocationOnMock
  */
 class AngConfigManagerRefreshTest {
 
-    private lateinit var mmkvStatic: MockedStatic<MMKV>
-    private lateinit var logStatic: MockedStatic<Log>
-    private lateinit var textUtilsStatic: MockedStatic<TextUtils>
+    private val stores = InMemoryStores()
 
     private val sub = "sub-1"
 
     @Before
-    fun setUp() {
-        stores.values.forEach { it.clear() }
-        mmkvStatic = Mockito.mockStatic(MMKV::class.java)
-        mmkvStatic.`when`<MMKV> { MMKV.mmkvWithID(anyString(), anyInt()) }
-            .thenAnswer { storeFor(it.getArgument(0)) }
-        logStatic = Mockito.mockStatic(Log::class.java)
-        // Разбор строки ответа начинается с TextUtils.isEmpty, а в JVM это заглушка Android.
-        textUtilsStatic = Mockito.mockStatic(TextUtils::class.java)
-        textUtilsStatic.`when`<Boolean> { TextUtils.isEmpty(any()) }
-            .thenAnswer { (it.getArgument<CharSequence?>(0)).isNullOrEmpty() }
-    }
+    fun setUp() = stores.start()
 
     @After
-    fun tearDown() {
-        mmkvStatic.close()
-        logStatic.close()
-        textUtilsStatic.close()
-        stores.values.forEach { it.clear() }
-    }
+    fun tearDown() = stores.stop()
 
     // ------------------------------------------------------------------ ссылки
 
@@ -239,35 +213,5 @@ class AngConfigManagerRefreshTest {
         assertNull(MmkvManager.decodeServerConfig(before[1]))
         assertNull(MmkvManager.decodeServerRaw(before[1]))
         assertNull(MmkvManager.decodeServerAffiliationInfo(before[1]))
-    }
-
-    // ------------------------------------------------------------------ подмена MMKV
-
-    private companion object {
-        /** Одно хранилище на ID, как у настоящего MMKV. MmkvManager держит их лениво - на весь JVM. */
-        val stores = HashMap<String, HashMap<String, Any?>>()
-        val fakes = HashMap<String, MMKV>()
-
-        fun storeFor(id: String): MMKV = fakes.getOrPut(id) { fake(stores.getOrPut(id) { HashMap() }) }
-
-        fun fake(map: HashMap<String, Any?>): MMKV = Mockito.mock(MMKV::class.java) { inv: InvocationOnMock ->
-            val key = inv.arguments.firstOrNull() as? String
-            val fallback = inv.arguments.getOrNull(1)
-            when (inv.method.name) {
-                "encode" -> { map[key!!] = inv.arguments[1]; true }
-                "decodeString" -> map[key] as? String ?: fallback
-                "decodeBool" -> map[key] as? Boolean ?: fallback ?: false
-                "decodeInt" -> map[key] as? Int ?: fallback ?: 0
-                "decodeLong" -> map[key] as? Long ?: fallback ?: 0L
-                "decodeFloat" -> map[key] as? Float ?: fallback ?: 0f
-                "decodeStringSet" -> map[key]
-                "containsKey" -> map.containsKey(key)
-                "allKeys" -> map.keys.toTypedArray()
-                "remove" -> { map.remove(key); inv.mock }
-                "removeValueForKey" -> { map.remove(key); null }
-                "clearAll" -> { map.clear(); null }
-                else -> Mockito.RETURNS_DEFAULTS.answer(inv)
-            }
-        }
     }
 }

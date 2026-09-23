@@ -145,7 +145,10 @@ class ProviderSettingsActivity : BaseActivity() {
     private fun bindState() {
         // With no подписка stored there is nothing for a schedule to apply to: toggling the switch
         // wrote to an empty list and looked like it had worked. The row says so by going inert.
-        val hasSubscriptions = MmkvManager.decodeSubscriptions().isNotEmpty()
+        // A подписка here is one there is something to fetch from — the store's own bucket for
+        // servers without one is not (SubscriptionUpdater.isRealSubscription), and counting it kept
+        // this row live on every install.
+        val hasSubscriptions = SubscriptionUpdater.currentSchedule() != null
         setRowEnabled(binding.rowAutoUpdate, hasSubscriptions)
         binding.switchAutoUpdate.restoreChecked(hasSubscriptions && isAutoUpdateOn())
         binding.switchNotify.restoreChecked(SettingsManager.isNotifyOnSubscriptionUpdate())
@@ -161,20 +164,15 @@ class ProviderSettingsActivity : BaseActivity() {
     // ---------------- ОБНОВЛЕНИЕ ----------------
 
     /** True if any stored subscription currently auto-updates. */
-    private fun isAutoUpdateOn(): Boolean =
-        MmkvManager.decodeSubscriptions().any { it.subscription.autoUpdate }
+    private fun isAutoUpdateOn(): Boolean = SubscriptionUpdater.currentSchedule()?.first == true
 
     /**
      * The interval that is actually scheduled: the one on the first auto-updating подписка, or the
-     * one the first подписка carries, or the shipped default when there is nothing to read.
+     * one the first подписка carries, or the shipped default when there is nothing to read — the
+     * same reading [SubscriptionUpdater.currentSchedule] gives the Настройки tab and new подписки.
      */
-    private fun storedIntervalMinutes(): Long {
-        val subs = MmkvManager.decodeSubscriptions()
-        val item = subs.firstOrNull { it.subscription.autoUpdate }?.subscription
-            ?: subs.firstOrNull()?.subscription
-            ?: return DEFAULT_INTERVAL_MINUTES
-        return item.updateInterval.takeIf { it > 0L } ?: DEFAULT_INTERVAL_MINUTES
-    }
+    private fun storedIntervalMinutes(): Long =
+        SubscriptionUpdater.currentSchedule()?.second?.takeIf { it > 0L } ?: DEFAULT_INTERVAL_MINUTES
 
     /**
      * Enable/disable auto-update across every stored subscription, then reschedule the

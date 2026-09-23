@@ -1250,6 +1250,8 @@ object AngConfigManager {
         // which answers «Подписка» rather than printing an empty string.
         subItem.remarks = uri.fragment?.trim().orEmpty()
         subItem.url = url
+        // В то расписание, которое человек уже выбрал в настройках, а не в умолчание «раз в час».
+        SubscriptionUpdater.applyCurrentSchedule(subItem)
         val guid = Utils.getUuid()
         MmkvManager.encodeSubscription(guid, subItem)
         return SubAddOutcome.Added(guid)

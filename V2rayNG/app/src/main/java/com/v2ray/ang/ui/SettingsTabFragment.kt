@@ -774,11 +774,12 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
      * «Настройки подписок» uses for the same state, so the two screens agree.
      */
     private fun currentSubAutoUpdateLabel(): String {
-        val subs = MmkvManager.decodeSubscriptions()
-        if (subs.isEmpty()) return getString(R.string.settings_sub_auto_update_none)
-        val active = subs.firstOrNull { it.subscription.autoUpdate }
-            ?: return subAutoUpdateLabel(0L)
-        return subAutoUpdateLabel(active.subscription.updateInterval)
+        // SubscriptionUpdater.currentSchedule, а не первая подписка в списке: первой там лежит
+        // служебная корзина серверов без подписки. Она есть на каждой установке, поэтому «Нет
+        // подписок» не появлялось никогда, а пересозданная с умолчанием она отвечала за всех «1 час».
+        val (enabled, minutes) = SubscriptionUpdater.currentSchedule()
+            ?: return getString(R.string.settings_sub_auto_update_none)
+        return subAutoUpdateLabel(if (enabled) minutes else 0L)
     }
 
     /**
@@ -791,13 +792,13 @@ class SettingsTabFragment : BaseFragment<FragmentSettingsTabBinding>() {
     private fun pickSubAutoUpdate() {
         // With no subscriptions the interval has nothing to apply to, so the picker would
         // silently no-op. Tell the user to add one first instead.
-        if (MmkvManager.decodeSubscriptions().isEmpty()) {
+        val schedule = SubscriptionUpdater.currentSchedule()
+        if (schedule == null) {
             toast(R.string.settings_sub_auto_update_empty)
             return
         }
         val entries = subAutoUpdateValues.map { subAutoUpdateLabel(it) }
-        val active = MmkvManager.decodeSubscriptions().firstOrNull { it.subscription.autoUpdate }
-        val currentMinutes = if (active == null) 0L else active.subscription.updateInterval
+        val currentMinutes = if (schedule.first) schedule.second else 0L
         // An interval stored by «Настройки подписок» that this list does not offer (2 ч, say) marks
         // nothing rather than snapping the checkmark onto a value the user never chose.
         val idx = subAutoUpdateValues.indexOf(currentMinutes)

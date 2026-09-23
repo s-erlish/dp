@@ -81,7 +81,12 @@ class SubscriptionSyncManager {
             val uuid = identityOf(info, url)
             val guid = managed[uuid]?.ifBlank { null } ?: Utils.getUuid()
 
-            val item = (MmkvManager.decodeSubscription(guid) ?: SubscriptionItem()).apply {
+            // НОВАЯ ПОДПИСКА ВСТАЁТ В ВЫБРАННОЕ РАСПИСАНИЕ, А ПРЕЖНЯЯ СВОЁ СОХРАНЯЕТ. Здесь стояло
+            // `autoUpdate = true` на каждом импорте, а импорт идёт при каждом входе, после покупки и
+            // по «Загрузить серверы». Кто выбрал в настройках «Выключено», получал автообновление
+            // обратно при первом же из них - молча, и строка настроек начинала показывать «1 час».
+            val item = (MmkvManager.decodeSubscription(guid)
+                ?: SubscriptionItem().also { SubscriptionUpdater.applyCurrentSchedule(it) }).apply {
                 // THE ПОДПИСКА'S OWN NICKNAME, AND NOTHING THAT ONLY LOOKS LIKE ONE.
                 //
                 // `displayName` is the label the user set in the cabinet and `defaultLabel` is the
@@ -104,7 +109,6 @@ class SubscriptionSyncManager {
                     ?: ""
                 this.url = url
                 enabled = true
-                autoUpdate = true
                 // No per-subscription User-Agent is stamped here on purpose. The fetch resolves
                 // per-sub -> global (provider screen) -> operator default itself, and the per-sub
                 // tier wins absolutely — so stamping the operator default made the provider
