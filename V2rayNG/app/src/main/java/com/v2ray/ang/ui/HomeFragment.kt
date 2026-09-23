@@ -3713,7 +3713,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     }
 
     /**
-     * «Загрузить сервера», and the two different loads that hide behind one button.
+     * «Загрузить серверы», and the two different loads that hide behind one button.
      *
      * The owner: «если удалить свою подписку при вошедшем аккаунте, то пишет типа загрузить сервера
      * … и не работает кнопка, пишет не удалось загрузить, хотя должно работать».
@@ -3721,7 +3721,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * He is in a state this button had no branch for. Deleting the подписка from the card removes
      * the LOCAL copy — `MmkvManager.removeSubscription` drops it from the store and takes its
      * серверы with it — while the ACCOUNT still holds the подписка, which is exactly why the gate
-     * correctly reads «Подписка активна, сервера ещё не загружены». But the button called
+     * correctly reads «Подписка активна, серверы ещё не загружены». But the button called
      * `refreshSubscriptions()`, i.e. the shell's `updateConfigViaSubAll()`, which walks the LOCAL
      * подписки and refetches each one. There were none. It returned `successCount == 0` without a
      * single request going out, the shell reported «Не удалось обновить», and this screen then

@@ -22,9 +22,9 @@
     <string name="flow_clip_0_note">Ищем ссылку на подписку</string>
     <string name="flow_clip_1_title">Нашли подписку</string>
     <string name="flow_clip_1_note">Загружаем список серверов</string>
-    <string name="flow_clip_2_title">Проверяем сервера</string>
+    <string name="flow_clip_2_title">Проверяем серверы</string>
     <string name="flow_clip_2_note">Измеряем задержку до каждого</string>
     <string name="flow_clip_3_title">Подписка добавлена</string>
-    <string name="flow_clip_3_note">Сервера готовы</string>
+    <string name="flow_clip_3_note">Серверы готовы</string>
     <string name="flow_clip_toast">Подписка добавлена</string>
 </resources>

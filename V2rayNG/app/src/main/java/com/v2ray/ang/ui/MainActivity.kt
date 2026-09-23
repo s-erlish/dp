@@ -622,7 +622,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
      * apiece plus one fetch per подписка, so its OWN bound is most of a minute — far past the point
      * where a screen that is not painting itself reads as a broken app rather than as a pause. Past
      * this the entrance plays regardless and Главная comes up in the state it is honestly in: on
-     * this path that is the gate block's «Подписка активна, сервера ещё не загружены», a screen with
+     * this path that is the gate block's «Подписка активна, серверы ещё не загружены», a screen with
      * a sentence and a button on it, which is a great deal better than nothing at all.
      *
      * A `postDelayed` and not an animator, because it is not a movement: it is a deadline, and
@@ -1968,7 +1968,7 @@ class MainActivity : HelperBaseActivity(), MainHost {
                 // went out: no подписки stored at all, and every stored подписка skipped
                 // (`updateConfigViaSub` returns skipCount for one that is disabled or has no URL).
                 // Both told the user his connection was at fault, instantly, about a fetch that
-                // never happened — the same defect «Загрузить сервера» had, and the instant arrival
+                // never happened — the same defect «Загрузить серверы» had, and the instant arrival
                 // of the message is the tell in both. Only a fetch that actually failed says so;
                 // when there was nothing to fetch, the answer is that there was nothing to fetch.
                 // `SubSettingActivity.updateAll` already branches this way on the same result.
