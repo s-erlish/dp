@@ -149,9 +149,9 @@
             app:iconSpaceReserved="false"
             app:singleLineTitle="false" />
 
-        <!-- SettingsManager.getDomesticDnsServers(). -->
+        <!-- SettingsManager.getDomesticDnsServers(). Умолчание = AppConfig.DNS_DIRECT. -->
         <EditTextPreference
-            android:defaultValue="223.5.5.5"
+            android:defaultValue="77.88.8.8"
             android:dialogMessage="@string/adv_domestic_dns_helper"
             android:key="pref_domestic_dns"
             android:negativeButtonText="@string/adv_cancel"

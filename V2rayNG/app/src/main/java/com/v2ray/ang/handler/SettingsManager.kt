@@ -44,6 +44,7 @@ object SettingsManager {
 
     fun initApp(context: Context) {
         ensureDefaultSettings()
+        migrateDomesticDnsDefaultOnce()
         retireAutoFallback()
         // «Российские приложения» mimo VPN, on out of the box — but only on an install whose
         // per-app routing nobody has touched. See RussianAppsPreset.seedOnFirstRun.
@@ -784,6 +785,34 @@ object SettingsManager {
         if (MmkvManager.decodeSettingsString(key).isNullOrEmpty()) {
             MmkvManager.encodeSettings(key, default)
         }
+    }
+
+    /** Умолчание апстрима для «DNS для прямых соединений»: AliDNS, у v2rayNG так с 1.6 до сих пор. */
+    private const val UPSTREAM_DOMESTIC_DNS = "223.5.5.5"
+
+    /**
+     * «DNS для прямых соединений» переезжает с китайского умолчания апстрима на Яндекс, один раз.
+     *
+     * [ensureDefaultValue] пишет умолчание в хранилище при первом запуске, поэтому у каждой
+     * установки до этой версии, где строку не трогали, там лежит [UPSTREAM_DOMESTIC_DNS]. Меняется
+     * ровно это значение: список, DoH, адрес с пробелом — выбор человека, и он остаётся. Отличить
+     * «не трогал» от «сам вписал 223.5.5.5» нельзя, как и с темой выше, но здесь владелец решил
+     * переводить: AliDNS в России своим выбором почти не бывает, а строка по-прежнему правится.
+     *
+     * Один раз — по отметке в хранилище: если потом кто-то вернёт себе 223.5.5.5 руками, следующий
+     * запуск его не перепишет. Ожидаемых IP, которые пришлось бы менять заодно, у Android нет: ядро
+     * получает geoip:cn только вместе с правилом geosite:cn, а в наборах departament его нет. Пара
+     * на ПК — ConfigHandler.MigrateSimpleDnsDefaults.
+     */
+    internal fun migrateDomesticDnsDefaultOnce() {
+        val migrationKey = "domestic_dns_yandex_migrated"
+        if (MmkvManager.decodeSettingsBool(migrationKey, false)) {
+            return
+        }
+        if (MmkvManager.decodeSettingsString(AppConfig.PREF_DOMESTIC_DNS) == UPSTREAM_DOMESTIC_DNS) {
+            MmkvManager.encodeSettings(AppConfig.PREF_DOMESTIC_DNS, AppConfig.DNS_DIRECT)
+        }
+        MmkvManager.encodeSettings(migrationKey, true)
     }
 
     /**

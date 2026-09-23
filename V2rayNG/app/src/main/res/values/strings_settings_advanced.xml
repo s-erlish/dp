@@ -48,7 +48,7 @@
     <string name="adv_fake_dns_summary_locked">Нужен включённый локальный резолвер</string>
 
     <string name="adv_domestic_dns_title">DNS для прямых соединений</string>
-    <string name="adv_domestic_dns_helper">IP-адрес или ссылка DoH, несколько через запятую. По умолчанию 223.5.5.5</string>
+    <string name="adv_domestic_dns_helper">IP-адрес или ссылка DoH, несколько через запятую. По умолчанию 77.88.8.8, DNS Яндекса</string>
     <string name="adv_domestic_dns_error">Нужен IP-адрес или ссылка, которая начинается с https://. Несколько адресов разделите запятой.</string>
 
     <string name="adv_dns_hosts_title">Записи hosts</string>

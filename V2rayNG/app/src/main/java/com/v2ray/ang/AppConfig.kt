@@ -242,7 +242,15 @@ object AppConfig {
 
     /** DNS server addresses. */
     const val DNS_PROXY = "1.1.1.1"
-    const val DNS_DIRECT = "223.5.5.5"
+
+    /**
+     * «DNS для прямых соединений»: им разрешаются домены, которые маршрут ведёт мимо VPN (в наборе
+     * «Россия» это geosite:category-ru). У апстрима здесь AliDNS 223.5.5.5, резолвер в Китае: из
+     * России каждый запрос идёт через полмира, а CDN, которые выбирают адрес по резолверу, отдают
+     * ближний к Китаю. Яндекс, как прямой DNS у departament для ПК. Установки со старым умолчанием
+     * переводит [com.v2ray.ang.handler.SettingsManager.migrateDomesticDnsDefaultOnce].
+     */
+    const val DNS_DIRECT = "77.88.8.8"
     const val DNS_VPN = "1.1.1.1"
     const val GEOSITE_PRIVATE = "geosite:private"
     const val GEOSITE_CN = "geosite:cn"
