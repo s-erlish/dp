@@ -3293,7 +3293,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
         // THE LEDGER AND THE GATE ARE MUTUALLY EXCLUSIVE (13-start-screen.md §4), and on the first
         // run that is not a style rule, it is the difference between seeing «Добавить подписку» and
         // not. A gated screen has no tunnel to meter and never will until the user acts, so the row
-        // can only ever read «0 KB/s 00:00:00 0 KB/s» — 32dp of zeroes standing between the object
+        // can only ever read «0 КБ/с 00:00:00 0 КБ/с» — 32dp of zeroes standing between the object
         // and the one action on the screen. «стартовый экран кнопок нет для добавления и тд, еле
         // подписку добавил»: the block below has to reach the fold on a short phone.
         //
@@ -3413,11 +3413,12 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
      * reads zero at rest rather than blank: this row is the screen's ledger and it is always there.
      * The session clock is written by [uptimeRunnable], which owns it second by second.
      *
-     * THE UNIT RIDES WITH THE VALUE — «1,0 KB/s», not a bare «1,0» under a «Отдача, Мбит/с»
+     * THE UNIT RIDES WITH THE VALUE — «1,0 КБ/с», not a bare «1,0» under a «Отдача, Мбит/с»
      * caption. The captions are gone (the owner's reference has none) so there is nothing left to
      * hold the unit, and a bare figure whose scale is invisible is worse than no figure. This is
-     * `Long.toSpeedString`, which is what the anchor build printed here and what the whole app
-     * prints everywhere else, so the same rate can never read two different ways in one product.
+     * `Long.toSpeedString`, which is what the anchor build printed here (in Latin then, «1,0 KB/s»)
+     * and what the whole app prints everywhere else, so the same rate can never read two different
+     * ways in one product.
      */
     private fun paintFigures() {
         if (!isBindingInitialized) return
@@ -4508,9 +4509,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>() {
     // ==================== Formatting ====================
 
     // The speed formatter that used to live here — one decimal of Мбит/с, with the unit stranded in
-    // a caption — went with the captions. `Long.toSpeedString` scales its own unit (B/s -> KB/s ->
-    // MB/s) and is what every other surface in the app already prints, so the same rate can no
-    // longer read two ways in one product. It is also what the reference build showed: «1,0 KB/s».
+    // a caption — went with the captions. `Long.toSpeedString` scales its own unit (КБ/с -> МБ/с)
+    // and is what every other surface in the app already prints, so the same rate can no longer
+    // read two ways in one product. It is also what the reference build showed, «1,0 KB/s», with
+    // the units in Russian now.
 
     /**
      * «14 августа» inside the current year, «14 августа 2027» otherwise. Never a numeric date on

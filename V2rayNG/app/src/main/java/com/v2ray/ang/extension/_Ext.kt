@@ -59,30 +59,69 @@ fun Context.toastError(message: Int) = Notice.say(this, message, NoticePolicy.Ki
 @Suppress("UNUSED_PARAMETER")
 fun Context.toastError(message: CharSequence) = Unit
 
-const val THRESHOLD = 1000L
-const val DIVISOR = 1024.0
+/** U+00A0: число и единица не расходятся по строкам. */
+private const val UNIT_SPACE = '\u00A0'
+
+/** Единицы объёма по-русски, как у кольца на вкладке «Аккаунт» и у карточки тарифа. */
+private val BYTE_UNITS = arrayOf("Б", "КБ", "МБ", "ГБ", "ТБ", "ПБ")
 
 /**
- * Converts a Long value to a speed string.
- *
- * @return The speed string.
+ * Число с одним знаком после запятой, запятой, а не точкой. Цифры собираются под [Locale.US],
+ * чтобы телефон на фарси или бенгали не получил свои цифры, и только разделитель меняется - тот же
+ * приём, что у `SubscriptionPagerAdapter.formatBytes`.
  */
-fun Long.toSpeedString(): String = this.toTrafficString() + "/s"
+private fun Double.oneDecimal(): String = String.format(Locale.US, "%.1f", this).replace('.', ',')
 
 /**
- * Converts a Long value to a traffic string.
+ * Скорость так, как её пишет интерфейс: «1,2 МБ/с», «240 КБ/с», «0 КБ/с».
  *
- * @return The traffic string.
+ * ЕДИНИЦЫ ПО-РУССКИ, И ОДНИ НА ВСЁ ПРИЛОЖЕНИЕ. Здесь стояло «1,2 MB/s» латиницей, а разделитель
+ * брался из языка ТЕЛЕФОНА: на телефоне с английским языком Главная и шторка писали «1.2 MB/s» -
+ * посреди русского интерфейса, рядом с «12,4 ГБ» на вкладке «Аккаунт». Остались байты, как в том
+ * виде Главной, который владелец назвал правильным («↑ 1,0 KB/s 00:11:52 ↓ 1,2 KB/s»): те же
+ * числа, по-русски.
+ *
+ * Начинается с КБ/с - скорость меньше килобайта всё равно пишется в КБ/с («0,4 КБ/с»), а не
+ * третьей единицей. Один знак после запятой до 100, дальше без него («248 КБ/с»); к следующей
+ * единице - с 1000, так что в числе не больше трёх цифр до запятой. Ноль - одним видом, «0 КБ/с»,
+ * как на Главной в покое (@string/home_speed_zero).
+ *
+ * @receiver байт в секунду.
+ */
+fun Long.toSpeedString(): String {
+    var value = coerceAtLeast(0L) / 1024.0
+    var unit = 1
+    while (value >= 999.5 && unit < BYTE_UNITS.lastIndex) {
+        value /= 1024.0
+        unit++
+    }
+    val figure = when {
+        value < 0.05 -> "0"
+        value < 99.95 -> value.oneDecimal()
+        else -> String.format(Locale.US, "%.0f", value)
+    }
+    return "$figure$UNIT_SPACE${BYTE_UNITS[unit]}/с"
+}
+
+/**
+ * Объём так, как его пишет интерфейс: «12,4 ГБ», «512 Б», «0 Б».
+ *
+ * Тот же счёт, что у кольца на вкладке «Аккаунт» (`SubscriptionPagerAdapter.formatBytes`): по
+ * 1024, с единицы, до которой дорос объём, один знак после запятой. Здесь стояли латинские «GB» и
+ * порог 1000 вместо 1024, и одни и те же байты подписки читались на Главной и на «Аккаунте»
+ * по-разному.
+ *
+ * @receiver байт.
  */
 fun Long.toTrafficString(): String {
-    val units = arrayOf("B", "KB", "MB", "GB", "TB", "PB")
-    var size = this.toDouble()
-    var unitIndex = 0
-    while (size >= THRESHOLD && unitIndex < units.size - 1) {
-        size /= DIVISOR
-        unitIndex++
+    if (this < 1024L) return "${coerceAtLeast(0L)}$UNIT_SPACE${BYTE_UNITS[0]}"
+    var value = toDouble()
+    var unit = 0
+    while (value >= 1024.0 && unit < BYTE_UNITS.lastIndex) {
+        value /= 1024.0
+        unit++
     }
-    return String.format(Locale.getDefault(), "%.1f %s", size, units[unitIndex])
+    return "${value.oneDecimal()}$UNIT_SPACE${BYTE_UNITS[unit]}"
 }
 
 val URI.idnHost: String

@@ -18,7 +18,8 @@
     <string name="home_strip_down_arrow" translatable="false">↓</string>
     <string name="home_strip_up_label">Отдача</string>
     <string name="home_strip_down_label">Приём</string>
-    <string name="home_speed_zero" translatable="false">0 KB/s</string>
+    <!-- Тот же вид, что у Long.toSpeedString для нуля: неразрывный пробел и русские единицы. -->
+    <string name="home_speed_zero">0\u00A0КБ/с</string>
     <string name="home_uptime_zero" translatable="false">00:00:00</string>
     <string name="home_uptime_format" translatable="false">%1$02d:%2$02d:%3$02d</string>
 
