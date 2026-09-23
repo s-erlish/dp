@@ -161,16 +161,18 @@ object AngConfigManager {
      *
      * @param server The server string.
      * @param subid The subscription ID.
-     * @param append Whether to append the configurations.
+     * @param append Whether to append the configurations. Honoured only for a real подписка: an
+     *   import with no подписка always appends — see [replacesServers].
      * @return An [ImportResult]; its first two components stay (count, countSub) for back-compat.
      */
     fun importBatchConfig(server: String?, subid: String, append: Boolean): ImportResult {
-        var count = parseBatchConfig(Utils.decode(server), subid, append)
+        val appendOnly = !replacesServers(subid, append)
+        var count = parseBatchConfig(Utils.decode(server), subid, appendOnly)
         if (count <= 0) {
-            count = parseBatchConfig(server, subid, append)
+            count = parseBatchConfig(server, subid, appendOnly)
         }
         if (count <= 0) {
-            count = parseCustomConfigServer(server, subid, append)
+            count = parseCustomConfigServer(server, subid, appendOnly)
         }
 
         // Single-server pastes/QR/manual use append mode, which would otherwise let a re-scanned or
@@ -206,6 +208,28 @@ object AngConfigManager {
             subFetch = subFetch
         )
     }
+
+    /**
+     * ЗАМЕНИТЬ МОЖНО ТОЛЬКО СЕРВЕРЫ ПОДПИСКИ. Импорт без подписки только добавляет.
+     *
+     * Замена - это «удалить всё, что лежит под [subid], и записать ответ заново»; у подписки это
+     * обновление: удалённое вернёт следующий ответ провайдера. Пустой [subid] означает корзину
+     * серверов без подписки (`MmkvManager.getSubscriptionId` читает его как
+     * `__default_subscription__`), а там лежит то, что человек добавил сам: по ссылке, по QR-коду,
+     * вручную. Вернуть это нечем.
+     *
+     * Ярлык «Сканировать QR» и ссылки depv:// / «Поделиться» звали импорт с `append = false` и без
+     * подписки, то есть ЗАМЕНЯЛИ корзину: отсканировал один сервер - остальные добавленные руками
+     * пропали вместе с пингами. Так досталось от V2rayNG: пока серверы не разложили по спискам
+     * подписок, `removeServerViaSubid` пустой [subid] пропускал, и это `false` ничего не удаляло;
+     * переезд (84ab54fe, «Migrate server storage to subscription lists») проверку убрал, а вызовы
+     * остались. Сами вызовы теперь добавляют, как «Добавить из буфера» внутри приложения, а это
+     * правило держит так любой будущий вызов, откуда бы он ни пришёл.
+     *
+     * @return true, если импорт вправе удалить серверы [subid] перед записью новых.
+     */
+    internal fun replacesServers(subid: String, append: Boolean): Boolean =
+        !append && subid.isNotBlank() && subid != AppConfig.DEFAULT_SUBSCRIPTION_ID
 
     /**
      * Removes fingerprint-duplicate servers within a single subscription bucket, so re-scanning or
