@@ -30,6 +30,12 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        # Без пакета «tools»: его больше нет в репозитории Google, и sdkmanager, который
+        # setup-android по умолчанию просит поставить «tools platform-tools», падал на нём —
+        # с 23 сентября ни одна сборка не доходила до компиляции. Платформу и build-tools
+        # сборка докачивает сама, NDK ставит следующий шаг.
+        with:
+          packages: 'platform-tools'
 
       - name: Install NDK
         run: |
