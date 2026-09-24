@@ -17,6 +17,18 @@ name: Publish release
 #
 # It publishes to a DRAFT release. Cutting the tag is the owner's decision; making the draft
 # visible is the second half of that decision and stays a human action.
+#
+# Как выпустить версию — так же, как выпуск для ПК:
+#   1. Поднять versionName и versionCode в V2rayNG/app/build.gradle.kts (versionCode — всегда больше
+#      прошлого, иначе телефон откажется ставить обновление) и положить описание в
+#      release-notes/v<версия>.md.
+#   2. Запустить сборку выпуска одним из двух способов:
+#      • отправить тег v<версия> на коммит с кодом выпуска (git push origin v2.2.2);
+#      • Actions → «Publish release» → Run workflow → ветка → версия, например 2.2.2. Кнопка есть,
+#        только когда этот файл лежит в ветке по умолчанию (master).
+#      Через 10–15 минут на странице Releases появится черновик с APK. «Publish release» — и
+#      приложения на телефонах увидят обновление в «Проверить обновления».
+# Черновик можно пересобрать тем же номером. Опубликованный выпуск не пересобирается.
 
 on:
   push:
@@ -24,8 +36,8 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Existing tag to build and publish (e.g. v2.2.2)'
+      version:
+        description: 'Версия, например 2.2.2 (как versionName в V2rayNG/app/build.gradle.kts)'
         required: true
         type: string
 
@@ -36,18 +48,50 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
+      # Запуск из Actions собирает ТОТ коммит, с которого его запустили, и тег появится на нём при
+      # публикации черновика. Пуш тега собирает сам тег.
       - name: Resolve the tag
         id: tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          IN_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          tag="${{ inputs.tag || github.ref_name }}"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            version="$(printf '%s' "$IN_VERSION" | tr -d '[:space:]')"
+            version="${version#[vV]}"
+            tag="v$version"
+            ref="$GITHUB_SHA"
+            if draft="$(gh release view "$tag" --json isDraft -q .isDraft 2>/dev/null)"; then
+              if [ "$draft" != "true" ]; then
+                echo "::error::Выпуск $tag уже опубликован. Укажите следующую версию."
+                exit 1
+              fi
+              echo "::notice::Черновик $tag будет заменён новой сборкой"
+            elif git ls-remote --exit-code --tags "https://github.com/$GH_REPO.git" "refs/tags/$tag" >/dev/null; then
+              echo "::error::Тег $tag уже есть. Укажите следующую версию."
+              exit 1
+            fi
+          else
+            tag="$GITHUB_REF_NAME"
+            version="${tag#v}"
+            ref="$tag"
+          fi
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Версия '$version' не подходит: нужна вида 2.2.2"
+            exit 1
+          fi
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+            echo "ref=$ref"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.tag.outputs.tag }}
+          ref: ${{ steps.tag.outputs.ref }}
           submodules: 'recursive'
           fetch-depth: '0'
 
@@ -212,20 +256,38 @@ jobs:
       # A DRAFT, on purpose. The tag says "this is the build"; publishing the draft says "ship it
       # to every installed client", and those are two decisions. The updater ignores drafts, so
       # nothing reaches a customer until a human presses the button.
+      # Описание — из release-notes/v<версия>.md, как у выпусков для ПК, а не список коммитов:
+      # его читают люди, которые ставят приложение.
       - name: Publish the draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          VERSION: ${{ steps.tag.outputs.version }}
+          REF: ${{ steps.tag.outputs.ref }}
         run: |
           set -euo pipefail
-          tag="${{ steps.tag.outputs.tag }}"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" dist/departament_*.apk --clobber
+          body="$RUNNER_TEMP/notes.md"
+          {
+            if [ -f "release-notes/v$VERSION.md" ]; then
+              cat "release-notes/v$VERSION.md"
+            else
+              echo "Описание выпуска: что нового для людей. Отредактируйте его перед публикацией."
+            fi
+            printf '\n---\n\nПрограмма распространяется по лицензии GPL-3.0.\n'
+          } > "$body"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ "$(gh release view "$TAG" --json isDraft -q .isDraft 2>/dev/null)" = "true" ]; then
+              gh release delete "$TAG" --yes
+            fi
+            gh release create "$TAG" dist/departament_*.apk --draft --target "$REF" \
+              --title "departament $VERSION" --notes-file "$body"
+          elif gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/departament_*.apk --clobber
           else
-            gh release create "$tag" dist/departament_*.apk \
-              --draft \
-              --title "departament ${{ steps.tag.outputs.version }}" \
-              --generate-notes
+            gh release create "$TAG" dist/departament_*.apk --draft \
+              --title "departament $VERSION" --notes-file "$body"
           fi
+          echo "Черновик $TAG: $(gh release view "$TAG" --json url -q .url) — откройте его и нажмите «Publish release»." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload APKs as a build artifact
         uses: actions/upload-artifact@v4
