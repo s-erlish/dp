@@ -2,7 +2,7 @@ package com.v2ray.ang.ui
 
 import android.os.Bundle
 import android.view.View
-import androidx.activity.viewModels
+import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -11,13 +11,15 @@ import com.v2ray.ang.auth.AccountCache
 import com.v2ray.ang.auth.AccountRepository
 import com.v2ray.ang.auth.AccountSession
 import com.v2ray.ang.auth.ApiError
+import com.v2ray.ang.auth.AuthTokenStore
 import com.v2ray.ang.auth.dto.DeviceDto
 import com.v2ray.ang.auth.dto.SubInfoDto
 import com.v2ray.ang.databinding.ActivityDevicesBinding
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.ui.adapter.DeviceAdapter
-import com.v2ray.ang.viewmodel.AccountViewModel
+import com.v2ray.ang.ui.component.SubPage
+import com.v2ray.ang.ui.component.ToolbarBinder
 import kotlinx.coroutines.launch
 
 /**
@@ -27,14 +29,16 @@ import kotlinx.coroutines.launch
  * The subscription UUID may be supplied via [EXTRA_REMNAWAVE_UUID]; if absent the first
  * subscription with a non-blank remnawaveUuid is resolved from the account.
  *
- * Device read/delete are not exposed on [AccountViewModel], so they go through
- * [AccountRepository] directly (both return [Result]); the ViewModel is still used to resolve
- * the active subscription.
+ * Everything on this screen goes through [AccountRepository] directly (every call returns a
+ * [Result]): the device list and the delete are not on `AccountViewModel`, and neither is the
+ * lookup that resolves the active подписка. The screen used to declare an `AccountViewModel`
+ * anyway — the doc comment claimed it resolved the subscription, and nothing ever read the field.
+ * Declaring it was not free: `by viewModels()` builds the model on first access, and the model
+ * builds a repository of its own.
  */
 class DeviceManagementActivity : BaseActivity() {
 
     private val binding by lazy { ActivityDevicesBinding.inflate(layoutInflater) }
-    private val viewModel: AccountViewModel by viewModels()
     private val repo = AccountRepository()
 
     private val adapter by lazy { DeviceAdapter(::confirmDelete) }
@@ -45,11 +49,28 @@ class DeviceManagementActivity : BaseActivity() {
     private var expectedCount: Int = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        SubPage.installTransitions(this)
         super.onCreate(savedInstanceState)
-        setContentViewWithToolbar(binding.root, showHomeAsUp = true, title = getString(R.string.devices_title))
+        // Handoff README §7: the sub-page lekalo draws «Устройства» at 24sp/700 under a
+        // 44dp back control with the explanation as the header's note — none of which
+        // activity_base's 16sp MaterialToolbar can do, so the header lives in this
+        // screen's own layout and the progress bar came with it.
+        setContentView(binding.root)
+        ToolbarBinder.bind(
+            root = binding.toolbar.root,
+            title = getString(R.string.devices_title),
+            activity = this,
+        )
+        ToolbarBinder.attachTo(binding.toolbar.root, binding.mainContent)
+        binding.toolbar.toolbarNote.text = getString(R.string.devices_subtitle)
+        binding.toolbar.toolbarNote.isVisible = true
 
         binding.rvDevices.layoutManager = LinearLayoutManager(this)
         binding.rvDevices.adapter = adapter
+        // §7: «Своё устройство помечено "Это устройство" акцентом и не удаляется». The same id the
+        // subscription fetch sends as its HWID header, so the row this marks is genuinely the row
+        // the server bound to this installation.
+        adapter.setOwnHwid(AuthTokenStore.deviceId())
 
         // Prefer the UUID passed via intent; otherwise resolve it from the already-loaded
         // AccountSession profile (no network). This lets the cache-first fast path in [loadDevices]
@@ -207,7 +228,13 @@ class DeviceManagementActivity : BaseActivity() {
                     // The cached list is now stale (one fewer device); drop it and re-fetch,
                     // bypassing the cache so the UI reflects the deletion immediately.
                     AccountCache.invalidateDevices(uuid)
-                    loadDevices(forceRefresh = true)
+                    // §7: the row dims, says «Отключено от подписки», and leaves 700ms later. The
+                    // refetch waits for that, because submitting a fresh list mid-animation would
+                    // yank the row out from under it and the sentence would never be read.
+                    hideLoading()
+                    adapter.release(device, binding.rvDevices) {
+                        loadDevices(forceRefresh = true)
+                    }
                 }
                 .onFailure {
                     hideLoading()
@@ -215,6 +242,12 @@ class DeviceManagementActivity : BaseActivity() {
                 }
         }
     }
+
+    // The progress bar moved into activity_devices.xml with the §7 header, so the base
+    // layout's cached one is never inflated and showLoading/hideLoading drive this one.
+    override fun showLoading() = runOnUiThread { binding.progressBar.isVisible = true }
+
+    override fun hideLoading() = runOnUiThread { binding.progressBar.isVisible = false }
 
     /** Shows the empty/error panel with [message], hiding the list. */
     private fun showEmptyState(message: String, isError: Boolean) {
@@ -226,9 +259,12 @@ class DeviceManagementActivity : BaseActivity() {
     private fun showEmpty(show: Boolean) {
         binding.layoutDevicesEmpty.visibility = if (show) View.VISIBLE else View.GONE
         binding.rvDevices.visibility = if (show) View.GONE else View.VISIBLE
-        // Hide the "devices connected to your subscription" subtitle while the empty/error
-        // overlay is up — it contradicts "no devices" / "subscription not found".
-        binding.tvDevicesSubtitle.visibility = if (show) View.GONE else View.VISIBLE
+        // §7's footnote explains what «Удалить» costs, so it goes with the rows that offer it.
+        binding.tvDevicesFootnote.visibility = if (show) View.GONE else View.VISIBLE
+        // Hide the "devices connected to your subscription" note while the empty/error
+        // overlay is up — it contradicts "no devices" / "subscription not found". §7 moved
+        // that sentence into the header, so this is the header's note now.
+        binding.toolbar.toolbarNote.visibility = if (show) View.GONE else View.VISIBLE
     }
 
     companion object {

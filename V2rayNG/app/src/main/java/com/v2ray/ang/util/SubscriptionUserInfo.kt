@@ -14,7 +14,31 @@ data class SubscriptionUserInfo(
     val total: Long = 0,
     val expire: Long = 0,
 ) {
+
+    /**
+     * **The подписка's term has run out, according to the подписка itself.**
+     *
+     * This is the one authoritative statement about expiry that arrives WITH the config body, on
+     * the same response, from the panel that serves both — which is what makes it usable as a gate
+     * on the body. When the term is over, the panel does not send a server list: it answers with a
+     * notice, one entry pointing at a host that exists to say «подписка истекла». Read as a config
+     * list, that notice replaces every real сервер of the подписка with a single fake location the
+     * app will then offer, select and try to connect through. @see
+     * com.v2ray.ang.handler.AngConfigManager.updateConfigViaSub
+     *
+     * `expire == 0` is «no expiry», the header's own convention for a perpetual plan. A value far
+     * in the future is the SAME statement written differently — several panels send a date around
+     * 2088 instead of 0 — and it is excluded for the same reason: a plan that never ends cannot
+     * have ended. Only a real date already behind us counts.
+     */
+    fun isExpired(nowSeconds: Long = System.currentTimeMillis() / 1000): Boolean =
+        expire in 1 until UNLIMITED_EXPIRE_SECONDS && expire < nowSeconds
+
     companion object {
+
+        /** ~2088-01-01 in epoch seconds. Some panels send a date this far out to mean "never". */
+        const val UNLIMITED_EXPIRE_SECONDS = 3_723_840_000L
+
         /**
          * Parses the raw header value. Returns null if nothing usable was found.
          */

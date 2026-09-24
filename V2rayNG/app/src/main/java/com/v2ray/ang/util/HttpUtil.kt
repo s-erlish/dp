@@ -42,6 +42,9 @@ object HttpUtil {
      */
     private const val SUBSCRIPTION_ACCEPT = "application/json, text/plain;q=0.9, */*;q=0.8"
 
+    /** Copy chunk for a download that reports progress. `copyTo`'s own default, kept explicit. */
+    private const val DOWNLOAD_BUFFER_BYTES = 8 * 1024
+
     /**
      * Resolves the User-Agent of a subscription request. The caller-supplied value — the
      * per-subscription override, else the operator-configured UA — always wins and is never
@@ -83,6 +86,16 @@ object HttpUtil {
 
     /** Mirrors [Utils.getDeviceName]'s own blank fallback, for a model name no header can carry. */
     const val FALLBACK_DEVICE_MODEL = "Android Device"
+
+    /**
+     * The host of [url], for a log line that must name an endpoint without leaking one.
+     *
+     * A подписка address carries the account token in its path — logging the URL whole put a working
+     * credential into «Журнал» and into every log a user might send to support. The host answers the
+     * question a log actually has ("which server did we talk to") and carries no secret.
+     */
+    fun hostOf(url: String): String =
+        runCatching { URL(url).host }.getOrNull()?.takeIf { it.isNotBlank() } ?: "(invalid address)"
 
     /**
      * Converts the domain part of a URL string to its IDN (Punycode, ASCII Compatible Encoding) format.
@@ -165,6 +178,26 @@ object HttpUtil {
 
 
     /**
+     * What a plain GET actually ended in — because "null" answers two different questions with the
+     * same word, and a caller that cannot tell them apart reports the wrong thing.
+     *
+     * [code] is the HTTP status when a server answered at all, and [NO_RESPONSE] when none did
+     * (offline, blocked, DNS, timeout, TLS). A 404 from a feed that has nothing to list is an
+     * ANSWER; it is not an outage, and it must not be reported as one — see
+     * `UpdateCheckerManager.fetch`, which is where that distinction was missing and turned an empty
+     * release list into «Не удалось связаться с сервером обновлений» plus a stack trace in «Журнал».
+     */
+    data class UrlContentOutcome(val body: String?, val code: Int) {
+        val answered: Boolean get() = code != NO_RESPONSE
+        val successful: Boolean get() = code in 200..299
+
+        companion object {
+            /** Nothing on the other end replied, so there is no status to reason about. */
+            const val NO_RESPONSE = -1
+        }
+    }
+
+    /**
      * Retrieves the content of a URL as a string.
      *
      * @param url The URL to fetch content from.
@@ -173,7 +206,21 @@ object HttpUtil {
      * @return The content of the URL as a string.
      */
     fun getUrlContent(request: UrlContentRequest): String? {
-        val url = request.url ?: return null
+        val outcome = getUrlOutcome(request)
+        // The status is only worth a line when the caller is not going to look at it — the ones
+        // that do (getUrlOutcome) decide for themselves whether it is news.
+        if (outcome.answered && !outcome.successful) {
+            LogUtil.w(AppConfig.TAG, "Failed to get URL content, code=${outcome.code}")
+        }
+        return outcome.body
+    }
+
+    /**
+     * The same GET as [getUrlContent], but it reports WHAT happened instead of only whether a body
+     * came back, and it says nothing to the log: the caller decides which outcomes are news.
+     */
+    fun getUrlOutcome(request: UrlContentRequest): UrlContentOutcome {
+        val url = request.url ?: return UrlContentOutcome(null, UrlContentOutcome.NO_RESPONSE)
         val client = buildOkHttpClient(request.timeout, request.httpPort, request.proxyUsername, request.proxyPassword, followRedirects = true)
         val requestBuilder = Request.Builder()
             .url(url)
@@ -185,76 +232,25 @@ object HttpUtil {
         try {
             client.newCall(requestBuilder.build()).execute().use { response ->
                 if (!response.isSuccessful) {
-                    LogUtil.w(AppConfig.TAG, "Failed to get URL content, code=${response.code}")
-                    return null
+                    return UrlContentOutcome(null, response.code)
                 }
-                return response.body?.string()
+                return UrlContentOutcome(response.body?.string(), response.code)
             }
         } catch (e: Exception) {
-            LogUtil.e(AppConfig.TAG, "Failed to get URL content", e)
+            LogUtil.w(AppConfig.TAG, "Failed to get URL content: ${e.message}")
         }
-        return null
+        return UrlContentOutcome(null, UrlContentOutcome.NO_RESPONSE)
     }
 
-    /**
-     * Retrieves the content of a URL as a string with a custom User-Agent header.
-     *
-     * @param url The URL to fetch content from.
-     * @param timeout The timeout value in milliseconds.
-     * @param httpPort The HTTP port to use.
-     * @return The content of the URL as a string.
-     * @throws IOException If an I/O error occurs.
-     */
-    @Throws(IOException::class)
-    fun getUrlContentWithUserAgent(request: UrlContentRequest): String {
-        var currentUrl = request.url
-        var redirects = 0
-        val maxRedirects = 3
-
-        while (redirects++ < maxRedirects) {
-            if (currentUrl == null) continue
-            val client = buildOkHttpClient(request.timeout, request.httpPort, request.proxyUsername, request.proxyPassword, followRedirects = false)
-            val requestBuilder = Request.Builder()
-                .url(currentUrl)
-                .get()
-                .header("User-agent", resolveSubscriptionUserAgent(request.userAgent))
-                .header("Accept", SUBSCRIPTION_ACCEPT)
-                .header("Connection", "close")
-
-            attachDeviceHeaders(request, requestBuilder)
-
-            applyEmbeddedBasicAuthHeader(currentUrl, requestBuilder)
-
-            if (request.httpPort != 0 && !request.proxyUsername.isNullOrBlank() && !request.proxyPassword.isNullOrBlank()) {
-                requestBuilder.header("Proxy-Authorization", Credentials.basic(request.proxyUsername, request.proxyPassword))
-            }
-
-            client.newCall(requestBuilder.build()).execute().use { response ->
-                when {
-                    response.isRedirect -> {
-                        val location = response.header("Location")
-                        if (location.isNullOrEmpty()) {
-                            throw IOException("Redirect location not found")
-                        }
-                        currentUrl = resolveLocation(currentUrl, location)
-                        if (currentUrl.isNullOrEmpty()) {
-                            throw IOException("Failed to resolve redirect location")
-                        }
-                        continue
-                    }
-
-                    response.isSuccessful -> {
-                        return response.body?.string() ?: ""
-                    }
-
-                    else -> {
-                        throw IOException("Request failed with status code ${response.code}")
-                    }
-                }
-            }
-        }
-        throw IOException("Too many redirects")
-    }
+    // `getUrlContentWithUserAgent` USED TO STAND HERE: the same подписка GET as
+    // [getUrlContentWithUserAgentEx] below — same headers, same embedded basic auth, same device
+    // headers, same three-hop redirect loop — differing only in that it threw the response headers
+    // away and returned the body alone. It lost its last caller when the fetch started reading
+    // `subscription-userinfo` (which is what tells an expired подписка apart from an empty one) and
+    // the операторские directives beside it, and a second copy of a redirect loop is exactly the
+    // kind of thing that stays behind and then drifts: the Ex variant has since grown the HWID
+    // headers and the Accept negotiation, and this one would have had to grow them too, silently,
+    // to keep answering the same way. One fetch, one place.
 
     /**
      * Body plus selected response headers of a subscription fetch.
@@ -290,7 +286,7 @@ object HttpUtil {
                 .header("Accept", SUBSCRIPTION_ACCEPT)
                 .header("Connection", "close")
 
-            attachDeviceHeaders(request, requestBuilder)
+            attachDeviceHeaders(request, requestBuilder, currentUrl)
 
             applyEmbeddedBasicAuthHeader(currentUrl, requestBuilder)
 
@@ -340,12 +336,30 @@ object HttpUtil {
      * from [AppConfig.HEADER_DEVICE_MODEL] (the real model, not a User-Agent guess). All values
      * are stable across calls, so they never register new device entries.
      *
+     * **AND ONLY TO THE HOST THE SUBSCRIPTION WAS ADDRESSED TO.** [getUrlContentWithUserAgentEx]
+     * follows up to three redirects itself, building a fresh request per hop, and this used to be
+     * re-attached to every one of them — so a `Location:` pointing anywhere at all was enough to
+     * make the app hand a stranger the identifier that follows this install across every update it
+     * ever makes, plus the device model and the OS version beside it. Nobody in the middle needs
+     * any of that: the panel's device ledger lives on the host the request was made TO, and a
+     * provider that answers from a CDN still delivers the body without it.
+     *
+     * [currentUrl] is therefore compared against [UrlContentRequest.url] — the address the user
+     * (or the account import) actually gave us — and the headers go out only while the two name
+     * the same host. See [isOriginHost] for what "the same host" means and what it deliberately
+     * does not mean.
+     *
      * Every value goes through [isHeaderSafe] first. The model comes from `Build.MODEL`, which is
      * whatever the OEM wrote there and is not guaranteed ASCII; unchecked, one such device would
      * throw here and fail every subscription update forever. Degrading the panel's device label is
      * the acceptable half of that trade, losing the subscription is not.
      */
-    private fun attachDeviceHeaders(request: UrlContentRequest, requestBuilder: Request.Builder) {
+    internal fun attachDeviceHeaders(
+        request: UrlContentRequest,
+        requestBuilder: Request.Builder,
+        currentUrl: String,
+    ) {
+        if (!isOriginHost(request.url, currentUrl)) return
         val hwid = request.hwid?.takeIf { it.isNotBlank() && isHeaderSafe(it) } ?: return
         requestBuilder.addHeader(AppConfig.HEADER_HWID, hwid)
         requestBuilder.addHeader(AppConfig.HEADER_DEVICE_OS, "android")
@@ -356,7 +370,41 @@ object HttpUtil {
         )
     }
 
-    private fun applyEmbeddedBasicAuthHeader(rawUrl: String, requestBuilder: Request.Builder) {
+    /**
+     * **Is [url] still the host [originUrl] named?** The one question that decides whether the
+     * device identity travels on this hop.
+     *
+     * THE HOST, NOT THE ADDRESS. A подписка that redirects `http` -> `https`, or `/sub/abc` ->
+     * `/api/sub/abc`, is the same server answering about itself; refusing it would break working
+     * subscriptions to prevent nothing. Compared case-insensitively because DNS is, so `Example.com`
+     * and `example.com` are one host and not two.
+     *
+     * A SUBDOMAIN IS A DIFFERENT HOST. `cdn.example.com` is not `example.com` here, deliberately,
+     * and this is the strict end of the choice: a sibling host under one registrable domain is
+     * usually the same operator, but "usually" is the whole of the argument for it and the cost of
+     * being wrong is the identifier itself. Nothing in this app relies on such a redirect — the
+     * only subscription addresses it fetches are the ones the panel hands out and the ones a user
+     * pasted — so strictness costs nothing that is known to exist.
+     *
+     * False when either address will not parse: an unreadable origin is not a host we can claim to
+     * recognise, and silence is the safe answer to a question we cannot answer.
+     */
+    internal fun isOriginHost(originUrl: String?, url: String): Boolean {
+        val origin = runCatching { URL(originUrl) }.getOrNull()?.host?.takeIf { it.isNotBlank() }
+            ?: return false
+        val current = runCatching { URL(url) }.getOrNull()?.host?.takeIf { it.isNotBlank() }
+            ?: return false
+        return origin.equals(current, ignoreCase = true)
+    }
+
+    /**
+     * The `user:pass@` half of the address being fetched, turned into a `Authorization: Basic`
+     * header. Taken from [rawUrl] — the address of THIS hop — and never from the original, which is
+     * why a redirect has never been able to carry an embedded credential off to another host: a
+     * `Location` without userinfo simply produces no header. That is the shape [attachDeviceHeaders]
+     * was missing and now has.
+     */
+    internal fun applyEmbeddedBasicAuthHeader(rawUrl: String, requestBuilder: Request.Builder) {
         val parsed = runCatching { URL(rawUrl) }.getOrNull() ?: return
         parsed.userInfo?.let { userInfo ->
             val colon = userInfo.indexOf(':')
@@ -370,6 +418,24 @@ object HttpUtil {
         }
     }
 
+    /**
+     * **The one client every request in this file is cut from.**
+     *
+     * `OkHttpClient()` is not a request object; it is a pool. Each instance owns a `Dispatcher`, a
+     * `ConnectionPool`, a `RouteDatabase` — and, the expensive one, its own lazily built
+     * `SSLSocketFactory` and `X509TrustManager`, which means loading and parsing the platform trust
+     * store on the first HTTPS call each instance makes. [buildOkHttpClient] used to mint a fresh
+     * one PER REQUEST, and `getUrlContentWithUserAgent*` mint one per REDIRECT HOP as well, so a
+     * subscription behind one redirect paid for two of everything and could not reuse so much as a
+     * TLS session between the two legs of its own fetch.
+     *
+     * `newBuilder()` hands the per-call settings (timeouts, proxy, redirects) their own client
+     * while sharing all of that — which is exactly the split OkHttp is designed around. Nothing
+     * about a request changes: the proxy and the timeouts are still set per call below, and this
+     * root has neither.
+     */
+    private val sharedClient: OkHttpClient by lazy { OkHttpClient() }
+
     private fun buildOkHttpClient(
         timeout: Int,
         httpPort: Int,
@@ -377,7 +443,7 @@ object HttpUtil {
         proxyPassword: String?,
         followRedirects: Boolean
     ): OkHttpClient {
-        val builder = OkHttpClient.Builder()
+        val builder = sharedClient.newBuilder()
             .connectTimeout(timeout.toLong(), TimeUnit.MILLISECONDS)
             .readTimeout(timeout.toLong(), TimeUnit.MILLISECONDS)
             .followRedirects(followRedirects)
@@ -420,9 +486,16 @@ object HttpUtil {
         }
     }
 
+    /**
+     * @param onProgress bytes written so far / total, or total `-1` when the server sent no
+     *   `Content-Length`. Called on the calling thread, so a UI consumer marshals it itself. It is
+     *   optional and defaults to null: a download the user is not watching should not pay for a
+     *   callback per chunk, and the existing asset downloader does not want one.
+     */
     fun downloadToFile(
         request: UrlContentRequest,
-        targetFile: File
+        targetFile: File,
+        onProgress: ((Long, Long) -> Unit)? = null
     ): Boolean {
         val url = request.url ?: return false
         val client = buildOkHttpClient(request.timeout, request.httpPort, request.proxyUsername, request.proxyPassword, followRedirects = true)
@@ -441,9 +514,27 @@ object HttpUtil {
                     return false
                 }
                 val body = response.body ?: return false
-                body.byteStream().use { input ->
-                    targetFile.outputStream().use { output ->
-                        input.copyTo(output)
+                if (onProgress == null) {
+                    body.byteStream().use { input ->
+                        targetFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                } else {
+                    val total = body.contentLength()
+                    var written = 0L
+                    onProgress(0L, total)
+                    body.byteStream().use { input ->
+                        targetFile.outputStream().use { output ->
+                            val buffer = ByteArray(DOWNLOAD_BUFFER_BYTES)
+                            while (true) {
+                                val read = input.read(buffer)
+                                if (read < 0) break
+                                output.write(buffer, 0, read)
+                                written += read
+                                onProgress(written, total)
+                            }
+                        }
                     }
                 }
                 true

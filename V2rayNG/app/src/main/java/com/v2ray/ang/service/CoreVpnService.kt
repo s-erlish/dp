@@ -18,6 +18,7 @@ import androidx.annotation.RequiresApi
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.LOOPBACK
 import com.v2ray.ang.BuildConfig
+import com.v2ray.ang.R
 import com.v2ray.ang.contracts.ServiceControl
 import com.v2ray.ang.contracts.Tun2SocksControl
 import com.v2ray.ang.core.CoreServiceManager
@@ -86,11 +87,6 @@ class CoreVpnService : VpnService(), ServiceControl {
         stopAllService()
     }
 
-//    override fun onLowMemory() {
-//        stopV2Ray()
-//        super.onLowMemory()
-//    }
-
     override fun onDestroy() {
         super.onDestroy()
         LogUtil.i(AppConfig.TAG, "StartCore-VPN: Service destroyed")
@@ -115,6 +111,33 @@ class CoreVpnService : VpnService(), ServiceControl {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         LogUtil.i(AppConfig.TAG, "StartCore-VPN: Service command received")
         try {
+            // A STICKY RESTART OF A PAUSED SERVICE IS NOT A REQUEST TO CONNECT.
+            //
+            // `START_STICKY` is what keeps a real session alive across a kill, and it hands back a
+            // `null` intent — which, in a fresh process, looks exactly like the restart of a
+            // tunnel that WAS running and is supposed to come back up. A pause that the system
+            // killed would therefore have turned the VPN back on by itself, with nobody asking.
+            // The flag is on disk for precisely this (see CoreServiceManager.isPaused): re-post
+            // the paused row from the selected server, re-arm its «Остановить», and stay down.
+            if (intent == null && CoreServiceManager.isPaused()) {
+                LogUtil.i(AppConfig.TAG, "StartCore-VPN: Restarted while paused; the tunnel stays down")
+                val paused = MmkvManager.getSelectServer()?.let { MmkvManager.decodeServerConfig(it) }
+                if (!NotificationManager.showNotification(paused)) {
+                    LogUtil.e(AppConfig.TAG, "StartCore-VPN: Failed to enter foreground while paused; stopping")
+                    stopAllService()
+                    return START_NOT_STICKY
+                }
+                CoreServiceManager.ensureCommandReceiver()
+                return START_STICKY
+            }
+
+            // EVERY OTHER START COMMAND IS A CONNECT, «Возобновить» in the shade included — it is
+            // an Intent to this class and nothing else (@see AppConfig.ACTION_RESUME_SERVICE), so
+            // it needs no branch of its own here; the ordinary start path IS the way back. The
+            // pause ends before the row is re-drawn below, so the shade says «Подключение…» from
+            // the first frame of the reconnect rather than still offering to resume it.
+            CoreServiceManager.clearPaused()
+
             // Promote to foreground first (mandatory within ~5s). showNotification is hardened to
             // never throw and returns false if the system refused the foreground promotion.
             if (!NotificationManager.showNotification(null)) {
@@ -123,7 +146,46 @@ class CoreVpnService : VpnService(), ServiceControl {
                 stopAllService()
                 return START_NOT_STICKY
             }
-            setupVpnService()
+            // A START THAT ARRIVES ON A LIVE TUNNEL IS A DUPLICATE, NOT A NEW SESSION — and until
+            // this guard it was the fastest way to lose a working connection.
+            //
+            // The shell decides whether to start or stop from `MainViewModel.isRunning`, and that
+            // value is OPTIMISTIC: `startListenBroadcast()` publishes `false` on every Activity
+            // start, before the daemon has answered the registration handshake. Press the connect
+            // object in that window — the app has just been opened, on a phone where the tunnel
+            // has been up since yesterday — and a start is issued against a core that is already
+            // running. What followed was: `configureVpnService()` closed the live interface and
+            // established a new one, `startCoreLoop` then refused because the core was up, and the
+            // refusal was handled by `stopAllService()`. The tunnel went down and the screen said
+            // «Не удалось подключиться».
+            //
+            // Nothing here has anything to do: the tunnel the caller wants IS the tunnel that is
+            // running. So say so, and leave it alone. Checked after the foreground promotion (which
+            // now re-posts the live notification rather than blanking it) because the promotion is
+            // what the 5-second `startForegroundService` deadline demands, whatever comes next.
+            if (CoreServiceManager.isRunning()) {
+                LogUtil.w(AppConfig.TAG, "StartCore-VPN: A core is already running; keeping the live tunnel")
+                MessageUtil.sendMsg2UI(this, AppConfig.MSG_STATE_RUNNING, "")
+                return START_STICKY
+            }
+
+            // THE SETUP'S ANSWER IS HONOURED, and both halves of that matter.
+            //
+            // It used to be ignored, so a setup that bailed still fell into startService() — and
+            // that guard is `::mInterface.isInitialized`, which stays true for the rest of the
+            // process once a session has ever been established. So the second connect after a
+            // revoked VPN permission handed the core the PREVIOUS session's file descriptor, which
+            // stopAllService had already closed.
+            //
+            // The other half is that a refusal announced nothing. `prepare() != null` — the system
+            // permission has been withdrawn — called stopSelf() and stopped, with no state
+            // broadcast at all, so the screen sat on «Подключение…» until the 20-second watchdog
+            // gave up on it. A start that cannot happen says so now, in the same breath as every
+            // other failed start.
+            if (!setupVpnService()) {
+                LogUtil.e(AppConfig.TAG, "StartCore-VPN: Setup failed; not starting the core")
+                return START_NOT_STICKY
+            }
             startService()
         } catch (e: Exception) {
             // Any uncaught failure here would kill the :RunSoLibV2RayDaemon process, leaving the
@@ -134,7 +196,6 @@ class CoreVpnService : VpnService(), ServiceControl {
             stopAllService()
         }
         return START_STICKY
-        //return super.onStartCommand(intent, flags, startId)
     }
 
     /**
@@ -168,6 +229,27 @@ class CoreVpnService : VpnService(), ServiceControl {
         stopAllService(true)
     }
 
+    /**
+     * Пауза: the same teardown as [stopService] with the two lines that would burn the bridge
+     * left out — `stopSelf()` and the cancelled notification.
+     *
+     * The tun interface IS closed. Leaving it up with nothing reading it would not be a pause,
+     * it would be an outage: every route still points into the tunnel and no core is emptying
+     * it, so the phone loses the internet rather than the VPN. Closing it hands routing back to
+     * the system, which is what «выключить впн» means to the person who pressed the button.
+     *
+     * THE VPN PERMISSION IS NOT ASKED FOR AGAIN ON THE WAY BACK. `VpnService.prepare()` returns
+     * null once the user has consented to this app, and consent belongs to the package, not to
+     * the interface — closing the tunnel does not withdraw it, and this service does not even
+     * stop, so nothing here can. [setupVpnService] runs its `prepare()` on resume exactly as it
+     * does on a cold connect and gets null back, then establishes a fresh interface. (The one
+     * case where it does not is the one where the user revoked the permission in Settings
+     * meanwhile, and that already reports a start failure instead of a silent dead end.)
+     */
+    override fun pauseService() {
+        stopAllService(isForced = true, keepAlive = true)
+    }
+
     override fun vpnProtect(socket: Int): Boolean {
         return protect(socket)
     }
@@ -182,22 +264,29 @@ class CoreVpnService : VpnService(), ServiceControl {
     /**
      * Sets up the VPN service.
      * Prepares the VPN and configures it if preparation is successful.
+     *
+     * @return true when the tunnel interface is up and the core may be started.
      */
-    private fun setupVpnService() {
+    private fun setupVpnService(): Boolean {
         val prepare = prepare(this)
         if (prepare != null) {
             LogUtil.e(AppConfig.TAG, "StartCore-VPN: Permission not granted")
+            // The user revoked the VPN permission (or another app took it). Nothing here can ask
+            // for it back — only an Activity can — so the honest thing is to report the start as
+            // failed and let the screen offer the retry, rather than leaving it negotiating.
+            reportStartFailure(getString(R.string.toast_permission_denied))
             stopSelf()
-            return
+            return false
         }
 
         if (configureVpnService() != true) {
             LogUtil.e(AppConfig.TAG, "StartCore-VPN: Configuration failed")
             stopSelf()
-            return
+            return false
         }
 
         runTun2socks()
+        return true
     }
 
     /**
@@ -273,16 +362,11 @@ class CoreVpnService : VpnService(), ServiceControl {
         }
 
         // Configure DNS servers
-        //if (MmkvManager.decodeSettingsBool(AppConfig.PREF_LOCAL_DNS_ENABLED) == true) {
-        //  builder.addDnsServer(PRIVATE_VLAN4_ROUTER)
-        //} else {
         SettingsManager.getVpnDnsServers().forEach {
             if (Utils.isPureIpAddress(it)) {
                 builder.addDnsServer(it)
             }
         }
-
-        //builder.setSession(V2RayServiceManager.getRunningServerName())
     }
 
     /**
@@ -339,6 +423,22 @@ class CoreVpnService : VpnService(), ServiceControl {
         // Handle the VPN service's own package according to the mode
         if (bypassApps) apps.add(selfPackageName) else apps.remove(selfPackageName)
 
+        // AN UNINSTALLED PACKAGE IS NOT AN ERROR, and logging it as one is why «Журнал» filled with
+        // red on a perfectly healthy connect.
+        //
+        // The selection is a list of package NAMES, and it long outlives the apps: uninstalling an
+        // app does not prune it, the «Подобрать автоматически» list is a remote file describing apps
+        // this phone may never have had, and the «Российские приложения» набор deliberately names
+        // every bank and operator app in the country so that whichever ones the user installs later
+        // are already covered. Every absent one threw here, and every throw wrote an ERROR line with
+        // a stack trace — on EVERY connect, one per package. Nothing was wrong, and the log said
+        // dozens of things were.
+        //
+        // So the skip is counted, not reported, and one INFO line states the outcome: a real
+        // diagnostic («37 из 40 применены») instead of 3 alarms, and still enough to notice a
+        // selection that has gone entirely stale.
+        var applied = 0
+        var missing = 0
         apps.forEach {
             try {
                 if (bypassApps) {
@@ -348,10 +448,16 @@ class CoreVpnService : VpnService(), ServiceControl {
                     // In proxy mode, only allow the selected apps
                     builder.addAllowedApplication(it)
                 }
+                applied++
             } catch (e: PackageManager.NameNotFoundException) {
-                LogUtil.e(AppConfig.TAG, "StartCore-VPN: Failed to configure app", e)
+                missing++
             }
         }
+        LogUtil.i(
+            AppConfig.TAG,
+            "StartCore-VPN: per-app rules applied to $applied of ${apps.size} packages" +
+                if (missing > 0) " ($missing not installed)" else ""
+        )
     }
 
     /**
@@ -359,25 +465,40 @@ class CoreVpnService : VpnService(), ServiceControl {
      * Starts the tun2socks process with the appropriate parameters.
      */
     private fun runTun2socks() {
+        // isUsingHevTun() is the user's preference AND TProxyService.isAvailable — see its kdoc.
+        // When the native bridge cannot load, this is false, nothing here touches TProxyService,
+        // and the core owns the tunnel instead (CoreConfigManager.needTun / the tun fd handed to
+        // startLoop). Do not "simplify" this back to reading the preference alone: that is what
+        // turned a missing .so into an ExceptionInInitializerError out of a static initialiser,
+        // past onStartCommand's catch(Exception), and killed :RunSoLibV2RayDaemon on connect.
         if (SettingsManager.isUsingHevTun()) {
             tun2SocksService = TProxyService(
                 context = applicationContext,
                 vpnInterface = mInterface,
-                isRunningProvider = { isRunning },
-                restartCallback = { runTun2socks() }
             )
         } else {
+            if (MmkvManager.decodeSettingsBool(AppConfig.PREF_USE_HEV_TUNNEL, true)) {
+                LogUtil.w(
+                    AppConfig.TAG,
+                    "StartCore-VPN: hev-socks5-tunnel is unavailable in this build; " +
+                        "the core will carry the tunnel itself"
+                )
+            }
             tun2SocksService = null
         }
 
         tun2SocksService?.startTun2Socks()
     }
 
-    private fun stopAllService(isForced: Boolean = true) {
-//        val configName = defaultDPreference.getPrefString(PREF_CURR_CONFIG_GUID, "")
-//        val emptyInfo = VpnNetworkInfo()
-//        val info = loadVpnNetworkInfo(configName, emptyInfo)!! + (lastNetworkInfo ?: emptyInfo)
-//        saveVpnNetworkInfo(configName, info)
+    /**
+     * @param isForced also close the tun interface (and, unless paused, stop the service itself).
+     * @param keepAlive **пауза**: everything comes down except this service and its row in the
+     *   shade. The ONLY two differences from a stop are on this page — `stopCoreLoop` keeps the
+     *   notification instead of cancelling it, and `stopSelf()` is not called. Written as a
+     *   parameter rather than a parallel method on purpose: a copy of this teardown would drift
+     *   from it the first time either half changed.
+     */
+    private fun stopAllService(isForced: Boolean = true, keepAlive: Boolean = false) {
         isRunning = false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             try {
@@ -390,7 +511,7 @@ class CoreVpnService : VpnService(), ServiceControl {
         tun2SocksService?.stopTun2Socks()
         tun2SocksService = null
 
-        CoreServiceManager.stopCoreLoop()
+        CoreServiceManager.stopCoreLoop(keepAlive)
 
         if (isForced) {
             //stopSelf has to be called ahead of mInterface.close(). otherwise v2ray core cannot be stooped
@@ -398,7 +519,11 @@ class CoreVpnService : VpnService(), ServiceControl {
             //This can be verified by putting stopself() behind and call stopLoop and startLoop
             //in a row for several times. You will find that later created v2ray core report port in use
             //which means the first v2ray core somehow failed to stop and release the port.
-            stopSelf()
+            //
+            // A PAUSE KEEPS THE SERVICE, so it is the one path that does not stop itself. The
+            // ordering the comment above protects is preserved: the core stop was asked for a few
+            // lines up and the interface is still closed after it, with the same delay.
+            if (!keepAlive) stopSelf()
 
             // Add a small delay to allow the async core stop operation to complete
             // before closing the VPN interface, preventing a race condition that can

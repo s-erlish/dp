@@ -15,13 +15,13 @@ import com.v2ray.ang.R
 import com.v2ray.ang.contracts.BaseAdapterListener
 import com.v2ray.ang.databinding.ActivityUserAssetBinding
 import com.v2ray.ang.dto.entities.AssetUrlItem
-import com.v2ray.ang.extension.toast
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.extension.toastSuccess
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.ui.component.EmptyStateBinder
 import com.v2ray.ang.ui.component.RowBinder
+import com.v2ray.ang.ui.component.SelectPopup
 import com.v2ray.ang.ui.component.SubPage
 import com.v2ray.ang.ui.component.ToolbarBinder
 import com.v2ray.ang.util.LogUtil
@@ -91,20 +91,35 @@ class UserAssetActivity : HelperBaseActivity() {
         RowBinder.bind(
             root = binding.rowSource.root,
             title = getString(R.string.asset_source),
+            // The current source is the SUBTITLE, where the prototype puts it: these names run
+            // to «Loyalsoldier/v2ray-rules-dat» and a trailing value would ellipsise all of it
+            // away. Same reason «User-Agent» on Настройки провайдеров reads its value that way.
+            subtitle = current,
             glyph = R.drawable.ic_globe_24dp,
-            value = current,
             trailing = RowBinder.Trailing.Glyph(
                 icon = R.drawable.ic_arrow_drop_down,
                 contentDescription = getString(R.string.asset_source_cd),
             ),
+            // §6's «окошко у значения», not a cycle. Cycling made the third source reachable
+            // only by tapping twice past the second and never showed what the options WERE -
+            // the same defect «Стратегия доменов» on Маршрутизация was carrying.
             onClick = {
                 val sources = AppConfig.GEO_FILES_SOURCES
-                val next = sources[(sources.indexOf(current).coerceAtLeast(0) + 1) % sources.size]
-                MmkvManager.encodeSettings(AppConfig.PREF_GEO_FILES_SOURCES, next)
-                bindSourceRow()
-                refreshData()
+                SelectPopup.show(
+                    anchor = binding.rowSource.root,
+                    options = sources.toList(),
+                    selectedIndex = sources.indexOf(current).coerceAtLeast(0),
+                    caret = binding.rowSource.rowTrailingGlyph,
+                ) { picked ->
+                    MmkvManager.encodeSettings(AppConfig.PREF_GEO_FILES_SOURCES, sources[picked])
+                    bindSourceRow()
+                    refreshData()
+                }
             },
         )
+        // The card hosting the popup must not clip it, so its rows carry the corners.
+        RowBinder.edge(binding.rowSource.root, RowBinder.Edge.TOP)
+        RowBinder.edge(binding.rowDownload.root, RowBinder.Edge.BOTTOM)
     }
 
     /** «Обновить файлы» reports its own progress in place, per §15: a row that is working says so. */
@@ -212,11 +227,10 @@ class UserAssetActivity : HelperBaseActivity() {
             }
             downloading = false
             bindDownloadRow()
-            if (result.successCount > 0) {
-                toastSuccess(getString(R.string.asset_download_done, result.successCount))
-            } else {
-                toastError(R.string.asset_download_failed)
-            }
+            // Only the failure speaks. The download row rebinds with the new file dates the
+            // instant this returns, so «Скачано файлов: 3» reported a number about a list the
+            // user is already looking at.
+            if (result.successCount <= 0) toastError(R.string.asset_download_failed)
             refreshData()
         }
     }
@@ -281,7 +295,6 @@ class UserAssetActivity : HelperBaseActivity() {
                 .show()
         }
 
-        override fun onShare(url: String) {}
 
         override fun onRefreshData() {
             refreshData()

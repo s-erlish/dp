@@ -112,6 +112,45 @@
         <item name="warningContainer">@color/warning_container</item>
         <!-- Loading placeholder fill. -->
         <item name="colorSkeleton">@color/skeleton</item>
+        <!-- The press plane (handoff README §1). A held row steps DOWN to it. -->
+        <item name="colorPressBg">@color/press_bg</item>
+        <!-- Destructive TEXT (not the fill red) and the 12% selection wash.
+             Both used to be read straight off @color/…, which the runtime mono
+             overlay cannot re-point — see attrs.xml beside each. -->
+        <item name="colorDestructiveText">@color/color_destructive_text</item>
+        <item name="colorAccentFill">@color/accent_fill_12</item>
+
+        <!-- ================================================================ -->
+        <!-- THE RIPPLE IS OFF, PRODUCT-WIDE. Handoff README, «Главное         -->
+        <!-- правило»: «В сборке НЕТ ... ripple как отклика на нажатие», and   -->
+        <!-- §1 spells out what replaces it — a scale from the press ladder    -->
+        <!-- plus a background step DOWN to ?attr/colorPressBg. A ripple is a  -->
+        <!-- radial splash that reads as light coming OFF the surface; this    -->
+        <!-- design pushes the object IN.                                      -->
+        <!--                                                                   -->
+        <!-- One line, and it is deliberately here rather than in sixty        -->
+        <!-- layouts. ?attr/selectableItemBackground, its borderless twin, and -->
+        <!-- every platform widget that draws its own ripple all tint it with  -->
+        <!-- colorControlHighlight; transparent means none of them can paint   -->
+        <!-- one, whether or not the layout that asked for it has been visited -->
+        <!-- yet. A screen still swaps its background to @drawable/bg_row when -->
+        <!-- its wave reaches it — that is what adds the press STEP — but no   -->
+        <!-- screen can be left with a glow in the meantime.                   -->
+        <!--                                                                   -->
+        <!-- The @color/ripple_* ColorStateLists stay in res/color/ untouched: -->
+        <!-- they are still the tone a future opt-in would use, and deleting   -->
+        <!-- a token to prove a point is not how anything here is removed.     -->
+        <!-- ================================================================ -->
+        <item name="colorControlHighlight">@android:color/transparent</item>
+
+        <!-- THE BLUE THEMES DO NOT MOVE. Each of these three aliases exactly
+             what the surface it feeds already resolved to, and the plate's
+             outline is transparent, so light and dark render bit-identically
+             before and after the mono fix. Only ThemeOverlay.Mono restates
+             them. See the block over these attrs in attrs.xml. -->
+        <item name="colorPlateContainer">@color/md_theme_primaryContainer</item>
+        <item name="colorPlateOutline">@android:color/transparent</item>
+        <item name="colorAccentFigure">@color/md_theme_primary</item>
 
         <!-- Edge-to-edge: fully transparent system bars so the page draws
              underneath them. Disable the auto contrast scrim (API 29+). -->
@@ -151,17 +190,15 @@
         <!-- attrs already resolved to. 86 call sites across res/ and java/ are -->
         <!-- corrected by the six lines below with zero layout edits.           -->
         <!--                                                                   -->
-        <!-- Incy keeps ONE accent: green/orange/purple/yellow were already     -->
-        <!-- aliased to blue and stay aliased. They are retirement debt, not a  -->
-        <!-- palette — the coloured tile system is exactly three: accent,       -->
-        <!-- destructive, neutral (D-5). Live counts: iconTintBlue 43,          -->
-        <!-- Green 11, Purple 11, Red 10, Orange 9, Yellow 2.                   -->
+        <!-- Incy keeps ONE accent, and the retirement debt is now paid: the    -->
+        <!-- Green / Orange / Purple / Yellow tints were aliases of the accent  -->
+        <!-- kept alive only until their last call site migrated. The counts    -->
+        <!-- this comment used to record (Green 11, Purple 11, Orange 9,        -->
+        <!-- Yellow 2) are all zero, so the aliases are gone with them. The     -->
+        <!-- coloured tile system is exactly three: accent, destructive,        -->
+        <!-- neutral (D-5) — and neutral is an attribute, not a hue.            -->
         <!-- ================================================================ -->
         <item name="iconTintBlue">@color/md_theme_primary</item>
-        <item name="iconTintGreen">@color/md_theme_primary</item>
-        <item name="iconTintOrange">@color/md_theme_primary</item>
-        <item name="iconTintPurple">@color/md_theme_primary</item>
-        <item name="iconTintYellow">@color/md_theme_primary</item>
         <item name="iconTintRed">@color/md_theme_error</item>
 
         <!-- The tile FILLS stay on icon_tile_* for now. They are 20% washes and
@@ -173,10 +210,6 @@
              values-night/colors.xml. That file is not owned by this change;
              reported as follow-up. -->
         <item name="iconTileBgBlue">@color/icon_tile_blue</item>
-        <item name="iconTileBgGreen">@color/icon_tile_blue</item>
-        <item name="iconTileBgOrange">@color/icon_tile_blue</item>
-        <item name="iconTileBgPurple">@color/icon_tile_blue</item>
-        <item name="iconTileBgYellow">@color/icon_tile_blue</item>
         <item name="iconTileBgRed">@color/icon_tile_red</item>
 
         <!-- Latency text on the server row. 00-rules.md 3.5 binds these two
@@ -405,6 +438,14 @@
         <item name="colorOnError">@color/mono_surface</item>
         <item name="colorErrorContainer">@color/mono_surfaceContainerHighest</item>
         <item name="colorOnErrorContainer">@color/mono_onSurface</item>
+        <!-- The fifth: destructive TEXT had no attribute at all, so «Выйти из
+             аккаунта», «Удалить», the field-error line and the expired-меter
+             marker stayed red on the greyscale screen. §5.7: «красная в цветной
+             теме, белая в моно». -->
+        <item name="colorDestructiveText">@color/mono_destructiveText</item>
+        <!-- 12% of the ink accent, so a selected row is an ink wash and not the
+             blue theme's #1F4C8DFF leaking through (60-mono-home.png). -->
+        <item name="colorAccentFill">@color/mono_accentFill</item>
 
         <item name="colorSurface">@color/mono_surface</item>
         <item name="colorOnSurface">@color/mono_onSurface</item>
@@ -420,6 +461,17 @@
              the blue theme's #2A3142 / #F1F4FA. -->
         <item name="colorSurfaceInverse">@color/mono_onSurface</item>
         <item name="colorOnSurfaceInverse">@color/mono_surface</item>
+        <!-- ...and the third of that family, which was the ONE colour attribute
+             AppThemeBase declares and this overlay did not answer. Unset it kept
+             @color/md_theme_inversePrimary — #AEC7FF / #1E5FC7, a literal blue on
+             the screen whose entire point is that there is no hue on it. Nothing
+             in this product's own layouts names it, which is exactly why it
+             survived: M3 reads it for the accent drawn ON the inverse plane
+             (a snackbar action that misses snackbarStyle, tooltips, sliders).
+             mono_surface is that ink in both modes for the same reason it is
+             colorOnSurfaceInverse above — the inverse plane is mono_onSurface, so
+             what reads on it is mono_surface. -->
+        <item name="colorPrimaryInverse">@color/mono_surface</item>
         <item name="android:colorBackground">@color/mono_background</item>
         <item name="colorOnBackground">@color/mono_onBackground</item>
         <item name="colorOutline">@color/mono_outline</item>
@@ -435,6 +487,9 @@
         <item name="warningText">@color/mono_warningText</item>
         <item name="warningContainer">@color/mono_warningContainer</item>
         <item name="colorSkeleton">@color/mono_skeleton</item>
+        <!-- §8's mono column gives the press plane its own value (#0B0B0C dark),
+             so it is restated here rather than inherited. -->
+        <item name="colorPressBg">@color/mono_press_bg</item>
 
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
@@ -452,21 +507,19 @@
         <item name="chipTypeText">@color/mono_onPrimaryContainer</item>
         <item name="chipJsonText">@color/mono_onSurface</item>
         <item name="chipJsonBg">@color/mono_surfaceContainerHighest</item>
+
+        <!-- The three roles that carry mono's contract. Values and the measured
+             figures are in colors.xml / values-night/colors.xml beside them. -->
+        <item name="colorPlateContainer">@color/mono_plateContainer</item>
+        <item name="colorPlateOutline">@color/mono_plateOutline</item>
+        <item name="colorAccentFigure">@color/mono_accentFigure</item>
         <item name="pingGood">@color/mono_onSurfaceVariant</item>
         <item name="pingBad">@color/mono_onSurface</item>
         <item name="indicatorColor">@color/mono_primary</item>
         <item name="iconTintBlue">@color/mono_onSurfaceVariant</item>
-        <item name="iconTintGreen">@color/mono_onSurfaceVariant</item>
-        <item name="iconTintOrange">@color/mono_onSurfaceVariant</item>
-        <item name="iconTintPurple">@color/mono_onSurfaceVariant</item>
         <item name="iconTintRed">@color/mono_onSurfaceVariant</item>
-        <item name="iconTintYellow">@color/mono_onSurfaceVariant</item>
         <item name="iconTileBgBlue">@color/mono_surfaceContainerHighest</item>
-        <item name="iconTileBgGreen">@color/mono_surfaceContainerHighest</item>
-        <item name="iconTileBgOrange">@color/mono_surfaceContainerHighest</item>
-        <item name="iconTileBgPurple">@color/mono_surfaceContainerHighest</item>
         <item name="iconTileBgRed">@color/mono_surfaceContainerHighest</item>
-        <item name="iconTileBgYellow">@color/mono_surfaceContainerHighest</item>
 
         <!-- Keep app-wide dialog styling under the mono overlay too. The overlay's
              greyscale ?attr colours flow into the same dialog theme automatically. -->

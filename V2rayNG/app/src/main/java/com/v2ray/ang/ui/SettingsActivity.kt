@@ -516,7 +516,12 @@ class SettingsActivity : BaseActivity() {
          * поднят и его придётся перезапустить. В отключённом состоянии - молча.
          */
         private fun noticeCoreChange() {
-            val running = runCatching { CoreServiceManager.isRunning() }.getOrDefault(false)
+            // `isTunnelUp`, НЕ `isRunning`. Настройки живут в UI-процессе, а ядро — в
+            // `:RunSoLibV2RayDaemon`, и его контроллер там свой: `isRunning` отвечал «нет» всегда,
+            // сколько бы туннель ни был поднят. Условие не выполнялось никогда, и сообщение,
+            // которого требует 12-settings.md 10.1, не показывалось ни разу.
+            // @see CoreServiceManager.isTunnelUp
+            val running = runCatching { CoreServiceManager.isTunnelUp() }.getOrDefault(false)
             if (running) notice(R.string.adv_notice_reconnecting)
         }
 

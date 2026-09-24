@@ -57,6 +57,23 @@ class PerAppProxyViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Applies [added] and [removed] to the selection WITHOUT asking for a service restart.
+     *
+     * The «Российские приложения» preset is the only caller, and the omission is the point: the
+     * owner asked that applying it must not drop a live tunnel by itself, which is exactly what the
+     * desktop's equivalent does. Every other edit on this screen still raises the flag, because a
+     * user who ticks one app is expressing an intent about the connection they are looking at; a
+     * preset switch is a configuration choice that can wait for the next connection, and the screen
+     * says as much.
+     */
+    fun applyPresetQuietly(added: Collection<String>, removed: Collection<String>) {
+        val changed = blacklist.addAll(added) or blacklist.removeAll(removed.toSet())
+        if (changed) {
+            MmkvManager.encodeSettings(AppConfig.PREF_PER_APP_PROXY_SET, blacklist)
+        }
+    }
+
     private fun save() {
         MmkvManager.encodeSettings(AppConfig.PREF_PER_APP_PROXY_SET, blacklist)
         SettingsChangeManager.makeRestartService()

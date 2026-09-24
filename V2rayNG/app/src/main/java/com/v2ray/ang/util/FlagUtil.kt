@@ -1,6 +1,7 @@
 package com.v2ray.ang.util
 
 import com.v2ray.ang.dto.entities.ProfileItem
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Resolves a country flag emoji for a server, Happ/Incy style.
@@ -26,12 +27,22 @@ object FlagUtil {
 
     /**
      * Returns a flag emoji for the given profile, or a globe if none can be derived.
+     *
+     * MEMOISED, BECAUSE THIS RUNS IN `onBindViewHolder`. Both this and [stripLeadingFlag] are
+     * called for every server row on every bind — i.e. once per row per scroll recycle, on the main
+     * thread, in the middle of a frame — and the answer is a pure function of a remark that does
+     * not change while the list is on screen.
+     *
+     * The cost when the remark carries no flag emoji of its own is not small: [parseCountryCode]
+     * lowercases the whole string, runs a regex over it, then walks ~90 country/city names doing a
+     * word-boundaried search for each. That is the NORMAL path for a Russian panel, which writes
+     * «Германия 2» rather than «🇩🇪 Germany» — so on those lists every frame of a scroll was paying
+     * for the same hundred string searches over and over.
      */
-    fun resolveFlag(profile: ProfileItem): String {
-        val remark = profile.remarks
-        extractFlagEmoji(remark)?.let { return it }
-        parseCountryCode(remark)?.let { return codeToFlag(it) }
-        return GLOBE
+    fun resolveFlag(profile: ProfileItem): String = memo(flagMemo, profile.remarks) { remark ->
+        extractFlagEmoji(remark)
+            ?: parseCountryCode(remark)?.let { codeToFlag(it) }
+            ?: GLOBE
     }
 
     /**
@@ -64,18 +75,49 @@ object FlagUtil {
      * name. No-op when the remark carries no flag; when the flag is all the remark has, the remark
      * is returned untouched, because a name that is only a flag beats a name that is nothing.
      */
-    fun stripLeadingFlag(remark: String): String {
-        val flag = extractFlagEmoji(remark) ?: return remark
-        var out = remark
-        while (true) {
-            val at = out.indexOf(flag)
-            if (at < 0) break
-            val head = out.substring(0, at).trimEnd(*FLAG_SEPARATORS)
-            val tail = out.substring(at + flag.length).trimStart(*FLAG_SEPARATORS)
-            out = if (head.isEmpty() || tail.isEmpty()) head + tail else "$head $tail"
+    fun stripLeadingFlag(remark: String): String = memo(strippedMemo, remark) { text ->
+        val flag = extractFlagEmoji(text)
+        if (flag == null) {
+            text
+        } else {
+            var out = text
+            while (true) {
+                val at = out.indexOf(flag)
+                if (at < 0) break
+                val head = out.substring(0, at).trimEnd(*FLAG_SEPARATORS)
+                val tail = out.substring(at + flag.length).trimStart(*FLAG_SEPARATORS)
+                out = if (head.isEmpty() || tail.isEmpty()) head + tail else "$head $tail"
+            }
+            out.trim().ifBlank { text }
         }
-        return out.trim().ifBlank { remark }
     }
+
+    /**
+     * The two memos above, and the one rule that keeps them from being a leak.
+     *
+     * A remark is at most a few dozen characters and there is one per server, so the natural bound
+     * is the size of the server list. [MEMO_LIMIT] is generous against that and is a backstop
+     * against the one thing that could make the key space unbounded — a подписка refresh that
+     * renames everything on every run. It is cleared wholesale rather than evicted one entry at a
+     * time: the next hundred binds refill exactly what is on screen, and an LRU here would cost
+     * more bookkeeping than the parse it is protecting.
+     *
+     * `ConcurrentHashMap` because the two readers are in different processes AND on different
+     * threads: the list binds on the UI process's main thread, `NotificationManager` builds the
+     * shade's title on the daemon's.
+     */
+    private fun memo(cache: ConcurrentHashMap<String, String>, key: String, compute: (String) -> String): String {
+        val hit = cache[key]
+        if (hit != null) return hit
+        val value = compute(key)
+        if (cache.size >= MEMO_LIMIT) cache.clear()
+        cache[key] = value
+        return value
+    }
+
+    private const val MEMO_LIMIT = 512
+    private val flagMemo = ConcurrentHashMap<String, String>()
+    private val strippedMemo = ConcurrentHashMap<String, String>()
 
     /**
      * Converts a 2-letter country code (e.g. "NL") to its flag emoji. Aliases such as the

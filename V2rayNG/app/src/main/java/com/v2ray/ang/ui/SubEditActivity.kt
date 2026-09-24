@@ -183,9 +183,12 @@ class SubEditActivity : BaseActivity() {
                 layout.helperText = getString(R.string.subs_ed_profile_none)
                 return@setEndIconOnClickListener
             }
+            val current = field.text.toString()
             EditorActionsSheet(this, getString(R.string.subs_ed_profile_pick)).apply {
                 suggestions.forEach { remark ->
-                    action(label = remark) { field.text = Utils.getEditable(remark) }
+                    action(label = remark, selected = remark == current) {
+                        field.text = Utils.getEditable(remark)
+                    }
                 }
             }.show()
         }

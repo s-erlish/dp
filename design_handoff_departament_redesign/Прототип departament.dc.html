@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link rel="stylesheet" href="_ds/nocturne-778731a5-55f4-4d98-918e-4e26d8871e27/styles.css">
+<script src="_ds/nocturne-778731a5-55f4-4d98-918e-4e26d8871e27/_ds_bundle.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0f1018;font-family:Inter,system-ui,sans-serif;display:flex;justify-content:center;padding:28px 0}
+a{color:#b6acea}a:hover{color:#cfc8f2}
+@keyframes rise{from{opacity:0}to{opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pop{from{opacity:0}to{opacity:1}}
+@keyframes sonar{from{transform:scale(1);opacity:1}to{transform:scale(1.6);opacity:0}}
+@keyframes glowSoft{0%,100%{opacity:1}50%{opacity:.68}}
+@keyframes slideL{from{opacity:0;transform:translateX(-44px)}to{opacity:1;transform:none}}
+@keyframes dropIn{from{opacity:0;transform:translateY(-22px)}to{opacity:1;transform:none}}
+@keyframes bloomIn{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
+@keyframes liftIn{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+.row{display:flex;align-items:center;min-height:56px;padding:10px 16px;box-sizing:border-box;cursor:pointer;will-change:transform;backface-visibility:hidden;transition:transform 200ms cubic-bezier(.34,1.2,.64,1),background-color 200ms cubic-bezier(.25,1,.5,1)}
+.row:active{transform:scale(.975);background:var(--pressBg);transition-duration:70ms;transition-timing-function:cubic-bezier(.4,0,.6,1)}
+.card{will-change:transform;backface-visibility:hidden}
+.card:active{transform:scale(.975);background:var(--pressBg);transition-duration:70ms;transition-timing-function:cubic-bezier(.4,0,.6,1)}
+.btn{cursor:pointer;will-change:transform;backface-visibility:hidden;transition:transform 200ms cubic-bezier(.34,1.25,.64,1)}
+.btn:active{transform:scale(.965);transition-duration:70ms;transition-timing-function:cubic-bezier(.4,0,.6,1)}
+.ico{cursor:pointer;border-radius:50%;will-change:transform;backface-visibility:hidden;transition:transform 200ms cubic-bezier(.34,1.25,.64,1)}
+.ico:active{transform:scale(.88);transition-duration:70ms;transition-timing-function:cubic-bezier(.4,0,.6,1)}
+.opt{cursor:pointer;will-change:transform;backface-visibility:hidden;transition:transform 200ms cubic-bezier(.34,1.2,.64,1),background-color 200ms cubic-bezier(.25,1,.5,1)}
+.opt:active{transform:scale(.965);background:var(--pressBg)!important;transition-duration:70ms;transition-timing-function:cubic-bezier(.4,0,.6,1)}
+.pill{cursor:pointer;will-change:transform;backface-visibility:hidden;transition:transform 200ms cubic-bezier(.34,1.2,.64,1),background-color 200ms cubic-bezier(.25,1,.5,1)}
+.pill:active{transform:scale(.965);background:var(--pressBg);transition-duration:70ms;transition-timing-function:cubic-bezier(.4,0,.6,1)}
+.scroll::-webkit-scrollbar{width:0}
+</style></helmet>
+
+<div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+
+  <div style="display:flex;align-items:center;gap:8px;padding:6px;border-radius:100px;background:rgba(255,255,255,.06)">
+    <div onClick="{{ themeDark }}" class="btn" style="padding:7px 16px;border-radius:100px;background:{{ ui.darkBg }};color:{{ ui.darkFg }};font:500 12px Inter,sans-serif">Тёмная</div>
+    <div onClick="{{ themeMono }}" class="btn" style="padding:7px 16px;border-radius:100px;background:{{ ui.monoBg }};color:{{ ui.monoFg }};font:500 12px Inter,sans-serif">Чёрно-белая</div>
+  </div>
+
+  <div ref="{{ root }}" style="width:360px;height:800px;border-radius:26px;overflow:hidden;box-shadow:0 18px 44px rgba(0,0,0,.5);position:relative;background:var(--bg);color:var(--fg);font-family:Roboto,system-ui,sans-serif;display:flex;flex-direction:column">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 16px;font:500 12px 'Space Grotesk',sans-serif;flex:none">
+      <span>21:47</span><span style="font-size:11px;opacity:.75">69%</span>
+    </div>
+
+    <div class="scroll" style="flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:76px">
+
+      <sc-if value="{{ tabHome }}" hint-placeholder-val="{{ true }}">
+        <div class="row" style="min-height:52px;animation:{{ en.head }}">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--tile);display:flex;align-items:center;justify-content:center;font:700 16px Roboto,sans-serif;color:var(--tileFg);flex:none">S</div>
+          <div style="flex:1;min-width:0;margin-left:12px">
+            <div style="font:700 16px/1.25 'Space Grotesk',sans-serif">@serumfx</div>
+            <div style="margin-top:3px;font:400 12px Roboto,sans-serif;color:var(--fg2)">Управление аккаунтом</div>
+          </div>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="var(--fg2)"><path d="M8.6,4.6L7.2,6l6,6l-6,6l1.4,1.4L16,12z" /></svg>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;padding:0 16px;animation:{{ en.plus }}">
+          <div class="ico" style="width:42px;height:42px;display:flex;align-items:center;justify-content:center">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="var(--fg)"><path d="M19,13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" /></svg>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;align-items:center;padding:0 16px;animation:{{ en.ring }}">
+          <div style="width:214px;height:214px;position:relative;display:flex;align-items:center;justify-content:center">
+            <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(closest-side,var(--bloom),transparent);opacity:{{ c.bloomOp }};transition:opacity 400ms cubic-bezier(.25,1,.5,1)"></div>
+            <div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid var(--ring1)"></div>
+            <div style="position:absolute;inset:10px;border-radius:50%;border:1.5px solid var(--ring1)"></div>
+            <div style="position:absolute;inset:22px;border-radius:50%;border:2px solid {{ c.ring }};transition:border-color 300ms cubic-bezier(.25,1,.5,1);animation:{{ c.glow }}"></div>
+            <sc-if value="{{ c.sweep }}">
+              <svg viewBox="0 0 214 214" width="214" height="214" style="position:absolute;inset:0;animation:spin 1100ms linear infinite">
+                <circle cx="107" cy="107" r="85" fill="none" stroke="{{ c.acc }}" stroke-width="2" stroke-linecap="round" stroke-dasharray="104 430" />
+              </svg>
+            </sc-if>
+            <sc-if value="{{ c.pulse }}">
+              <div style="position:absolute;inset:22px;border-radius:50%;border:2px solid {{ c.acc }};animation:sonar 600ms cubic-bezier(.22,1,.36,1) both"></div>
+            </sc-if>
+            <div onClick="{{ toggleConn }}" style="width:150px;height:150px;border-radius:50%;background:var(--surf);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:transform 160ms cubic-bezier(.25,1,.5,1),background-color 220ms cubic-bezier(.25,1,.5,1)" style-active="transform:scale(.97);background:var(--surf2);transition-duration:90ms">
+              <svg viewBox="0 0 24 24" width="68" height="68" fill="var(--shieldOff)" style="position:absolute;opacity:{{ c.outlineOp }};transition:opacity 300ms cubic-bezier(.25,1,.5,1)"><path fill-rule="evenodd" d="M12,2.2 L19.6,5.2 L19.6,11.4 C19.6,16.1 15.9,19.9 12,21.8 C8.1,19.9 4.4,16.1 4.4,11.4 L4.4,5.2 Z M12,4.7 L17.2,6.8 L17.2,11.4 C17.2,14.9 14.7,17.9 12,19.3 C9.3,17.9 6.8,14.9 6.8,11.4 L6.8,6.8 Z" /></svg>
+              <svg viewBox="0 0 24 24" width="68" height="68" fill="{{ c.acc }}" style="position:absolute;opacity:{{ c.filledOp }};transition:opacity 300ms cubic-bezier(.25,1,.5,1)"><path d="M12,2.2 L19.6,5.2 L19.6,11.4 C19.6,16.1 15.9,19.9 12,21.8 C8.1,19.9 4.4,16.1 4.4,11.4 L4.4,5.2 Z" /></svg>
+            </div>
+          </div>
+          <div style="margin-top:10px;padding:6px 17px;border-radius:100px;border:1px solid {{ c.pillBd }};color:{{ c.pillFg }};font:500 14px 'Space Grotesk',sans-serif;transition:border-color 300ms,color 300ms">{{ c.pill }}</div>
+        </div>
+
+        <div style="display:flex;align-items:center;padding:12px 16px 0;font-family:'Space Grotesk',sans-serif;animation:{{ en.stats }}">
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px"><span style="font-size:12px;color:{{ c.acc }}">↑</span><span style="font:700 13px 'Space Grotesk',sans-serif">{{ c.up }}</span></div>
+          <div style="flex:1;text-align:center;font:700 14px 'Space Grotesk',sans-serif;color:var(--fg2)">{{ c.time }}</div>
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:4px"><span style="font-size:12px;color:{{ c.acc }}">↓</span><span style="font:700 13px 'Space Grotesk',sans-serif">{{ c.down }}</span></div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px 0;animation:{{ en.srvName }}">
+          <span style="width:22px;height:16px;border-radius:3px;background:var(--surf3);display:flex;align-items:center;justify-content:center;font-size:12px">🇪🇺</span>
+          <span style="font:700 16px 'Space Grotesk',sans-serif;color:{{ c.acc }}">Hybrid (Автовыбор)</span>
+        </div>
+
+        <div style="margin:10px 16px 0;background:var(--surf);border:1px solid var(--line);border-radius:20px;padding:10px 12px 12px;animation:{{ en.card }}">          <div style="display:flex;align-items:center">
+            <div onClick="{{ toggleServers }}" class="ico" style="width:32px;height:32px;margin-right:4px;display:flex;align-items:center;justify-content:center;flex:none"><svg viewBox="0 0 24 24" width="22" height="22" fill="var(--fg2)" style="transform:rotate({{ srv.rot }});transition:transform 300ms cubic-bezier(.25,1,.5,1)"><path d="M7,10l5,5 5,-5z" /></svg></div>
+            <div style="flex:1;min-width:0">
+              <div style="font:700 16px/1.25 'Space Grotesk',sans-serif">Моя подписка</div>
+              <div style="margin-top:3px;font:400 12px Roboto,sans-serif;color:var(--fg2)">04.08.2026 17:50 · 1 ч</div>
+            </div>
+            <div class="ico" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="20" height="20" fill="{{ c.acc }}"><path d="M12,11c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM18,13c0,-3.31 -2.69,-6 -6,-6s-6,2.69 -6,6c0,2.22 1.21,4.15 3,5.19l1,-1.74c-1.19,-0.7 -2,-1.97 -2,-3.45 0,-2.21 1.79,-4 4,-4s4,1.79 4,4c0,1.48 -0.81,2.75 -2,3.45l1,1.74c1.79,-1.04 3,-2.97 3,-5.19zM12,3C6.48,3 2,7.48 2,13c0,3.7 2.01,6.92 4.99,8.65l1,-1.73C5.61,18.53 4,15.96 4,13c0,-4.42 3.58,-8 8,-8s8,3.58 8,8c0,2.96 -1.61,5.53 -4,6.92l1,1.73c2.98,-1.73 5,-4.95 5,-8.65 0,-5.52 -4.48,-10 -10,-10z" /></svg></div>
+            <div class="ico" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="20" height="20" fill="{{ c.acc }}"><path d="M17.65,6.35C16.2,4.9 14.21,4 12,4c-4.42,0 -7.99,3.58 -7.99,8s3.57,8 7.99,8c3.73,0 6.84,-2.55 7.73,-6h-2.08c-0.82,2.33 -3.04,4 -5.65,4 -3.31,0 -6,-2.69 -6,-6s2.69,-6 6,-6c1.66,0 3.14,0.69 4.22,1.78L13,11h7V4l-2.35,2.35z" /></svg></div>
+            <div class="ico" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="18" height="18" fill="var(--fg2)"><path d="M16,9V4h1c0.55,0 1,-0.45 1,-1s-0.45,-1 -1,-1H7C6.45,2 6,2.45 6,3s0.45,1 1,1h1v5c0,1.66 -1.34,3 -3,3v2h5.97v7l1,1 1,-1v-7H19v-2c-1.66,0 -3,-1.34 -3,-3z" /></svg></div>
+          </div>
+          <div style="margin-top:10px;display:flex;align-items:baseline">
+            <span style="flex:1;font:500 12px 'Space Grotesk',sans-serif;font-feature-settings:'tnum' on">{{ tb.label }}</span>
+            <span style="font:400 12px Roboto,sans-serif;color:var(--fg2)">{{ tb.right }}</span>
+          </div>
+          <div style="margin-top:6px;height:3px;border-radius:2px;background:var(--surf3);overflow:hidden">
+            <span style="display:block;height:3px;border-radius:2px;width:{{ tb.pct }};background:{{ tb.fill }};transition:width 500ms cubic-bezier(.25,1,.5,1)"></span>
+          </div>
+          <div style="margin-top:10px;text-align:center;font:400 12px/1.5 Roboto,sans-serif;color:var(--fg2)">Без рекламы на YouTube: Hybrid, Russia<br>Если не работает, обновите подписку 🔄<br>@departamentvpn</div>
+          <div style="margin-top:10px;display:flex;align-items:center">
+            <div class="btn" style="display:flex;align-items:center;gap:8px;padding:7px 16px 7px 12px;border-radius:100px;background:var(--accBg)">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="var(--accFg)"><path d="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM13,19h-2v-2h2v2zM15.07,11.25l-0.9,0.92C13.45,12.9 13,13.5 13,15h-2v-0.5c0,-1.1 0.45,-2.1 1.17,-2.83l1.24,-1.26c0.37,-0.36 0.59,-0.86 0.59,-1.41 0,-1.1 -0.9,-2 -2,-2s-2,0.9 -2,2H8c0,-2.21 1.79,-4 4,-4s4,1.79 4,4c0,0.88 -0.36,1.68 -0.93,2.25z" /></svg>
+              <span style="font:500 12px Roboto,sans-serif;color:var(--accFg)">Поддержка</span>
+            </div>
+            <div style="flex:1"></div>
+            <div class="ico" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 1024 1024" width="20" height="20" fill="{{ c.acc }}"><path d="M912.2,154A85.3,85.3 0,0 0,853.3 128a85.3,85.3 0,0 0,-33.3 6.8l-708.3,306.8a42.7,42.7 0,0 0,-26.5 42.7V512a42.7,42.7 0,0 0,29.4 42.7L298.7,616.1l55.5,187.3a75.9,75.9 0,0 0,56.3 53.3,62.7 62.7,0 0,0 15.4,0 73.8,73.8 0,0 0,50.8 -20.5l67.8,-64 131.4,103.7a85.3,85.3 0,0 0,90 9.4l14.1,-7.3a88.3,88.3 0,0 0,46.5 -62.7L938.7,235.1a90,90 0,0 0,-26.5 -81.1zM763.7,805.1a25.2,25.2 0,0 1,-12.8 17.5l-14.1,7.3a19.6,19.6 0,0 1,-9 2.1,19.6 19.6,0 0,1 -12.4,-4.7l-160.4,-128a20.9,20.9 0,0 0,-27.7 0l-94.7,89.2a11.1,11.1 0,0 1,-6 2.1V640a21.8,21.8 0,0 1,6.8 -15.8c136.1,-128 217.6,-199.7 266.2,-240.6a15.8,15.8 0,0 0,5.1 -11.1,13.7 13.7,0 0,0 -4.3,-11.1 14.9,14.9 0,0 0,-17.9 -4.3l-322.6,203.5a21.3,21.3 0,0 1,-18.3 0L149.3,494.9l694.2,-301.2a16.6,16.6 0,0 1,7.7 0,22.2 22.2,0 0,1 16.2,7.7 26.9,26.9 0,0 1,6.8 23.5z" /></svg></div>
+          </div>
+        </div>
+
+        <div style="overflow:hidden;max-height:{{ srv.h }};opacity:{{ srv.op }};transition:max-height 340ms cubic-bezier(.25,1,.5,1),opacity 220ms">
+        <sc-for list="{{ servers }}" as="sv" hint-placeholder-count="7">
+          <div onClick="{{ sv.pick }}" style="margin:2px 16px 0;display:flex;align-items:center;min-height:56px;padding:8px 12px;box-sizing:border-box;border-radius:20px;cursor:pointer;background:{{ sv.bg }};border:1.5px solid {{ sv.bd }};box-shadow:{{ sv.divider }};animation:{{ sv.anim }};transition:transform 160ms cubic-bezier(.25,1,.5,1),background-color 220ms cubic-bezier(.25,1,.5,1),border-color 220ms cubic-bezier(.25,1,.5,1)" style-active="transform:scale(.98);transition-duration:90ms">
+            <span style="width:28px;height:28px;border-radius:12px;background:var(--surf3);display:flex;align-items:center;justify-content:center;font-size:14px;flex:none">{{ sv.flag }}</span>
+            <div style="flex:1;min-width:0;padding-left:12px">
+              <div style="font:700 16px/1.25 'Space Grotesk',sans-serif">{{ sv.name }}</div>
+              <div style="margin-top:4px;display:flex;align-items:center;gap:8px">
+                <span style="padding:3px 9px;border-radius:8px;background:var(--accBg);font:500 11px 'Space Grotesk',sans-serif;letter-spacing:.04em;color:{{ c.acc }}">{{ sv.proto }}</span>
+                <span style="padding:3px 9px;border-radius:8px;background:var(--jsonBg);font:500 11px 'Space Grotesk',sans-serif;letter-spacing:.04em;color:var(--jsonFg)">JSON</span>
+                <span style="flex:1;font:400 12px Roboto,sans-serif;color:var(--fg2);overflow:hidden;white-space:nowrap;text-overflow:ellipsis">{{ sv.transport }}</span>
+                <span style="font:700 12px 'Space Grotesk',sans-serif;font-feature-settings:'tnum' on;color:{{ sv.pingFg }};flex:none">{{ sv.ping }}</span>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+        </div>
+        <div style="height:12px"></div>
+      </sc-if>
+
+      <sc-if value="{{ tabAcc }}">
+        <div style="display:flex;align-items:center;gap:10px;padding:6px 16px 0">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--tile);display:flex;align-items:center;justify-content:center;font:700 14px 'Space Grotesk',sans-serif;color:var(--tileFg);flex:none">S</div>
+          <span style="flex:1;font:500 14px Roboto,sans-serif">@serumfx</span>
+          <div class="btn" style="height:30px;padding:0 12px;border-radius:100px;border:1px solid var(--line);box-sizing:border-box;display:flex;align-items:center;gap:6px">
+            <span style="font:700 13px 'Space Grotesk',sans-serif;font-feature-settings:'tnum' on">1 ₽</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="var(--fg2)"><path d="M19,13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" /></svg>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;align-items:center;padding:20px 16px 0">
+          <div style="width:172px;height:172px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <svg viewBox="0 0 172 172" width="172" height="172" style="position:absolute;inset:0;transform:rotate(-90deg)">
+              <circle cx="86" cy="86" r="80" fill="none" stroke="var(--surf3)" stroke-width="6" />
+              <circle cx="86" cy="86" r="80" fill="none" stroke="{{ c.acc }}" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ tr.dash }}" style="transition:stroke-dasharray 500ms cubic-bezier(.25,1,.5,1)" />
+            </svg>
+            <span style="font:700 28px 'Space Grotesk',sans-serif;letter-spacing:-.02em;font-feature-settings:'tnum' on">{{ tr.used }}</span>
+            <span style="margin-top:4px;font:400 12px Roboto,sans-serif;color:var(--fg2)">{{ tr.of }}</span>
+          </div>
+
+          <div style="margin-top:18px;text-align:center">
+            <div style="font:700 18px/1.2 'Space Grotesk',sans-serif;letter-spacing:-.01em">departament vpn</div>
+            <div style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px">
+              <span style="padding:3px 9px;border-radius:100px;background:var(--accBg);font:500 11px 'Space Grotesk',sans-serif;letter-spacing:.04em;color:var(--accFg)">Base</span>
+              <span style="font:400 13px Roboto,sans-serif;color:var(--fg2)">Действует до 04.06.2099</span>
+            </div>
+          </div>
+
+          <div style="margin-top:20px;width:100%;display:flex;gap:8px">
+            <div class="btn" style="flex:1;height:48px;border-radius:24px;border:1.5px solid {{ c.acc }};box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="{{ c.acc }}"><path d="M19,13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" /></svg>
+              <span style="font:700 15px Roboto,sans-serif;color:{{ c.acc }}">Пополнить</span>
+            </div>
+            <div class="btn" style="flex:1;height:48px;border-radius:24px;border:1.5px solid {{ c.acc }};box-sizing:border-box;display:flex;align-items:center;justify-content:center">
+              <span style="font:700 15px Roboto,sans-serif;color:var(--accFg)">Продлить</span>
+            </div>
+          </div>
+
+          <div onClick="{{ tg.renew }}" class="row" style="margin-top:12px;width:100%;border-radius:16px;background:var(--surf);border:1px solid var(--line);padding:12px 14px">
+            <div style="flex:1;min-width:0">
+              <div style="font:400 14px Roboto,sans-serif">Автопродление</div>
+              <div style="margin-top:3px;font:400 12px/1.35 Roboto,sans-serif;color:var(--fg2)">{{ renewText }}</div>
+            </div>
+            <div style="width:52px;height:32px;border-radius:16px;box-sizing:border-box;border:2px solid {{ sr.bd }};background:{{ sr.track }};position:relative;flex:none;transition:background-color 220ms,border-color 220ms">
+              <span style="position:absolute;top:50%;left:{{ sr.left }};width:{{ sr.size }};height:{{ sr.size }};margin-top:-{{ sr.half }};border-radius:50%;background:{{ sr.thumb }};transition:left 220ms cubic-bezier(.25,1,.5,1),width 220ms,height 220ms,margin-top 220ms,background-color 220ms"></span>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:24px 16px 8px;font:700 16px 'Space Grotesk',sans-serif">Управление</div>
+        <div style="margin:0 16px;background:var(--surf);border:1px solid var(--line);border-radius:20px;overflow:hidden">
+          <sc-for list="{{ manage }}" as="r" hint-placeholder-count="3">
+            <div onClick="{{ r.open }}" class="row" style="border-top:1px solid {{ r.sep }}">
+              <div style="width:40px;height:40px;border-radius:12px;background:var(--tile);display:flex;align-items:center;justify-content:center;flex:none">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="var(--tileFg)"><path d="{{ r.icon }}" /></svg>
+              </div>
+              <div style="flex:1;margin-left:16px;min-width:0">
+                <div style="font:400 14px Roboto,sans-serif">{{ r.name }}</div>
+                <div style="margin-top:3px;font:400 13px Roboto,sans-serif;color:var(--fg2)">{{ r.sub }}</div>
+              </div>
+              <span style="font:400 13px Roboto,sans-serif;color:var(--fg2);flex:none">{{ r.value }}</span>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="var(--fg2)" style="margin-left:4px;flex:none"><path d="M8.6,4.6L7.2,6l6,6l-6,6l1.4,1.4L16,12z" /></svg>
+            </div>
+          </sc-for>
+        </div>
+
+        <div onClick="{{ signOut }}" class="row" style="margin:16px 16px 0;border-radius:20px;background:var(--surf);border:1px solid var(--line);overflow:hidden">
+          <div style="width:40px;height:40px;border-radius:12px;background:var(--tile);display:flex;align-items:center;justify-content:center;flex:none">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="{{ c.danger }}"><path d="M17,7l-1.41,1.41L18.17,11H8v2h10.17l-2.58,2.58L17,17l5,-5L17,7zM4,5h8V3H4c-1.1,0 -2,0.9 -2,2v14c0,1.1 0.9,2 2,2h8v-2H4V5z" /></svg>
+          </div>
+          <span style="flex:1;margin-left:16px;font:400 14px Roboto,sans-serif;color:{{ c.danger }}">Выйти из аккаунта</span>
+        </div>
+
+        <div style="height:16px"></div>
+      </sc-if>
+
+      <sc-if value="{{ tabSet }}">
+        <div style="padding:6px 16px 0;flex:none"></div>
+        <sc-for list="{{ hub }}" as="sec" hint-placeholder-count="6">
+          <div style="padding:22px 16px 8px;font:700 16px 'Space Grotesk',sans-serif">{{ sec.label }}</div>          <div style="margin:0 16px;background:var(--surf);border:1px solid var(--line);border-radius:20px">
+            <sc-for list="{{ sec.rows }}" as="r" hint-placeholder-count="3">
+              <div onClick="{{ r.click }}" class="row" style="border-top:1px solid {{ r.sep }};border-radius:{{ r.rad }};position:relative;z-index:{{ r.rowZ }}">
+                <div style="width:40px;height:40px;border-radius:12px;background:var(--tile);display:flex;align-items:center;justify-content:center;flex:none">
+                  <svg viewBox="{{ r.vb }}" width="22" height="22" fill="var(--tileFg)"><path d="{{ r.icon }}" /></svg>
+                </div>
+                <div style="flex:1 1 auto;min-width:76px;overflow:hidden;margin-left:16px;margin-right:{{ r.gap }}">
+                  <div style="font:400 14px/1.35 Roboto,sans-serif">{{ r.name }}</div>
+                  <sc-if value="{{ r.hasSub }}">
+                    <div style="margin-top:3px;font:400 12.5px/1.35 Roboto,sans-serif;color:var(--fg2)">{{ r.sub }}</div>
+                  </sc-if>
+                </div>
+                <sc-if value="{{ r.isToggle }}">
+                  <div style="width:52px;height:32px;border-radius:16px;box-sizing:border-box;border:2px solid {{ r.sw.bd }};background:{{ r.sw.track }};position:relative;flex:none;transition:background-color 220ms,border-color 220ms">
+                    <span style="position:absolute;top:50%;left:{{ r.sw.left }};width:{{ r.sw.size }};height:{{ r.sw.size }};margin-top:-{{ r.sw.half }};border-radius:50%;background:{{ r.sw.thumb }};transition:left 220ms cubic-bezier(.25,1,.5,1),width 220ms,height 220ms,margin-top 220ms,background-color 220ms"></span>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ r.isNav }}" hint-placeholder-val="{{ true }}">
+                  <span style="font:400 13px Roboto,sans-serif;color:{{ r.valueFg }};text-align:right;flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35;transition:color 220ms">{{ r.value }}</span>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="var(--fg2)" style="margin-left:4px;flex:none;transform:rotate({{ r.rot }});transition:transform 300ms cubic-bezier(.25,1,.5,1)"><path d="{{ r.chev }}" /></svg>
+                </sc-if>
+                <sc-if value="{{ r.hasPop }}">
+                  <div style="position:absolute;top:48px;right:8px;width:{{ r.popW }};padding:6px;border-radius:16px;background:var(--popBg);border:1px solid var(--outline);box-shadow:0 20px 44px rgba(0,0,0,.8);clip-path:{{ r.popClip }};opacity:{{ r.popOp }};pointer-events:{{ r.popPe }};transition:clip-path 260ms cubic-bezier(.25,1,.5,1),opacity 180ms cubic-bezier(.25,1,.5,1);z-index:40">
+                    <sc-for list="{{ r.opts }}" as="o" hint-placeholder-count="3">
+                      <div onClick="{{ o.pick }}" class="opt" style="display:flex;align-items:center;min-height:38px;padding:4px 10px;box-sizing:border-box;border-radius:11px;background:{{ o.bg }}">
+                        <span style="flex:1;font:400 13px/1.3 Roboto,sans-serif">{{ o.name }}</span>
+                        <sc-if value="{{ o.on }}"><svg viewBox="0 0 24 24" width="16" height="16" fill="var(--fg)" style="margin-left:6px;animation:pop 220ms cubic-bezier(.25,1,.5,1) both"><path d="M9,16.2L4.8,12l-1.4,1.4L9,19 21,7l-1.4,-1.4L9,16.2z" /></svg></sc-if>
+                      </div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+        <div style="height:16px"></div>
+      </sc-if>
+
+    </div>
+
+    <sc-if value="{{ sub.open }}">
+      <div style="position:absolute;inset:0;background:var(--bg);display:flex;flex-direction:column;animation:rise 260ms cubic-bezier(.25,1,.5,1) both;z-index:20">
+        <div style="display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 16px;font:500 12px 'Space Grotesk',sans-serif;flex:none">
+          <span>21:47</span><span style="font-size:11px;opacity:.75">69%</span>
+        </div>
+        <div style="padding:4px 16px 0;flex:none">
+          <div onClick="{{ closeSub }}" class="ico" style="width:44px;height:44px;margin-left:-10px;display:flex;align-items:center;justify-content:center">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="var(--fg)" style="transform:rotate(180deg)"><path d="M8.6,4.6L7.2,6l6,6l-6,6l1.4,1.4L16,12z" /></svg>
+          </div>
+          <div style="margin-top:8px;font:700 24px/1.2 'Space Grotesk',sans-serif;letter-spacing:-.01em">{{ sub.title }}</div>
+          <sc-if value="{{ sub.hasNote }}">
+            <div style="margin-top:6px;font:400 13px/1.45 Roboto,sans-serif;color:var(--fg2)">{{ sub.note }}</div>
+          </sc-if>
+        </div>
+
+        <div class="scroll" style="flex:1;overflow-y:auto;padding-bottom:20px">
+          <sc-if value="{{ buy.on }}">
+            <sc-for list="{{ buy.plans }}" as="p" hint-placeholder-count="2">
+              <div style="margin:16px 16px 0;border-radius:20px;background:var(--surf);border:1.5px solid {{ p.bd }};overflow:hidden;transition:border-color 260ms cubic-bezier(.25,1,.5,1),background-color 260ms cubic-bezier(.25,1,.5,1)">
+                <div onClick="{{ p.toggle }}" class="row" style="min-height:64px">
+                  <div style="flex:1;min-width:0">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span style="font:700 16px 'Space Grotesk',sans-serif;color:{{ p.titleFg }};transition:color 260ms">{{ p.name }}</span>
+                      <sc-if value="{{ p.hasBadge }}">
+                        <span style="padding:3px 9px;border-radius:100px;background:var(--accBg);font:500 10px 'Space Grotesk',sans-serif;letter-spacing:.04em;color:var(--accFg)">{{ p.badge }}</span>
+                      </sc-if>
+                    </div>
+                    <div style="margin-top:4px;font:400 13px/1.35 Roboto,sans-serif;color:var(--fg2)">{{ p.note }}</div>
+                  </div>
+                  <div style="text-align:right;flex:none;margin-right:8px">
+                    <div style="font:700 16px 'Space Grotesk',sans-serif;font-feature-settings:'tnum' on;color:{{ p.titleFg }};transition:color 260ms">{{ p.price }}</div>
+                    <div style="margin-top:3px;font:400 11px Roboto,sans-serif;color:var(--fg2)">{{ p.per }}</div>
+                  </div>
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="var(--fg2)" style="flex:none;transform:rotate({{ p.rot }});transition:transform 300ms cubic-bezier(.25,1,.5,1)"><path d="M7,10l5,5 5,-5z" /></svg>
+                </div>
+
+                <div style="overflow:hidden;max-height:{{ p.h }};opacity:{{ p.op }};transition:max-height 340ms cubic-bezier(.25,1,.5,1),opacity 240ms cubic-bezier(.25,1,.5,1)">
+                  <div style="height:1px;margin:0 16px;background:var(--line)"></div>
+                  <sc-for list="{{ p.terms }}" as="t" hint-placeholder-count="4">
+                    <div onClick="{{ t.pick }}" class="row" style="min-height:52px;background:{{ t.bg }}">
+                      <div style="width:20px;height:20px;border-radius:50%;box-sizing:border-box;border:2px solid {{ t.dotBd }};display:flex;align-items:center;justify-content:center;flex:none;transition:border-color 220ms">
+                        <sc-if value="{{ t.on }}"><span style="width:9px;height:9px;border-radius:50%;background:{{ t.dot }};animation:pop 220ms cubic-bezier(.25,1,.5,1) both"></span></sc-if>
+                      </div>
+                      <div style="flex:1;margin-left:14px;min-width:0">
+                        <div style="font:400 14px Roboto,sans-serif">{{ t.name }}</div>
+                        <sc-if value="{{ t.hasSave }}">
+                          <div style="margin-top:3px;font:400 12px Roboto,sans-serif;color:{{ t.saveFg }}">{{ t.save }}</div>
+                        </sc-if>
+                      </div>
+                      <span style="font:700 14px 'Space Grotesk',sans-serif;font-feature-settings:'tnum' on;flex:none">{{ t.price }}</span>
+                    </div>
+                  </sc-for>
+                  <div style="padding:6px 16px 16px">
+                    <div class="btn" style="height:46px;border-radius:23px;border:1.5px solid {{ buy.acc }};box-sizing:border-box;display:flex;align-items:center;justify-content:center">
+                      <span style="font:700 15px Roboto,sans-serif;color:{{ buy.acc }}">{{ p.cta }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </sc-for>
+            <div style="margin:20px 16px 0;font:400 12px/1.5 Roboto,sans-serif;color:var(--fg2);display:none">.</div>
+          </sc-if>
+
+          <sc-for list="{{ sub.groups }}" as="gr" hint-placeholder-count="2">
+            <sc-if value="{{ gr.hasLabel }}">
+              <div style="padding:22px 16px 8px;font:700 16px 'Space Grotesk',sans-serif">{{ gr.label }}</div>
+            </sc-if>
+            <sc-if value="{{ gr.isMono }}">
+              <div style="margin:0 16px;padding:12px 14px;border-radius:16px;background:var(--pressBg);border:1px solid var(--line)">
+                <sc-for list="{{ gr.lines }}" as="ln" hint-placeholder-count="5">
+                  <div style="font:400 11px/1.7 'Space Grotesk',ui-monospace,monospace;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ ln.text }}</div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <div style="margin:{{ gr.margin }};background:var(--surf);border:1px solid var(--line);border-radius:20px;overflow:hidden;display:{{ gr.disp }}">
+              <sc-for list="{{ gr.rows }}" as="r" hint-placeholder-count="3">
+                <div onClick="{{ r.click }}" class="row" style="border-top:1px solid {{ r.sep }}">
+                  <sc-if value="{{ r.hasTile }}">
+                    <div style="width:40px;height:40px;border-radius:12px;background:var(--tile);display:flex;align-items:center;justify-content:center;flex:none;font:700 15px 'Space Grotesk',sans-serif;color:var(--tileFg)">
+                      <sc-if value="{{ r.hasIcon }}">
+                        <svg viewBox="{{ r.vb }}" width="22" height="22" fill="var(--tileFg)"><path d="{{ r.icon }}" /></svg>
+                      </sc-if>
+                      <sc-if value="{{ r.hasLetter }}">{{ r.letter }}</sc-if>
+                    </div>
+                  </sc-if>
+                  <div style="flex:1 1 auto;min-width:70px;overflow:hidden;margin-left:{{ r.pad }};margin-right:{{ r.gap }}">
+                    <div style="font:400 14px/1.3 Roboto,sans-serif;color:{{ r.fg }}">{{ r.name }}</div>
+                    <sc-if value="{{ r.hasSub }}">
+                      <div style="margin-top:4px;font:400 13px/1.35 Roboto,sans-serif;color:var(--fg2)">{{ r.sub }}</div>
+                    </sc-if>
+                  </div>
+                  <sc-if value="{{ r.isCheck }}">
+                    <div style="width:22px;height:22px;border-radius:7px;box-sizing:border-box;border:2px solid {{ r.boxBd }};background:{{ r.boxBg }};display:flex;align-items:center;justify-content:center;flex:none;transition:background-color 220ms,border-color 220ms">
+                      <sc-if value="{{ r.on }}"><svg viewBox="0 0 24 24" width="16" height="16" fill="{{ r.tick }}" style="animation:pop 260ms cubic-bezier(.25,1,.5,1) both"><path d="M9,16.2L4.8,12l-1.4,1.4L9,19 21,7l-1.4,-1.4L9,16.2z" /></svg></sc-if>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isToggle }}">
+                    <div style="width:52px;height:32px;border-radius:16px;box-sizing:border-box;border:2px solid {{ r.sw.bd }};background:{{ r.sw.track }};position:relative;flex:none;transition:background-color 220ms,border-color 220ms">
+                      <span style="position:absolute;top:50%;left:{{ r.sw.left }};width:{{ r.sw.size }};height:{{ r.sw.size }};margin-top:-{{ r.sw.half }};border-radius:50%;background:{{ r.sw.thumb }};transition:left 220ms cubic-bezier(.25,1,.5,1),width 220ms,height 220ms,margin-top 220ms,background-color 220ms"></span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.isPlain }}" hint-placeholder-val="{{ true }}">
+                    <span style="font:{{ r.valueWeight }} 13px Roboto,sans-serif;color:{{ r.valueFg }};flex:none;white-space:nowrap">{{ r.value }}</span>
+                    <sc-if value="{{ r.hasChev }}">
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="var(--fg2)" style="margin-left:4px;flex:none"><path d="M8.6,4.6L7.2,6l6,6l-6,6l1.4,1.4L16,12z" /></svg>
+                    </sc-if>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+            <sc-if value="{{ gr.hasFoot }}">
+              <div style="margin:12px 16px 0;font:400 12px/1.5 Roboto,sans-serif;color:var(--fg2)">{{ gr.foot }}</div>
+            </sc-if>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ onboard }}">
+      <div style="position:absolute;inset:0;background:var(--bg);display:flex;flex-direction:column;z-index:24;animation:rise 300ms cubic-bezier(.25,1,.5,1) both">
+        <div style="display:flex;align-items:center;justify-content:space-between;height:32px;padding:0 16px;font:500 12px 'Space Grotesk',sans-serif;flex:none">
+          <span>21:47</span><span style="font-size:11px;opacity:.75">69%</span>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 16px 32px">
+          <div style="width:112px;height:112px;position:relative;display:flex;align-items:center;justify-content:center;margin-bottom:28px;animation:bloomIn 620ms cubic-bezier(.22,1,.36,1) both">
+            <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(closest-side,var(--bloom),transparent)"></div>
+            <div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid var(--ring1)"></div>
+            <div style="position:absolute;inset:12px;border-radius:50%;border:1.5px dashed var(--ring1)"></div>
+            <svg viewBox="0 0 24 24" width="44" height="44" fill="var(--shieldOff)"><path fill-rule="evenodd" d="M12,2.2 L19.6,5.2 L19.6,11.4 C19.6,16.1 15.9,19.9 12,21.8 C8.1,19.9 4.4,16.1 4.4,11.4 L4.4,5.2 Z M12,4.7 L17.2,6.8 L17.2,11.4 C17.2,14.9 14.7,17.9 12,19.3 C9.3,17.9 6.8,14.9 6.8,11.4 L6.8,6.8 Z" /></svg>
+          </div>
+
+          <div style="font:700 24px/1.2 'Space Grotesk',sans-serif;letter-spacing:-.01em;animation:liftIn 460ms cubic-bezier(.22,1,.36,1) 80ms both">Приветствуем!</div>
+          <div style="margin-top:8px;font:400 14px/1.5 Roboto,sans-serif;color:var(--fg2);max-width:290px;min-height:42px;animation:liftIn 460ms cubic-bezier(.22,1,.36,1) 140ms both">{{ ob.sub }}</div>
+
+          <div style="overflow:hidden;max-height:{{ ob.foundH }};opacity:{{ ob.foundOp }};transition:max-height 340ms cubic-bezier(.25,1,.5,1),opacity 240ms cubic-bezier(.25,1,.5,1)">
+            <div onClick="{{ flowClip }}" class="card" style="margin-top:20px;padding:14px;border-radius:20px;background:var(--surf);border:1px solid var(--line);cursor:pointer">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="width:40px;height:40px;border-radius:12px;background:var(--surf3);display:flex;align-items:center;justify-content:center;flex:none;font-size:18px">🍀</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font:700 16px/1.25 'Space Grotesk',sans-serif">Подписка</div>
+                  <div style="margin-top:3px;font:400 12px Roboto,sans-serif;color:var(--fg2)">Ссылка в буфере обмена</div>
+                </div>
+              </div>
+              <div style="margin-top:12px;height:48px;border-radius:24px;border:1.5px solid {{ c.acc }};box-sizing:border-box;display:flex;align-items:center;justify-content:center">
+                <span style="font:700 15px Roboto,sans-serif;color:var(--accFg)">Добавить подписку</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="overflow:hidden;max-height:{{ ob.emptyH }};opacity:{{ ob.emptyOp }};transition:max-height 340ms cubic-bezier(.25,1,.5,1),opacity 240ms cubic-bezier(.25,1,.5,1)">
+            <div onClick="{{ obFound }}" class="btn" style="margin-top:20px;height:52px;border-radius:26px;border:1.5px solid var(--outline);box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:10px">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="var(--fg2)"><path d="M16,1L4,1c-1.1,0 -2,0.9 -2,2v14h2L4,3h12L16,1zM19,5L8,5c-1.1,0 -2,0.9 -2,2v14c0,1.1 0.9,2 2,2h11c1.1,0 2,-0.9 2,-2L21,7c0,-1.1 -0.9,-2 -2,-2zM19,21L8,21L8,7h11v14z" /></svg>
+              <span style="font:500 15px Roboto,sans-serif;color:var(--fg)">Добавить из буфера обмена</span>
+            </div>
+          </div>
+
+          <div onClick="{{ flowTg }}" class="btn" style="margin-top:14px;height:52px;border-radius:26px;border:1.5px solid var(--outline);box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:10px;animation:liftIn 460ms cubic-bezier(.22,1,.36,1) 260ms both">
+            <svg viewBox="0 0 1024 1024" width="20" height="20" fill="#2AABEE"><path d="M912.2,154A85.3,85.3 0,0 0,853.3 128a85.3,85.3 0,0 0,-33.3 6.8l-708.3,306.8a42.7,42.7 0,0 0,-26.5 42.7V512a42.7,42.7 0,0 0,29.4 42.7L298.7,616.1l55.5,187.3a75.9,75.9 0,0 0,56.3 53.3,62.7 62.7,0 0,0 15.4,0 73.8,73.8 0,0 0,50.8 -20.5l67.8,-64 131.4,103.7a85.3,85.3 0,0 0,90 9.4l14.1,-7.3a88.3,88.3 0,0 0,46.5 -62.7L938.7,235.1a90,90 0,0 0,-26.5 -81.1zM763.7,805.1a25.2,25.2 0,0 1,-12.8 17.5l-14.1,7.3a19.6,19.6 0,0 1,-9 2.1,19.6 19.6,0 0,1 -12.4,-4.7l-160.4,-128a20.9,20.9 0,0 0,-27.7 0l-94.7,89.2a11.1,11.1 0,0 1,-6 2.1V640a21.8,21.8 0,0 1,6.8 -15.8c136.1,-128 217.6,-199.7 266.2,-240.6a15.8,15.8 0,0 0,5.1 -11.1,13.7 13.7,0 0,0 -4.3,-11.1 14.9,14.9 0,0 0,-17.9 -4.3l-322.6,203.5a21.3,21.3 0,0 1,-18.3 0L149.3,494.9l694.2,-301.2a16.6,16.6 0,0 1,7.7 0,22.2 22.2,0 0,1 16.2,7.7 26.9,26.9 0,0 1,6.8 23.5z" /></svg>
+            <span style="font:700 15px Roboto,sans-serif;color:var(--fg)">Войти через Telegram</span>
+          </div>
+
+          <div onClick="{{ toggleMore }}" class="btn" style="margin-top:12px;height:44px;border-radius:22px;display:flex;align-items:center;justify-content:center;gap:6px;animation:liftIn 460ms cubic-bezier(.22,1,.36,1) 320ms both">
+            <span style="font:500 13px Roboto,sans-serif;color:var(--fg2)">Другие способы</span>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="var(--fg2)" style="transform:rotate({{ more.rot }});transition:transform 300ms cubic-bezier(.25,1,.5,1)"><path d="M7,10l5,5 5,-5z" /></svg>
+          </div>
+
+          <div style="overflow:hidden;max-height:{{ more.h }};opacity:{{ more.op }};transition:max-height 320ms cubic-bezier(.25,1,.5,1),opacity 220ms cubic-bezier(.25,1,.5,1)">
+            <div style="padding-top:4px;display:flex;flex-direction:column;gap:2px">
+              <div class="row" style="min-height:52px;padding:0 12px;border-radius:14px">
+                <svg viewBox="0 0 1024 1024" width="20" height="20" fill="var(--fg2)" style="flex:none"><path d="M181.333333 384a32 32 0 0 1-64 0v-111.146667a155.52 155.52 0 0 1 155.52-155.52H384a32 32 0 0 1 0 64h-111.146667a91.52 91.52 0 0 0-91.52 91.52V384zM640 181.333333a32 32 0 0 1 0-64h111.146667a155.52 155.52 0 0 1 155.52 155.52V384a32 32 0 0 1-64 0v-111.146667a91.52 91.52 0 0 0-91.52-91.52H640zM842.666667 640a32 32 0 0 1 64 0v111.146667a155.52 155.52 0 0 1-155.52 155.52H640a32 32 0 0 1 0-64h111.146667a91.52 91.52 0 0 0 91.52-91.52V640zM384 842.666667a32 32 0 0 1 0 64h-111.146667a155.52 155.52 0 0 1-155.52-155.52V640a32 32 0 0 1 64 0v111.146667a91.52 91.52 0 0 0 91.52 91.52H384z m-192-298.666667a32 32 0 0 1 0-64h640a32 32 0 0 1 0 64H192z" /></svg>
+                <span style="flex:1;margin-left:14px;font:400 14px Roboto,sans-serif">Добавить по QR-коду</span>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="var(--fg2)"><path d="M8.6,4.6L7.2,6l6,6l-6,6l1.4,1.4L16,12z" /></svg>
+              </div>
+              <div class="row" style="min-height:52px;padding:0 12px;border-radius:14px">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="var(--fg2)" style="flex:none"><path d="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM11,19.93c-3.95,-0.49 -7,-3.85 -7,-7.93 0,-0.62 0.08,-1.21 0.21,-1.79L9,15v1c0,1.1 0.9,2 2,2v1.93zM17.9,17.39c-0.26,-0.81 -1,-1.39 -1.9,-1.39h-1v-3c0,-0.55 -0.45,-1 -1,-1H8v-2h2c0.55,0 1,-0.45 1,-1V7h2c1.1,0 2,-0.9 2,-2v-0.41c2.93,1.19 5,4.06 5,7.41 0,2.08 -0.8,3.97 -2.1,5.39z" /></svg>
+                <span style="flex:1;margin-left:14px;font:400 14px Roboto,sans-serif">Войти через сайт</span>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="var(--fg2)"><path d="M8.6,4.6L7.2,6l6,6l-6,6l1.4,1.4L16,12z" /></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ fl.on }}">
+      <div style="position:absolute;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 32px;z-index:30;animation:rise 240ms cubic-bezier(.25,1,.5,1) both;will-change:opacity,transform;opacity:{{ fl.shellOp }};transform:{{ fl.shellTf }};transition:opacity 520ms cubic-bezier(.33,0,.2,1),transform 600ms cubic-bezier(.33,0,.2,1)">
+        <div style="width:132px;height:132px;position:relative;display:flex;align-items:center;justify-content:center">
+          <div style="position:absolute;inset:0;border-radius:50%;background:radial-gradient(closest-side,var(--bloom),transparent)"></div>
+          <div style="position:absolute;inset:0;border-radius:50%;border:1.5px solid var(--ring1)"></div>
+          <sc-if value="{{ fl.busy }}">
+            <svg viewBox="0 0 132 132" width="132" height="132" style="position:absolute;inset:0;animation:spin 1100ms linear infinite">
+              <circle cx="66" cy="66" r="64" fill="none" stroke="{{ c.acc }}" stroke-width="2" stroke-linecap="round" stroke-dasharray="80 322" />
+            </svg>
+          </sc-if>
+          <sc-if value="{{ fl.done }}">
+            <div style="position:absolute;inset:0;border-radius:50%;border:2px solid {{ c.acc }};animation:sonar 600ms cubic-bezier(.22,1,.36,1) both"></div>
+            <div style="position:absolute;inset:0;border-radius:50%;border:2px solid {{ c.acc }}"></div>
+          </sc-if>
+          <sc-if value="{{ fl.isTg }}">
+            <svg viewBox="0 0 1024 1024" width="46" height="46" fill="#2AABEE"><path d="M912.2,154A85.3,85.3 0,0 0,853.3 128a85.3,85.3 0,0 0,-33.3 6.8l-708.3,306.8a42.7,42.7 0,0 0,-26.5 42.7V512a42.7,42.7 0,0 0,29.4 42.7L298.7,616.1l55.5,187.3a75.9,75.9 0,0 0,56.3 53.3,62.7 62.7,0 0,0 15.4,0 73.8,73.8 0,0 0,50.8 -20.5l67.8,-64 131.4,103.7a85.3,85.3 0,0 0,90 9.4l14.1,-7.3a88.3,88.3 0,0 0,46.5 -62.7L938.7,235.1a90,90 0,0 0,-26.5 -81.1zM763.7,805.1a25.2,25.2 0,0 1,-12.8 17.5l-14.1,7.3a19.6,19.6 0,0 1,-9 2.1,19.6 19.6,0 0,1 -12.4,-4.7l-160.4,-128a20.9,20.9 0,0 0,-27.7 0l-94.7,89.2a11.1,11.1 0,0 1,-6 2.1V640a21.8,21.8 0,0 1,6.8 -15.8c136.1,-128 217.6,-199.7 266.2,-240.6a15.8,15.8 0,0 0,5.1 -11.1,13.7 13.7,0 0,0 -4.3,-11.1 14.9,14.9 0,0 0,-17.9 -4.3l-322.6,203.5a21.3,21.3 0,0 1,-18.3 0L149.3,494.9l694.2,-301.2a16.6,16.6 0,0 1,7.7 0,22.2 22.2,0 0,1 16.2,7.7 26.9,26.9 0,0 1,6.8 23.5z" /></svg>
+          </sc-if>
+          <sc-if value="{{ fl.done }}">
+            <svg viewBox="0 0 24 24" width="44" height="44" fill="{{ c.acc }}" style="position:absolute;animation:pop 320ms cubic-bezier(.25,1,.5,1) both"><path d="M9,16.2L4.8,12l-1.4,1.4L9,19 21,7l-1.4,-1.4L9,16.2z" /></svg>
+          </sc-if>
+        </div>
+
+        <div style="margin-top:26px;font:700 20px/1.25 'Space Grotesk',sans-serif;text-align:center">{{ fl.title }}</div>
+        <div style="margin-top:8px;font:400 13px/1.45 Roboto,sans-serif;color:var(--fg2);text-align:center">{{ fl.note }}</div>
+
+        <div style="margin-top:22px;width:100%;height:3px;border-radius:2px;background:var(--surf3);overflow:hidden">
+          <span style="display:block;height:3px;border-radius:2px;background:{{ c.acc }};width:{{ fl.pct }};transition:width 900ms cubic-bezier(.25,1,.5,1)"></span>
+        </div>
+
+        <sc-if value="{{ fl.toast }}">
+          <div style="position:absolute;left:24px;right:24px;bottom:36px;display:flex;align-items:center;justify-content:center;gap:8px;height:40px;border-radius:100px;background:var(--surf2);border:1px solid var(--line);animation:rise 260ms cubic-bezier(.25,1,.5,1) both">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="var(--fg)"><path d="M9,16.2L4.8,12l-1.4,1.4L9,19 21,7l-1.4,-1.4L9,16.2z" /></svg>
+            <span style="font:500 13px Roboto,sans-serif">{{ fl.toastText }}</span>
+          </div>
+        </sc-if>
+      </div>
+      <div style="position:absolute;inset:0;pointer-events:none;z-index:29;background:radial-gradient(circle at 50% 42%,var(--bloom),transparent 60%);opacity:{{ fl.haloOp }};will-change:opacity;transition:opacity 620ms cubic-bezier(.25,1,.5,1)"></div>
+    </sc-if>
+
+    <div style="position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(to top,var(--page) 0%,var(--page) 45%,transparent 100%);pointer-events:none"></div>
+    <div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:flex-end;padding-bottom:6px">
+      <span style="position:absolute;bottom:2px;left:{{ navLeft }};width:28px;height:3px;border-radius:2px;background:{{ navFg }};transition:left 280ms cubic-bezier(.25,1,.5,1),background-color 220ms"></span>
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+        <div onClick="{{ t.pick }}" class="btn" style="flex:1;display:flex;flex-direction:column;align-items:center;padding:6px 0 9px">
+          <svg viewBox="{{ t.vb }}" width="23" height="23" fill="{{ t.fg }}" style="display:block;transition:fill 220ms"><path d="{{ t.icon }}" /></svg>
+          <span style="margin-top:-1px;font:{{ t.weight }} 11px/1 Roboto,sans-serif;color:{{ t.fg }};transition:color 220ms">{{ t.name }}</span>
+        </div>
+      </sc-for>
+    </div>
+
+  </div>
+
+  <div style="width:360px;display:flex;align-items:center;gap:8px">
+    <span style="font:500 11px Inter,sans-serif;color:rgba(233,233,237,.5);flex:none">Старт</span>
+    <div onClick="{{ resetOnboard }}" class="btn" style="flex:1;height:30px;border-radius:100px;background:{{ obUi.startBg }};color:{{ obUi.startFg }};display:flex;align-items:center;justify-content:center;font:500 11px Inter,sans-serif">Начальный экран</div>
+    <div onClick="{{ skipOnboard }}" class="btn" style="flex:1;height:30px;border-radius:100px;background:{{ obUi.appBg }};color:{{ obUi.appFg }};display:flex;align-items:center;justify-content:center;font:500 11px Inter,sans-serif">Приложение</div>
+  </div>
+
+  <div style="width:360px;display:flex;align-items:center;gap:8px">
+    <span style="font:500 11px Inter,sans-serif;color:rgba(233,233,237,.5);flex:none">Переход</span>
+    <sc-for list="{{ transUi }}" as="t" hint-placeholder-count="3">
+      <div onClick="{{ t.pick }}" class="btn" style="flex:1;height:30px;border-radius:100px;background:{{ t.bg }};color:{{ t.fg }};display:flex;align-items:center;justify-content:center;font:500 11px Inter,sans-serif">{{ t.name }}</div>
+    </sc-for>
+  </div>
+
+  <div style="width:360px;display:flex;align-items:center;gap:8px">
+    <span style="font:500 11px Inter,sans-serif;color:rgba(233,233,237,.5);flex:none">Трафик</span>
+    <div onClick="{{ setTbUnlim }}" class="btn" style="flex:1;height:30px;border-radius:100px;background:{{ tbUi.unlimBg }};color:{{ tbUi.unlimFg }};display:flex;align-items:center;justify-content:center;font:500 11px Inter,sans-serif">Безлимит</div>
+    <div onClick="{{ setTbLim }}" class="btn" style="flex:1;height:30px;border-radius:100px;background:{{ tbUi.limBg }};color:{{ tbUi.limFg }};display:flex;align-items:center;justify-content:center;font:500 11px Inter,sans-serif">4 ГБ из 10 ГБ</div>
+  </div>
+
+  <div style="width:360px;display:flex;gap:8px">
+    <div onClick="{{ flowTg }}" class="btn" style="flex:1;height:38px;border-radius:100px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;gap:8px">
+      <svg viewBox="0 0 1024 1024" width="16" height="16" fill="#2AABEE"><path d="M912.2,154A85.3,85.3 0,0 0,853.3 128a85.3,85.3 0,0 0,-33.3 6.8l-708.3,306.8a42.7,42.7 0,0 0,-26.5 42.7V512a42.7,42.7 0,0 0,29.4 42.7L298.7,616.1l55.5,187.3a75.9,75.9 0,0 0,56.3 53.3,62.7 62.7,0 0,0 15.4,0 73.8,73.8 0,0 0,50.8 -20.5l67.8,-64 131.4,103.7a85.3,85.3 0,0 0,90 9.4l14.1,-7.3a88.3,88.3 0,0 0,46.5 -62.7L938.7,235.1a90,90 0,0 0,-26.5 -81.1zM763.7,805.1a25.2,25.2 0,0 1,-12.8 17.5l-14.1,7.3a19.6,19.6 0,0 1,-9 2.1,19.6 19.6,0 0,1 -12.4,-4.7l-160.4,-128a20.9,20.9 0,0 0,-27.7 0l-94.7,89.2a11.1,11.1 0,0 1,-6 2.1V640a21.8,21.8 0,0 1,6.8 -15.8c136.1,-128 217.6,-199.7 266.2,-240.6a15.8,15.8 0,0 0,5.1 -11.1,13.7 13.7,0 0,0 -4.3,-11.1 14.9,14.9 0,0 0,-17.9 -4.3l-322.6,203.5a21.3,21.3 0,0 1,-18.3 0L149.3,494.9l694.2,-301.2a16.6,16.6 0,0 1,7.7 0,22.2 22.2,0 0,1 16.2,7.7 26.9,26.9 0,0 1,6.8 23.5z" /></svg>
+      <span style="font:500 12px Inter,sans-serif;color:#e9e9ed">Вход через Telegram</span>
+    </div>
+    <div onClick="{{ flowClip }}" class="btn" style="flex:1;height:38px;border-radius:100px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;gap:8px">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="rgba(233,233,237,.7)"><path d="M16,1L4,1c-1.1,0 -2,0.9 -2,2v14h2L4,3h12L16,1zM19,5L8,5c-1.1,0 -2,0.9 -2,2v14c0,1.1 0.9,2 2,2h11c1.1,0 2,-0.9 2,-2L21,7c0,-1.1 -0.9,-2 -2,-2zM19,21L8,21L8,7h11v14z" /></svg>
+      <span style="font:500 12px Inter,sans-serif;color:#e9e9ed">Добавление из буфера</span>
+    </div>
+  </div>
+
+  <div style="width:360px;font:400 11px/1.6 Inter,system-ui,sans-serif;color:rgba(233,233,237,.5)">Нажмите щит — пройдёт полный цикл подключения.</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:420,&quot;height&quot;:900}}">
+const THEMES = {
+  dark: {
+    '--page': '#0A0B0D', '--bg': 'radial-gradient(620px circle at 50% 28%,#151C2B 0%,#0E1119 52%,#0A0B0D 100%)',
+    '--surf': '#141619', '--surf2': '#1A1D21', '--surf3': '#20242B', '--line': '#20242B', '--outline': '#2A2E36',
+    '--fg': '#F2F4F8', '--fg2': '#9BA1AD', '--tile': '#20242B', '--tileFg': '#9BA1AD',
+    '--accBg': '#17325C', '--accFg': '#CFE0FF', '--ring1': 'rgba(76,141,255,.18)',
+    '--bloom': 'rgba(76,141,255,.28)', '--shieldOff': '#3A4A66',
+    '--jsonBg': '#3A2E00', '--jsonFg': '#EAB308', '--pressRing': 'rgba(76,141,255,.35)', '--pressBg': '#0D1017', '--popBg': '#20242B'
+  },
+  mono: {
+    '--page': '#000000', '--bg': 'radial-gradient(620px circle at 50% 28%,#161618 0%,#0D0D0F 50%,#000000 100%)',
+    '--surf': '#121214', '--surf2': '#1B1B1E', '--surf3': '#232326', '--line': '#28282C', '--outline': '#38383C',
+    '--fg': '#F4F4F5', '--fg2': '#B0B0B4', '--tile': '#232326', '--tileFg': '#B0B0B4',
+    '--accBg': '#2A2A2E', '--accFg': '#F4F4F5', '--ring1': 'rgba(128,128,128,.2)',
+    '--bloom': 'rgba(128,128,128,.26)', '--shieldOff': '#5B5B61',
+    '--jsonBg': '#232326', '--jsonFg': '#F4F4F5', '--pressRing': 'rgba(255,255,255,.22)', '--pressBg': '#0B0B0C', '--popBg': '#232326'
+  }
+};
+const ACC = { dark: '#4C8DFF', mono: '#FFFFFF' };
+const ICONS = {
+  shield: ['M12,2.2 L19.6,5.2 L19.6,11.4 C19.6,16.1 15.9,19.9 12,21.8 C8.1,19.9 4.4,16.1 4.4,11.4 L4.4,5.2 Z', '0 0 24 24'],
+  router: ['M20.2,5.9l0.8,-0.8C19.6,3.7 17.8,3 16,3s-3.6,0.7 -5,2.1l0.8,0.8C13,4.8 14.5,4.2 16,4.2s3,0.6 4.2,1.7zM19.3,6.7c-0.8,-0.8 -2.1,-1.4 -3.3,-1.4s-2.5,0.5 -3.3,1.4l0.8,0.8c0.6,-0.6 1.6,-1 2.5,-1s1.9,0.4 2.5,1l0.8,-0.8zM19,13h-2V9h-2v4H5c-1.1,0 -2,0.9 -2,2v4c0,1.1 0.9,2 2,2h14c1.1,0 2,-0.9 2,-2v-4c0,-1.1 -0.9,-2 -2,-2zM8,18H6v-2h2v2zM11.5,18h-2v-2h2v2zM15,18h-2v-2h2v2z', '0 0 24 24'],
+  globe: ['M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM11,19.93c-3.95,-0.49 -7,-3.85 -7,-7.93 0,-0.62 0.08,-1.21 0.21,-1.79L9,15v1c0,1.1 0.9,2 2,2v1.93zM17.9,17.39c-0.26,-0.81 -1,-1.39 -1.9,-1.39h-1v-3c0,-0.55 -0.45,-1 -1,-1H8v-2h2c0.55,0 1,-0.45 1,-1V7h2c1.1,0 2,-0.9 2,-2v-0.41c2.93,1.19 5,4.06 5,7.41 0,2.08 -0.8,3.97 -2.1,5.39z', '0 0 24 24'],
+  help: ['M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM13,19h-2v-2h2v2zM15.07,11.25l-0.9,0.92C13.45,12.9 13,13.5 13,15h-2v-0.5c0,-1.1 0.45,-2.1 1.17,-2.83l1.24,-1.26c0.37,-0.36 0.59,-0.86 0.59,-1.41 0,-1.1 -0.9,-2 -2,-2s-2,0.9 -2,2H8c0,-2.21 1.79,-4 4,-4s4,1.79 4,4c0,0.88 -0.36,1.68 -0.93,2.25z', '0 0 24 24'],
+  ping: ['M12,11c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM18,13c0,-3.31 -2.69,-6 -6,-6s-6,2.69 -6,6c0,2.22 1.21,4.15 3,5.19l1,-1.74c-1.19,-0.7 -2,-1.97 -2,-3.45 0,-2.21 1.79,-4 4,-4s4,1.79 4,4c0,1.48 -0.81,2.75 -2,3.45l1,1.74c1.79,-1.04 3,-2.97 3,-5.19zM12,3C6.48,3 2,7.48 2,13c0,3.7 2.01,6.92 4.99,8.65l1,-1.73C5.61,18.53 4,15.96 4,13c0,-4.42 3.58,-8 8,-8s8,3.58 8,8c0,2.96 -1.61,5.53 -4,6.92l1,1.73c2.98,-1.73 5,-4.95 5,-8.65 0,-5.52 -4.48,-10 -10,-10z', '0 0 24 24'],
+  http: ['M20,13H4c-0.55,0 -1,0.45 -1,1v6c0,0.55 0.45,1 1,1h16c0.55,0 1,-0.45 1,-1v-6c0,-0.55 -0.45,-1 -1,-1zM7,19c-0.83,0 -1.5,-0.67 -1.5,-1.5S6.17,16 7,16s1.5,0.67 1.5,1.5S7.83,19 7,19zM20,3H4c-0.55,0 -1,0.45 -1,1v6c0,0.55 0.45,1 1,1h16c0.55,0 1,-0.45 1,-1V4c0,-0.55 -0.45,-1 -1,-1zM7,9c-0.83,0 -1.5,-0.67 -1.5,-1.5S6.17,6 7,6s1.5,0.67 1.5,1.5S7.83,9 7,9z', '0 0 24 24'],
+  lock: ['M742.4,409.6L716.8,409.6L716.8,332.8C716.8,205.8 613.4,102.4 486.4,102.4S256,205.8 256,332.8L256,409.6h-25.6C188.1,409.6 153.6,444.1 153.6,486.4v409.6c0,42.3 34.5,76.8 76.8,76.8h512c42.3,0 76.8,-34.5 76.8,-76.8v-409.6c0,-42.3 -34.5,-76.8 -76.8,-76.8zM307.2,332.8C307.2,234 387.6,153.6 486.4,153.6S665.6,234 665.6,332.8L665.6,409.6L307.2,409.6L307.2,332.8zM768,896a25.6,25.6 0,0 1,-25.6 25.6h-512a25.6,25.6 0,0 1,-25.6 -25.6v-409.6a25.6,25.6 0,0 1,25.6 -25.6h512a25.6,25.6 0,0 1,25.6 25.6v409.6z', '0 0 1024 1024'],
+  code: ['M469.2,802.1l-81.7,-24.6L554.8,221.9l81.7,24.6L469.2,802.1zM362.7,654.5l-124.7,-141.7 124.8,-143.5 -64.4,-56 -173.8,199.8 174,197.7 64.1,-56.3zM899.4,513.1l-173.8,-199.8 -64.4,56 124.8,143.5 -124.7,141.7 64.1,56.4 174,-197.7z', '0 0 1024 1024'],
+  gear: ['M924.8,625.7l-65.5,-56c3.1,-19 4.7,-38.4 4.7,-57.8s-1.6,-38.8 -4.7,-57.8l65.5,-56c10.1,-8.6 13.8,-22.6 9.3,-35.2l-0.9,-2.6c-18.1,-50.5 -44.9,-96.9 -79.7,-137.9l-1.8,-2.1c-8.6,-10.1 -22.5,-13.9 -35.1,-9.5l-81.3,28.9c-30,-24.6 -63.5,-44 -99.7,-57.6l-15.7,-85c-2.4,-13.1 -12.7,-23.3 -25.8,-25.7l-2.7,-0.5c-52.1,-9.4 -106.9,-9.4 -159,0l-2.7,0.5c-13.1,2.4 -23.4,12.6 -25.8,25.7l-15.8,85.4c-35.9,13.6 -69.2,32.9 -99,57.4l-81.9,-29.1c-12.5,-4.4 -26.5,-0.7 -35.1,9.5l-1.8,2.1c-34.8,41.1 -61.6,87.5 -79.7,137.9l-0.9,2.6c-4.5,12.5 -0.8,26.5 9.3,35.2l66.3,56.6c-3.1,18.8 -4.6,38 -4.6,57.1 0,19.2 1.5,38.4 4.6,57.1L99,625.5c-10.1,8.6 -13.8,22.6 -9.3,35.2l0.9,2.6c18.1,50.4 44.9,96.9 79.7,137.9l1.8,2.1c8.6,10.1 22.5,13.9 35.1,9.5l81.9,-29.1c29.8,24.5 63.1,43.9 99,57.4l15.8,85.4c2.4,13.1 12.7,23.3 25.8,25.7l2.7,0.5c26.1,4.7 52.8,7.1 79.5,7.1 26.7,0 53.5,-2.4 79.5,-7.1l2.7,-0.5c13.1,-2.4 23.4,-12.6 25.8,-25.7l15.7,-85c36.2,-13.6 69.7,-32.9 99.7,-57.6l81.3,28.9c12.5,4.4 26.5,0.7 35.1,-9.5l1.8,-2.1c34.8,-41.1 61.6,-87.5 79.7,-137.9l0.9,-2.6c4.5,-12.3 0.8,-26.3 -9.3,-35zM512,678c-97.2,0 -176,-78.8 -176,-176s78.8,-176 176,-176 176,78.8 176,176 -78.8,176 -176,176z', '0 0 1024 1024'],
+  refresh: ['M17.65,6.35C16.2,4.9 14.21,4 12,4c-4.42,0 -7.99,3.58 -7.99,8s3.57,8 7.99,8c3.73,0 6.84,-2.55 7.73,-6h-2.08c-0.82,2.33 -3.04,4 -5.65,4 -3.31,0 -6,-2.69 -6,-6s2.69,-6 6,-6c1.66,0 3.14,0.69 4.22,1.78L13,11h7V4l-2.35,2.35z', '0 0 24 24'],
+  servers: ['M5,4h14a1,1 0 0,1 1,1v5a1,1 0 0,1 -1,1H5a1,1 0 0,1 -1,-1V5a1,1 0 0,1 1,-1zM7,7.5m-1,0a1,1 0 1,0 2,0a1,1 0 1,0 -2,0M5,13h14a1,1 0 0,1 1,1v5a1,1 0 0,1 -1,1H5a1,1 0 0,1 -1,-1v-5a1,1 0 0,1 1,-1zM7,16.5m-1,0a1,1 0 1,0 2,0a1,1 0 1,0 -2,0', '0 0 24 24'],
+  share: ['M18,16.08c-0.76,0 -1.44,0.3 -1.96,0.77L8.91,12.7c0.05,-0.23 0.09,-0.46 0.09,-0.7s-0.04,-0.47 -0.09,-0.7l7.05,-4.11c0.54,0.5 1.25,0.81 2.04,0.81 1.66,0 3,-1.34 3,-3s-1.34,-3 -3,-3 -3,1.34 -3,3c0,0.24 0.04,0.47 0.09,0.7L8.04,9.81C7.5,9.31 6.79,9 6,9c-1.66,0 -3,1.34 -3,3s1.34,3 3,3c0.79,0 1.5,-0.31 2.04,-0.81l7.12,4.16c-0.05,0.21 -0.08,0.43 -0.08,0.65 0,1.61 1.31,2.92 2.92,2.92 1.61,0 2.92,-1.31 2.92,-2.92s-1.31,-2.92 -2.92,-2.92z', '0 0 24 24'],
+  backup: ['M864,192L704,192L704,96c0,-17.7 -14.3,-32 -32,-32L352,64c-9,0 -17.2,3.7 -22.9,9.7L137.7,265.1c-6,5.8 -9.7,14 -9.7,22.9v512c0,17.7 14.3,32 32,32h160v96c0,17.7 14.3,32 32,32h512c17.7,0 32,-14.3 32,-32L896,224c0,-17.7 -14.3,-32 -32,-32zM320,173.2L320,256h-82.8l82.8,-82.8zM192,768L192,320h160c17.7,0 32,-14.3 32,-32L384,128h256v64h-96c-9,0 -17.2,3.7 -22.9,9.7L329.7,393.1c-6,5.8 -9.7,14 -9.7,22.9v352L192,768zM512,301.2L512,384h-82.8l82.8,-82.8zM832,896L384,896L384,448h160c17.7,0 32,-14.3 32,-32L576,256h256v640z', '0 0 1024 1024'],
+  hotspot: ['M12,11c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM18,13c0,-3.31 -2.69,-6 -6,-6s-6,2.69 -6,6c0,2.22 1.21,4.15 3,5.19l1,-1.74c-1.19,-0.7 -2,-1.97 -2,-3.45 0,-2.21 1.79,-4 4,-4s4,1.79 4,4c0,1.48 -0.81,2.75 -2,3.45l1,1.74c1.79,-1.04 3,-2.97 3,-5.19zM12,3C6.48,3 2,7.48 2,13c0,3.7 2.01,6.92 4.99,8.65l1,-1.73C5.61,18.53 4,15.96 4,13c0,-4.42 3.58,-8 8,-8s8,3.58 8,8c0,2.96 -1.61,5.53 -4,6.92l1,1.73c2.98,-1.73 5,-4.95 5,-8.65 0,-5.52 -4.48,-10 -10,-10z', '0 0 24 24'],
+  copy: ['M16,1L4,1c-1.1,0 -2,0.9 -2,2v14h2L4,3h12L16,1zM19,5L8,5c-1.1,0 -2,0.9 -2,2v14c0,1.1 0.9,2 2,2h11c1.1,0 2,-0.9 2,-2L21,7c0,-1.1 -0.9,-2 -2,-2zM19,21L8,21L8,7h11v14z', '0 0 24 24'],
+  scan: ['M181.333333 384a32 32 0 0 1-64 0v-111.146667a155.52 155.52 0 0 1 155.52-155.52H384a32 32 0 0 1 0 64h-111.146667a91.52 91.52 0 0 0-91.52 91.52V384zM640 181.333333a32 32 0 0 1 0-64h111.146667a155.52 155.52 0 0 1 155.52 155.52V384a32 32 0 0 1-64 0v-111.146667a91.52 91.52 0 0 0-91.52-91.52H640zM842.666667 640a32 32 0 0 1 64 0v111.146667a155.52 155.52 0 0 1-155.52 155.52H640a32 32 0 0 1 0-64h111.146667a91.52 91.52 0 0 0 91.52-91.52V640zM384 842.666667a32 32 0 0 1 0 64h-111.146667a155.52 155.52 0 0 1-155.52-155.52V640a32 32 0 0 1 64 0v111.146667a91.52 91.52 0 0 0 91.52 91.52H384z m-192-298.666667a32 32 0 0 1 0-64h640a32 32 0 0 1 0 64H192z', '0 0 1024 1024']
+};
+const CHEV = 'M8.6,4.6L7.2,6l6,6l-6,6l1.4,1.4L16,12z';
+const CARET = 'M7,10l5,5 5,-5z';
+const THEMES_OPTS = ['Тёмная', 'Светлая', 'Чёрно-белая', 'Как в системе'];
+const LANGS = ['Системный', 'Русский', 'English'];
+const AUTOUP = ['1 час', '3 часа', '6 часов', '12 часов', 'Раз в сутки', 'Выключено'];
+const MODES = ['TUN', 'Только прокси'];
+const DNS = ['Cloudflare', 'Google', 'Cloudflare + Google', 'AdGuard', 'Quad9', 'Свой…'];
+const PINGS = ['Реальная задержка', 'HTTP-запрос', 'TCP-соединение', 'ICMP (ping)'];
+const HUB = [
+  ['Подключение', [
+    ['Режим', '', 'shield', null, 'mode', '176px'],
+    ['Прокси по приложениям', '', 'router', null, null, null, 'Вкл', 'perapp'],
+    ['Обход локальной сети', 'Прямой доступ к устройствам', 'globe', 'lan'],
+    ['IPv6', 'Адресация IPv6 в туннеле', 'globe', 'ipv6'],
+    ['DNS', '', 'help', null, 'dns', '210px'],
+    ['Пинг', '', 'ping', null, 'ping', '208px'],    ['Локальный прокси', 'Порт, логин и доступ по сети', 'router', null, null, null, '', 'lproxy'],
+    ['Постоянный VPN', 'Блокировать трафик без VPN', 'shield', null, null, null, '', 'always']
+  ]],
+  ['Обход блокировок', [
+    ['Мультиплексирование (Mux)', 'Запросы в одном канале', 'http', 'mux'],
+    ['Фрагментация пакетов', 'Разбивает рукопожатие против DPI', 'code', 'frag']
+  ]],
+  ['Интерфейс', [
+    ['Оформление', '', 'gear', null, 'look', '186px'],
+    ['Язык', '', 'globe', null, 'lang', '166px'],
+    ['Запуск при загрузке', 'Подключаться после перезагрузки', 'lock', 'boot']
+  ]],
+  ['Подписка', [
+    ['Автообновление подписки', '', 'refresh', null, 'autoup', '176px'],
+    ['Маршрутизация', '', 'servers', null, null, null, '', 'routing'],
+    ['Файлы ресурсов', '', 'code', null, null, null, '', 'assets']
+  ]],
+  ['Устройства', [['Перенести подписку на телевизор', '', 'share', null, null, null, '', 'tv']]],
+  ['О приложении', [
+    ['Журнал', '', 'code', null, null, null, '', 'log'],
+    ['Проверить обновления', '', 'refresh', null, null, null, '', 'update'],
+    ['О приложении', '', 'help', null, null, null, '2.2.1', 'about'],
+    ['Резервное копирование', '', 'backup', null, null, null, '', 'backup']
+  ]]
+];
+
+class Component extends DCLogic {
+  state = {
+    theme: 'dark', tab: 0, conn: 'off', pulse: false, unlim: true, renew: true,
+    lan: true, ipv6: false, mux: false, frag: false, boot: false,
+    mode: 0, dns: 0, ping: 0, look: 0, lang: 0, autoup: 0, open: null, srvSel: 0, srvOpen: true,
+    sub: null, apps: { tg: true, yt: false, ch: true, dc: false, sp: false }, pa: true, bypass: false,
+    flow: null, step: 0, flowOut: false, trans: 'fade', unlimTb: true, enter: false,
+    onboard: true, clip: 'empty', more: false,
+    lpMemFree: false, lpAuth: true, lpUdp: false, lpHttp: false, lpHide: false, lpHotspot: false, lpRoute: true,
+    alwaysOn: false, killSw: true,
+    psLaunch: true, psPingLaunch: false, psPingUpd: true, psHwid: true, preRelease: false,
+    devices: [
+      { name: 'Xiaomi 13T Pro', meta: 'Активно: сейчас · ID: 8F7A21', self: true },
+      { name: 'Redmi Note 12', meta: 'Активно: 2 ч назад · ID: 4C19BE' },
+      { name: 'Неизвестное устройство', meta: 'Активно: 3 дн. назад · ID: 21D0FA' }
+    ], plan: 'base', term: { base: 0, pro: 0 }
+  };
+  componentDidMount() { this.apply(); }
+  componentDidUpdate() { this.apply(); }
+  componentWillUnmount() { (this._t || []).forEach(clearTimeout); }
+  later(fn, ms) { this._t = this._t || []; this._t.push(setTimeout(fn, ms)); }
+  apply() {
+    const el = this._root;
+    if (!el) return;
+    const t = THEMES[this.state.theme];
+    Object.keys(t).forEach(k => el.style.setProperty(k, t[k]));
+  }
+  sw(on) {
+    const acc = ACC[this.state.theme];
+    const m = this.state.theme === 'mono';
+    return {
+      track: on ? acc : (m ? '#232326' : '#1E2126'), bd: on ? acc : (m ? '#38383C' : '#3A4150'),
+      thumb: on ? (m ? '#111214' : '#FFFFFF') : (m ? '#38383C' : '#7C8494'),
+      left: on ? '22px' : '6px', size: on ? '24px' : '16px', half: on ? '12px' : '8px'
+    };
+  }
+  removeDevice(i) {
+    const devices = this.state.devices.map((d, j) => j === i ? Object.assign({}, d, { gone: true, meta: 'Отключено от подписки' }) : d);
+    this.setState({ devices });
+    this.later(() => this.setState({ devices: this.state.devices.filter((d, j) => j !== i) }), 700);
+  }
+  runFlow(kind) {
+    this.setState({ flow: kind, step: 0, flowOut: false, enter: false, tab: 0, onboard: false });
+    this.later(() => this.setState({ step: 1 }), 1200);
+    this.later(() => this.setState({ step: 2 }), 3000);
+    this.later(() => this.setState({ step: 3 }), 4600);
+    this.later(() => this.setState({ flowOut: true }), 5900);
+    this.later(() => this.setState({ flow: null, step: 0, flowOut: false, enter: true }), 6450);
+    this.later(() => this.setState({ enter: false }), 8600);
+  }
+  buildFlow(s, acc, fg, fg2, m) {
+    if (!s.flow) return { on: false, title: '', note: '', step: 0, busy: false, done: false, pct: '0%', toast: false, toastText: '', out: false, shellOp: '1', shellTf: 'none', shellBlur: 'blur(0px)', haloOp: '0' };
+    const tg = s.flow === 'tg';
+    const t = [
+      tg ? ['Открываем Telegram', 'Подтвердите вход в приложении'] : ['Читаем буфер обмена', 'Ищем ссылку на подписку'],      tg ? ['Проверяем вход', 'Сверяем аккаунт с сервером'] : ['Нашли подписку', 'Загружаем список серверов'],
+      tg ? ['Добавляем подписку', 'Почти готово'] : ['Проверяем сервера', 'Измеряем задержку до каждого'],
+      tg ? ['Подписка добавлена', 'Аккаунт привязан'] : ['Подписка добавлена', 'Сервера готовы']
+    ][s.step];
+    return {
+      on: true, title: t[0], note: t[1], step: s.step,
+      busy: s.step < 3, done: s.step === 3,
+      pct: ['18%', '54%', '86%', '100%'][s.step],
+      isTg: tg,
+      toast: s.step === 3, toastText: tg ? 'Подписка привязана' : 'Подписка добавлена',
+      out: s.flowOut,
+      shellOp: s.flowOut ? '0' : '1',
+      shellTf: s.flowOut
+        ? (s.trans === 'lift' ? 'translateY(-14%) scale(.97)'
+          : s.trans === 'slide' ? 'translateX(-22%) scale(.97)'
+          : 'scale(1.06)')
+        : 'none',
+      shellBlur: 'none',
+      haloOp: s.flowOut ? '1' : '0'
+    };
+  }
+
+  buildBuy(s, acc, fg, fg2, m) {
+    if (s.sub !== 'buy') return { on: false, acc, plans: [] };
+    const PLANS = [
+      { key: 'base', name: 'Base', badge: 'Текущий', note: '5 устройств · трафик без ограничений', from: '150 ₽', terms: [
+        ['1 месяц', '150 ₽', ''],
+        ['3 месяца', '400 ₽', 'Выгода 50 ₽'],
+        ['6 месяцев', '750 ₽', 'Выгода 150 ₽'],
+        ['12 месяцев', '1 400 ₽', 'Выгода 400 ₽']
+      ] },
+      { key: 'pro', name: 'Pro', badge: '', note: '10 устройств · приоритетные сервера', from: '250 ₽', terms: [
+        ['1 месяц', '250 ₽', ''],
+        ['3 месяца', '690 ₽', 'Выгода 60 ₽'],
+        ['6 месяцев', '1 290 ₽', 'Выгода 210 ₽'],
+        ['12 месяцев', '2 400 ₽', 'Выгода 600 ₽']
+      ] }
+    ];
+    return {
+      on: true, acc,
+      plans: PLANS.map(p => {
+        const open = s.plan === p.key;
+        const cur = s.term[p.key] || 0;
+        return {
+          name: p.name, badge: p.badge, hasBadge: !!p.badge, note: p.note,
+          price: p.from, per: 'в месяц',
+          bd: open ? acc : 'var(--line)',
+          titleFg: open ? acc : fg,
+          rot: open ? '180deg' : '0deg',
+          h: open ? '340px' : '0px', op: open ? '1' : '0',
+          cta: 'Оплатить ' + p.terms[cur][1],
+          toggle: () => this.setState({ plan: open ? null : p.key }),
+          terms: p.terms.map((t, i) => ({
+            name: t[0], price: t[1], save: t[2], hasSave: !!t[2],
+            saveFg: fg2,
+            on: cur === i,
+            dot: acc, dotBd: cur === i ? acc : 'var(--outline)',
+            bg: cur === i ? 'var(--surf2)' : 'transparent',
+            pick: () => this.setState({ term: Object.assign({}, s.term, { [p.key]: i }) })
+          }))
+        };
+      })
+    };
+  }
+
+  buildSub(s, acc, fg, fg2, m) {
+    const R = (o) => Object.assign({
+      name: '', sub: '', hasSub: false, value: '', valueFg: fg2, valueWeight: '400',
+      fg: fg, icon: '', vb: '0 0 24 24', hasIcon: false, hasLetter: false, letter: '',
+      hasTile: false, isCheck: false, isToggle: false, isPlain: true, hasChev: false,
+      pad: '0px', gap: '12px', sep: 'transparent', on: false, click: () => {},
+      boxBd: '', boxBg: '', tick: '', sw: this.sw(false)
+    }, o);
+    const tile = (k) => ({ hasTile: true, hasIcon: true, icon: ICONS[k][0], vb: ICONS[k][1], pad: '16px' });
+    const seps = (rows) => rows.map((r, i) => Object.assign(r, { sep: i === 0 ? 'transparent' : 'var(--line)' }));
+
+    if (s.sub === 'buy') {
+      return { open: true, title: 'Купить подписку', hasNote: true, note: 'Выберите тариф и срок', groups: [] };
+    }
+    if (s.sub === 'devices') {
+      const rows = s.devices.map((d, i) => R(Object.assign({
+        name: d.name, sub: d.meta, hasSub: true,
+        value: d.self ? 'Это устройство' : (d.gone ? 'Удалено' : 'Удалить'),
+        valueFg: d.self ? acc : (d.gone ? fg2 : (m ? fg : '#F04452')),
+        valueWeight: '500',
+        fg: d.gone ? fg2 : fg,
+        click: d.self || d.gone ? () => {} : () => this.removeDevice(i)
+      }, tile('router'))));
+      return {
+        open: true, title: 'Устройства', hasNote: true, note: 'Устройства, подключённые к вашей подписке',
+        groups: [
+          { hasLabel: false, isMono: false, disp: 'block', margin: '16px 16px 0', hasFoot: true, foot: 'Удалённое устройство отключается от подписки и освобождает слот.', rows: seps(rows) }
+        ]
+      };
+    }
+    if (s.sub === 'history') {
+      return {
+        open: true, title: 'История платежей', hasNote: true, note: 'Все ваши операции',
+        groups: [
+          { hasLabel: false, isMono: false, disp: 'block', margin: '16px 16px 0', hasFoot: false, rows: seps([
+            R(Object.assign({ name: 'Продление · 30 дн.', sub: '03.08.2026 · Оплачено', hasSub: true, value: '150 ₽', valueFg: fg, valueWeight: '500' }, tile('refresh'))),
+            R(Object.assign({ name: 'Пополнение баланса', sub: '01.07.2026 · Оплачено', hasSub: true, value: '500 ₽', valueFg: fg, valueWeight: '500' }, tile('backup'))),
+            R(Object.assign({ name: 'Продление · 30 дн.', sub: '03.07.2026 · В обработке', hasSub: true, value: '150 ₽', valueFg: fg2, valueWeight: '500' }, tile('refresh')))
+          ]) },
+          { hasLabel: false, isMono: false, disp: 'block', margin: '12px 16px 0', hasFoot: false, rows: [
+            R({ name: 'Показать ещё', fg: acc, gap: '0px' })
+          ] }
+        ]
+      };
+    }
+    if (s.sub === 'perapp') {
+      const app = (k, name, pkg, letter) => R({
+        name, sub: pkg, hasSub: true, hasTile: true, hasLetter: true, letter, pad: '16px',
+        isCheck: true, isPlain: false, on: !!s.apps[k],
+        boxBd: s.apps[k] ? acc : 'var(--outline)', boxBg: s.apps[k] ? acc : 'transparent',
+        tick: m ? '#111214' : '#00183A',
+        click: () => this.setState({ apps: Object.assign({}, s.apps, { [k]: !s.apps[k] }) })
+      });
+      const n = Object.values(s.apps).filter(Boolean).length;
+      return {
+        open: true, title: 'Прокси по приложениям', hasNote: false,
+        groups: [
+          { hasLabel: false, isMono: false, disp: 'block', margin: '16px 16px 0', hasFoot: false, rows: seps([
+            R(Object.assign({ name: 'Включить прокси по приложениям', isToggle: true, isPlain: false, sw: this.sw(s.pa), click: () => this.setState({ pa: !s.pa }) }, tile('router'))),
+            R(Object.assign({ name: 'Режим обхода', sub: s.bypass ? 'Отмеченные — напрямую, остальные через прокси' : 'Отмеченные — через прокси, остальные напрямую', hasSub: true, isToggle: true, isPlain: false, sw: this.sw(s.bypass), click: () => this.setState({ bypass: !s.bypass }) }, tile('globe')))
+          ]) },
+          { hasLabel: true, label: 'Приложения', isMono: false, disp: 'block', margin: '0 16px', hasFoot: false, rows: seps([
+            app('tg', 'Telegram', 'org.telegram.messenger', 'T'),
+            app('yt', 'YouTube', 'com.google.android.youtube', 'Y'),
+            app('ch', 'Chrome', 'com.android.chrome', 'C'),
+            app('dc', 'Discord', 'com.discord', 'D'),
+            app('sp', 'Spotify', 'com.spotify.music', 'S')
+          ]) }
+        ]
+      };
+    }
+    const SUBS = {
+      lproxy: ['Локальный прокси', '', [
+        { label: 'Память', rows: [
+          ['Лимит оперативной памяти', 'Меньше — экономнее, но возможны замедления', 'router', null, '128 МБ'],
+          ['Снять ограничение', 'Работать без ограничения памяти ядра', 'router', 'lpMemFree']
+        ] },
+        { label: 'SOCKS5-авторизация', rows: [
+          ['SOCKS5 авторизация', 'Требовать логин и пароль для доступа', 'lock', 'lpAuth'],
+          ['Логин', '', 'copy', null, 'departament'],
+          ['Пароль', '', 'copy', null, '••••••••••'],
+          ['Сбросить логин/пароль', '', '', null, '', true]
+        ] },
+        { label: 'Локальный прокси', rows: [
+          ['Блокировать UDP', 'Запретить UDP-трафик через прокси', 'http', 'lpUdp'],
+          ['HTTP-прокси авторизация', 'Добавлять HTTP-прокси с авторизацией', 'http', 'lpHttp'],
+          ['Скрыть значок (только прокси)', 'Работать без VPN, только локальный прокси', 'shield', 'lpHide'],
+          ['Доступ через хотспот', 'Ручной SOCKS5-прокси для устройств в сети', 'hotspot', 'lpHotspot'],
+          ['Маршрутизация по домену', 'Определять правила по имени домена', 'globe', 'lpRoute']
+        ] }
+      ]],
+      always: ['Постоянный VPN', 'Системные переключатели Android', [
+        { rows: [
+          ['Постоянный VPN', 'Подключаться автоматически', 'shield', 'alwaysOn'],
+          ['Блокировка без VPN', 'Не пускать трафик мимо туннеля', 'lock', 'killSw']
+        ], foot: 'Оба переключателя живут в настройках Android — кнопка ниже откроет их напрямую.' },
+        { rows: [['Открыть настройки Android', '', '', null, '', true]] }
+      ]],
+      routing: ['Маршрутизация', '', [
+        { label: 'Доменная стратегия', rows: [
+          ['Доменная стратегия', 'IPIfNonMatch', 'globe', null, '', false, true]
+        ] },
+        { label: 'Настройки правил маршрутизации', rows: [
+          ['proxy', 'domain: geosite:google, geosite:youtube', 'servers', null, '', false, true],
+          ['direct', 'domain: geosite:category-ru, ip: geoip:ru', 'servers', null, '', false, true],
+          ['block', 'domain: geosite:category-ads-all', 'servers', null, '', false, true]
+        ] },
+        { rows: [['Добавить правило', '', '', null, '', true]] }
+      ]],
+      assets: ['Файлы ресурсов', '', [
+        { label: 'Источник Geo-файлов', rows: [
+          ['Источник Geo-файлов', 'Loyalsoldier/v2ray-rules-dat', 'globe', null, '', false, true]
+        ] },
+        { label: 'Файлы ресурсов', rows: [
+          ['geosite.dat', '2 МБ . 03.08.2026', 'globe', null, '', false, true],
+          ['geoip.dat', '8 МБ . 03.08.2026', 'globe', null, '', false, true]
+        ] }
+      ]],
+      provider: ['Настройки провайдеров', '', [
+        { label: 'Обновление', rows: [
+          ['Автообновление', 'Автоматически обновлять подписки', 'refresh', 'psAuto'],
+          ['Интервал обновления', '', 'refresh', null, '1 ч'],
+          ['Уведомлять об обновлениях', 'Показывать уведомление после обновления подписки', 'help', 'psNotify']
+        ] },
+        { label: 'При запуске', rows: [
+          ['Обновлять подписки при запуске', '', 'refresh', 'psLaunch'],
+          ['Пинг серверов при запуске', '', 'ping', 'psPingLaunch'],
+          ['Пинг при обновлении', '', 'ping', 'psPingUpd']
+        ] },
+        { label: 'Сеть', rows: [
+          ['Отправлять HWID', 'Отправлять идентификатор устройства при обновлении подписки', 'router', 'psHwid'],
+          ['User-Agent', 'User-Agent для запросов подписки', 'globe', null, '', false, true]
+        ] },
+        { label: 'Список серверов', rows: [
+          ['Сортировка серверов', '', 'servers', null, 'По пингу']
+        ] }
+      ]],
+      tv: ['Отправить на TV', 'Отсканируйте QR-код, показанный на телевизоре, затем выберите подписку для отправки. Оба устройства должны быть в одной сети Wi-Fi.', [
+        { rows: [['Сканировать код телевизора', '', 'scan', null, '', true]] },
+        { label: 'Выберите подписку для отправки', rows: [
+          ['Моя подписка', '', '', null, '', false, true]
+        ] },
+        { rows: [['Отправить', '', 'share', null, '', true]] }
+      ]],
+      log: ['Журнал', '', [
+        { mono: [
+          '20:47:02  core  started, v25.3.6',
+          '20:47:02  tun   fd=42 mtu=1500',
+          '20:47:03  dns   1.1.1.1 ok 24ms',
+          '20:47:05  vless hybrid-eu handshake ok',
+          '20:47:05  route IPIfNonMatch applied'
+        ] },
+        { rows: [
+          ['Копировать', '', 'copy', null, '', true],
+          ['Очистить', '', 'code', null, '', true]
+        ] }
+      ]],
+      update: ['Проверить обновление', '', [
+        { rows: [
+          ['Искать предварительный выпуск', '', 'code', 'preRelease'],
+          ['Проверить обновление', '', 'refresh', null, '', true]
+        ], foot: 'departament 2.2.1' }
+      ]],
+      about: ['О приложении', '', [
+        { rows: [
+          ['Исходный код', '', 'code', null, '', false, true],
+          ['Лицензии открытого ПО', '', 'help', null, '', false, true],
+          ['Обратная связь', '', 'help', null, '', false, true],
+          ['Канал в Telegram', '', 'globe', null, '', false, true],
+          ['Политика конфиденциальности', '', 'lock', null, '', false, true]
+        ], foot: 'departament 2.2.1 · com.departament.vpn' }
+      ]],
+      backup: ['Резервное копирование', 'Файл с серверами и настройками', [
+        { label: 'Данные', rows: [
+          ['Сохранить копию', 'Все серверы и настройки в один файл', 'backup', null, '', false, true],
+          ['Поделиться конфигурацией', 'Отправить файл в другое приложение', 'share', null, '', false, true],
+          ['Восстановить из файла', 'Заменит текущие сервера', 'refresh', null, '', false, true]
+        ] },
+        { label: 'Облако', rows: [['Настройки WebDAV', 'Не настроено', 'lock', null, '', false, true]] }
+      ]]
+    };
+    if (SUBS[s.sub]) {
+      const d = SUBS[s.sub];
+      return {
+        open: true, title: d[0], hasNote: !!d[1], note: d[1],
+        groups: d[2].map((g, gi) => {
+          if (g.mono) return {
+            hasLabel: false, margin: '12px 16px 0', hasFoot: false, isMono: true, disp: 'none',
+            lines: g.mono.map(l => ({ text: l })), rows: []
+          };
+          return {
+            hasLabel: !!g.label, label: g.label || '', isMono: false, disp: 'block',
+            margin: g.label ? '0 16px' : (gi === 0 ? '16px 16px 0' : '12px 16px 0'),
+            hasFoot: !!g.foot, foot: g.foot || '',
+            rows: seps(g.rows.map(rw => {
+              const tk = rw[3], link = rw[5], chev = rw[6];
+              return R(Object.assign(
+                rw[2] ? tile(rw[2]) : { pad: '0px' },
+                {
+                  name: rw[0], sub: rw[1] || '', hasSub: !!rw[1],
+                  value: rw[4] || '', valueFg: fg2,
+                  fg: link ? acc : fg,
+                  isToggle: !!tk, isPlain: !tk, hasChev: !!chev,
+                  sw: tk ? this.sw(!!s[tk]) : this.sw(false),
+                  gap: (tk || rw[4] || chev) ? '12px' : '0px',
+                  click: tk ? () => this.setState({ [tk]: !s[tk] }) : () => {}
+                }
+              ));
+            }))
+          };
+        })
+      };
+    }
+    return { open: false, title: '', hasNote: false, note: '', groups: [] };
+  }
+
+  renderVals() {
+    const s = this.state, acc = ACC[s.theme], m = s.theme === 'mono';
+    const fg = m ? '#F4F4F5' : '#F2F4F8', fg2 = m ? '#B0B0B4' : '#9BA1AD';
+    const on = (k) => s.open === k;
+    const sel = { mode: MODES[s.mode], dns: DNS[s.dns], ping: PINGS[s.ping], look: THEMES_OPTS[s.look], lang: LANGS[s.lang], autoup: AUTOUP[s.autoup] };
+
+    return {
+      root: (el) => { this._root = el; this.apply(); },
+      themeDark: () => this.setState({ theme: 'dark' }),
+      themeMono: () => this.setState({ theme: 'mono' }),
+      ui: {
+        darkBg: s.theme === 'dark' ? '#e9e9ed' : 'transparent', darkFg: s.theme === 'dark' ? '#14121f' : '#e9e9ed',
+        monoBg: m ? '#e9e9ed' : 'transparent', monoFg: m ? '#14121f' : '#e9e9ed'
+      },
+      tabHome: s.tab === 0, tabAcc: s.tab === 1, tabSet: s.tab === 2,
+      tabs: [
+        ['Главная', 'M10,20v-6h4v6h5v-8h3L12,3 1,12h3v8z', '0 0 24 24'],
+        ['Аккаунт', 'M12,12c2.21,0 4,-1.79 4,-4s-1.79,-4 -4,-4 -4,1.79 -4,4 1.79,4 4,4zM12,14c-2.67,0 -8,1.34 -8,4v1a1,1 0 0,0 1,1h14a1,1 0 0,0 1,-1v-1c0,-2.66 -5.33,-4 -8,-4z', '0 0 24 24'],
+        ['Настройки', ICONS.gear[0], ICONS.gear[1]]
+      ].map((t, i) => ({
+        name: t[0], icon: t[1], vb: t[2],
+        fg: s.tab === i ? fg : fg2, weight: s.tab === i ? '700' : '500',
+        pick: () => this.setState({ tab: i, open: null })
+      })),
+      navLeft: ['46px', '166px', '286px'][s.tab],
+      navFg: fg,
+      toggleServers: () => this.setState({ srvOpen: !s.srvOpen }),
+      srv: { rot: s.srvOpen ? '0deg' : '-90deg', h: s.srvOpen ? '620px' : '0px', op: s.srvOpen ? '1' : '0' },
+      signOut: () => {},
+
+      toggleConn: () => {
+        if (s.conn === 'connecting') return;
+        if (s.conn === 'on') { this.setState({ conn: 'off' }); return; }
+        this.setState({ conn: 'connecting' });
+        this.later(() => this.setState({ conn: 'on', pulse: true }), 2200);
+        this.later(() => this.setState({ pulse: false }), 2900);
+      },
+      c: {
+        acc, sweep: s.conn === 'connecting', pulse: s.pulse,
+        btnBd: m ? '#4A4A4E' : '#3A4150',
+        danger: m ? '#F4F4F5' : '#F04452',
+        glow: s.conn === 'on' ? 'glowSoft 5500ms ease-in-out infinite' : 'none',
+        bloomOp: s.conn === 'off' ? '0.35' : '1',
+        ring: s.conn === 'on' ? acc : (m ? 'rgba(128,128,128,.4)' : 'rgba(76,141,255,.30)'),
+        outlineOp: s.conn === 'on' ? '0' : '1', filledOp: s.conn === 'on' ? '1' : '0',
+        pill: { off: 'Не подключено', connecting: 'Подключаемся…', on: 'Подключено' }[s.conn],
+        pillBd: s.conn === 'on' ? acc : (m ? '#2A2A2E' : '#2A2E36'),
+        pillFg: s.conn === 'off' ? fg2 : acc,
+        up: s.conn === 'on' ? '3,7 KB/s' : '0 KB/s',
+        down: s.conn === 'on' ? '24,8 KB/s' : '0 KB/s',
+        time: s.conn === 'on' ? '01:24:20' : '00:00:00'
+      },
+
+      servers: [
+        ['🇪🇺', 'Hybrid (Автовыбор)', 'VLESS', 'TCP · REALITY', '88 мс'],
+        ['🇪🇺', 'Hybrid (Автовыбор, gRPC)', 'VLESS', 'GRPC · REALITY', '91 мс'],
+        ['🇵🇱', 'Poland', 'VLESS', 'TCP · REALITY', '97 мс'],
+        ['🇳🇱', 'Netherlands', 'VLESS', 'TCP · REALITY', '87 мс'],
+        ['🇱🇻', 'Latvia', 'VLESS', 'GRPC · REALITY', '106 мс'],
+        ['🇫🇮', 'Finland', 'VLESS', 'TCP · REALITY', '103 мс'],
+        ['🇳🇱', 'Netherlands 2', 'VLESS', 'TCP · REALITY', '—']
+      ].map((v, i) => ({
+        flag: v[0], name: v[1], proto: v[2], transport: v[3], ping: v[4],
+        pingFg: v[4] === '—' ? fg2 : (m ? fg : '#22C55E'),
+        bg: s.srvSel === i ? (m ? 'rgba(255,255,255,.08)' : 'rgba(76,141,255,.12)') : 'transparent',
+        bd: s.srvSel === i ? acc : 'transparent',
+        divider: s.srvSel === i || i === 0 ? 'none' : 'inset 0 1px 0 var(--line)',
+        pick: () => this.setState({ srvSel: i }),
+        anim: s.enter ? 'slideL 560ms cubic-bezier(.22,1,.36,1) ' + (700 + i * 85) + 'ms both' : 'none'
+      })),
+
+      tb: s.unlimTb
+        ? { pct: '0%', fill: 'transparent', label: '2,0 ТБ / ∞', right: '∞' }
+        : { pct: '40%', fill: acc, label: '4 ГБ / 10 ГБ', right: '12 дн.' },
+      setTbUnlim: () => this.setState({ unlimTb: true }),
+      setTbLim: () => this.setState({ unlimTb: false }),
+      tbUi: {
+        unlimBg: s.unlimTb ? 'rgba(255,255,255,.14)' : 'transparent',
+        unlimFg: s.unlimTb ? '#e9e9ed' : 'rgba(233,233,237,.5)',
+        limBg: s.unlimTb ? 'transparent' : 'rgba(255,255,255,.14)',
+        limFg: s.unlimTb ? 'rgba(233,233,237,.5)' : '#e9e9ed'
+      },
+      transUi: [['fade', 'Проявление'], ['lift', 'Подъём'], ['slide', 'Сдвиг']].map(t => ({
+        name: t[1],
+        bg: s.trans === t[0] ? 'rgba(255,255,255,.14)' : 'transparent',
+        fg: s.trans === t[0] ? '#e9e9ed' : 'rgba(233,233,237,.5)',
+        pick: () => this.setState({ trans: t[0] })
+      })),
+      en: {
+        head: s.enter ? 'dropIn 460ms cubic-bezier(.22,1,.36,1) 60ms both' : 'none',
+        plus: s.enter ? 'dropIn 460ms cubic-bezier(.22,1,.36,1) 130ms both' : 'none',
+        ring: s.enter ? 'bloomIn 720ms cubic-bezier(.22,1.05,.36,1) 180ms both' : 'none',
+        stats: s.enter ? 'liftIn 520ms cubic-bezier(.22,1,.36,1) 420ms both' : 'none',
+        srvName: s.enter ? 'liftIn 520ms cubic-bezier(.22,1,.36,1) 500ms both' : 'none',
+        card: s.enter ? 'liftIn 560ms cubic-bezier(.22,1,.36,1) 580ms both' : 'none'
+      },
+      onboard: s.onboard,
+      ob: {
+        found: s.clip === 'found', empty: s.clip !== 'found',
+        foundH: s.clip === 'found' ? '190px' : '0px', foundOp: s.clip === 'found' ? '1' : '0',
+        emptyH: s.clip === 'found' ? '0px' : '80px', emptyOp: s.clip === 'found' ? '0' : '1',
+        sub: s.clip === 'found' ? 'Нашли ссылку в буфере обмена. Или войдите — подписка добавится сама.' : 'Войдите в аккаунт — подписка добавится сама.'
+      },
+      obFound: () => this.setState({ clip: 'found' }),
+      toggleMore: () => this.setState({ more: !s.more }),
+      more: { h: s.more ? '112px' : '0px', op: s.more ? '1' : '0', rot: s.more ? '180deg' : '0deg' },
+      resetOnboard: () => this.setState({ onboard: true, clip: 'empty', more: false, tab: 0, sub: null, conn: 'off' }),
+      obUi: {
+        startBg: s.onboard ? 'rgba(255,255,255,.14)' : 'transparent',
+        startFg: s.onboard ? '#e9e9ed' : 'rgba(233,233,237,.5)',
+        appBg: s.onboard ? 'transparent' : 'rgba(255,255,255,.14)',
+        appFg: s.onboard ? 'rgba(233,233,237,.5)' : '#e9e9ed'
+      },
+      skipOnboard: () => this.setState({ onboard: false }),
+      tg: { renew: () => this.setState({ renew: !s.renew }) },
+      manageStub: null,
+      sr: this.sw(s.renew),
+      renewText: s.renew ? 'Спишется 04.06.2099 · 150 ₽' : 'Продление отключено',
+      setUnlim: () => this.setState({ unlim: true }),
+      setLim: () => this.setState({ unlim: false }),
+      tr: {
+        dash: s.unlim ? '503 0' : '191 312',
+        used: s.unlim ? '2,0 ТБ' : '1,9 ТБ',
+        of: s.unlim ? 'без ограничений' : 'из 5 ТБ',
+        unlimBg: s.unlim ? acc : 'transparent', unlimFg: s.unlim ? (m ? '#111214' : '#00183A') : fg2,
+        limBg: s.unlim ? 'transparent' : acc, limFg: s.unlim ? fg2 : (m ? '#111214' : '#00183A')
+      },
+      manage: [
+        ['Купить подписку', 'Тарифы и продление', '', 'M16,6l2.29,2.29 -4.88,4.88 -4,-4L2,16.59 3.41,18l6,-6 4,4 6.3,-6.29L22,12V6z'],
+        ['Устройства', 'Управление устройствами', '32 / ∞', 'M4,6h18V4H4c-1.1,0 -2,0.9 -2,2v11H0v3h14v-3H4V6zM23,8h-6c-0.55,0 -1,0.45 -1,1v10c0,0.55 0.45,1 1,1h6c0.55,0 1,-0.45 1,-1V9c0,-0.55 -0.45,-1 -1,-1zM22,18h-4v-8h4v8z'],
+        ['История платежей', 'Все ваши операции', '03.08.2026', 'M13,3c-4.97,0 -9,4.03 -9,9H1l3.89,3.89 0.07,0.14L9,12H6c0,-3.87 3.13,-7 7,-7s7,3.13 7,7 -3.13,7 -7,7c-1.93,0 -3.68,-0.79 -4.94,-2.06l-1.42,1.42C8.27,19.99 10.51,21 13,21c4.97,0 9,-4.03 9,-9s-4.03,-9 -9,-9zM12,8v5l4.28,2.54 0.72,-1.21 -3.5,-2.08V8H12z']
+      ].map((r, i) => ({ name: r[0], sub: r[1], value: r[2], icon: r[3], sep: i === 0 ? 'transparent' : 'var(--line)', open: () => this.setState({ sub: ['buy', 'devices', 'history'][i] }) })),
+
+      buy: this.buildBuy(s, acc, fg, fg2, m),
+      closeSub: () => this.setState({ sub: null }),
+      flowTg: () => this.runFlow('tg'),
+      flowClip: () => this.runFlow('clip'),
+      fl: this.buildFlow(s, acc, fg, fg2, m),
+      sub: this.buildSub(s, acc, fg, fg2, m),
+
+      hub: HUB.map(sec => ({
+        label: sec[0],
+        rows: sec[1].map((r, i) => {
+          const key = r[3], pop = r[4], isToggle = !!key;
+          const opts = pop === 'mode' ? MODES : pop === 'dns' ? DNS : pop === 'ping' ? PINGS
+            : pop === 'look' ? THEMES_OPTS : pop === 'lang' ? LANGS : pop === 'autoup' ? AUTOUP : [];
+          const cur = pop ? s[pop] : -1;
+          return {
+            name: r[0], sub: r[1] || '', hasSub: !!r[1],
+            value: pop ? sel[pop] : (r[6] || ''),
+            valueFg: pop && on(pop) ? fg2 : (pop ? fg : fg2),
+            icon: ICONS[r[2]][0], vb: ICONS[r[2]][1],
+            isToggle, isNav: !isToggle,
+            chev: pop ? CARET : CHEV, rot: pop && on(pop) ? '180deg' : '0deg',
+            hasPop: !!pop, popW: r[5] || '200px',
+            rowZ: pop && on(pop) ? '30' : 'auto',
+            popClip: on(pop) ? 'inset(0 0 0 0 round 16px)' : 'inset(0 0 100% 0 round 16px)',
+            popOp: on(pop) ? '1' : '0', popPe: on(pop) ? 'auto' : 'none',
+            opts: opts.map((o, j) => ({
+              name: o, on: cur === j,
+              bg: cur === j ? 'var(--surf3)' : 'transparent',
+              pick: () => this.setState({ [pop]: j, open: null })
+            })),
+            sw: isToggle ? this.sw(!!s[key]) : this.sw(false),
+            gap: (isToggle || pop || r[6]) ? '12px' : '0px',
+            sep: i === 0 ? 'transparent' : 'var(--line)',
+            rad: sec[1].length === 1 ? '19px' : (i === 0 ? '19px 19px 0 0' : (i === sec[1].length - 1 ? '0 0 19px 19px' : '0')),
+            click: isToggle ? () => this.setState({ [key]: !s[key] })
+              : pop ? () => this.setState({ open: on(pop) ? null : pop })
+              : r[7] ? () => this.setState({ sub: r[7] }) : () => {}
+          };
+        })
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

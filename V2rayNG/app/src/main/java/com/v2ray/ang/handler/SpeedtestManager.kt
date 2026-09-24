@@ -312,9 +312,17 @@ object SpeedtestManager {
             socket.connect(InetSocketAddress(url, port), timeoutMs)
             return elapsedMs(start)
         } catch (e: UnknownHostException) {
-            LogUtil.e(AppConfig.TAG, "Unknown host: $url", e)
+            // A PROBE THAT FAILS IS A RESULT, NOT AN ERROR, and this is the app's noisiest log line
+            // by a wide margin. «Проверить все» probes every server in the list; a server that is
+            // down, filtered, or simply unreachable from the current network is the everyday
+            // outcome, the return value below already SAYS so (-1), and the row already draws it.
+            // Writing an ERROR with a stack trace per failed probe filled «Журнал» with red during
+            // exactly the operation the user ran on purpose.
+            //
+            // Kept at warn, one line, no trace: a failed probe is still worth being able to see.
+            LogUtil.w(AppConfig.TAG, "Ping: unknown host $url")
         } catch (e: IOException) {
-            LogUtil.e(AppConfig.TAG, "socketConnectTime IOException: $e")
+            LogUtil.w(AppConfig.TAG, "Ping: $url:$port unreachable (${e.message})")
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to establish socket connection to $url:$port", e)
         } finally {
@@ -342,6 +350,16 @@ object SpeedtestManager {
         }
     }
 
+    /**
+     * The exit IP as the geo-API sees it.
+     *
+     * UPSTREAM'S, AND WITHOUT A CALLER HERE ON PURPOSE. Its one call site was
+     * `CoreServiceManager.measureV2rayDelay`, which fired it after every successful 30-second probe
+     * — an HTTP request through the local proxy, 120 an hour while a tunnel is up — and handed the
+     * answer to a status line this product does not have, so it was discarded on arrival. The call
+     * is gone; the function stays, because it is upstream's and a screen that wants to show the exit
+     * IP would ask exactly this.
+     */
     fun getRemoteIPInfo(): String? {
         val url = MmkvManager.decodeSettingsString(AppConfig.PREF_IP_API_URL)
             .takeIf { !it.isNullOrBlank() } ?: AppConfig.IP_API_URL

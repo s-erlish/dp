@@ -1519,7 +1519,7 @@ Create (all in `res/drawable/`, all vector or shape XML, all referencing theme a
 | `bg_row_selected.xml` | `<shape>` rect, `radius_control`, solid `@color/state_selected` |
 | `focus_ring.xml` | `<layer-list>`: inner transparent inset `focus_offset`, outer `<shape>` stroke `stroke_focus` `?attr/colorPrimary`, `radius_control` |
 | `divider_hairline.xml` | `<shape>` line, `stroke_hairline`, `?attr/colorOutlineVariant` |
-| `bg_meter_track.xml` / `bg_meter_fill.xml` | 6dp bars, radius 3 (half height), `?attr/colorSurfaceContainerHighest` / `?attr/colorPrimary` |
+| ~~`bg_meter_track.xml` / `bg_meter_fill.xml`~~ | **удалены при финальной сверке.** Ни одной ссылки за всё время: единственный измеритель в продукте — `ProgressBar` с `@drawable/bg_traffic_gradient` в `layout_subscription_meta_bar.xml`, и лишний набор имён для той же полосы только приглашал завести второй |
 | `bg_skeleton.xml` | `<shape>` rect, `radius_chip`, solid `?attr/colorSkeleton` |
 | `bg_sheet_handle.xml` | `<shape>` rect, radius 2, solid `?attr/colorOutline` |
 | Colour selectors in `res/color/` | `field_stroke_selector`, `segment_text_selector`, `segment_bg_selector`, `switch_thumb_selector`, `switch_track_selector`, `state_press_on_accent` |

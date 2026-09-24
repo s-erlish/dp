@@ -38,9 +38,11 @@
     android:orientation="vertical"
     tools:context=".ui.RoutingEditActivity">
 
+    <!-- §7's lekalo: back 44dp, then the title at 24sp/700 UNDER it. The ids are
+         view_toolbar's, so ToolbarBinder.bind/attachTo below need no change. -->
     <include
         android:id="@+id/toolbar"
-        layout="@layout/view_toolbar" />
+        layout="@layout/view_sub_header" />
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/main_content"

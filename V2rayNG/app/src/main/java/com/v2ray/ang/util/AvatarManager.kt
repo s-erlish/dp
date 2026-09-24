@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.LruCache
 import android.util.Log
 import android.view.View
 import android.widget.ImageView
@@ -47,8 +48,29 @@ object AvatarManager {
             .build()
     }
 
-    // In-memory cache so re-binding the same avatar does not re-decode from disk/network.
-    private val memory = HashMap<String, Bitmap>()
+    /**
+     * In-memory cache so re-binding the same avatar does not re-decode from disk/network.
+     *
+     * **БЫЛО `HashMap`, БЕЗ ГРАНИЦЫ И БЕЗ ЗАМКА.** Two things were wrong with that.
+     *
+     * It never shrank. The custom photo is keyed by the file's `lastModified`, so EVERY time the
+     * user picks a new avatar the map gains an entry and keeps the old one: a 512×512 ARGB bitmap,
+     * a megabyte, held for the life of the process, and only `clearCustomAvatar` ever removed any
+     * of them. Change the photo ten times in a session and ten megabytes stay behind it.
+     *
+     * And it was written from two threads: [applyAvatar] reads and fills it on the main thread,
+     * while [saveCustomAvatar] runs on `Dispatchers.IO` (`AccountFragment` calls it there) and
+     * wrote into the same map.
+     *
+     * `LruCache` fixes both — it is synchronized, and it is bounded BY BYTES rather than by entry
+     * count, because one entry here is a bitmap and «сколько-то штук» says nothing about how much
+     * memory that is.
+     */
+    private val memory = object : LruCache<String, Bitmap>(
+        (Runtime.getRuntime().maxMemory() / 64).coerceIn(1L * 1024 * 1024, 6L * 1024 * 1024).toInt()
+    ) {
+        override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
+    }
 
     // region custom (user-picked) avatar
 
@@ -62,7 +84,7 @@ object AvatarManager {
             val bmp = decodeSampled(context, uri) ?: return false
             val out = customFile(context)
             out.outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-            memory["custom:${out.lastModified()}"] = bmp
+            memory.put("custom:${out.lastModified()}", bmp)
             true
         } catch (e: Exception) {
             Log.w(TAG, "saveCustomAvatar failed", e)
@@ -76,7 +98,7 @@ object AvatarManager {
         } catch (e: Exception) {
             Log.w(TAG, "clearCustomAvatar failed", e)
         }
-        memory.keys.filter { it.startsWith("custom:") }.forEach { memory.remove(it) }
+        memory.snapshot().keys.filter { it.startsWith("custom:") }.forEach { memory.remove(it) }
     }
 
     // endregion
@@ -96,7 +118,7 @@ object AvatarManager {
         val custom = customFile(context)
         if (custom.exists()) {
             val key = "custom:${custom.lastModified()}"
-            val cached = memory[key]
+            val cached = memory.get(key)
             if (cached != null) {
                 showBitmap(image, monogram, cached)
             } else {
@@ -105,7 +127,7 @@ object AvatarManager {
                         runCatching { decodeSampledFile(custom.absolutePath) }.getOrNull()
                     }
                     if (bmp != null) {
-                        memory[key] = bmp
+                        memory.put(key, bmp)
                         showBitmap(image, monogram, bmp)
                     } else {
                         showMonogram(image, monogram)
@@ -118,7 +140,7 @@ object AvatarManager {
         // 2. Telegram photo URL from the backend
         val url = profile?.avatarUrl?.takeIf { it.isNotBlank() }
         if (url != null) {
-            val cached = memory[url]
+            val cached = memory.get(url)
             if (cached != null) {
                 showBitmap(image, monogram, cached)
                 return
@@ -127,7 +149,7 @@ object AvatarManager {
             scope.launch {
                 val bmp = withContext(Dispatchers.IO) { fetchRemote(context, url) }
                 if (bmp != null) {
-                    memory[url] = bmp
+                    memory.put(url, bmp)
                     // Only apply if no custom photo was added while the fetch was in flight.
                     if (!custom.exists()) showBitmap(image, monogram, bmp)
                 }

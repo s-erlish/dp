@@ -1024,18 +1024,29 @@ persistent, quiet bar: `Нет сети. Показаны последние д�
 ### 9.7 Enforcement
 
 ```bash
-# dashes in shipped copy. Use this literal form: the PCRE \x{2014} form fails in this environment.
-cd /home/user/dp/V2rayNG/app/src/main/res  && grep -rn -e '—' -e '–' values*/strings*.xml
+# dashes in SHIPPED COPY. The `<string` filter matters: 1.4.11 governs user-visible strings, and
+# without it the scan also reports the English prose in the XML comments, which is not copy and
+# which every file in this project has. Use this literal form: the PCRE \x{2014} form fails here.
+cd /home/user/dp/V2rayNG/app/src/main/res  && grep -rn -e '—' -e '–' values*/strings*.xml | grep '<string'
 cd /home/user/v2rayN/v2rayN/v2rayN.Desktop && grep -rn -e '—' -e '–' Common/L.*.cs
 # three dots where the single ellipsis character belongs
-cd /home/user/dp/V2rayNG/app/src/main/res  && grep -rn '\.\.\.' values*/strings*.xml
+cd /home/user/dp/V2rayNG/app/src/main/res  && grep -rn '\.\.\.' values*/strings*.xml | grep '<string'
 ```
 
-**Known debt, baseline scan 2026-07-26: 22 hits on Android, 44 on desktop.** Android:
-`values/strings.xml`, `strings_pay.xml`, `strings_account.xml`, `strings_local_proxy.xml`,
-`strings_devices.xml`, `strings_deeplink.xml`, `strings_perapp.xml`, `strings_auth.xml`, plus the
-`values-ru/`, `values-vi/`, `values-zh-rCN/`, `values-zh-rTW/`, `values-bn/`, `values-ar/`
-translations. Desktop: `Common/L.*.cs`. Clearing these is part of the copy pass, not optional
+**ANDROID IS CLEAR as of 2026-09-02: zero dashes and zero three-dot ellipses in shipped copy.**
+The baseline scan of 2026-07-26 found 22 hits on Android and 44 on desktop; the Android half was
+cleared in pieces as the screens were rebuilt, and the last seven went with the e-mail/password
+pass — `perapp_mode_selected_hint`, `perapp_mode_except_hint`, `upd_found_line`,
+`upd_permission_line`, `upd_error_foreign`, `onb_sub_empty`, `onb_sub_found`.
+
+**None of them became a hyphen.** A dash carrying a pause in Russian does not read as `-`; every
+one was removed by rewriting the phrase so no dash is wanted — a verb where the copula was elided
+(«Отмеченные ИДУТ через прокси»), a full stop where two clauses were joined, a conjunction («Войдите
+в аккаунт, И подписка добавится сама»), or a reordering that puts the state before the request.
+A mechanical character swap satisfies the grep and damages the copy, which is the opposite of what
+1.4.11 is for.
+
+**Desktop debt stands: `Common/L.*.cs`.** Clearing it is part of the copy pass, not optional
 cleanup.
 
 ---

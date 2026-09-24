@@ -15,15 +15,15 @@
         android:state_enabled="false" />
     <item
         android:alpha="0.10"
-        android:color="@color/color_destructive_text"
+        android:color="?attr/colorDestructiveText"
         android:state_pressed="true" />
     <item
         android:alpha="0.08"
-        android:color="@color/color_destructive_text"
+        android:color="?attr/colorDestructiveText"
         android:state_focused="true" />
     <item
         android:alpha="0.06"
-        android:color="@color/color_destructive_text"
+        android:color="?attr/colorDestructiveText"
         android:state_hovered="true" />
     <item android:color="@android:color/transparent" />
 </selector>

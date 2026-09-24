@@ -724,7 +724,6 @@ class DialerNativeService : IDialerService {
                     val streamResponse = root.optBoolean("streamResponse", false)
                     val extraObject = root.optJSONObject("extra")
                     val headers = extraObject.optStringMap("headers")
-                    // val cookies = extraObject.optStringMap("cookies")
                     val referrer = extraObject?.optString("referrer")?.takeIf { it.isNotBlank() }
                     val protocols = extraObject.optProtocols()
 

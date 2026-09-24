@@ -5,6 +5,7 @@ import android.util.TypedValue
 import android.view.View
 import android.view.animation.AnimationUtils
 import android.view.animation.Interpolator
+import android.widget.CompoundButton
 import androidx.annotation.AttrRes
 import androidx.annotation.ColorInt
 import androidx.annotation.IntegerRes
@@ -20,10 +21,46 @@ import java.util.WeakHashMap
  * Nothing here is a component. It exists so the binders below never hard-code a duration, never
  * name a curve of their own, and never animate without checking whether the user wants motion.
  *
- * Everything in this file is `internal`: it is the package's own plumbing, not part of the surface a
- * screen binds against. A screen agent calls [RowBinder], [ToolbarBinder], [EmptyStateBinder],
- * [ChipBinder], [SkeletonBinder], [SelectionBinder], [SubPage] and [onSingleClick], and nothing else.
+ * Everything in this file is `internal` — the package's own plumbing, not part of the surface a
+ * screen binds against — with ONE exception, [restoreChecked], which is a rule every screen with a
+ * switch has to obey and therefore has to be able to reach. A screen agent calls [RowBinder],
+ * [ToolbarBinder], [EmptyStateBinder], [ChipBinder], [SkeletonBinder], [SelectionBinder], [SubPage],
+ * [onSingleClick] and [restoreChecked], and nothing else.
  */
+
+/**
+ * WRITE A STORED SWITCH POSITION WITHOUT PLAYING IT. The owner, about the settings tab: «переключатели
+ * как будто дёргаются, когда захожу в настройки… включаются очень быстро».
+ *
+ * Every switch inflates in its DEFAULT position — off — and is only then handed the stored value, so
+ * a switch that is on gets drawn off first and morphed on in front of the user. `setChecked` alone
+ * does not prevent it, and that is the part that is easy to get wrong: `SwitchCompat.setChecked`
+ * guards exactly ONE animation, the thumb's slide along the track, behind `isLaidOut()`. What it does
+ * not guard is the drawable state change it also performs — `mtrl_switch_thumb` is an
+ * `<animated-selector>` whose unchecked→checked `<transition>` is an `<animated-vector>` morphing the
+ * thumb's path over ~250 ms. An AnimatedVectorDrawable asked to start before its view has ever been
+ * drawn does not lose the animation: it PARKS it and flushes it on the first `draw()`. So the morph
+ * is not merely surviving the bind, it is timed to begin on the screen's very first frame.
+ *
+ * [View.jumpDrawablesToCurrentState] is the answer to exactly that: the thumb and the track jump to
+ * the end of whatever transition is in flight and the position animator ends. The state is already
+ * correct; only the theatre around it is dropped.
+ *
+ * THE `isChecked == value` GUARD IS WHAT KEEPS THIS HONEST IN THE OTHER DIRECTION, and it is why
+ * this is a helper rather than two lines copied around. A bind pass runs again on resume, after
+ * every picker, and after the user's own tap; without the guard the next pass would cut off the
+ * animation the user had just started with their own finger. With it, a bind that changes nothing
+ * touches nothing, and only a value the user did not just set is snapped into place.
+ *
+ * This lives here, once, because the same defect was fixed on the settings tab alone and left
+ * standing on every other screen that binds a switch — the shape that already cost this project
+ * three rounds with the mono-theme tile.
+ */
+fun CompoundButton.restoreChecked(value: Boolean) {
+    if (isChecked == value) return
+    isChecked = value
+    jumpDrawablesToCurrentState()
+}
 
 /**
  * Resolves a colour the theme carries as an attribute.

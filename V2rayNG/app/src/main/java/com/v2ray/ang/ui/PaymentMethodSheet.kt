@@ -1,18 +1,17 @@
 package com.v2ray.ang.ui
 
 import android.os.Bundle
-import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import androidx.fragment.app.FragmentManager
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.v2ray.ang.R
+import com.v2ray.ang.ui.component.onSingleClick
 
 /**
  * Reusable, Incy-styled (dark surface + blue accents) bottom sheet that lets the user pick a
@@ -80,9 +79,6 @@ class PaymentMethodSheet : BottomSheetDialogFragment() {
                 inflater = inflater,
                 parent = rows,
                 iconRes = R.drawable.ic_pay_wallet,
-                tileBgRes = R.drawable.bg_icon_green,
-                // Intentional green differentiator for the balance row; not a plain blue accent.
-                tintColor = ContextCompat.getColor(requireContext(), R.color.icon_green),
                 label = getString(R.string.pay_method_from_balance_fmt, label),
                 methodId = ID_BALANCE,
             )
@@ -95,9 +91,6 @@ class PaymentMethodSheet : BottomSheetDialogFragment() {
                 inflater = inflater,
                 parent = rows,
                 iconRes = if (isSbp) R.drawable.ic_pay_sbp else R.drawable.ic_pay_card,
-                tileBgRes = R.drawable.bg_icon_blue,
-                // Mono-safe blue accent: resolves to grey under the monochrome theme.
-                tintColor = resolveThemeColor(R.attr.iconTintBlue),
                 label = label,
                 methodId = id,
             )
@@ -106,25 +99,34 @@ class PaymentMethodSheet : BottomSheetDialogFragment() {
         return root
     }
 
+    /**
+     * Adds one method row.
+     *
+     * THE TILE NO LONGER VARIES. Every row used to name its own plate — green for the balance,
+     * blue for the Platega methods — and D-5 closes the coloured tile set at three (accent,
+     * destructive, neutral) precisely because a fourth colour implies a category system this
+     * product does not have. What actually tells the rows apart is the GLYPH: wallet, СБП, card.
+     * The neutral plate and its tint come from the layout, through theme attributes, so the mono
+     * overlay reaches both.
+     */
     private fun addRow(
         inflater: LayoutInflater,
         parent: LinearLayout,
         iconRes: Int,
-        tileBgRes: Int,
-        tintColor: Int,
         label: String,
         methodId: String,
     ) {
         val row = inflater.inflate(R.layout.item_payment_method, parent, false)
         row.findViewById<TextView>(R.id.tv_pay_label).text = label
-        row.findViewById<FrameLayout>(R.id.fl_pay_tile).setBackgroundResource(tileBgRes)
-        val icon = row.findViewById<ImageView>(R.id.iv_pay_icon)
-        icon.setImageResource(iconRes)
-        icon.setColorFilter(tintColor)
-        row.setOnClickListener {
+        row.findViewById<ImageView>(R.id.iv_pay_icon).setImageResource(iconRes)
+        // A rule belongs BETWEEN two rows: on the first one it would cut across the gap that
+        // separates the list from the title above it.
+        row.findViewById<View>(R.id.pay_method_divider).isVisible = parent.childCount > 0
+        row.onSingleClick {
             // Rows stop responding the moment one of them is taken: a bottom sheet dismisses over
             // a frame or two, which is long enough for a second tap to land on a second row and
-            // post a second result — i.e. a second charge.
+            // post a second result — i.e. a second charge. onSingleClick guards the same row; this
+            // guards its neighbours, and the sheet needs both.
             parent.isEnabled = false
             for (i in 0 until parent.childCount) parent.getChildAt(i).isClickable = false
             val result = Bundle(payload).apply { putString(RESULT_METHOD_ID, methodId) }
@@ -132,13 +134,6 @@ class PaymentMethodSheet : BottomSheetDialogFragment() {
             dismissAllowingStateLoss()
         }
         parent.addView(row)
-    }
-
-    /** Resolves a theme colour attr (e.g. [R.attr.iconTintBlue]) to an ARGB int for the current theme. */
-    private fun resolveThemeColor(attr: Int): Int {
-        val tv = TypedValue()
-        requireContext().theme.resolveAttribute(attr, tv, true)
-        return tv.data
     }
 
     companion object {

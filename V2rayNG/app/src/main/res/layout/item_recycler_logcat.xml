@@ -7,9 +7,16 @@
   the only thing a user scans a log for - was not shown at all.
 
   Now: a meta line carrying the timestamp and the tag, a status chip on the lines that
-  actually went wrong (three hues, no fourth - R12), and the message underneath at
-  Caption on the full width. A chip on EVERY line would be the decoration §2.4.4 asks
-  you to delete; a chip only where something failed is a signal.
+  actually went wrong (three hues, no fourth - R12), and the message underneath on the
+  full width. A chip on EVERY line would be the decoration §2.4.4 asks you to delete;
+  a chip only where something failed is a signal.
+
+  2026-08 REDESIGN - handoff §7 «моноширинный блок лога». Both text lines are
+  TextAppearance.App.Mono now: the prototype draws the log as fixed-pitch 11sp inside
+  a slab, and a log lines up in columns only if every glyph is the same width. The
+  vertical padding drops from 12 to 6 for the same reason the slab exists at all -
+  these are LINES of a block, not rows of a list, and 24dp of air between two 13dp
+  lines turned five log entries into a page.
 
   The row is pressable and long-pressable (long press copies the line), so it carries
   @drawable/bg_row like every other row in the product rather than
@@ -24,10 +31,10 @@
     android:clickable="true"
     android:focusable="true"
     android:orientation="vertical"
-    android:paddingStart="@dimen/screen_gutter"
-    android:paddingTop="@dimen/space_12"
-    android:paddingEnd="@dimen/screen_gutter"
-    android:paddingBottom="@dimen/space_12">
+    android:paddingStart="@dimen/space_14"
+    android:paddingTop="@dimen/space_6"
+    android:paddingEnd="@dimen/space_14"
+    android:paddingBottom="@dimen/space_6">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -54,7 +61,7 @@
             android:layout_weight="1"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textAppearance="@style/TextAppearance.App.Caption"
+            android:textAppearance="@style/TextAppearance.App.Mono"
             tools:text="14:23:01  ·  GoLog" />
     </LinearLayout>
 
@@ -62,8 +69,8 @@
         android:id="@+id/log_content"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/space_4"
-        android:textAppearance="@style/TextAppearance.App.Caption"
+        android:layout_marginTop="@dimen/space_2"
+        android:textAppearance="@style/TextAppearance.App.Mono"
         android:textColor="?attr/colorOnSurface"
         tools:text="failed to handle mux client connection: connection closed" />
 </LinearLayout>

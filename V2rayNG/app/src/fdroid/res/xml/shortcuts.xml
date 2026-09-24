@@ -1,4 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Launcher long-press shortcuts.
+
+  android:targetPackage IS A LITERAL AND HAS TO BE. `${applicationId}` was tried here and it does
+  NOT work: manifest placeholders are substituted by the manifest merger and by nothing else, so a
+  res/xml file keeps the text «${applicationId}» verbatim into the packaged APK (verified with
+  `aapt2 dump xmltree`). Every shortcut then points at a package that does not exist and the
+  launcher answers with «Приложение не установлено» on all four of them.
+
+  So the value below is this flavour's real applicationId — build.gradle.kts `applicationId`
+  plus the fdroid flavour's `applicationIdSuffix` ("com.departamentvpn.app" + ".fdroid"). If
+  applicationId ever changes, this file and src/main/res/xml/shortcuts.xml change with it.
+  android:targetClass stays on the NAMESPACE (com.v2ray.ang), which is where the classes live and
+  is deliberately not the applicationId.
+-->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
         android:enabled="true"
@@ -12,7 +27,7 @@
         <intent
             android:action="android.intent.action.VIEW"
             android:targetClass="com.v2ray.ang.ui.ScSwitchActivity"
-            android:targetPackage="${applicationId}" />
+            android:targetPackage="com.departamentvpn.app.fdroid" />
         <categories android:name="android.shortcut.conversation" />
     </shortcut>
     <shortcut
@@ -27,7 +42,7 @@
         <intent
             android:action="android.intent.action.VIEW"
             android:targetClass="com.v2ray.ang.ui.ScScannerActivity"
-            android:targetPackage="${applicationId}" />
+            android:targetPackage="com.departamentvpn.app.fdroid" />
         <categories android:name="android.shortcut.conversation" />
     </shortcut>
     <shortcut
@@ -42,7 +57,7 @@
         <intent
             android:action="android.intent.action.VIEW"
             android:targetClass="com.v2ray.ang.ui.ScStartActivity"
-            android:targetPackage="${applicationId}" />
+            android:targetPackage="com.departamentvpn.app.fdroid" />
         <categories android:name="android.shortcut.conversation" />
     </shortcut>
     <shortcut
@@ -57,7 +72,7 @@
         <intent
             android:action="android.intent.action.VIEW"
             android:targetClass="com.v2ray.ang.ui.ScStopActivity"
-            android:targetPackage="${applicationId}" />
+            android:targetPackage="com.departamentvpn.app.fdroid" />
         <categories android:name="android.shortcut.conversation" />
     </shortcut>
 </shortcuts>

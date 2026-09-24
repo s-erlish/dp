@@ -2,14 +2,7 @@
 <resources>
     <!-- Экран «Схемы URL-адресов» (deeplinks depv://) -->
     <string name="url_scheme_list_title">Схемы URL-адресов</string>
-    <string name="url_scheme_note_title">Примечание</string>
     <string name="url_scheme_note_body">Эти ссылки открывают приложение и выполняют действие. Их можно использовать в автоматизациях, ярлыках и виджетах. Значения в фигурных скобках нужно заменить.\n{base64}: сервер или правила маршрутизации в Base64.\n{url}: ссылка на подписку или на сервер.</string>
-
-    <string name="url_scheme_group_start">Запустить туннель</string>
-    <string name="url_scheme_group_stop">Остановить туннель</string>
-    <string name="url_scheme_group_toggle">Переключить</string>
-    <string name="url_scheme_group_import">Добавить сервер</string>
-    <string name="url_scheme_group_routing">Маршрутизация</string>
 
     <string name="url_scheme_label_connect">Подключиться</string>
     <string name="url_scheme_label_open">Открыть</string>
@@ -20,6 +13,4 @@
     <string name="url_scheme_label_add">Добавить по URL</string>
     <string name="url_scheme_label_routing_add">Добавить маршруты</string>
     <string name="url_scheme_label_routing_onadd">Добавить и применить</string>
-
-    <string name="url_scheme_copied">Скопировано</string>
 </resources>

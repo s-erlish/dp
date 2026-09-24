@@ -78,6 +78,11 @@ build_android() {
 build_desktop() {
   export DOTNET_ROOT=/opt/dotnet PATH=/opt/dotnet:$PATH
   export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
+  # MSBuild keeps worker nodes alive after the build to speed up the next one. Those nodes inherit
+  # the flock file descriptor below and outlive the `flock` process, so the lock is never released
+  # and every later run of this script blocks forever on a build that finished minutes ago. Disable
+  # node reuse: a few seconds per run buys a lock that actually unlocks.
+  export MSBUILDDISABLENODEREUSE=1
   echo "=== DESKTOP: dotnet build v2rayN.Desktop -c Release ==="
   echo "(waiting for the desktop build lock if another agent holds it)"
   flock /tmp/dep-desktop-build.lock \

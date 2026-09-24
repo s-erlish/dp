@@ -2,10 +2,11 @@ package com.v2ray.ang.ui.component
 
 import android.content.res.ColorStateList
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.annotation.DimenRes
 import androidx.annotation.DrawableRes
-import androidx.core.content.ContextCompat
 import androidx.core.view.AccessibilityDelegateCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
@@ -26,6 +27,11 @@ import com.v2ray.ang.R
  * ```
  * [ 16 gutter ][ 40 tile r12, 22 glyph ][ 12 ][ text column, weight 1 ][ 12 ][ ONE trailing ][ 16 ]
  * ```
+ *
+ * That closing 16 is a line and not a margin: it is where the text column stops and where the
+ * card's content edge is, so a trailing GLYPH is measured to its last painted pixel and not to its
+ * box ([alignInkToGutter]). A trailing OBJECT with a boundary of its own - a switch, a checkbox, a
+ * button with a label - is measured to that boundary, like every other object in the product.
  *
  * This binder owns the row's CONTENT and its STATE, and it enforces the three things geometry
  * cannot:
@@ -62,8 +68,52 @@ object RowBinder {
      */
     enum class TileRole { NEUTRAL, ACCENT, DESTRUCTIVE }
 
-    /** The title's ramp role. [DESTRUCTIVE] is `TextAppearance.App.Title.Destructive`. */
-    enum class RowTone { DEFAULT, DESTRUCTIVE }
+    /**
+     * The title's tone. The SIZE never changes with it - handoff §6 gives every row title
+     * 14sp/400 (`TextAppearance.App.Body`) and the tone only moves its colour.
+     *
+     * [ACCENT] is §7's action row: «Проверить обновление», «Копировать», «Очистить»,
+     * «Сканировать код телевизора», «Добавить правило». The prototype draws those as a normal
+     * row whose NAME is accent-coloured, with no chevron and no button - the accent is the
+     * affordance. At most one such group per screen, or the screen turns blue.
+     */
+    enum class RowTone { DEFAULT, DESTRUCTIVE, ACCENT }
+
+    /**
+     * Where a row sits in a section card that does NOT clip its children - see [edge].
+     *
+     * [MIDDLE] is the default and the only one a clipping card ever needs, because there the card's
+     * own 20dp corner does the trimming.
+     */
+    enum class Edge { MIDDLE, TOP, BOTTOM, ONLY }
+
+    /**
+     * Rounds a row to its section card's corner, for the cards that host a [SelectPopup].
+     *
+     * README §6 and §11 grabl 4: a card whose row can open the popup must carry `clipChildren` and
+     * `clipToPadding` false, or the popup is sliced off at the card's bottom edge. With the clip
+     * gone the card also stops trimming its first and last row to its own radius, so those two rows
+     * carry the corner themselves — 19dp, one pixel tighter than the card's 20 because the card
+     * paints its hairline stroke inside the radius.
+     *
+     * Padding is restored by hand: `setBackgroundResource` re-derives padding from the new drawable
+     * and would otherwise drop the `Widget.Departament.Row` insets that put the tile on the 16dp
+     * gutter — the same trap [bindTile] guards against.
+     */
+    fun edge(root: View, edge: Edge) {
+        val background = when (edge) {
+            Edge.MIDDLE -> R.drawable.bg_row
+            Edge.TOP -> R.drawable.bg_row_top
+            Edge.BOTTOM -> R.drawable.bg_row_bottom
+            Edge.ONLY -> R.drawable.bg_row_only
+        }
+        val left = root.paddingLeft
+        val top = root.paddingTop
+        val right = root.paddingRight
+        val bottom = root.paddingBottom
+        root.setBackgroundResource(background)
+        root.setPadding(left, top, right, bottom)
+    }
 
     /**
      * The trailing affordance and the promise it makes to the user (32-master-plan-android.md 8.1).
@@ -116,6 +166,20 @@ object RowBinder {
         ) : Trailing
 
         /**
+         * MEMBERSHIP of a set, which is not the same promise as [Toggle] (handoff §7, «список
+         * приложений с чекбоксами»). A switch says «this is on now»; a box says «this one is in
+         * the set some other control acts on». «Прокси по приложениям» marks 128 apps, and a
+         * column of switches down its right edge claims to be turning 128 things on one at a time.
+         *
+         * The ROW still owns the tap and the box is neither clickable nor focusable, exactly as
+         * with [Toggle], so nothing about the touch target or the announcement changes.
+         */
+        data class Checkbox(
+            val checked: Boolean,
+            val onCheckedChange: (Boolean) -> Unit,
+        ) : Trailing
+
+        /**
          * This item is the current selection (22-components 18). The check slot is ALWAYS reserved
          * and only its alpha changes, so selecting an item never reflows the list. This is the one
          * sanctioned pairing: a marker row may also carry a `value` - the server row's ping figure
@@ -124,9 +188,14 @@ object RowBinder {
         data class Marker(val selected: Boolean) : Trailing
 
         /**
-         * A 40dp icon button performing the action in place; the row itself is inert.
+         * An icon button performing the action in place; the row itself is inert.
          * [contentDescription] is not optional, and it names the ACTION rather than the object -
          * «Скопировать код», not «Код».
+         *
+         * It DRAWS at `@dimen/row_action_size` 36 and is TAPPED at 48 ([restoreTouchTarget]): a
+         * 48dp box cannot put a narrow glyph's ink on the row's gutter without hanging its press
+         * plate outside the card, and it made every row carrying one 8dp taller than its
+         * neighbours.
          */
         data class IconAction(
             @param:DrawableRes val icon: Int,
@@ -203,6 +272,10 @@ object RowBinder {
             "Departament row: a toggle row is a title, an optional subtitle and the switch " +
                 "(22-components 8.5). A value beside a switch is two trailing elements."
         }
+        require(trailing !is Trailing.Checkbox || value == null) {
+            "Departament row: a checkbox row is a title, an optional subtitle and the box. " +
+                "A value beside it is two trailing elements."
+        }
 
         val slots = RowSlots.of(root)
         bindTile(slots, glyph, tileRole)
@@ -231,6 +304,112 @@ object RowBinder {
                 .setInterpolator(chevron.curve(R.interpolator.ease_standard))
                 .start()
         }
+    }
+
+    /**
+     * Puts the trailing glyph's INK on the row's 16dp end gutter, which its box cannot do on its
+     * own.
+     *
+     * THE LINE IS THE GUTTER AND NOT A CONTROL, which is what the first two rounds of this got
+     * wrong. The slot holds one of several objects and they are not the same KIND of object:
+     * `row_chevron`, `row_trailing_glyph` and `row_marker` are 18dp `ImageView`s whose box already
+     * ends on the row's `paddingEnd`, while `row_icon_action` is a `MaterialButton` whose 22dp icon
+     * is centred in a larger box. Levelling them with each other closed the difference the owner
+     * could see — «дальше баги по кнопкам 1-3 скрины, они улетели куда-то влево» — and left the
+     * whole family 6dp inside the line the text column, the card's content edge and the screen all
+     * end on. He came back: «надо их правее также поставить правильно».
+     *
+     * ONE NUMBER CANNOT SERVE THEM, which is the trap [ToolbarBinder.alignInkToGutter] hit first.
+     * Every glyph in this set is a 24-unit viewport and they fill it by very different amounts, so
+     * the correction belongs to the GLYPH and is applied here, at the one place that knows which
+     * glyph is going in:
+     *
+     * ```
+     *                       ink of 24 units    drawn at    empty air    pull
+     *   ic_chevron_right        7.2 … 16         18dp        6.00      -6.00
+     *   ic_arrow_drop_down        7 … 17         18dp        5.25      -5.25
+     *   ic_action_done            3 … 21         18dp        2.25      -2.25
+     *   ic_copy                   2 … 21         22dp        2.75      -9.75   (+7 box)
+     *   ic_more_vert_24dp        10 … 14         22dp        9.17     -16.00   (+7 box)
+     * ```
+     *
+     * The numbers and their arithmetic are on the dimensions in `values/tokens_row_action.xml`. The
+     * two slots whose drawable `view_row.xml` declares itself carry their pull in that file instead,
+     * three lines under the `src` it was measured from; these two are the ones a CALLER fills.
+     *
+     * A glyph this function does not know about is reset to no pull rather than left alone — these
+     * rows are recycled by five adapters, and a stale margin from the previous holder's icon would
+     * outlive the icon that earned it. No pull is also the only honest default: it draws the slot
+     * exactly where it drew before any of this existed.
+     */
+    private fun MaterialButton.alignInkToGutter(@DrawableRes icon: Int) = pullInk(
+        when (icon) {
+            R.drawable.ic_more_vert_24dp -> R.dimen.row_action_nudge_overflow
+            R.drawable.ic_copy -> R.dimen.row_action_nudge_wide
+            else -> 0
+        }
+    )
+
+    /** [alignInkToGutter] for the 18dp slot, i.e. the same glyphs at ×0.75 instead of ×0.9167. */
+    private fun ImageView.alignInkToGutter(@DrawableRes icon: Int) = pullInk(
+        when (icon) {
+            R.drawable.ic_chevron_right -> R.dimen.row_glyph_nudge_chevron
+            R.drawable.ic_arrow_drop_down -> R.dimen.row_glyph_nudge_caret
+            R.drawable.ic_action_done -> R.dimen.row_glyph_nudge_check
+            else -> 0
+        }
+    )
+
+    /**
+     * Writes one pull, or clears it when [nudge] is 0.
+     *
+     * A negative end margin on the row's LAST visible child does not move that child directly —
+     * `LinearLayout` places a child from what came before it. It shortens `mTotalLength` during
+     * measure, which hands the same dp to the weight-1 text column, which then pushes everything
+     * after it along by exactly that much. The slot ends up in the row's own end padding, where
+     * there is nothing to collide with.
+     *
+     * AND NOTHING CLIPS — WHICH IS NOW TRUE. `clipToPadding` defaults to true, so until
+     * `view_row.xml` turned it off the row's 16dp `paddingEnd` was also a clip line, and the press
+     * disc of a slot deliberately parked past it lost everything beyond 16: rendered and measured,
+     * 12dp of a 28dp disc, cut flat on the side the finger is on. «выделил зажав на три точки …
+     * обрезается». The pull is not the thing that was wrong; the clip was.
+     */
+    private fun View.pullInk(@DimenRes nudge: Int) {
+        val params = layoutParams as? ViewGroup.MarginLayoutParams ?: return
+        val value = if (nudge == 0) 0 else resources.getDimensionPixelSize(nudge)
+        if (params.marginEnd == value) return
+        params.marginEnd = value
+        layoutParams = params
+    }
+
+    /**
+     * Gives [Trailing.IconAction] back the 48dp it stopped DRAWING (00-rules.md 14.2).
+     *
+     * `view_row.xml` lays that button out at `@dimen/row_action_size` 36 so its ink can reach the
+     * gutter without the box leaving the row; the touch area does not shrink with it. This is the
+     * `layout_subscription_meta_bar` pattern verbatim — 36dp discs tapped at 48 — and it is
+     * [expandTouchTarget] and its `CompositeTouchDelegate` doing the work, not a third copy of them.
+     *
+     * THE ASK IS 60 AND NOT 48, and the extra 12 is not slack. [expandTouchTarget] grows a hit rect
+     * symmetrically about the control, and the row's own edge then trims whatever falls outside it:
+     * once «⋮»'s ink is on the gutter its box is flush with that edge, so its centre is 18dp from
+     * it and a 48dp square centred there would need 6dp the row does not have. Asking for 60 grows
+     * the rect 12dp on each side, the row keeps the 12 on the inside, and 36 + 12 is the 48 the
+     * floor wants. The copy glyph, whose box stops 6.25dp short of the edge, ends up with 54 —
+     * harmless, because a row showing this control is inert by construction (22-components 8.4) and
+     * there is nothing in that strip for the delegate to take a tap away from.
+     *
+     * ONCE PER VIEW, NOT PER BIND: the delegate is registered on the PARENT and the composite that
+     * holds several only ever grows, so [R.id.tag_row_action_touch] stamps the view with the glyph
+     * its rect was measured for. A row recycled between the two glyphs earns a second rect, 6.25dp
+     * over from the first; both point at this same button, so the older one can only widen the
+     * target, never mis-aim it.
+     */
+    private fun MaterialButton.restoreTouchTarget(@DrawableRes icon: Int) {
+        if (getTag(R.id.tag_row_action_touch) == icon) return
+        setTag(R.id.tag_row_action_touch, icon)
+        expandTouchTarget(TOUCH_TARGET_ASK_DP)
     }
 
     /**
@@ -264,12 +443,30 @@ object RowBinder {
         tile.setBackgroundResource(background)
         tile.setPadding(left, top, right, bottom)
 
+        // THE NEUTRAL FILL COMES FROM THE THEME, NOT FROM THE DRAWABLE. bg_tile_neutral paints
+        // @color/icon_tile_neutral, and a ThemeOverlay can only override ATTRIBUTES — so the mono
+        // theme could not touch it and every «grey» tile stayed faintly blue there. The tint is a
+        // no-op in the other two themes: icon_tile_neutral is #E3EAF4 / #20242B and
+        // colorSurfaceContainerHighest is the same two values. Accent and destructive tiles keep
+        // their own drawables, which are already attribute-driven.
+        ViewCompat.setBackgroundTintList(
+            tile,
+            if (role == TileRole.NEUTRAL) {
+                ColorStateList.valueOf(tile.themeColor(com.google.android.material.R.attr.colorSurfaceContainerHighest))
+            } else {
+                null
+            },
+        )
+
         tile.setImageResource(glyph)
         ImageViewCompat.setImageTintList(tile, ColorStateList.valueOf(tile.tintFor(role)))
     }
 
+    // Same reason as the fill above: @color/icon_glyph_neutral is #54607A / #9BA1AD, which is
+    // exactly colorOnSurfaceVariant in both themes — but as a colour resource the mono overlay
+    // could not reach it, so mono glyphs stayed blue-grey. Attribute, same pixels.
     private fun View.tintFor(role: TileRole): Int = when (role) {
-        TileRole.NEUTRAL -> ContextCompat.getColor(context, R.color.icon_glyph_neutral)
+        TileRole.NEUTRAL -> themeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
         TileRole.ACCENT -> themeColor(androidx.appcompat.R.attr.colorPrimary)
         TileRole.DESTRUCTIVE -> themeColor(androidx.appcompat.R.attr.colorError)
     }
@@ -280,11 +477,17 @@ object RowBinder {
         subtitle: CharSequence?,
         tone: RowTone,
     ) {
+        // ONE SIZE FOR EVERY ROW TITLE — handoff §6: «заголовок 14sp/400». The tone moves the
+        // colour and nothing else, so a red «Удалить» and an accent «Копировать» sit on the same
+        // baseline grid as the row above them. The colour is an ATTRIBUTE rather than a second
+        // TextAppearance because the mono overlay redefines attributes and cannot reach a style.
         slots.title.text = title
-        slots.title.setTextAppearance(
+        slots.title.setTextAppearance(R.style.TextAppearance_App_Body)
+        slots.title.setTextColor(
             when (tone) {
-                RowTone.DEFAULT -> R.style.TextAppearance_App_Title
-                RowTone.DESTRUCTIVE -> R.style.TextAppearance_App_Title_Destructive
+                RowTone.DEFAULT -> slots.title.themeColor(com.google.android.material.R.attr.colorOnSurface)
+                RowTone.DESTRUCTIVE -> slots.title.themeColor(R.attr.colorDestructiveText)
+                RowTone.ACCENT -> slots.title.themeColor(androidx.appcompat.R.attr.colorPrimary)
             }
         )
         slots.subtitle.text = subtitle ?: ""
@@ -311,6 +514,7 @@ object RowBinder {
         slots.marker.visibility = View.GONE
         slots.toggle.setOnCheckedChangeListener(null)
         slots.toggle.visibility = View.GONE
+        slots.checkBox.visibility = View.GONE
         slots.iconAction.clearClick()
         slots.iconAction.visibility = View.GONE
         slots.actionButton.clearClick()
@@ -333,6 +537,7 @@ object RowBinder {
 
             is Trailing.Glyph -> with(slots.trailingGlyph) {
                 setImageResource(trailing.icon)
+                alignInkToGutter(trailing.icon)
                 contentDescription = trailing.contentDescription
                 importantForAccessibility = if (trailing.contentDescription == null) {
                     View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -344,30 +549,44 @@ object RowBinder {
 
             is Trailing.Toggle -> with(slots.toggle) {
                 visibility = View.VISIBLE
-                isChecked = trailing.checked
+                // THE LISTENER IS DETACHED BEFORE THE STATE IS WRITTEN. `bind` runs again on every
+                // rebind — a resume, a value that changed elsewhere, a recycled holder — and
+                // assigning `isChecked` while the PREVIOUS bind's listener is still attached fires
+                // that closure, which belongs to the previous call's `trailing` and so writes the
+                // previous item's target with this item's value.
+                setOnCheckedChangeListener(null)
+                // ...and the position is restored, not played: this is a value being read back, and
+                // an animated state change queued before the first draw parks and then spills into
+                // it — the «переключатели дёргаются» defect. `restoreChecked`'s own guard leaves an
+                // animation the user just started with their finger alone.
+                restoreChecked(trailing.checked)
                 setOnCheckedChangeListener { _, checked -> trailing.onCheckedChange(checked) }
+            }
+
+            is Trailing.Checkbox -> with(slots.checkBox) {
+                visibility = View.VISIBLE
+                // The fill and the tick both hang off this one state, so a recycled row cannot
+                // keep the previous item's tick. Jump to it: an animated state change queued
+                // before the first draw parks and then spills out into it (the switch defect).
+                isActivated = trailing.checked
+                jumpDrawablesToCurrentState()
             }
 
             is Trailing.Marker -> {
                 // The slot stays VISIBLE and moves its alpha, so selection changes nothing about
-                // the layout - no reflow, no geometry shift (22-components 18.1).
+                // the layout - no reflow, no geometry shift (22-components 18.1). The title does
+                // NOT change weight with it: §6 gives every row title one size and one weight,
+                // and the marker plus the activated background are already two channels.
                 slots.marker.visibility = View.VISIBLE
                 slots.marker.alpha = if (trailing.selected) 1f else 0f
-                // The fourth selection axis: title weight 700 selected, 500 not. Both are ramp
-                // roles, so the weight is never set inline.
-                slots.title.setTextAppearance(
-                    if (trailing.selected) {
-                        R.style.TextAppearance_App_Title
-                    } else {
-                        R.style.TextAppearance_App_Title_Medium
-                    }
-                )
             }
 
             is Trailing.IconAction -> with(slots.iconAction) {
                 visibility = View.VISIBLE
                 setIconResource(trailing.icon)
                 contentDescription = trailing.contentDescription
+                alignInkToGutter(trailing.icon)
+                restoreTouchTarget(trailing.icon)
                 onSingleClick(action = trailing.onClick)
             }
 
@@ -392,11 +611,22 @@ object RowBinder {
         // lives in the trailing slot would stay tappable. Disable the three interactive slots by
         // hand; the other trailing elements are glyphs and have nothing to disable.
         slots.toggle.isEnabled = enabled
+        slots.checkBox.isEnabled = enabled
         slots.iconAction.isEnabled = enabled
         slots.actionButton.isEnabled = enabled
         // R6: disabled is 0.38 on the WHOLE control, on both platforms.
         root.alpha = if (enabled) 1f else DISABLED_ALPHA
         root.isActivated = trailing is Trailing.Marker && trailing.selected
+        // ...and it lands instantly, like every other state written before a first draw. `bg_row`
+        // and its three edge variants are selectors with enterFadeDuration/exitFadeDuration, so the
+        // activated fill CROSS-FADES whenever it is written — including on a recycled row, where the
+        // holder arrives carrying the previous item's selection and dissolves it into this one's
+        // while the list scrolls. Five adapters bind rows through here.
+        //
+        // The press keeps its fade: those durations are motion_press_in / motion_press_out, and a
+        // press happens on a laid-out, drawn row long after this call. Same rule as the switch two
+        // slots down (@see restoreChecked) and the checkbox's own jump above.
+        root.jumpDrawablesToCurrentState()
 
         when {
             // An inert row keeps its background: `bg_row` only draws a pressed or focused state,
@@ -406,6 +636,12 @@ object RowBinder {
 
             trailing is Trailing.Toggle -> root.onSingleClick(Haptic.TICK) {
                 slots.toggle.isChecked = !slots.toggle.isChecked
+            }
+
+            trailing is Trailing.Checkbox -> root.onSingleClick(Haptic.TICK) {
+                val next = !slots.checkBox.isActivated
+                slots.checkBox.isActivated = next
+                trailing.onCheckedChange(next)
             }
 
             onClick != null -> {
@@ -418,9 +654,11 @@ object RowBinder {
 
         applySemantics(
             root = root,
-            checkable = trailing is Trailing.Toggle,
-            checked = trailing is Trailing.Toggle && trailing.checked,
+            checkable = trailing is Trailing.Toggle || trailing is Trailing.Checkbox,
+            checked = (trailing is Trailing.Toggle && trailing.checked) ||
+                (trailing is Trailing.Checkbox && trailing.checked),
             selected = trailing is Trailing.Marker && trailing.selected,
+            checkboxClass = trailing is Trailing.Checkbox,
         )
     }
 
@@ -434,6 +672,7 @@ object RowBinder {
         checkable: Boolean,
         checked: Boolean,
         selected: Boolean,
+        checkboxClass: Boolean = false,
     ) {
         ViewCompat.setAccessibilityDelegate(root, object : AccessibilityDelegateCompat() {
             override fun onInitializeAccessibilityNodeInfo(
@@ -452,14 +691,24 @@ object RowBinder {
                 @Suppress("DEPRECATION")
                 info.isChecked = checked
                 info.isSelected = selected
-                if (checkable) info.className = SWITCH_CLASS
+                if (checkable) {
+                    info.className = if (checkboxClass) CHECKBOX_CLASS else SWITCH_CLASS
+                }
             }
         })
     }
 
     private const val DISABLED_ALPHA = 0.38f
     private const val EXPANDED_DEGREES = 90f
+
+    /**
+     * What [restoreTouchTarget] asks [expandTouchTarget] for: 36dp of drawn button, 12dp of grown
+     * rect on the side the row's edge does not take, and the 48dp floor is met. It is a dp count
+     * and not a `@dimen` because that is the unit the helper takes.
+     */
+    private const val TOUCH_TARGET_ASK_DP = 60
     private const val SWITCH_CLASS = "android.widget.Switch"
+    private const val CHECKBOX_CLASS = "android.widget.CheckBox"
 }
 
 /**
@@ -478,6 +727,7 @@ class RowSlots private constructor(
     val marker: ImageView,
     val trailingGlyph: ImageView,
     val toggle: MaterialSwitch,
+    val checkBox: ImageView,
     val iconAction: MaterialButton,
     val actionButton: MaterialButton,
 ) {
@@ -497,6 +747,7 @@ class RowSlots private constructor(
             marker = root.slot(R.id.row_marker, LAYOUT, "row_marker"),
             trailingGlyph = root.slot(R.id.row_trailing_glyph, LAYOUT, "row_trailing_glyph"),
             toggle = root.slot(R.id.row_switch, LAYOUT, "row_switch"),
+            checkBox = root.slot(R.id.row_check_box, LAYOUT, "row_check_box"),
             iconAction = root.slot(R.id.row_icon_action, LAYOUT, "row_icon_action"),
             actionButton = root.slot(R.id.row_action, LAYOUT, "row_action"),
         )

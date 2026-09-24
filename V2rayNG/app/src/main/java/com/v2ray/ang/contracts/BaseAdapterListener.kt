@@ -20,12 +20,6 @@ interface BaseAdapterListener {
     fun onRemove(guid: String, position: Int)
 
     /**
-     * Request the host to share the specified URL.
-     * @param url The URL to be shared
-     */
-    fun onShare(url: String)
-
-    /**
      * Request the host to refresh data (for example, reload from the ViewModel or call notifyDataSetChanged).
      */
     fun onRefreshData()

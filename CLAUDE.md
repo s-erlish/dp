@@ -17,7 +17,8 @@ accent, brand font Space Grotesk, Russian UI, sentence-case):
 
 - ONE spacing scale (`@dimen/space_4/8/12/16/24`), ONE 16dp screen gutter, ONE
   accent (blue; red only for destructive), consistent radii
-  (`@dimen/radius_chip 12` / `radius_card 20` / `radius_tile 12`), consistent
+  (`@dimen/radius_chip 8` / `radius_card 20` / `radius_tile 12` /
+  `radius_button 24`; полная лестница — `docs/design2026/TOKENS.md`), consistent
   40dp tiles / 22dp glyphs, `@dimen/row_min_height 56` (≥48dp touch targets).
 - Type scale via `TextAppearance.App.{Headline,Title,Body,Subtitle,Caption,Chip}`.
 - Section headers are sentence-case bold — NOT tiny ALL-CAPS tracked eyebrows.

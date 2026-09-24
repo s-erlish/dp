@@ -10,8 +10,9 @@ import androidx.core.view.isVisible
 import com.v2ray.ang.R
 import com.v2ray.ang.databinding.ActivityUrlSchemeListBinding
 import com.v2ray.ang.databinding.ItemEditorSectionBinding
-import com.v2ray.ang.databinding.ViewRowBinding
-import com.v2ray.ang.extension.toastSuccess
+import com.v2ray.ang.databinding.ViewCardSectionBinding
+import com.v2ray.ang.databinding.ViewRowLineBinding
+import com.v2ray.ang.extension.toast
 import com.v2ray.ang.ui.component.EmptyStateBinder
 import com.v2ray.ang.ui.component.RowBinder
 import com.v2ray.ang.ui.component.SubPage
@@ -68,10 +69,19 @@ class UrlSchemeListActivity : BaseActivity() {
             header.sectionTitle.setText(section.titleRes)
             binding.schemeList.addView(header.root)
 
-            section.schemes.forEach { scheme ->
-                val row = ViewRowBinding.inflate(inflater, binding.schemeList, false)
+            // The section's rows live inside ONE bordered card, which is the composition this
+            // screen had at 5e8cd54 (five section cards, each holding its schemes) and the one the
+            // owner asked for back on 2026-08-02. The card is inflated rather than hand-built so it
+            // is the same @style/Widget.Departament.CardSection every other screen uses.
+            val card = ViewCardSectionBinding.inflate(inflater, binding.schemeList, false)
+            binding.schemeList.addView(card.root)
+
+            section.schemes.forEachIndexed { index, scheme ->
+                val row = ViewRowLineBinding.inflate(inflater, card.cardBody, false)
+                // §6: the hairline runs the full width of the card and never above its first row.
+                row.rowDivider.isVisible = index > 0
                 RowBinder.bind(
-                    root = row.root,
+                    root = row.row.root,
                     title = getString(scheme.labelRes),
                     subtitle = scheme.uri,
                     // The button IS the action, so the row is inert - one target, not two.
@@ -80,11 +90,11 @@ class UrlSchemeListActivity : BaseActivity() {
                         contentDescription = getString(R.string.scheme_copy_cd),
                         onClick = {
                             Utils.setClipboard(this, scheme.uri)
-                            toastSuccess(R.string.editor_copied)
+                            toast(R.string.notice_copied)
                         },
                     ),
                 )
-                binding.schemeList.addView(row.root)
+                card.cardBody.addView(row.root)
             }
         }
     }

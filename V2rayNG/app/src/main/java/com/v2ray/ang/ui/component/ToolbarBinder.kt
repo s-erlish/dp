@@ -2,6 +2,7 @@ package com.v2ray.ang.ui.component
 
 import android.app.Activity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.core.widget.NestedScrollView
@@ -26,8 +27,9 @@ import com.v2ray.ang.R
  *   `contentDescription` somebody forgot.
  * - **At most one action.** [bind] takes one, so a second one has nowhere to go; a screen that
  *   genuinely needs two puts them behind an overflow.
- * - **The hairline is the only permitted boundary**, it ships at alpha 0, and it fades in only once
- *   the content behind it has scrolled ([attachTo]). It never appears at rest.
+ * - **There is no boundary under the header at any scroll position.** The hairline the layout still
+ *   carries stays at alpha 0 for the screen's whole life; [attachTo] is the switch that used to
+ *   raise it, and it is deliberately a no-op. Read its note before reviving it.
  */
 object ToolbarBinder {
 
@@ -54,6 +56,10 @@ object ToolbarBinder {
      *   through [SubPage.close], so the exit transition matches the entrance. Pass null on a TAB
      *   screen, which has no back affordance: the leading gap then takes over and the title still
      *   starts at the 16dp gutter.
+     * @param note handoff README §7's optional 13sp explanation under the title - ONE sentence
+     *   saying what the screen is for. A note that restates the title is deleted, not written, so
+     *   null (the default) hides the slot. `view_toolbar.xml` has no such slot and simply ignores
+     *   it; only `view_sub_header.xml` draws it.
      * @param actionIcon the one trailing action's glyph, or `0` for none.
      * @param actionDescription the action's name, stating the ACTION and not the object -
      *   «Добавить сервер», not «Сервер». Required whenever [actionIcon] is set: an icon-only
@@ -64,6 +70,7 @@ object ToolbarBinder {
         root: View,
         title: CharSequence,
         activity: Activity? = null,
+        note: CharSequence? = null,
         @DrawableRes actionIcon: Int = 0,
         actionDescription: CharSequence? = null,
         onAction: ((View) -> Unit)? = null,
@@ -75,6 +82,14 @@ object ToolbarBinder {
 
         val slots = ToolbarSlots.of(root)
         slots.title.text = title
+
+        // §7's «необязательное пояснение». Resolved leniently rather than through RowSlots.slot():
+        // the same binder serves view_toolbar.xml, which has no note to find, and a missing
+        // optional slot is not a wiring mistake there.
+        slots.note?.let { view ->
+            view.text = note
+            view.visibility = if (note.isNullOrBlank()) View.GONE else View.VISIBLE
+        }
 
         if (activity == null) {
             slots.back.clearClick()
@@ -94,56 +109,86 @@ object ToolbarBinder {
             slots.action.setIconResource(actionIcon)
             slots.action.contentDescription = actionDescription
             slots.action.visibility = View.VISIBLE
+            slots.action.alignInkToGutter(actionIcon)
             onAction?.let { slots.action.onSingleClick(action = it) }
         }
     }
 
     /**
-     * Fades the hairline in when [scroller] has moved off the top and back out when it returns,
-     * over `motion_state` 220ms on `ease_standard` in and `motion_state_exit` 165ms out - exit is
-     * 75% of enter, here as everywhere.
+     * Puts the action's INK on the 16dp gutter, which its box cannot do on its own.
      *
-     * This is the only thing about the header that is allowed to change on scroll: no colour, no
-     * elevation, no shadow, no collapsing hero, no scroll-driven alpha on anything else
-     * (32-master-plan-android.md 7.4).
+     * THE LINE IS THE GUTTER AND NOT THE BACK ARROW, which is what the round before this one got
+     * wrong — the same mistake [RowBinder.alignInkToGutter] made one component down, and it is
+     * corrected here for the same reason. 16 is where the page title starts, where every card's
+     * content edge is, where each of the row's five trailing glyphs now stops, and the ONE gutter
+     * `CLAUDE.md` gives the product. Levelling the action with a control instead of with that line
+     * closed the gap the owner could see and left the whole slot adrift of it: «вот нашел что
+     * плюсик сверху он левее, надо правее опять сделать».
      *
-     * Call it once, from `onCreate`. A `RecyclerView` keeps every listener it is given, so calling
-     * it per data load stacks duplicates that all animate the same hairline.
+     * ONE NUMBER CANNOT SERVE BOTH GLYPHS. The slot holds the two extremes of the icon set — a
+     * 24-unit viewport filled x 5…19 by «+» and x 10…14 by «⋮» — so a margin big enough for the
+     * overflow shoves the plus 5dp past the gutter. The correction belongs to the GLYPH and is
+     * applied here, at the one place that knows which glyph is going in:
+     *
+     * ```
+     *                       ink of 24 units   air behind it   ink from box end   margin
+     *   ic_add_24dp              5 … 19            5dp           6 + 5 = 11        +5
+     *   ic_more_vert_24dp       10 … 14           10dp           6 + 10 = 16        0
+     * ```
+     *
+     * THE MARGIN IS POSITIVE NOW, and that is the whole difference between this round and the two
+     * before it. `MaterialButton`'s `iconGravity` is `textStart`, not `start`: the library CENTRES
+     * the icon and then shifts it by half the difference between the two paddings, so the 18/12
+     * padding pair the slot used to carry moved the glyph 3dp off its own press plate instead of
+     * placing it. The glyph is carried by the slot's inset split now
+     * (`@dimen/toolbar_plate_inset_lead`, 16/4 of a 20dp total in a box that is an exact 48), which
+     * leaves it 18dp from the box's trailing edge — 6dp behind the glyph box — and moves the plate
+     * with it. What is left for this function is the glyph's own air, and because that is at most
+     * 10 the box never has to leave the screen: the target is a full 48dp with no `TouchDelegate`,
+     * and the press disc keeps 4dp of clearance from the window. The arithmetic is on the two
+     * dimensions in `values/dimens.xml`.
+     *
+     * A glyph this function does not know about is reset to NO pull rather than left alone. It is
+     * the honest default — it draws the slot exactly where the layout puts it — and it is now load
+     * bearing: neither header carries a resting margin any more, so "leave it" would mean
+     * inheriting whichever pull the previous bind happened to write.
      */
-    fun attachTo(root: View, scroller: RecyclerView) {
-        val hairline = ToolbarSlots.of(root).hairline
-        scroller.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                hairline.fade(recyclerView.canScrollVertically(-1))
-            }
-        })
-        hairline.fade(scroller.canScrollVertically(-1))
+    private fun MaterialButton.alignInkToGutter(@DrawableRes icon: Int) {
+        val nudge = when (icon) {
+            R.drawable.ic_more_vert_24dp -> R.dimen.toolbar_action_nudge_overflow
+            R.drawable.ic_add_24dp -> R.dimen.toolbar_action_nudge_wide
+            else -> 0
+        }
+        val params = layoutParams as? ViewGroup.MarginLayoutParams ?: return
+        val value = if (nudge == 0) 0 else resources.getDimensionPixelSize(nudge)
+        if (params.marginEnd == value) return
+        params.marginEnd = value
+        layoutParams = params
     }
+
+    /**
+     * NO-OP, DELIBERATELY, AND THE CALLS ARE LEFT IN PLACE.
+     *
+     * This used to fade the hairline in once the content had scrolled off the top — the one thing
+     * about the header that was allowed to react to scroll (32-master-plan-android.md 7.4). The
+     * owner saw it on the device and rejected it: «появляется какая-то полоска под текстом журнал,
+     * так и в других вкладках наблюдается если вниз пролистать».
+     *
+     * He is right that it is not the design's. §7's лекало is back control → title → optional note →
+     * cards, and neither the specification nor the prototype draws a boundary under the title at any
+     * scroll position. The line was ours, inherited from a Material habit, and it reads as a stray
+     * rule because the first thing under it — a search field, a card — already has an edge of its own.
+     *
+     * Kept as an empty function rather than deleted, and the hairline view kept at alpha 0 rather
+     * than removed, because 24 screens call this and `ToolbarSlots` resolves the id. Making the
+     * boundary come back is one line here, in one place, if it is ever wanted again.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun attachTo(root: View, scroller: RecyclerView) = Unit
 
     /** [attachTo], for a screen whose content is a `NestedScrollView` rather than a list. */
-    fun attachTo(root: View, scroller: NestedScrollView) {
-        val hairline = ToolbarSlots.of(root).hairline
-        scroller.setOnScrollChangeListener(
-            NestedScrollView.OnScrollChangeListener { view, _, _, _, _ ->
-                hairline.fade(view.canScrollVertically(-1))
-            }
-        )
-        hairline.fade(scroller.canScrollVertically(-1))
-    }
-
-    private fun View.fade(show: Boolean) {
-        val target = if (show) 1f else 0f
-        if (alpha == target) return
-        motion(snap = { alpha = target }) {
-            animate()
-                .alpha(target)
-                .setDuration(
-                    durationOf(if (show) R.integer.motion_state else R.integer.motion_state_exit)
-                )
-                .setInterpolator(curve(R.interpolator.ease_standard))
-                .start()
-        }
-    }
+    @Suppress("UNUSED_PARAMETER")
+    fun attachTo(root: View, scroller: NestedScrollView) = Unit
 }
 
 /** The toolbar's child views, resolved once from `view_toolbar.xml`. */
@@ -152,6 +197,7 @@ class ToolbarSlots private constructor(
     val back: MaterialButton,
     val leadingGap: View,
     val title: TextView,
+    val note: TextView?,
     val action: MaterialButton,
     val hairline: View,
 ) {
@@ -165,6 +211,9 @@ class ToolbarSlots private constructor(
             back = root.slot(R.id.toolbar_back, LAYOUT, "toolbar_back"),
             leadingGap = root.slot(R.id.toolbar_leading_gap, LAYOUT, "toolbar_leading_gap"),
             title = root.slot(R.id.toolbar_title, LAYOUT, "toolbar_title"),
+            // The ONE optional slot, and the only one resolved with findViewById: it exists in
+            // view_sub_header.xml and not in view_toolbar.xml, and both are bound through here.
+            note = root.findViewById(R.id.toolbar_note),
             action = root.slot(R.id.toolbar_action, LAYOUT, "toolbar_action"),
             hairline = root.slot(R.id.toolbar_hairline, LAYOUT, "toolbar_hairline"),
         )

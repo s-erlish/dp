@@ -1,7 +1,11 @@
 package com.v2ray.ang.ui.component
 
+import android.graphics.Rect
 import android.os.SystemClock
+import android.view.MotionEvent
+import android.view.TouchDelegate
 import android.view.View
+import android.view.ViewGroup
 import com.v2ray.ang.R
 import com.v2ray.ang.util.pressHaptic
 import com.v2ray.ang.util.tickHaptic
@@ -108,3 +112,68 @@ fun View.clearClick() {
     isFocusable = false
     setTag(R.id.tag_last_click, null)
 }
+
+/**
+ * Grows a control's TOUCH area to [minDp] square without changing a pixel of how it draws.
+ *
+ * `CLAUDE.md` and 00-rules.md put the floor at 48dp and PORT-DELTA П-29 lists it among the things
+ * the port must keep, but the подписка card's action row draws 36dp discs — «Проверить», «Обновить»,
+ * «Закрепить», «Telegram» — because 36dp is what the design draws. Those two facts only conflict if
+ * the drawn size and the touched size have to be the same number, and they do not: [TouchDelegate]
+ * is the framework's answer for exactly this, and it is why the neighbouring @id/btn_collapse could
+ * stay 48dp while these four could not.
+ *
+ * Call it ONCE per view — from `onCreateViewHolder`, never `onBindViewHolder`. A delegate is added
+ * to the PARENT, so a call per bind would stack a fresh one on every recycle.
+ *
+ * The parent may already own a delegate (its own, or another sibling's from a previous call), and a
+ * View holds exactly one. [CompositeTouchDelegate] is what lets four siblings share the slot; the
+ * hit rect is read after layout, because before it the view has no bounds to grow.
+ */
+fun View.expandTouchTarget(minDp: Int = MIN_TOUCH_DP) {
+    val host = parent as? View ?: return
+    host.post {
+        val holder = parent as? ViewGroup ?: return@post
+        val rect = Rect()
+        getHitRect(rect)
+        val min = (minDp * resources.displayMetrics.density).toInt()
+        val growX = ((min - rect.width()) / 2).coerceAtLeast(0)
+        val growY = ((min - rect.height()) / 2).coerceAtLeast(0)
+        if (growX == 0 && growY == 0) return@post
+        rect.inset(-growX, -growY)
+        val composite = holder.touchDelegate as? CompositeTouchDelegate
+            ?: CompositeTouchDelegate(holder).also { holder.touchDelegate = it }
+        composite.add(TouchDelegate(rect, this))
+    }
+}
+
+/**
+ * One [TouchDelegate] slot, several delegates. A View has a single `touchDelegate`, so four 36dp
+ * siblings in one row cannot each claim it; this holds them all and offers the event to each.
+ *
+ * The event's location is restored between delegates because `TouchDelegate.onTouchEvent` REWRITES
+ * it — it re-points the coordinates at the delegate's own view before forwarding — so a second
+ * delegate reading the mutated event would test a point the finger never touched.
+ */
+private class CompositeTouchDelegate(host: View) : TouchDelegate(Rect(), host) {
+
+    private val delegates = mutableListOf<TouchDelegate>()
+
+    fun add(delegate: TouchDelegate) {
+        delegates += delegate
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        val x = event.x
+        val y = event.y
+        var handled = false
+        delegates.forEach { delegate ->
+            event.setLocation(x, y)
+            handled = delegate.onTouchEvent(event) || handled
+        }
+        return handled
+    }
+}
+
+/** 00-rules.md / CLAUDE.md: nothing in the product is tappable in less than this. */
+private const val MIN_TOUCH_DP = 48

@@ -89,10 +89,77 @@ object BackendConfig {
         // Auth
         const val telegramLoginToken = "/client/auth/telegram-login-token"
         const val telegramLoginCheck = "/client/auth/telegram-login-check"
+        const val register = "/client/auth/register"
         const val login = "/client/auth/login"
         const val twoFaLogin = "/client/auth/2fa-login"
         const val googleLogin = "/client/auth/google"
         const val me = "/client/auth/me"
+
+        /**
+         * **«Восстановить пароль».** `{email}` in, 200 `{message}` out, and the same 200 whether
+         * the address has an account behind it or not: the panel refuses to say which, so nobody
+         * can use this endpoint to find out who is registered. The app must not undo that by
+         * phrasing its answer as a fact, which is why the screen after it says «если аккаунт
+         * существует» rather than «письмо отправлено на …».
+         *
+         * The letter carries a LINK, and the link opens the SITE, where the new password is typed.
+         * The panel has a `password-reset/consume` beside this one and the app deliberately does
+         * not call it: it never sees the token in the letter, so there is nothing to consume and
+         * nothing to poll for either. A password change moves nothing on the profile, so the wait
+         * that follows the OTHER letters this app sends would have no question to ask here.
+         */
+        const val passwordResetRequest = "/client/auth/password-reset/request"
+
+        /**
+         * Attach an e-mail to the session already in flight: `{email}` in, a letter carrying a
+         * LINK out. Deliberately NOT under `/client/auth` — the panel puts it on the client root,
+         * because it is an errand of an account that exists rather than a way of getting one.
+         *
+         * There is no confirmation endpoint here on purpose. The link in the letter opens the
+         * SITE, and the site calls `/client/auth/verify-link-email` with the token in it; the app
+         * never sees that token and never posts it. What the app watches instead is [me], which
+         * starts answering with a non-blank `email` the moment the link is opened.
+         */
+        const val linkEmailRequest = "/client/link-email-request"
+
+        /**
+         * Give the account a password, so the address attached above becomes a way IN and not only
+         * a label. `{newPassword}`, **minimum six characters** — the panel's schema for THIS
+         * endpoint; registration's is eight, and the two are not interchangeable.
+         *
+         * Refused with «Пароль уже установлен. Используйте смену пароля.» exactly when the account
+         * has a real password and has finished onboarding, which is what
+         * `UserProfileDto.canSetPassword` mirrors so the step is never offered into a refusal.
+         */
+        const val setPassword = "/client/set-password"
+
+        /**
+         * Marks the account's onboarding finished. Body-less; the whole effect is
+         * `onboardingCompleted = true`.
+         *
+         * It is the SECOND half of whatever gave the account its password, not an errand of its
+         * own. The panel refuses a set-password only when `passwordHash && onboardingCompleted`, so
+         * leaving the flag alone keeps the endpoint open on an account that already has a password:
+         * the step could be walked twice, and the app's idea of the account would drift from the
+         * site's.
+         *
+         * Which is why a REGISTRATION sends it too. The panel creates the client with the flag
+         * false on both of its registration paths — `/client/auth/register` with e-mail
+         * verification off, and `/client/auth/verify-email` — even though the password travelled in
+         * that very request. Without the flag the account is born permanently eligible for a
+         * password step it does not need.
+         */
+        const val completeOnboarding = "/client/complete-onboarding"
+
+        /**
+         * Replace the address the account already has: `{newEmail, currentPassword?}`. The password
+         * is the panel's account-takeover guard and is required only of accounts that HAVE one.
+         *
+         * Answers with a letter, exactly as [linkEmailRequest] does, and the link in it lands on
+         * the same `verify-link-email` on the site. So the app watches the same [me] afterwards —
+         * but for the address becoming the NEW one, not merely for it being non-blank.
+         */
+        const val changeEmailRequest = "/client/profile/change-email/request"
 
         // Subscription
         /** The authoritative ACTIVE (root) subscription summary — richer than the /all root item. */
